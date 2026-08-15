@@ -3,8 +3,19 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "@avalon/game": "workspace:*",
     "boardgame.io": "^0.50.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "tsx": "^4.23.12",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.10"
   }
 }
