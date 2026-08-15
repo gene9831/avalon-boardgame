@@ -8,10 +8,13 @@ console.log(
     `Lobby API listening on ${running.lobbyPort}`,
 )
 
-const shutdown = () => {
-  running.close()
+let shuttingDown = false
+const shutdown = async () => {
+  if (shuttingDown) return
+  shuttingDown = true
+  await running.close()
   process.exit(0)
 }
 
-process.once('SIGINT', shutdown)
-process.once('SIGTERM', shutdown)
+process.once('SIGINT', () => void shutdown())
+process.once('SIGTERM', () => void shutdown())

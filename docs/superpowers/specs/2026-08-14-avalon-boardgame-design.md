@@ -68,7 +68,7 @@ infra/postgres/        Database-only Docker Compose deployment files
 docs/                  Rules, architecture decisions, and design records
 ```
 
-The root package delegates web development, server development, lint, and preview commands to the workspace packages; root `build` and `typecheck` validate both `@avalon/game` and `@avalon/server`. `packages/game` contains the shared boardgame.io rule core and filtered player-view projection. `apps/server` now owns the boardgame.io Socket.IO/Lobby runtime with process-local memory storage; PostgreSQL persistence remains a later adapter. `apps/web` remains the browser client.
+The root package delegates web development, server development, lint, and preview commands to the workspace packages; root `build` and `typecheck` validate both `@avalon/game` and `@avalon/server`. `packages/game` contains the shared boardgame.io rule core and filtered player-view projection. `apps/server` owns the boardgame.io Socket.IO/Lobby runtime and selects PostgreSQL persistence when `DATABASE_URL` is configured, while retaining process-local memory storage only for tests or explicit ephemeral local development. `apps/web` remains the browser client.
 
 ## Room lifecycle
 
@@ -210,7 +210,7 @@ The default is `{ enabled: false }`. The first implementation does not add a wal
 
 ## PostgreSQL storage
 
-boardgame.io 0.50.2 provides an asynchronous `StorageAPI` but no PostgreSQL adapter. The project will implement a small `PostgresStorage` backed by `pg.Pool`.
+boardgame.io 0.50.2 provides an asynchronous `StorageAPI` but no PostgreSQL adapter. The project implements a small `PostgresStorage` backed by `pg.Pool`.
 
 The logical schema is:
 

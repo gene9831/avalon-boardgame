@@ -4,15 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "dev": "node --env-file-if-exists=.env.local --import tsx src/index.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@avalon/game": "workspace:*",
-    "boardgame.io": "^0.50.2"
+    "boardgame.io": "^0.50.2",
+    "pg": "^8.23.0"
   },
   "devDependencies": {
+    "@types/pg": "^8.21.0",
     "@types/node": "^24.13.3",
     "tsx": "^4.23.12",
     "typescript": "~6.0.3",
