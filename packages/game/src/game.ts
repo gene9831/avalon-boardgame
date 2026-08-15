@@ -120,16 +120,19 @@ export const AvalonGame: Game<AvalonG, Record<string, never>, AvalonSetupData> =
         stages: {
           start: {
             moves: {
-              startGame: ({ G, ctx, events, random, playerID }) => {
-                if (playerID !== '0' || G.status !== 'lobby') {
-                  return INVALID_MOVE
-                }
+              startGame: {
+                client: false,
+                move: ({ G, ctx, events, random, playerID }) => {
+                  if (playerID !== '0' || G.status !== 'lobby') {
+                    return INVALID_MOVE
+                  }
 
-                const roles = random.Shuffle(buildRoleDeck(ctx.numPlayers))
-                G.secret.roleByPlayer = assignRoles(ctx.playOrder, roles)
-                G.status = 'playing'
-                G.leaderID = ctx.playOrder[random.Die(ctx.numPlayers) - 1]
-                events.setPhase('teamProposal')
+                  const roles = random.Shuffle(buildRoleDeck(ctx.numPlayers))
+                  G.secret.roleByPlayer = assignRoles(ctx.playOrder, roles)
+                  G.status = 'playing'
+                  G.leaderID = ctx.playOrder[random.Die(ctx.numPlayers) - 1]
+                  events.setPhase('teamProposal')
+                },
               },
             },
           },
@@ -158,27 +161,30 @@ export const AvalonGame: Game<AvalonG, Record<string, never>, AvalonSetupData> =
         stages: {
           leader: {
             moves: {
-              proposeTeam: ({ G, ctx, events, playerID }, team: PlayerID[]) => {
-                if (G.leaderID !== playerID || G.proposedTeam !== null) {
-                  return INVALID_MOVE
-                }
+              proposeTeam: {
+                client: false,
+                move: ({ G, ctx, events, playerID }, team: PlayerID[]) => {
+                  if (G.leaderID !== playerID || G.proposedTeam !== null) {
+                    return INVALID_MOVE
+                  }
 
-                const { questTeamSizes } = getPlayerCountConfig(ctx.numPlayers)
-                const requiredTeamSize = questTeamSizes[G.questIndex]
-                const seatedPlayerIDs = new Set(ctx.playOrder)
+                  const { questTeamSizes } = getPlayerCountConfig(ctx.numPlayers)
+                  const requiredTeamSize = questTeamSizes[G.questIndex]
+                  const seatedPlayerIDs = new Set(ctx.playOrder)
 
-                if (
-                  !Array.isArray(team) ||
-                  team.length !== requiredTeamSize ||
-                  new Set(team).size !== team.length ||
-                  team.some((memberID) => !seatedPlayerIDs.has(memberID))
-                ) {
-                  return INVALID_MOVE
-                }
+                  if (
+                    !Array.isArray(team) ||
+                    team.length !== requiredTeamSize ||
+                    new Set(team).size !== team.length ||
+                    team.some((memberID) => !seatedPlayerIDs.has(memberID))
+                  ) {
+                    return INVALID_MOVE
+                  }
 
-                G.proposedTeam = [...team]
-                G.secret.pendingVotes = {}
-                events.setPhase('teamVote')
+                  G.proposedTeam = [...team]
+                  G.secret.pendingVotes = {}
+                  events.setPhase('teamVote')
+                },
               },
             },
           },
@@ -193,56 +199,59 @@ export const AvalonGame: Game<AvalonG, Record<string, never>, AvalonSetupData> =
         stages: {
           vote: {
             moves: {
-              castTeamVote: ({ G, ctx, events, playerID }, vote: TeamVote) => {
-                if (
-                  (vote !== 'approve' && vote !== 'reject') ||
-                  G.proposedTeam === null ||
-                  G.secret.pendingVotes[playerID] !== undefined
-                ) {
-                  return INVALID_MOVE
-                }
+              castTeamVote: {
+                client: false,
+                move: ({ G, ctx, events, playerID }, vote: TeamVote) => {
+                  if (
+                    (vote !== 'approve' && vote !== 'reject') ||
+                    G.proposedTeam === null ||
+                    G.secret.pendingVotes[playerID] !== undefined
+                  ) {
+                    return INVALID_MOVE
+                  }
 
-                G.secret.pendingVotes[playerID] = vote
-                if (Object.keys(G.secret.pendingVotes).length !== ctx.numPlayers) {
-                  return
-                }
+                  G.secret.pendingVotes[playerID] = vote
+                  if (Object.keys(G.secret.pendingVotes).length !== ctx.numPlayers) {
+                    return
+                  }
 
-                const votes = {
-                  ...G.secret.pendingVotes,
-                } as Record<PlayerID, TeamVote>
-                const approvalCount = Object.values(votes).filter(
-                  (currentVote) => currentVote === 'approve',
-                ).length
-                const approved = approvalCount > ctx.numPlayers / 2
+                  const votes = {
+                    ...G.secret.pendingVotes,
+                  } as Record<PlayerID, TeamVote>
+                  const approvalCount = Object.values(votes).filter(
+                    (currentVote) => currentVote === 'approve',
+                  ).length
+                  const approved = approvalCount > ctx.numPlayers / 2
 
-                G.voteHistory.push({
-                  questIndex: G.questIndex,
-                  team: [...G.proposedTeam],
-                  votes,
-                  approved,
-                })
-                G.secret.pendingVotes = {}
+                  G.voteHistory.push({
+                    questIndex: G.questIndex,
+                    team: [...G.proposedTeam],
+                    votes,
+                    approved,
+                  })
+                  G.secret.pendingVotes = {}
 
-                if (approved) {
-                  G.consecutiveRejectedTeams = 0
-                  events.setPhase('quest')
-                  return
-                }
+                  if (approved) {
+                    G.consecutiveRejectedTeams = 0
+                    events.setPhase('quest')
+                    return
+                  }
 
-                G.consecutiveRejectedTeams += 1
-                G.proposedTeam = null
+                  G.consecutiveRejectedTeams += 1
+                  G.proposedTeam = null
 
-                if (G.consecutiveRejectedTeams >= 5) {
-                  finishGame(
-                    G,
-                    { winner: 'evil', reason: 'five_rejections' },
-                    events.endGame,
-                  )
-                  return
-                }
+                  if (G.consecutiveRejectedTeams >= 5) {
+                    finishGame(
+                      G,
+                      { winner: 'evil', reason: 'five_rejections' },
+                      events.endGame,
+                    )
+                    return
+                  }
 
-                G.leaderID = nextPlayerID(ctx.playOrder, G.leaderID)
-                events.setPhase('teamProposal')
+                  G.leaderID = nextPlayerID(ctx.playOrder, G.leaderID)
+                  events.setPhase('teamProposal')
+                },
               },
             },
           },
@@ -268,84 +277,87 @@ export const AvalonGame: Game<AvalonG, Record<string, never>, AvalonSetupData> =
         stages: {
           quest: {
             moves: {
-              playQuestCard: ({
-                G,
-                ctx,
-                events,
-                random,
-                playerID,
-              }, card: QuestCard) => {
-                const team = G.proposedTeam
-                const role = G.secret.roleByPlayer[playerID]
+              playQuestCard: {
+                client: false,
+                move: ({
+                  G,
+                  ctx,
+                  events,
+                  random,
+                  playerID,
+                }, card: QuestCard) => {
+                  const team = G.proposedTeam
+                  const role = G.secret.roleByPlayer[playerID]
 
-                if (
-                  (card !== 'success' && card !== 'fail') ||
-                  team === null ||
-                  !team.includes(playerID) ||
-                  role === undefined ||
-                  G.secret.pendingQuestCards[playerID] !== undefined ||
-                  (loyaltyForRole(role) === 'good' && card === 'fail')
-                ) {
-                  return INVALID_MOVE
-                }
+                  if (
+                    (card !== 'success' && card !== 'fail') ||
+                    team === null ||
+                    !team.includes(playerID) ||
+                    role === undefined ||
+                    G.secret.pendingQuestCards[playerID] !== undefined ||
+                    (loyaltyForRole(role) === 'good' && card === 'fail')
+                  ) {
+                    return INVALID_MOVE
+                  }
 
-                G.secret.pendingQuestCards[playerID] = card
-                if (
-                  Object.keys(G.secret.pendingQuestCards).length !==
-                  team.length
-                ) {
-                  return
-                }
+                  G.secret.pendingQuestCards[playerID] = card
+                  if (
+                    Object.keys(G.secret.pendingQuestCards).length !==
+                    team.length
+                  ) {
+                    return
+                  }
 
-                const submittedCards = team
-                  .map((memberID) => G.secret.pendingQuestCards[memberID])
-                  .filter((submittedCard): submittedCard is QuestCard =>
-                    submittedCard !== undefined,
-                  )
-                const shuffledCards = random.Shuffle(submittedCards)
-                const failCount = shuffledCards.filter(
-                  (submittedCard) => submittedCard === 'fail',
-                ).length
-                const successCount = shuffledCards.length - failCount
-                const failThreshold = getPlayerCountConfig(
-                  ctx.numPlayers,
-                ).questFailThresholds[G.questIndex]
-                const succeeded = failCount < failThreshold
-                const resolvedQuestIndex = G.questIndex
+                  const submittedCards = team
+                    .map((memberID) => G.secret.pendingQuestCards[memberID])
+                    .filter((submittedCard): submittedCard is QuestCard =>
+                      submittedCard !== undefined,
+                    )
+                  const shuffledCards = random.Shuffle(submittedCards)
+                  const failCount = shuffledCards.filter(
+                    (submittedCard) => submittedCard === 'fail',
+                  ).length
+                  const successCount = shuffledCards.length - failCount
+                  const failThreshold = getPlayerCountConfig(
+                    ctx.numPlayers,
+                  ).questFailThresholds[G.questIndex]
+                  const succeeded = failCount < failThreshold
+                  const resolvedQuestIndex = G.questIndex
 
-                G.questHistory.push({
-                  questIndex: resolvedQuestIndex,
-                  team: [...team],
-                  successCount,
-                  failCount,
-                  succeeded,
-                })
-                G.secret.pendingQuestCards = {}
-                G.proposedTeam = null
-                G.questIndex += 1
+                  G.questHistory.push({
+                    questIndex: resolvedQuestIndex,
+                    team: [...team],
+                    successCount,
+                    failCount,
+                    succeeded,
+                  })
+                  G.secret.pendingQuestCards = {}
+                  G.proposedTeam = null
+                  G.questIndex += 1
 
-                if (succeeded) {
-                  G.goodSuccesses += 1
-                } else {
-                  G.evilFailures += 1
-                }
+                  if (succeeded) {
+                    G.goodSuccesses += 1
+                  } else {
+                    G.evilFailures += 1
+                  }
 
-                if (G.evilFailures >= 3) {
-                  finishGame(
-                    G,
-                    { winner: 'evil', reason: 'three_quests' },
-                    events.endGame,
-                  )
-                  return
-                }
+                  if (G.evilFailures >= 3) {
+                    finishGame(
+                      G,
+                      { winner: 'evil', reason: 'three_quests' },
+                      events.endGame,
+                    )
+                    return
+                  }
 
-                if (G.goodSuccesses >= 3) {
-                  events.setPhase('assassination')
-                  return
-                }
+                  if (G.goodSuccesses >= 3) {
+                    events.setPhase('assassination')
+                    return
+                  }
 
-                G.leaderID = nextPlayerID(ctx.playOrder, G.leaderID)
-                events.setPhase('teamProposal')
+                  G.leaderID = nextPlayerID(ctx.playOrder, G.leaderID)
+                  events.setPhase('teamProposal')
+                },
               },
             },
           },
@@ -377,28 +389,31 @@ export const AvalonGame: Game<AvalonG, Record<string, never>, AvalonSetupData> =
         stages: {
           assassin: {
             moves: {
-              assassinate: ({ G, ctx, events, playerID }, targetID: PlayerID) => {
-                const assassinRole = G.secret.roleByPlayer[playerID]
-                const targetRole = G.secret.roleByPlayer[targetID]
+              assassinate: {
+                client: false,
+                move: ({ G, ctx, events, playerID }, targetID: PlayerID) => {
+                  const assassinRole = G.secret.roleByPlayer[playerID]
+                  const targetRole = G.secret.roleByPlayer[targetID]
 
-                if (
-                  assassinRole !== 'assassin' ||
-                  !ctx.playOrder.includes(targetID) ||
-                  targetRole === undefined ||
-                  loyaltyForRole(targetRole) === 'evil'
-                ) {
-                  return INVALID_MOVE
-                }
+                  if (
+                    assassinRole !== 'assassin' ||
+                    !ctx.playOrder.includes(targetID) ||
+                    targetRole === undefined ||
+                    loyaltyForRole(targetRole) === 'evil'
+                  ) {
+                    return INVALID_MOVE
+                  }
 
-                finishGame(
-                  G,
-                  {
-                    winner: targetRole === 'merlin' ? 'evil' : 'good',
-                    reason: 'assassination',
-                    targetID,
-                  },
-                  events.endGame,
-                )
+                  finishGame(
+                    G,
+                    {
+                      winner: targetRole === 'merlin' ? 'evil' : 'good',
+                      reason: 'assassination',
+                      targetID,
+                    },
+                    events.endGame,
+                  )
+                },
               },
             },
           },

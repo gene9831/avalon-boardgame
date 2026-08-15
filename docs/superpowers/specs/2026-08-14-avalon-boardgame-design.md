@@ -68,7 +68,7 @@ infra/postgres/        Database-only Docker Compose deployment files
 docs/                  Rules, architecture decisions, and design records
 ```
 
-The root package delegates development, lint, and preview commands to `@avalon/web`; root `build` and `typecheck` also validate `@avalon/game`. `packages/game` now contains the shared boardgame.io rule core and filtered player-view projection. `apps/server` remains the boundary for the future Socket.IO/lobby/persistence runtime, while `apps/web` remains the browser client.
+The root package delegates web development, server development, lint, and preview commands to the workspace packages; root `build` and `typecheck` validate both `@avalon/game` and `@avalon/server`. `packages/game` contains the shared boardgame.io rule core and filtered player-view projection. `apps/server` now owns the boardgame.io Socket.IO/Lobby runtime with process-local memory storage; PostgreSQL persistence remains a later adapter. `apps/web` remains the browser client.
 
 ## Room lifecycle
 

@@ -35,6 +35,14 @@ Run the web package:
 pnpm dev
 ```
 
+Run the boardgame.io server and Lobby API:
+
+```bash
+pnpm dev:server
+```
+
+The server listens on game port `8000` and Lobby API port `8001` by default. Configure them with `AVALON_GAME_PORT`, `AVALON_LOBBY_PORT`, and `AVALON_ORIGINS`. The current server uses process-local memory storage for LAN development; PostgreSQL will be added through a later storage module.
+
 Validate the current workspace:
 
 ```bash
@@ -44,7 +52,7 @@ pnpm test
 pnpm typecheck
 ```
 
-The current scaffold has no package test script yet, so `pnpm test` completes without running cases. It is wired to run tests from any workspace package as soon as the game implementation adds them. The web package can also be addressed directly with `pnpm --filter @avalon/web <command>`. Tailwind CSS v4 is integrated through `@tailwindcss/vite`; the starter's focused CSS remains available for the future board and card visuals.
+`pnpm test` runs the rule-core tests and the server's Lobby/Socket.IO integration tests. The web package can also be addressed directly with `pnpm --filter @avalon/web <command>`. Tailwind CSS v4 is integrated through `@tailwindcss/vite`; the starter's focused CSS remains available for the future board and card visuals.
 
 ## Design references
 
