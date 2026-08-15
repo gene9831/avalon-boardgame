@@ -3,7 +3,22 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
   "dependencies": {
     "boardgame.io": "^0.50.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.10"
   }
 }

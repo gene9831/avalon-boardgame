@@ -68,7 +68,7 @@ infra/postgres/        Database-only Docker Compose deployment files
 docs/                  Rules, architecture decisions, and design records
 ```
 
-The root package delegates development, build, lint, and preview commands to `@avalon/web`. The server and game packages are workspace boundaries during the initial scaffold; they do not yet contain the game implementation.
+The root package delegates development, lint, and preview commands to `@avalon/web`; root `build` and `typecheck` also validate `@avalon/game`. `packages/game` now contains the shared boardgame.io rule core and filtered player-view projection. `apps/server` remains the boundary for the future Socket.IO/lobby/persistence runtime, while `apps/web` remains the browser client.
 
 ## Room lifecycle
 

@@ -1,5 +1,18 @@
 # `@avalon/game`
 
-This package will own the shared, server-authoritative Avalon rules and the public types used by the browser and server packages.
+This package contains the shared, server-authoritative Avalon rule core:
 
-It is intentionally empty of game behavior during the workspace migration so the project structure can be validated before implementation begins.
+- role distribution for 5–10 players;
+- boardgame.io phases, stages, active players, and moves;
+- simultaneous team votes and quest-card submissions;
+- victory and assassination resolution;
+- filtered player views that never expose the authoritative `secret` state during play.
+
+It is browser-safe and does not contain Socket.IO, PostgreSQL, or UI code. The server and web packages consume the public exports from `src/index.ts`.
+
+Run its checks from the workspace root:
+
+```bash
+pnpm --filter @avalon/game test
+pnpm --filter @avalon/game typecheck
+```
