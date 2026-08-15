@@ -1,0 +1,70 @@
+{
+  "ruleSet": "the-resistance-avalon-original-base",
+  "players": {
+    "min": 5,
+    "max": 10
+  },
+  "roles": [
+    "merlin",
+    "assassin",
+    "loyal_servant",
+    "minion"
+  ],
+  "playerCounts": {
+    "5": {
+      "good": 3,
+      "evil": 2,
+      "questTeamSizes": [2, 3, 2, 3, 3],
+      "questFailThresholds": [1, 1, 1, 1, 1]
+    },
+    "6": {
+      "good": 4,
+      "evil": 2,
+      "questTeamSizes": [2, 3, 4, 3, 4],
+      "questFailThresholds": [1, 1, 1, 1, 1]
+    },
+    "7": {
+      "good": 4,
+      "evil": 3,
+      "questTeamSizes": [2, 3, 3, 4, 4],
+      "questFailThresholds": [1, 1, 1, 2, 1]
+    },
+    "8": {
+      "good": 5,
+      "evil": 3,
+      "questTeamSizes": [3, 4, 4, 5, 5],
+      "questFailThresholds": [1, 1, 1, 2, 1]
+    },
+    "9": {
+      "good": 6,
+      "evil": 3,
+      "questTeamSizes": [3, 4, 4, 5, 5],
+      "questFailThresholds": [1, 1, 1, 2, 1]
+    },
+    "10": {
+      "good": 6,
+      "evil": 4,
+      "questTeamSizes": [3, 4, 4, 5, 5],
+      "questFailThresholds": [1, 1, 1, 2, 1]
+    }
+  },
+  "teamVote": {
+    "approval": "strict_majority",
+    "tie": "reject",
+    "maxConsecutiveRejections": 5
+  },
+  "quest": {
+    "goodMustPlaySuccess": true,
+    "evilMayPlay": ["success", "fail"],
+    "totalQuests": 5
+  },
+  "victory": {
+    "goodQuestSuccesses": 3,
+    "evilQuestFailures": 3,
+    "assassinationAfterGoodSuccesses": 3
+  },
+  "leader": {
+    "rotation": "clockwise"
+  }
+}
+
