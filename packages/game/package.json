@@ -1,0 +1,9 @@
+{
+  "name": "@avalon/game",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "dependencies": {
+    "boardgame.io": "^0.50.2"
+  }
+}

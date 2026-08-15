@@ -1,0 +1,13 @@
+{
+  "name": "avalon-boardgame",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @avalon/web dev",
+    "build": "pnpm --filter @avalon/web build",
+    "lint": "pnpm --filter @avalon/web lint",
+    "preview": "pnpm --filter @avalon/web preview",
+    "test": "pnpm -r --if-present run test"
+  }
+}
