@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Persist independent rooms in PostgreSQL

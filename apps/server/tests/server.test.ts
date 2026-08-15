@@ -6,7 +6,9 @@ import { SocketIO } from 'boardgame.io/multiplayer'
 
 import { AvalonGame } from '@avalon/game'
 
-import { startAvalonServer } from '../src/server'
+import { createAvalonServer, startAvalonServer } from '../src/server'
+import { MemoryStorage } from '../src/storage/memory'
+import { PostgresStorage } from '../src/storage/postgres'
 
 type AvalonClient = ReturnType<typeof Client>
 type AvalonClientState = NonNullable<ReturnType<AvalonClient['getState']>>
@@ -38,9 +40,56 @@ function waitForClientState(
 }
 
 describe('Avalon server', () => {
+  it('selects PostgreSQL storage when DATABASE_URL is configured', async () => {
+    const previousDatabaseURL = process.env.DATABASE_URL
+    process.env.DATABASE_URL = 'postgresql://example:example@127.0.0.1:5432/avalon'
+
+    try {
+      const { db } = createAvalonServer({
+        config: { gamePort: 0, lobbyPort: 0, origins: ['*'] },
+      })
+
+      expect(db).toBeInstanceOf(PostgresStorage)
+      await (db as PostgresStorage).close()
+    } finally {
+      if (previousDatabaseURL === undefined) {
+        delete process.env.DATABASE_URL
+      } else {
+        process.env.DATABASE_URL = previousDatabaseURL
+      }
+    }
+  })
+
+  it('allows memory storage only when explicitly configured', async () => {
+    const previousDatabaseURL = process.env.DATABASE_URL
+    const previousStorageMode = process.env.AVALON_STORAGE
+    delete process.env.DATABASE_URL
+    process.env.AVALON_STORAGE = 'memory'
+
+    try {
+      const { db } = createAvalonServer({
+        config: { gamePort: 0, lobbyPort: 0, origins: ['*'] },
+      })
+
+      expect(db).toBeInstanceOf(MemoryStorage)
+    } finally {
+      if (previousDatabaseURL === undefined) {
+        delete process.env.DATABASE_URL
+      } else {
+        process.env.DATABASE_URL = previousDatabaseURL
+      }
+      if (previousStorageMode === undefined) {
+        delete process.env.AVALON_STORAGE
+      } else {
+        process.env.AVALON_STORAGE = previousStorageMode
+      }
+    }
+  })
+
   it('starts the game server and Lobby API', async () => {
     const running = await startAvalonServer({
       config: { gamePort: 0, lobbyPort: 0, origins: ['*'] },
+      db: new MemoryStorage(),
     })
 
     try {
@@ -48,13 +97,14 @@ describe('Avalon server', () => {
       expect(response.status).toBe(200)
       expect(await response.json()).toEqual(['avalon'])
     } finally {
-      running.close()
+      await running.close()
     }
   })
 
   it('keeps multiple Lobby matches isolated', async () => {
     const running = await startAvalonServer({
       config: { gamePort: 0, lobbyPort: 0, origins: ['*'] },
+      db: new MemoryStorage(),
     })
     const lobby = new LobbyClient({
       server: `http://127.0.0.1:${running.lobbyPort}`,
@@ -85,13 +135,14 @@ describe('Avalon server', () => {
       expect(firstMatch.players.find(({ id }) => id === 0)?.name).toBe('Alice')
       expect(secondMatch.players.find(({ id }) => id === 0)?.name).toBe('Bob')
     } finally {
-      running.close()
+      await running.close()
     }
   })
 
   it('synchronizes five seat-bound clients through Socket.IO', async () => {
     const running = await startAvalonServer({
       config: { gamePort: 0, lobbyPort: 0, origins: ['*'] },
+      db: new MemoryStorage(),
     })
     const lobby = new LobbyClient({
       server: `http://127.0.0.1:${running.lobbyPort}`,
@@ -141,7 +192,7 @@ describe('Avalon server', () => {
       }
     } finally {
       clients.forEach((client) => client.stop())
-      running.close()
+      await running.close()
     }
   }, 10000)
 })
