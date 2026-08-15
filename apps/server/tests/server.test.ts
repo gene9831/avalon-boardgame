@@ -139,6 +139,36 @@ describe('Avalon server', () => {
     }
   })
 
+  it('prevents one client identity from occupying multiple seats', async () => {
+    const running = await startAvalonServer({
+      config: { gamePort: 0, lobbyPort: 0, origins: ['*'] },
+      db: new MemoryStorage(),
+    })
+    const lobby = new LobbyClient({
+      server: `http://127.0.0.1:${running.lobbyPort}`,
+    })
+
+    try {
+      const { matchID } = await lobby.createMatch('avalon', { numPlayers: 5 })
+      await lobby.joinMatch('avalon', matchID, {
+        playerID: '0',
+        playerName: 'Alice',
+        data: { clientID: 'client-1' },
+      })
+
+      await expect(lobby.joinMatch('avalon', matchID, {
+        playerID: '1',
+        playerName: 'Alice on another tab',
+        data: { clientID: 'client-1' },
+      })).rejects.toThrow('HTTP status 409')
+
+      const match = await lobby.getMatch('avalon', matchID)
+      expect(match.players.find(({ id }) => id === 1)?.name).toBeUndefined()
+    } finally {
+      await running.close()
+    }
+  })
+
   it('synchronizes five seat-bound clients through Socket.IO', async () => {
     const running = await startAvalonServer({
       config: { gamePort: 0, lobbyPort: 0, origins: ['*'] },

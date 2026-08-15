@@ -1,6 +1,7 @@
+import { randomUUID } from 'node:crypto'
 import type { AddressInfo } from 'node:net'
 
-import type { StorageAPI } from 'boardgame.io'
+import type { Server as BoardgameServerTypes, StorageAPI } from 'boardgame.io'
 import { Server as createBoardgameServer } from 'boardgame.io/server'
 
 import { AvalonGame } from '@avalon/game'
@@ -12,6 +13,63 @@ import { PostgresStorage } from './storage/postgres'
 type BoardgameServer = ReturnType<typeof createBoardgameServer>
 type ServerHandles = Awaited<ReturnType<BoardgameServer['run']>>
 type BoardgameGame = Parameters<typeof createBoardgameServer>[0]['games'][number]
+
+const CLIENT_ID_DATA_KEY = 'clientID'
+
+function readClientID(data: unknown) {
+  if (typeof data !== 'object' || data === null) return undefined
+
+  const clientID = (data as Record<string, unknown>)[CLIENT_ID_DATA_KEY]
+  return typeof clientID === 'string' && clientID.length > 0
+    ? clientID
+    : undefined
+}
+
+function normalizePlayerName(name: unknown) {
+  return typeof name === 'string' ? name.trim().toLocaleLowerCase() : ''
+}
+
+function createAvalonCredentialGenerator(
+  db: StorageAPI.Sync | StorageAPI.Async,
+): BoardgameServerTypes.GenerateCredentials {
+  return async (ctx) => {
+    const matchID = ctx.params.id
+    const playerID = ctx.request.body?.playerID
+    const playerName = normalizePlayerName(ctx.request.body?.playerName)
+    const clientID = readClientID(ctx.request.body?.data)
+
+    if (typeof matchID === 'string') {
+      const { metadata } = await (db as StorageAPI.Async).fetch(matchID, {
+        metadata: true,
+      })
+      const allPlayers = metadata === undefined ? [] : Object.values(metadata.players)
+      const pendingPlayer = allPlayers.find(
+        (player) => String(player.id) === String(playerID),
+      )
+      const players = allPlayers.filter(
+        (player) => String(player.id) !== String(playerID),
+      )
+      const rejectJoin = (message: string): never => {
+        if (pendingPlayer !== undefined) {
+          delete pendingPlayer.name
+          delete pendingPlayer.data
+        }
+        ctx.throw(409, message)
+        throw new Error(message)
+      }
+
+      if (clientID && players.some((player) => readClientID(player.data) === clientID)) {
+        rejectJoin('Client has already joined this match')
+      }
+
+      if (playerName && players.some((player) => normalizePlayerName(player.name) === playerName)) {
+        rejectJoin('Player name is already used in this match')
+      }
+    }
+
+    return randomUUID()
+  }
+}
 
 export interface AvalonServerOptions {
   config?: AvalonServerConfig
@@ -46,6 +104,7 @@ export function createAvalonServer(options: AvalonServerOptions = {}) {
   const boardgame = createBoardgameServer({
     games: [AvalonGame as unknown as BoardgameGame],
     db,
+    generateCredentials: createAvalonCredentialGenerator(db),
     origins: config.origins,
     apiOrigins: config.origins,
   })

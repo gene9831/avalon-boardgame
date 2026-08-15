@@ -22,6 +22,7 @@ import {
 import { AvalonGame, type AvalonG } from '@avalon/game'
 
 import { webConfig } from './config'
+import { getClientID } from './client-identity'
 import {
   AVALON_GAME_NAME,
   createAvalonLobbyClient,
@@ -44,6 +45,10 @@ type AvalonClient = ReturnType<typeof Client<AvalonG>>
 type AvalonClientState = ReturnType<AvalonClient['getState']>
 
 function errorMessage(error: unknown) {
+  if (error instanceof Error && error.message === 'HTTP status 409') {
+    return '这个房间的座位已被占用，或当前浏览器已经在本局入座。'
+  }
+
   return error instanceof Error ? error.message : '请求失败，请稍后重试。'
 }
 
@@ -78,6 +83,7 @@ function App() {
 
 function LobbyRoute() {
   const lobby = useMemo(() => createAvalonLobbyClient(), [])
+  const clientID = useMemo(() => getClientID(), [])
   const navigate = useNavigate()
   const lastRoomSession = useMemo(() => loadLastRoomSession(), [])
   const [playerName, setPlayerName] = useState(
@@ -113,6 +119,7 @@ function LobbyRoute() {
     }
 
     const joined = await lobby.joinMatch(AVALON_GAME_NAME, matchID, {
+      data: { clientID },
       playerID,
       playerName: trimmedName,
     })
@@ -124,7 +131,7 @@ function LobbyRoute() {
     }
     saveRoomSession(nextSession)
     return nextSession
-  }, [lobby, playerName])
+  }, [clientID, lobby, playerName])
 
   const handleJoin = async (matchID: string, playerID: string) => {
     setBusy(true)

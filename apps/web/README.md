@@ -7,7 +7,12 @@ The browser uses two routes:
 - `/` is the lobby for creating and joining rooms.
 - `/rooms/:matchID` is the waiting room for one match. The room page has a
   `返回主页` button; returning home keeps this browser's seat credentials so
-  the recent room can be reopened.
+the recent room can be reopened.
+
+Each browser profile uses a stable local client ID when joining. The server
+rejects that client ID (and duplicate player names) if it tries to occupy a
+second seat in the same room. This is a seat-binding guard for the no-account
+LAN MVP, not an account-level identity system.
 
 Run it from the workspace root:
 
