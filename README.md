@@ -2,7 +2,7 @@
 
 An online implementation of the base rules of *The Resistance: Avalon* for 5–10 players on a local network. The planned runtime uses React, TypeScript, Vite, boardgame.io, Socket.IO, and PostgreSQL.
 
-The repository is now a pnpm workspace. The current migration establishes the package boundaries and keeps the Vite starter page running; Avalon rules, multiplayer flow, and the full game UI are implemented in subsequent steps.
+The repository is now a pnpm workspace. The shared Avalon rule core is implemented in `packages/game`; multiplayer transport, lobby/persistence, and the full game UI are implemented in subsequent steps.
 
 ## Workspace layout
 
@@ -41,6 +41,7 @@ Validate the current workspace:
 pnpm build
 pnpm lint
 pnpm test
+pnpm typecheck
 ```
 
 The current scaffold has no package test script yet, so `pnpm test` completes without running cases. It is wired to run tests from any workspace package as soon as the game implementation adds them. The web package can also be addressed directly with `pnpm --filter @avalon/web <command>`. Tailwind CSS v4 is integrated through `@tailwindcss/vite`; the starter's focused CSS remains available for the future board and card visuals.

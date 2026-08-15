@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter @avalon/web dev",
-    "build": "pnpm --filter @avalon/web build",
+    "build": "pnpm --filter @avalon/game typecheck && pnpm --filter @avalon/web build",
     "lint": "pnpm --filter @avalon/web lint",
     "preview": "pnpm --filter @avalon/web preview",
-    "test": "pnpm -r --if-present run test"
+    "test": "pnpm -r --if-present run test",
+    "typecheck": "pnpm --filter @avalon/game typecheck && pnpm --filter @avalon/web exec tsc -b"
   }
 }
