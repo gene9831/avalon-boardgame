@@ -19,10 +19,17 @@ import {
   useParams,
 } from 'react-router-dom'
 
-import { AvalonGame, type AvalonG } from '@avalon/game'
+import {
+  AvalonGame,
+  type AvalonG,
+  type AvalonPlayerView,
+  type PlayerID,
+  type TeamVote,
+} from '@avalon/game'
 
 import { webConfig } from './config'
 import { getClientID } from './client-identity'
+import { RoomGamePanel } from './RoomGamePanel'
 import {
   AVALON_GAME_NAME,
   createAvalonLobbyClient,
@@ -42,7 +49,10 @@ import {
 } from './room-session'
 
 type AvalonClient = ReturnType<typeof Client<AvalonG>>
-type AvalonClientState = ReturnType<AvalonClient['getState']>
+type AvalonRawClientState = NonNullable<ReturnType<AvalonClient['getState']>>
+type AvalonClientState = Omit<AvalonRawClientState, 'G'> & {
+  G: AvalonPlayerView
+}
 
 function errorMessage(error: unknown) {
   if (error instanceof Error && error.message === 'HTTP status 409') {
@@ -196,7 +206,7 @@ function RoomRoute() {
     loadRoomSession(matchID),
   )
   const [room, setRoom] = useState<AvalonMatch | null>(null)
-  const [gameState, setGameState] = useState<AvalonClientState>(null)
+  const [gameState, setGameState] = useState<AvalonClientState | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const refreshRoom = useCallback(async (roomID: string, silent = false) => {
@@ -255,7 +265,7 @@ function RoomRoute() {
         clientRef.current = client
         unsubscribe = client.subscribe((nextState) => {
           if (!active) return
-          setGameState(nextState)
+          setGameState(nextState as AvalonClientState | null)
           if (client?.matchData !== undefined) {
             setRoom((previousRoom) =>
               previousRoom === null
@@ -296,6 +306,18 @@ function RoomRoute() {
     }
   }
 
+  const handleProposeTeam = (team: PlayerID[]) => {
+    if (gameState?.isActive) {
+      clientRef.current?.moves.proposeTeam(team)
+    }
+  }
+
+  const handleCastTeamVote = (vote: TeamVote) => {
+    if (gameState?.isActive) {
+      clientRef.current?.moves.castTeamVote(vote)
+    }
+  }
+
   const handleReconnect = () => {
     const client = clientRef.current
     if (client === null) return
@@ -328,7 +350,9 @@ function RoomRoute() {
     <RoomView
       gameState={gameState}
       onBackHome={() => navigate('/')}
+      onCastTeamVote={handleCastTeamVote}
       onForgetSession={handleForgetSession}
+      onProposeTeam={handleProposeTeam}
       onReconnect={handleReconnect}
       onStart={handleStart}
       room={room}
@@ -583,9 +607,11 @@ function LobbyView({
 }
 
 interface RoomViewProps {
-  gameState: AvalonClientState
+  gameState: AvalonClientState | null
   onBackHome: () => void
+  onCastTeamVote: (vote: TeamVote) => void
   onForgetSession: () => void
+  onProposeTeam: (team: PlayerID[]) => void
   onReconnect: () => void
   onStart: () => void
   room: AvalonMatch
@@ -595,7 +621,9 @@ interface RoomViewProps {
 function RoomView({
   gameState,
   onBackHome,
+  onCastTeamVote,
   onForgetSession,
+  onProposeTeam,
   onReconnect,
   onStart,
   room,
@@ -605,6 +633,7 @@ function RoomView({
   const occupiedPlayerIDs = getOccupiedPlayerIDs(room)
   const isFull = occupiedPlayerIDs.length === numPlayers
   const phase = gameState?.ctx.phase
+  const activeStage = gameState?.ctx.activePlayers?.[session.playerID]
   const connected = gameState?.isConnected === true
   const canStart =
     connected &&
@@ -616,58 +645,69 @@ function RoomView({
   return (
     <PageShell eyebrow={`Room ${room.matchID}`} title="房间等待中">
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
-        <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="font-mono text-sm text-slate-400">{room.matchID}</p>
-              <h2 className="mt-2 text-2xl font-semibold text-white">玩家座位</h2>
-            </div>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <button
-                className="rounded-lg border border-white/15 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-amber-300/60 hover:text-white"
-                onClick={onBackHome}
-                type="button"
-              >
-                返回主页
-              </button>
-              <ConnectionBadge connected={connected} />
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            {Array.from({ length: numPlayers }, (_, index) => {
-              const player = room.players.find(({ id }) => id === index)
-              const occupied = player?.name !== undefined && player.name !== null
-              const isCurrentPlayer = String(index) === session.playerID
-
-              return (
-                <div
-                  className={`rounded-2xl border p-4 ${
-                    isCurrentPlayer
-                      ? 'border-amber-300/70 bg-amber-300/10'
-                      : 'border-white/10 bg-slate-950/30'
-                  }`}
-                  key={index}
+        <div className="space-y-6">
+          <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="font-mono text-sm text-slate-400">{room.matchID}</p>
+                <h2 className="mt-2 text-2xl font-semibold text-white">玩家座位</h2>
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <button
+                  className="rounded-lg border border-white/15 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-amber-300/60 hover:text-white"
+                  onClick={onBackHome}
+                  type="button"
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                      座位 {index + 1}
-                    </span>
-                    {isCurrentPlayer && (
-                      <span className="text-xs font-semibold text-amber-300">这是你</span>
-                    )}
+                  返回主页
+                </button>
+                <ConnectionBadge connected={connected} />
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              {Array.from({ length: numPlayers }, (_, index) => {
+                const player = room.players.find(({ id }) => id === index)
+                const occupied = player?.name !== undefined && player.name !== null
+                const isCurrentPlayer = String(index) === session.playerID
+
+                return (
+                  <div
+                    className={`rounded-2xl border p-4 ${
+                      isCurrentPlayer
+                        ? 'border-amber-300/70 bg-amber-300/10'
+                        : 'border-white/10 bg-slate-950/30'
+                    }`}
+                    key={index}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                        座位 {index + 1}
+                      </span>
+                      {isCurrentPlayer && (
+                        <span className="text-xs font-semibold text-amber-300">这是你</span>
+                      )}
+                    </div>
+                    <p className="mt-3 font-medium text-white">
+                      {occupied ? player?.name : '等待玩家加入'}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {player?.isConnected ? '已连接' : occupied ? '等待连接' : '空座位'}
+                    </p>
                   </div>
-                  <p className="mt-3 font-medium text-white">
-                    {occupied ? player?.name : '等待玩家加入'}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {player?.isConnected ? '已连接' : occupied ? '等待连接' : '空座位'}
-                  </p>
-                </div>
-              )
-            })}
-          </div>
-        </section>
+                )
+              })}
+            </div>
+          </section>
+
+          <RoomGamePanel
+            activeStage={activeStage}
+            game={gameState?.G ?? null}
+            onCastTeamVote={onCastTeamVote}
+            onProposeTeam={onProposeTeam}
+            phase={phase}
+            playerID={session.playerID}
+          />
+        </div>
 
         <aside className="space-y-6">
           <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-2xl shadow-black/20 backdrop-blur">
@@ -679,7 +719,11 @@ function RoomView({
               <StatusRow label="你的座位" value={`座位 ${Number(session.playerID) + 1}`} />
               <StatusRow
                 label="队长"
-                value={gameState?.G.leaderID === null ? '尚未产生' : `座位 ${Number(gameState?.G.leaderID) + 1}`}
+                value={
+                  gameState?.G.leaderID === null || gameState?.G.leaderID === undefined
+                    ? '尚未产生'
+                    : `座位 ${Number(gameState.G.leaderID) + 1}`
+                }
               />
             </div>
 
@@ -694,11 +738,6 @@ function RoomView({
               </button>
             )}
 
-            {phase !== undefined && phase !== 'lobby' && (
-              <div className="mt-6 rounded-xl border border-cyan-300/20 bg-cyan-300/10 p-4 text-sm leading-6 text-cyan-100">
-                游戏核心已连接。完整的队伍、投票和任务操作界面将在下一模块接入。
-              </div>
-            )}
           </section>
 
           <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 text-sm leading-6 text-slate-400">
