@@ -29,6 +29,7 @@ import {
 
 import { webConfig } from './config'
 import { getClientID } from './client-identity'
+import { executePendingJoin, type PendingJoin } from './join-flow'
 import { RoomGamePanel } from './RoomGamePanel'
 import {
   AVALON_GAME_NAME,
@@ -39,6 +40,11 @@ import {
   type AvalonMatch,
   type LobbyPlayer,
 } from './lobby'
+import {
+  getPreferredPlayerName,
+  loadPlayerName,
+  savePlayerName,
+} from './player-name'
 import {
   clearRoomSession,
   getAvailableSeatIDs,
@@ -96,14 +102,16 @@ function LobbyRoute() {
   const clientID = useMemo(() => getClientID(), [])
   const navigate = useNavigate()
   const lastRoomSession = useMemo(() => loadLastRoomSession(), [])
-  const [playerName, setPlayerName] = useState(
-    () => lastRoomSession?.playerName ?? '',
-  )
+  const [pendingJoin, setPendingJoin] = useState<PendingJoin | null>(null)
+  const [nameDialogOpen, setNameDialogOpen] = useState(false)
+  const [nameDialogValue, setNameDialogValue] = useState('')
+  const [nameDialogError, setNameDialogError] = useState<string | null>(null)
   const [numPlayers, setNumPlayers] = useState(5)
   const [matches, setMatches] = useState<AvalonMatch[]>([])
   const [selectedSeats, setSelectedSeats] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const requestInFlightRef = useRef(false)
 
   const refreshMatches = useCallback(async () => {
     try {
@@ -122,54 +130,89 @@ function LobbyRoute() {
     return () => window.clearInterval(timer)
   }, [refreshMatches])
 
-  const joinRoom = useCallback(async (matchID: string, playerID: string) => {
-    const trimmedName = playerName.trim()
-    if (trimmedName.length === 0) {
-      throw new Error('请先填写玩家名称。')
-    }
+  const executePendingJoinRequest = useCallback(
+    async (intent: PendingJoin, playerName: string) => {
+      if (requestInFlightRef.current) return
 
-    const joined = await lobby.joinMatch(AVALON_GAME_NAME, matchID, {
-      data: { clientID },
-      playerID,
-      playerName: trimmedName,
-    })
-    const nextSession: RoomSession = {
-      matchID,
-      playerID: joined.playerID,
-      credentials: joined.playerCredentials,
-      playerName: trimmedName,
-    }
-    saveRoomSession(nextSession)
-    return nextSession
-  }, [clientID, lobby, playerName])
+      requestInFlightRef.current = true
+      setBusy(true)
+      setError(null)
+      setNameDialogError(null)
 
-  const handleJoin = async (matchID: string, playerID: string) => {
-    setBusy(true)
-    setError(null)
-    try {
-      const nextSession = await joinRoom(matchID, playerID)
-      navigate(`/rooms/${encodeURIComponent(nextSession.matchID)}`)
-    } catch (requestError) {
-      setError(errorMessage(requestError))
-    } finally {
-      setBusy(false)
-    }
+      try {
+        const session = await executePendingJoin(lobby, intent, {
+          clientID,
+          gameName: AVALON_GAME_NAME,
+          playerName,
+        })
+        savePlayerName(session.playerName)
+        saveRoomSession(session)
+        setPendingJoin(null)
+        setNameDialogOpen(false)
+        setNameDialogValue('')
+        setNameDialogError(null)
+        navigate(`/rooms/${encodeURIComponent(session.matchID)}`)
+      } catch (requestError) {
+        setNameDialogValue(playerName)
+        setNameDialogError(errorMessage(requestError))
+        setNameDialogOpen(true)
+      } finally {
+        requestInFlightRef.current = false
+        setBusy(false)
+      }
+    },
+    [clientID, lobby, navigate],
+  )
+
+  const beginPendingJoin = useCallback(
+    (intent: PendingJoin) => {
+      if (requestInFlightRef.current) return
+
+      const preferredName = getPreferredPlayerName(
+        loadPlayerName(),
+        lastRoomSession?.playerName ?? null,
+      )
+      setPendingJoin(intent)
+      setError(null)
+
+      if (preferredName !== null) {
+        void executePendingJoinRequest(intent, preferredName)
+        return
+      }
+
+      setNameDialogValue('')
+      setNameDialogError(null)
+      setNameDialogOpen(true)
+    },
+    [executePendingJoinRequest, lastRoomSession],
+  )
+
+  const handleJoin = (matchID: string, playerID: string) => {
+    beginPendingJoin({ type: 'join', matchID, playerID })
   }
 
-  const handleCreate = async () => {
-    setBusy(true)
-    setError(null)
-    try {
-      const created = await lobby.createMatch(AVALON_GAME_NAME, {
-        numPlayers,
-      })
-      const nextSession = await joinRoom(created.matchID, '0')
-      navigate(`/rooms/${encodeURIComponent(nextSession.matchID)}`)
-    } catch (requestError) {
-      setError(errorMessage(requestError))
-    } finally {
-      setBusy(false)
+  const handleCreate = () => {
+    beginPendingJoin({ type: 'create', numPlayers })
+  }
+
+  const handleNameDialogCancel = () => {
+    if (requestInFlightRef.current) return
+
+    setPendingJoin(null)
+    setNameDialogOpen(false)
+    setNameDialogValue('')
+    setNameDialogError(null)
+  }
+
+  const handleNameDialogSubmit = () => {
+    if (pendingJoin === null || requestInFlightRef.current) return
+
+    if (nameDialogValue.trim().length === 0) {
+      setNameDialogError('玩家名称不能为空')
+      return
     }
+
+    void executePendingJoinRequest(pendingJoin, nameDialogValue)
   }
 
   const handleResumeRoom = () => {
@@ -178,22 +221,31 @@ function LobbyRoute() {
   }
 
   return (
-    <LobbyView
-      busy={busy}
-      error={error}
-      lastRoomSession={lastRoomSession}
-      matches={matches}
-      numPlayers={numPlayers}
-      onCreate={handleCreate}
-      onJoin={handleJoin}
-      onRefresh={() => void refreshMatches()}
-      onResumeRoom={handleResumeRoom}
-      playerName={playerName}
-      selectedSeats={selectedSeats}
-      setNumPlayers={setNumPlayers}
-      setPlayerName={setPlayerName}
-      setSelectedSeats={setSelectedSeats}
-    />
+    <>
+      <LobbyView
+        busy={busy}
+        error={error}
+        lastRoomSession={lastRoomSession}
+        matches={matches}
+        numPlayers={numPlayers}
+        onCreate={handleCreate}
+        onJoin={handleJoin}
+        onRefresh={() => void refreshMatches()}
+        onResumeRoom={handleResumeRoom}
+        selectedSeats={selectedSeats}
+        setNumPlayers={setNumPlayers}
+        setSelectedSeats={setSelectedSeats}
+      />
+      <PlayerNameDialog
+        busy={busy}
+        error={nameDialogError}
+        onCancel={handleNameDialogCancel}
+        onChange={setNameDialogValue}
+        onSubmit={handleNameDialogSubmit}
+        open={nameDialogOpen}
+        value={nameDialogValue}
+      />
+    </>
   )
 }
 
@@ -424,10 +476,8 @@ interface LobbyViewProps {
   onJoin: (matchID: string, playerID: string) => void
   onRefresh: () => void
   onResumeRoom: () => void
-  playerName: string
   selectedSeats: Record<string, string>
   setNumPlayers: (value: number) => void
-  setPlayerName: (value: string) => void
   setSelectedSeats: Dispatch<SetStateAction<Record<string, string>>>
 }
 
@@ -441,10 +491,8 @@ function LobbyView({
   onJoin,
   onRefresh,
   onResumeRoom,
-  playerName,
   selectedSeats,
   setNumPlayers,
-  setPlayerName,
   setSelectedSeats,
 }: LobbyViewProps) {
   return (
@@ -459,19 +507,7 @@ function LobbyView({
             创建者自动占用 0 号座位。其他设备打开同一个局域网地址即可加入。
           </p>
 
-          <label className="mt-8 block text-sm font-medium text-slate-200" htmlFor="player-name">
-            玩家名称
-          </label>
-          <input
-            className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-amber-300/70 focus:ring-2 focus:ring-amber-300/20"
-            id="player-name"
-            maxLength={24}
-            onChange={(event) => setPlayerName(event.target.value)}
-            placeholder="例如：亚瑟"
-            value={playerName}
-          />
-
-          <label className="mt-5 block text-sm font-medium text-slate-200" htmlFor="player-count">
+          <label className="mt-8 block text-sm font-medium text-slate-200" htmlFor="player-count">
             玩家人数
           </label>
           <select
@@ -489,7 +525,7 @@ function LobbyView({
 
           <button
             className="mt-6 w-full rounded-xl bg-amber-300 px-4 py-3 font-semibold text-slate-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={busy || playerName.trim().length === 0}
+            disabled={busy}
             onClick={onCreate}
             type="button"
           >
@@ -563,7 +599,7 @@ function LobbyView({
                           </select>
                           <button
                             className="rounded-lg bg-cyan-300 px-3 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-50"
-                            disabled={busy || playerName.trim().length === 0 || selectedSeat === ''}
+                            disabled={busy || selectedSeat === ''}
                             onClick={() => onJoin(match.matchID, selectedSeat)}
                             type="button"
                           >
@@ -603,6 +639,98 @@ function LobbyView({
 
       <ErrorNotice error={error} />
     </PageShell>
+  )
+}
+
+function PlayerNameDialog({
+  busy,
+  error,
+  onCancel,
+  onChange,
+  onSubmit,
+  open,
+  value,
+}: {
+  busy: boolean
+  error: string | null
+  onCancel: () => void
+  onChange: (value: string) => void
+  onSubmit: () => void
+  open: boolean
+  value: string
+}) {
+  const dialogRef = useRef<HTMLDialogElement | null>(null)
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (dialog === null) return
+
+    if (open && !dialog.open) {
+      dialog.showModal()
+    } else if (!open && dialog.open) {
+      dialog.close()
+    }
+  }, [open])
+
+  return (
+    <dialog
+      aria-labelledby="player-name-dialog-title"
+      className="w-[calc(100%-2rem)] max-w-md rounded-3xl border border-white/15 bg-slate-900 p-0 text-slate-200 shadow-2xl shadow-black/40 backdrop:bg-slate-950/70"
+      onCancel={(event) => {
+        event.preventDefault()
+        if (!busy) onCancel()
+      }}
+      ref={dialogRef}
+    >
+      <form
+        className="p-6 sm:p-8"
+        onSubmit={(event) => {
+          event.preventDefault()
+          onSubmit()
+        }}
+      >
+        <h2 className="text-2xl font-semibold text-white" id="player-name-dialog-title">
+          输入玩家名称
+        </h2>
+        <p className="mt-3 text-sm leading-6 text-slate-300">
+          进入房间前，请告诉大家你想使用的名字。
+        </p>
+        <label className="mt-6 block text-sm font-medium text-slate-200" htmlFor="dialog-player-name">
+          玩家名称
+        </label>
+        <input
+          autoFocus
+          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-amber-300/70 focus:ring-2 focus:ring-amber-300/20"
+          id="dialog-player-name"
+          maxLength={24}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="例如：亚瑟"
+          value={value}
+        />
+        {error !== null && (
+          <p className="mt-3 text-sm text-rose-200" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            className="rounded-xl border border-white/15 px-4 py-3 font-semibold text-slate-200 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={busy}
+            onClick={onCancel}
+            type="button"
+          >
+            取消
+          </button>
+          <button
+            className="rounded-xl bg-amber-300 px-4 py-3 font-semibold text-slate-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={busy}
+            type="submit"
+          >
+            {busy ? '处理中…' : '确认并进入'}
+          </button>
+        </div>
+      </form>
+    </dialog>
   )
 }
 
