@@ -10,6 +10,7 @@ import { loadServerConfig, type AvalonServerConfig } from './config'
 import { MemoryStorage } from './storage/memory'
 import { PostgresStorage } from './storage/postgres'
 import { AvalonSocketRegistry, registerDevAdminRoutes } from './dev-admin'
+import { createDeletionSafeStorage } from './storage/deletion-safe'
 
 type BoardgameServer = ReturnType<typeof createBoardgameServer>
 type ServerHandles = Awaited<ReturnType<BoardgameServer['run']>>
@@ -101,7 +102,11 @@ function getPort(server: NonNullable<ServerHandles['appServer']>) {
 
 export function createAvalonServer(options: AvalonServerOptions = {}) {
   const config = options.config ?? loadServerConfig()
-  const db = options.db ?? createDefaultStorage()
+  const rawDb = options.db ?? createDefaultStorage()
+  const guardedStorage = rawDb.type() === 0
+    ? createDeletionSafeStorage(rawDb as StorageAPI.Sync)
+    : createDeletionSafeStorage(rawDb as StorageAPI.Async)
+  const db = guardedStorage.storage as StorageAPI.Sync | StorageAPI.Async
   const boardgame = createBoardgameServer({
     games: [AvalonGame as unknown as BoardgameGame],
     db,
@@ -116,16 +121,16 @@ export function createAvalonServer(options: AvalonServerOptions = {}) {
   }
   const namespace = app._io?.of('avalon')
   if (namespace !== undefined) registry.attach(namespace as unknown as Parameters<typeof registry.attach>[0])
-  const unavailableMatchIDs = new Set<string>()
   registerDevAdminRoutes(boardgame.router, {
     config,
     db,
+    deletionGuard: guardedStorage.deletionGuard,
     registry,
     queues: boardgame.transport,
-    unavailableMatchIDs,
+    unavailableMatchIDs: guardedStorage.deletionGuard.unavailableMatchIDs,
   })
 
-  return { boardgame, config, db }
+  return { boardgame, config, db: rawDb }
 }
 
 function createDefaultStorage(
