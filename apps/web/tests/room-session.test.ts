@@ -1,12 +1,15 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
   clearRoomSession,
   getAvailableSeatIDs,
+  getRoomSessionInvalidationNotice,
   isRoomSessionStillValid,
   loadLastRoomSession,
   loadRoomSession,
   saveRoomSession,
+  validateRoomSession,
+  RoomSessionValidationHttpError,
   type RoomSessionStorage,
 } from '../src/room-session'
 
@@ -25,6 +28,7 @@ const session = {
   playerID: '2',
   credentials: 'credential-123',
   playerName: 'Alice',
+  sessionID: 'join-session-123',
 }
 
 describe('room session storage', () => {
@@ -78,11 +82,84 @@ describe('room session storage', () => {
     expect(loadRoomSession('room-456', storage)).toBeNull()
   })
 
+  it('loads a legacy room session without a join session ID', () => {
+    const { sessionID: _sessionID, ...legacySession } = session
+    const storage = createStorage({
+      'avalon:room-session:room-123': JSON.stringify(legacySession),
+    })
+
+    expect(loadRoomSession(session.matchID, storage)).toEqual(legacySession)
+  })
+
   it('returns unoccupied seat IDs in ascending order', () => {
     expect(getAvailableSeatIDs(5, ['0', '3'])).toEqual(['1', '2', '4'])
   })
 
   it('recognizes an empty current seat as an invalidated session', () => {
-    expect(isRoomSessionStillValid({ players: [{ id: 0, name: undefined }] }, '0')).toBe(false)
+    expect(isRoomSessionStillValid({ players: [{ id: 2, name: undefined }] }, session)).toBe(false)
+  })
+
+  it('invalidates a stale session when a kicked seat is immediately reused', () => {
+    expect(isRoomSessionStillValid({
+      players: [{
+        id: 2,
+        name: 'Alice',
+        data: { clientID: 'same-browser', sessionID: 'replacement-session' },
+      }],
+    }, session)).toBe(false)
+  })
+
+  it('accepts a legacy session only while the occupied seat is also legacy', () => {
+    const { sessionID: _sessionID, ...legacySession } = session
+
+    expect(isRoomSessionStillValid({
+      players: [{ id: 2, name: 'Alice', data: { clientID: 'client-1' } }],
+    }, legacySession)).toBe(true)
+    expect(isRoomSessionStillValid({
+      players: [{
+        id: 2,
+        name: 'Alice',
+        data: { clientID: 'client-1', sessionID: 'replacement-session' },
+      }],
+    }, legacySession)).toBe(false)
+  })
+
+  it('validates the stored credential without exposing it in the URL', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
+
+    await validateRoomSession('http://localhost:8001', session, fetcher)
+
+    expect(fetcher).toHaveBeenCalledWith(
+      'http://localhost:8001/rooms/avalon/room-123/players/2/session',
+      {
+        method: 'POST',
+        headers: { Authorization: 'Bearer credential-123' },
+      },
+    )
+    expect(fetcher.mock.calls[0][0]).not.toContain('credential-123')
+  })
+
+  it('rejects an old credential even when replacement public data is copied', async () => {
+    const copiedPublicRoom = {
+      players: [{
+        id: 2,
+        name: 'Alice',
+        data: { clientID: 'same-browser', sessionID: session.sessionID },
+      }],
+    }
+    const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 403 }))
+
+    expect(isRoomSessionStillValid(copiedPublicRoom, session)).toBe(true)
+    await expect(
+      validateRoomSession('http://localhost:8001', session, fetcher),
+    ).rejects.toEqual(new RoomSessionValidationHttpError(403))
+    expect(getRoomSessionInvalidationNotice(new RoomSessionValidationHttpError(403)))
+      .toBe('你的房间座位已被释放，已返回主页。')
+  })
+
+  it('classifies a missing room separately from an unauthorized seat', () => {
+    expect(getRoomSessionInvalidationNotice(new RoomSessionValidationHttpError(404)))
+      .toBe('房间已被删除，已返回主页。')
+    expect(getRoomSessionInvalidationNotice(new Error('network unavailable'))).toBeNull()
   })
 })

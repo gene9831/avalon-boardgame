@@ -1,8 +1,25 @@
 import { describe, expect, it, vi } from 'vitest'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 
 import { createDevToolsClient, DevToolsHttpError } from '../src/dev-tools'
+import { LobbyDevTools } from '../src/LobbyDevTools'
 
 describe('development tools client', () => {
+  it('renders the homepage token panel only when development tools are enabled', () => {
+    const props = {
+      enabled: false,
+      onTokenChange: vi.fn(),
+      token: '',
+    }
+
+    expect(renderToStaticMarkup(createElement(LobbyDevTools, props))).toBe('')
+    expect(renderToStaticMarkup(createElement(LobbyDevTools, {
+      ...props,
+      enabled: true,
+    }))).toContain('开发管理员 Token')
+  })
+
   it('sends the development Bearer token when deleting a room', async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
     const client = createDevToolsClient('http://localhost:8001', fetcher)

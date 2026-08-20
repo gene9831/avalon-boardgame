@@ -15,6 +15,7 @@ import {
   Navigate,
   Route,
   Routes,
+  useLocation,
   useNavigate,
   useParams,
 } from 'react-router-dom'
@@ -31,8 +32,14 @@ import { webConfig } from './config'
 import { getClientID } from './client-identity'
 import { createDevToolsClient } from './dev-tools'
 import { executePendingJoin, type PendingJoin } from './join-flow'
+import { LobbyDevTools } from './LobbyDevTools'
 import { RoomDevTools } from './RoomDevTools'
 import { RoomGamePanel } from './RoomGamePanel'
+import {
+  consumeRoomNavigationNotice,
+  getRoomNavigationNotice,
+  isRoomRouteGenerationCurrent,
+} from './room-navigation'
 import {
   AVALON_GAME_NAME,
   createAvalonLobbyClient,
@@ -49,10 +56,12 @@ import {
 import {
   clearDeletedLastRoomSession,
   clearRoomSession,
+  getRoomSessionInvalidationNotice,
   isRoomSessionStillValid,
   loadLastRoomSession,
   loadRoomSession,
   saveRoomSession,
+  validateRoomSession,
   type RoomSession,
 } from './room-session'
 import {
@@ -77,6 +86,14 @@ function errorMessage(error: unknown) {
   }
 
   return error instanceof Error ? error.message : '请求失败，请稍后重试。'
+}
+
+function roomInvalidationNotice(error: unknown) {
+  return getRoomSessionInvalidationNotice(error) ?? (
+    error instanceof Error && error.message === 'HTTP status 404'
+      ? '房间已被删除，已返回主页。'
+      : null
+  )
 }
 
 function phaseLabel(phase: string | undefined) {
@@ -109,6 +126,7 @@ function App() {
 }
 
 function LobbyRoute() {
+  const location = useLocation()
   const lobby = useMemo(() => createAvalonLobbyClient(), [])
   const devTools = useMemo(() => createDevToolsClient(webConfig.lobbyURL), [])
   const clientID = useMemo(() => getClientID(), [])
@@ -124,7 +142,19 @@ function LobbyRoute() {
   const [matches, setMatches] = useState<AvalonRoomSummary[]>([])
   const [selectedSeats, setSelectedSeats] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(() =>
+    getRoomNavigationNotice(location.state),
+  )
+  const roomNotice = getRoomNavigationNotice(location.state)
+  useEffect(() => {
+    if (roomNotice === null) return
+
+    setError(roomNotice)
+    navigate(location.pathname, {
+      replace: true,
+      state: consumeRoomNavigationNotice(location.state),
+    })
+  }, [location.pathname, location.state, navigate, roomNotice])
   const [devToolsEnabled, setDevToolsEnabled] = useState(false)
   const [devToken, setDevToken] = useState('')
   const requestInFlightRef = useRef(false)
@@ -257,7 +287,7 @@ function LobbyRoute() {
     <>
       <LobbyView
         busy={busy}
-        error={error}
+        error={roomNotice ?? error}
         lastRoomSession={lastRoomSession}
         devToken={devToken}
         devToolsEnabled={devToolsEnabled}
@@ -292,6 +322,7 @@ function RoomRoute() {
   const lobby = useMemo(() => createAvalonLobbyClient(), [])
   const devTools = useMemo(() => createDevToolsClient(webConfig.lobbyURL), [])
   const clientRef = useRef<AvalonClient | null>(null)
+  const routeGenerationRef = useRef(0)
   const [session, setSession] = useState<RoomSession | null>(() =>
     loadRoomSession(matchID),
   )
@@ -300,35 +331,54 @@ function RoomRoute() {
   const [error, setError] = useState<string | null>(null)
 
   const invalidateSession = useCallback(
-    (reason: string) => {
+    (reason: string, generation: number) => {
+      if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
+
       clientRef.current?.stop()
       clearRoomSession(matchID)
       setSession(null)
       setError(reason)
-      navigate('/')
+      navigate('/', { state: { roomNotice: reason } })
     },
     [matchID, navigate],
   )
 
-  const refreshRoom = useCallback(async (roomID: string, silent = false) => {
-    try {
-      const nextRoom = await lobby.getMatch(AVALON_GAME_NAME, roomID)
-      const nextRoomValue = nextRoom as AvalonMatch
-      if (!isRoomSessionStillValid(nextRoomValue, session?.playerID ?? '')) {
-        invalidateSession('你的房间座位已被释放，已返回主页。')
-        return
+  const refreshRoom = useCallback(
+    async (
+      roomID: string,
+      currentSession: RoomSession,
+      generation: number,
+      silent = false,
+    ) => {
+      if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
+
+      try {
+        const [nextRoom] = await Promise.all([
+          lobby.getMatch(AVALON_GAME_NAME, roomID),
+          validateRoomSession(webConfig.lobbyURL, currentSession),
+        ])
+        if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
+
+        const nextRoomValue = nextRoom as AvalonMatch
+        if (!isRoomSessionStillValid(nextRoomValue, currentSession)) {
+          invalidateSession('你的房间座位已被释放，已返回主页。', generation)
+          return
+        }
+        setRoom(nextRoomValue)
+      } catch (requestError) {
+        if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
+        const invalidationNotice = roomInvalidationNotice(requestError)
+        if (invalidationNotice !== null) {
+          invalidateSession(invalidationNotice, generation)
+          return
+        }
+        if (!silent) {
+          setError(`无法加载房间：${errorMessage(requestError)}`)
+        }
       }
-      setRoom(nextRoomValue)
-    } catch (requestError) {
-      if (requestError instanceof Error && requestError.message === 'HTTP status 404') {
-        invalidateSession('房间已被删除，已返回主页。')
-        return
-      }
-      if (!silent) {
-        setError(`无法加载房间：${errorMessage(requestError)}`)
-      }
-    }
-  }, [invalidateSession, lobby, session?.playerID])
+    },
+    [invalidateSession, lobby],
+  )
 
   useEffect(() => {
     setSession((currentSession) => {
@@ -349,6 +399,7 @@ function RoomRoute() {
       return
     }
 
+    const generation = ++routeGenerationRef.current
     let active = true
     let unsubscribe: () => void = () => undefined
     let client: AvalonClient | null = null
@@ -357,11 +408,14 @@ function RoomRoute() {
 
     const connect = async () => {
       try {
-        const initialRoom = await lobby.getMatch(AVALON_GAME_NAME, matchID)
-        if (!active) return
+        const [initialRoom] = await Promise.all([
+          lobby.getMatch(AVALON_GAME_NAME, matchID),
+          validateRoomSession(webConfig.lobbyURL, routeSession),
+        ])
+        if (!active || !isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
 
-        if (!isRoomSessionStillValid(initialRoom as AvalonMatch, routeSession.playerID)) {
-          invalidateSession('你的房间座位已被释放，已返回主页。')
+        if (!isRoomSessionStillValid(initialRoom as AvalonMatch, routeSession)) {
+          invalidateSession('你的房间座位已被释放，已返回主页。', generation)
           return
         }
 
@@ -379,12 +433,12 @@ function RoomRoute() {
         })
         clientRef.current = client
         unsubscribe = client.subscribe((nextState) => {
-          if (!active) return
+          if (!active || !isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
           setGameState(nextState as AvalonClientState | null)
           if (client?.matchData !== undefined) {
             const players = client.matchData as unknown as LobbyPlayer[]
-            if (!isRoomSessionStillValid({ players }, routeSession.playerID)) {
-              invalidateSession('你的房间座位已被释放，已返回主页。')
+            if (!isRoomSessionStillValid({ players }, routeSession)) {
+              invalidateSession('你的房间座位已被释放，已返回主页。', generation)
               return
             }
             setRoom((previousRoom) =>
@@ -399,9 +453,10 @@ function RoomRoute() {
         })
         client.start()
       } catch (requestError) {
-        if (active) {
-          if (requestError instanceof Error && requestError.message === 'HTTP status 404') {
-            invalidateSession('房间已被删除，已返回主页。')
+        if (active && isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) {
+          const invalidationNotice = roomInvalidationNotice(requestError)
+          if (invalidationNotice !== null) {
+            invalidateSession(invalidationNotice, generation)
           } else {
             setError(`无法连接房间：${errorMessage(requestError)}`)
           }
@@ -411,12 +466,15 @@ function RoomRoute() {
 
     void connect()
     const timer = window.setInterval(
-      () => void refreshRoom(matchID, true),
+      () => void refreshRoom(matchID, routeSession, generation, true),
       2500,
     )
 
     return () => {
       active = false
+      if (isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) {
+        routeGenerationRef.current += 1
+      }
       window.clearInterval(timer)
       unsubscribe()
       client?.stop()
@@ -463,23 +521,29 @@ function RoomRoute() {
   }
 
   const handleDeleteRoom = async (token: string) => {
+    const generation = routeGenerationRef.current
     await devTools.deleteRoom(matchID, token)
+    if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
     clientRef.current?.stop()
     clearRoomSession(matchID)
     setSession(null)
-    navigate('/')
+    navigate('/', { state: { roomNotice: '房间已被删除，已返回主页。' } })
   }
 
   const handleKickPlayer = async (playerID: string, token: string) => {
+    const generation = routeGenerationRef.current
     await devTools.kickPlayer(matchID, playerID, token)
+    if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
     if (playerID === routeSession?.playerID) {
       clientRef.current?.stop()
       clearRoomSession(matchID)
       setSession(null)
-      navigate('/')
+      navigate('/', { state: { roomNotice: '你的房间座位已被释放，已返回主页。' } })
       return
     }
-    await refreshRoom(matchID)
+    if (routeSession !== null) {
+      await refreshRoom(matchID, routeSession, generation)
+    }
   }
 
   if (routeSession === null) {
@@ -760,12 +824,11 @@ function LobbyView({
         </section>
       </div>
 
-      <details className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-5">
-        <summary className="cursor-pointer text-sm font-semibold text-slate-200">开发工具</summary>
-        <label className="mt-4 block text-sm text-slate-300" htmlFor="dev-token">开发管理员 Token</label>
-        <input className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 font-mono text-sm text-white" id="dev-token" onChange={(event) => onDevTokenChange(event.target.value)} placeholder="仅保存在当前页面内" type="password" value={devToken} />
-        <p className="mt-2 text-xs text-slate-500">开发工具状态：{devToolsEnabled ? '已启用' : '未启用'}</p>
-      </details>
+      <LobbyDevTools
+        enabled={devToolsEnabled}
+        onTokenChange={onDevTokenChange}
+        token={devToken}
+      />
 
       {lastRoomSession !== null && (
         <section className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-5 py-4">

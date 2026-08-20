@@ -3,6 +3,7 @@ export interface RoomSession {
   playerID: string
   credentials: string
   playerName: string
+  sessionID?: string
 }
 
 export interface RoomSessionStorage {
@@ -11,8 +12,24 @@ export interface RoomSessionStorage {
   removeItem: (key: string) => void
 }
 
+export class RoomSessionValidationHttpError extends Error {
+  readonly status: number
+
+  constructor(status: number) {
+    super(`HTTP status ${status}`)
+    this.name = 'RoomSessionValidationHttpError'
+    this.status = status
+  }
+}
+
+type Fetcher = typeof fetch
+
 interface RoomSessionRoom {
-  players: readonly { id: string | number; name?: string | null }[]
+  players: readonly {
+    id: string | number
+    name?: string | null
+    data?: unknown
+  }[]
 }
 
 export const ROOM_SESSION_KEY = 'avalon:room-session'
@@ -34,12 +51,16 @@ function isRoomSession(value: unknown): value is RoomSession {
   if (typeof value !== 'object' || value === null) return false
 
   const session = value as Partial<RoomSession>
-  return [
+  const requiredFieldsAreValid = [
     session.matchID,
     session.playerID,
     session.credentials,
     session.playerName,
   ].every((field) => typeof field === 'string' && field.length > 0)
+  return requiredFieldsAreValid && (
+    session.sessionID === undefined ||
+    (typeof session.sessionID === 'string' && session.sessionID.length > 0)
+  )
 }
 
 export function saveRoomSession(
@@ -129,7 +150,46 @@ export function getAvailableSeatIDs(
   )
 }
 
-export function isRoomSessionStillValid(room: RoomSessionRoom, playerID: string) {
-  const player = room.players.find((candidate) => String(candidate.id) === playerID)
-  return player?.name !== undefined && player.name !== null
+function readJoinSessionID(data: unknown) {
+  if (typeof data !== 'object' || data === null) return undefined
+  const sessionID = (data as Record<string, unknown>).sessionID
+  return typeof sessionID === 'string' && sessionID.length > 0
+    ? sessionID
+    : undefined
+}
+
+export function isRoomSessionStillValid(
+  room: RoomSessionRoom,
+  session: Pick<RoomSession, 'playerID' | 'sessionID'>,
+) {
+  const player = room.players.find(
+    (candidate) => String(candidate.id) === session.playerID,
+  )
+  if (player?.name === undefined || player.name === null) return false
+
+  const seatSessionID = readJoinSessionID(player.data)
+  if (session.sessionID === undefined) return seatSessionID === undefined
+  return seatSessionID === session.sessionID
+}
+
+export async function validateRoomSession(
+  baseURL: string,
+  session: Pick<RoomSession, 'matchID' | 'playerID' | 'credentials'>,
+  fetcher: Fetcher = fetch,
+) {
+  const response = await fetcher(
+    `${baseURL}/rooms/avalon/${encodeURIComponent(session.matchID)}/players/${encodeURIComponent(session.playerID)}/session`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session.credentials}` },
+    },
+  )
+  if (!response.ok) throw new RoomSessionValidationHttpError(response.status)
+}
+
+export function getRoomSessionInvalidationNotice(error: unknown) {
+  if (!(error instanceof RoomSessionValidationHttpError)) return null
+  if (error.status === 404) return '房间已被删除，已返回主页。'
+  if (error.status === 403) return '你的房间座位已被释放，已返回主页。'
+  return null
 }

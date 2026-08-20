@@ -47,6 +47,46 @@ function waitForClientState(
 }
 
 describe('Avalon development APIs', () => {
+  it('reports disabled status and keeps mutation routes unavailable', async () => {
+    const running = await startAvalonServer({
+      config: { ...config, devToolsEnabled: false, devAdminToken: undefined },
+      db: new MemoryStorage(),
+    })
+    const lobby = new LobbyClient({ server: baseURL(running) })
+
+    try {
+      const { matchID } = await lobby.createMatch('avalon', { numPlayers: 5 })
+      const status = await fetch(`${baseURL(running)}/dev/status`)
+      expect(status.status).toBe(200)
+      expect(await status.json()).toEqual({ enabled: false })
+
+      const deletion = await fetch(`${baseURL(running)}/dev/rooms/${matchID}`, {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer local-dev-token' },
+      })
+      expect(deletion.status).toBe(404)
+    } finally {
+      await running.close()
+    }
+  })
+
+  it('rejects an invalid development token when mutations are enabled', async () => {
+    const running = await startAvalonServer({ config, db: new MemoryStorage() })
+    const lobby = new LobbyClient({ server: baseURL(running) })
+
+    try {
+      const { matchID } = await lobby.createMatch('avalon', { numPlayers: 5 })
+      const deletion = await fetch(`${baseURL(running)}/dev/rooms/${matchID}`, {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer wrong-token' },
+      })
+      expect(deletion.status).toBe(401)
+      await expect(lobby.getMatch('avalon', matchID)).resolves.toMatchObject({ matchID })
+    } finally {
+      await running.close()
+    }
+  })
+
   it('does not expose a secret or client ID in public room summaries', async () => {
     const db = new MemoryStorage()
     const running = await startAvalonServer({ config, db })

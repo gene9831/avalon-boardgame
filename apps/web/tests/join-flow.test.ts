@@ -41,6 +41,7 @@ describe('pending join flow', () => {
       },
       {
         clientID: 'client-1',
+        createSessionID: () => 'join-session-1',
         gameName: 'avalon',
         playerName: ' Alice ',
       },
@@ -51,6 +52,7 @@ describe('pending join flow', () => {
       playerID: '0',
       credentials: 'credential-0',
       playerName: 'Alice',
+      sessionID: 'join-session-1',
     })
     expect(calls).toEqual([
       ['createMatch', 'avalon', { numPlayers: 5 }],
@@ -59,7 +61,7 @@ describe('pending join flow', () => {
         'avalon',
         'room-created',
         {
-          data: { clientID: 'client-1' },
+          data: { clientID: 'client-1', sessionID: 'join-session-1' },
           playerID: '0',
           playerName: 'Alice',
         },
@@ -77,6 +79,7 @@ describe('pending join flow', () => {
       },
       {
         clientID: 'client-1',
+        createSessionID: () => 'join-session-2',
         gameName: 'avalon',
         playerName: ' Bob ',
       },
@@ -90,7 +93,7 @@ describe('pending join flow', () => {
         'avalon',
         'room-existing',
         {
-          data: { clientID: 'client-1' },
+          data: { clientID: 'client-1', sessionID: 'join-session-2' },
           playerID: '3',
           playerName: 'Bob',
         },
@@ -102,10 +105,35 @@ describe('pending join flow', () => {
     await expect(
       executePendingJoin(fakeLobby, intent, {
         clientID: 'client-1',
+        createSessionID: () => 'join-session-3',
         gameName: 'avalon',
         playerName: '   ',
       }),
     ).rejects.toThrow('玩家名称不能为空')
     expect(calls).toEqual([])
+  })
+
+  it('keeps the public join session ID distinct from player credentials', async () => {
+    const result = await executePendingJoin(fakeLobby, intent, {
+      clientID: 'client-1',
+      createSessionID: () => 'opaque-join-session',
+      gameName: 'avalon',
+      playerName: 'Alice',
+    })
+
+    expect(result.sessionID).toBe('opaque-join-session')
+    expect(result.credentials).toBe('credential-3')
+    expect(result.sessionID).not.toBe(result.credentials)
+  })
+
+  it('namespaces default public session IDs away from credential UUIDs', async () => {
+    const result = await executePendingJoin(fakeLobby, intent, {
+      clientID: 'client-1',
+      gameName: 'avalon',
+      playerName: 'Alice',
+    })
+
+    expect(result.sessionID).toMatch(/^join-/)
+    expect(result.credentials).toBe('credential-3')
   })
 })

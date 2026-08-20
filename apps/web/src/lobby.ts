@@ -8,6 +8,11 @@ export interface LobbyPlayer {
   id: number
   name?: string
   isConnected?: boolean
+  data?: {
+    clientID?: string
+    sessionID?: string
+    [key: string]: unknown
+  }
 }
 
 export interface AvalonMatch {
