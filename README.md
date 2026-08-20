@@ -1,8 +1,8 @@
 # Avalon Board Game
 
-An online implementation of the base rules of *The Resistance: Avalon* for 5–10 players on a local network. The planned runtime uses React, TypeScript, Vite, boardgame.io, Socket.IO, and PostgreSQL.
+An online implementation of the base rules of *The Resistance: Avalon* for 5–10 players on a local network. The runtime uses React, TypeScript, Vite, boardgame.io, Socket.IO, and PostgreSQL.
 
-The repository is now a pnpm workspace. The shared Avalon rule core is implemented in `packages/game`; multiplayer transport, lobby/persistence, and the full game UI are implemented in subsequent steps.
+The repository is now a pnpm workspace. The shared Avalon rule core, multiplayer transport, Lobby flow, PostgreSQL persistence, seat-bound reconnect, and the first team proposal/vote UI slice are implemented. Quest, assassination, result presentation, and full LAN acceptance testing remain in progress.
 
 ## Workspace layout
 
@@ -41,7 +41,7 @@ Run the boardgame.io server and Lobby API:
 pnpm dev:server
 ```
 
-The server listens on game port `8000` and Lobby API port `8001` by default. Configure them with `AVALON_GAME_PORT`, `AVALON_LOBBY_PORT`, and `AVALON_ORIGINS`. The current server uses process-local memory storage for LAN development; PostgreSQL will be added through a later storage module.
+The server listens on game port `8000` and Lobby API port `8001` by default. Configure them with `AVALON_GAME_PORT`, `AVALON_LOBBY_PORT`, and `AVALON_ORIGINS`. When `DATABASE_URL` is configured, the server uses the PostgreSQL storage adapter; process-local memory storage is retained for tests and explicitly ephemeral development.
 
 Validate the current workspace:
 
@@ -57,6 +57,7 @@ pnpm typecheck
 ## Design references
 
 - [Confirmed game design](docs/superpowers/specs/2026-08-14-avalon-boardgame-design.md)
+- [Project status and next steps](docs/PROJECT_STATUS.md)
 - [Domain glossary](CONTEXT.md)
 - [Rule summary](docs/rules/rulebook-summary.md)
 - [Role visibility rules](docs/rules/role-visibility.md)
