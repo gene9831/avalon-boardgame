@@ -1,4 +1,4 @@
-import type { StorageAPI } from 'boardgame.io'
+import type { Server, StorageAPI } from 'boardgame.io'
 
 export interface MatchDeletionGuard {
   readonly unavailableMatchIDs: Set<string>
@@ -8,6 +8,70 @@ export interface MatchDeletionGuard {
 interface DeletionSafeStorage<TStorage> {
   storage: TStorage
   deletionGuard: MatchDeletionGuard
+  forceUpdateMetadata(
+    matchID: string,
+    update: (metadata: Server.MatchData) => void,
+  ): Server.MatchData | undefined | Promise<Server.MatchData | undefined>
+}
+
+interface MetadataVersion {
+  matchID: string
+  version: number
+}
+
+type VersionedMetadata = Server.MatchData & {
+  [metadataVersionKey]?: MetadataVersion
+}
+
+// This symbol is enumerable so boardgame.io's `{ ...metadata }` game updates
+// retain the version, while it remains absent from JSON responses.
+const metadataVersionKey = Symbol('avalon.metadataVersion')
+
+function getMetadataVersion(metadata: Server.MatchData): MetadataVersion | undefined {
+  return (metadata as VersionedMetadata)[metadataVersionKey]
+}
+
+function cloneMetadata(
+  metadata: Server.MatchData,
+  matchID: string,
+  version: number,
+): Server.MatchData {
+  const clone = structuredClone(metadata) as VersionedMetadata
+  Object.defineProperty(clone, metadataVersionKey, {
+    configurable: true,
+    enumerable: true,
+    value: Object.freeze({ matchID, version }),
+    writable: false,
+  })
+  return clone
+}
+
+function hasCurrentMetadataVersion(
+  matchID: string,
+  metadata: Server.MatchData,
+  metadataVersions: Map<string, number>,
+) {
+  const marker = getMetadataVersion(metadata)
+  return (
+    marker?.matchID === matchID &&
+    marker.version === (metadataVersions.get(matchID) ?? 0)
+  )
+}
+
+function versionFetchedMetadata<O extends StorageAPI.FetchOpts>(
+  matchID: string,
+  result: StorageAPI.FetchResult<O>,
+  version: number,
+): StorageAPI.FetchResult<O> {
+  const resultWithMetadata = result as StorageAPI.FetchResult<O> & {
+    metadata?: Server.MatchData
+  }
+  if (resultWithMetadata.metadata === undefined) return result
+
+  return {
+    ...result,
+    metadata: cloneMetadata(resultWithMetadata.metadata, matchID, version),
+  } as StorageAPI.FetchResult<O>
 }
 
 function emptyFetch<O extends StorageAPI.FetchOpts>(opts: O): StorageAPI.FetchResult<O> {
@@ -33,6 +97,17 @@ export function createDeletionSafeStorage(
   rawStorage: StorageAPI.Sync | StorageAPI.Async,
 ): DeletionSafeStorage<StorageAPI.Sync | StorageAPI.Async> {
   const unavailableMatchIDs = new Set<string>()
+  const metadataVersions = new Map<string, number>()
+  const metadataWriteQueues = new Map<string, Promise<void>>()
+  const enqueueMetadataWrite = <T>(
+    matchID: string,
+    write: () => Promise<T>,
+  ): Promise<T> => {
+    const previousWrite = metadataWriteQueues.get(matchID) ?? Promise.resolve()
+    const currentWrite = previousWrite.then(write)
+    metadataWriteQueues.set(matchID, currentWrite.then(() => undefined, () => undefined))
+    return currentWrite
+  }
   const deletionGuard: MatchDeletionGuard = {
     unavailableMatchIDs,
     markMatchDeleted: (matchID) => unavailableMatchIDs.add(matchID),
@@ -40,11 +115,38 @@ export function createDeletionSafeStorage(
 
   if (rawStorage.type() === 0) {
     const syncStorage = rawStorage as StorageAPI.Sync
+    const forceUpdateMetadata = (
+      matchID: string,
+      update: (metadata: Server.MatchData) => void,
+    ): Server.MatchData | undefined => {
+      if (unavailableMatchIDs.has(matchID)) return undefined
+
+      const version = metadataVersions.get(matchID) ?? 0
+      const result = syncStorage.fetch(matchID, { metadata: true })
+      if (unavailableMatchIDs.has(matchID) || result.metadata === undefined) {
+        return undefined
+      }
+
+      const updatedMetadata = cloneMetadata(result.metadata, matchID, version)
+      update(updatedMetadata)
+      const nextVersion = version + 1
+      syncStorage.setMetadata(
+        matchID,
+        cloneMetadata(updatedMetadata, matchID, nextVersion),
+      )
+      metadataVersions.set(matchID, nextVersion)
+      return cloneMetadata(updatedMetadata, matchID, nextVersion)
+    }
     const storage: StorageAPI.Sync = {
       type: () => 0,
       connect: () => syncStorage.connect(),
       createMatch: (matchID, opts) => {
-        if (!unavailableMatchIDs.has(matchID)) syncStorage.createMatch(matchID, opts)
+        if (unavailableMatchIDs.has(matchID)) return
+        syncStorage.createMatch(matchID, {
+          ...opts,
+          metadata: cloneMetadata(opts.metadata, matchID, 0),
+        })
+        metadataVersions.set(matchID, 0)
       },
       setState: (matchID, state, deltalog) => {
         if (!unavailableMatchIDs.has(matchID)) {
@@ -52,13 +154,21 @@ export function createDeletionSafeStorage(
         }
       },
       setMetadata: (matchID, metadata) => {
-        if (!unavailableMatchIDs.has(matchID)) {
-          syncStorage.setMetadata(matchID, metadata)
-        }
+        if (
+          unavailableMatchIDs.has(matchID) ||
+          !hasCurrentMetadataVersion(matchID, metadata, metadataVersions)
+        ) return
+
+        const version = metadataVersions.get(matchID) ?? 0
+        syncStorage.setMetadata(matchID, cloneMetadata(metadata, matchID, version + 1))
+        metadataVersions.set(matchID, version + 1)
       },
       fetch: (matchID, opts) => {
         if (unavailableMatchIDs.has(matchID)) return emptyFetch(opts)
-        return syncStorage.fetch(matchID, opts)
+        const version = metadataVersions.get(matchID) ?? 0
+        const result = syncStorage.fetch(matchID, opts)
+        if (unavailableMatchIDs.has(matchID)) return emptyFetch(opts)
+        return versionFetchedMetadata(matchID, result, version)
       },
       wipe: (matchID) => {
         deletionGuard.markMatchDeleted(matchID)
@@ -67,15 +177,47 @@ export function createDeletionSafeStorage(
       listMatches: (opts) =>
         syncStorage.listMatches(opts).filter((matchID) => !unavailableMatchIDs.has(matchID)),
     }
-    return { storage, deletionGuard }
+    return { storage, deletionGuard, forceUpdateMetadata }
   }
 
   const asyncStorage = rawStorage as StorageAPI.Async
+  const forceUpdateMetadata = async (
+    matchID: string,
+    update: (metadata: Server.MatchData) => void,
+  ): Promise<Server.MatchData | undefined> => {
+    let updatedMetadata: Server.MatchData | undefined
+    await enqueueMetadataWrite(matchID, async () => {
+      const version = metadataVersions.get(matchID) ?? 0
+      const wasUnavailable = unavailableMatchIDs.has(matchID)
+      if (wasUnavailable) return
+
+      const result = await asyncStorage.fetch(matchID, { metadata: true })
+      if (unavailableMatchIDs.has(matchID) || result.metadata === undefined) {
+        return
+      }
+
+      const currentMetadata = cloneMetadata(result.metadata, matchID, version)
+      update(currentMetadata)
+      const nextVersion = version + 1
+      await asyncStorage.setMetadata(
+        matchID,
+        cloneMetadata(currentMetadata, matchID, nextVersion),
+      )
+      metadataVersions.set(matchID, nextVersion)
+      updatedMetadata = cloneMetadata(currentMetadata, matchID, nextVersion)
+    })
+    return updatedMetadata
+  }
   const storage: StorageAPI.Async = {
     type: () => 1,
     connect: () => asyncStorage.connect(),
     createMatch: async (matchID, opts) => {
-      if (!unavailableMatchIDs.has(matchID)) await asyncStorage.createMatch(matchID, opts)
+      if (unavailableMatchIDs.has(matchID)) return
+      await asyncStorage.createMatch(matchID, {
+        ...opts,
+        metadata: cloneMetadata(opts.metadata, matchID, 0),
+      })
+      metadataVersions.set(matchID, 0)
     },
     setState: async (matchID, state, deltalog) => {
       if (!unavailableMatchIDs.has(matchID)) {
@@ -83,13 +225,31 @@ export function createDeletionSafeStorage(
       }
     },
     setMetadata: async (matchID, metadata) => {
-      if (!unavailableMatchIDs.has(matchID)) {
-        await asyncStorage.setMetadata(matchID, metadata)
-      }
+      await enqueueMetadataWrite(matchID, async () => {
+        if (
+          unavailableMatchIDs.has(matchID) ||
+          !hasCurrentMetadataVersion(matchID, metadata, metadataVersions)
+        ) return
+
+        const version = metadataVersions.get(matchID) ?? 0
+        await asyncStorage.setMetadata(
+          matchID,
+          cloneMetadata(metadata, matchID, version + 1),
+        )
+        metadataVersions.set(matchID, version + 1)
+      })
     },
     fetch: async (matchID, opts) => {
+      const version = metadataVersions.get(matchID) ?? 0
+      const wasUnavailable = unavailableMatchIDs.has(matchID)
+      if (wasUnavailable) return emptyFetch(opts)
+      const result = await asyncStorage.fetch(matchID, opts)
       if (unavailableMatchIDs.has(matchID)) return emptyFetch(opts)
-      return asyncStorage.fetch(matchID, opts)
+      return versionFetchedMetadata(
+        matchID,
+        result,
+        version,
+      )
     },
     wipe: async (matchID) => {
       deletionGuard.markMatchDeleted(matchID)
@@ -100,5 +260,5 @@ export function createDeletionSafeStorage(
       return matchIDs.filter((matchID) => !unavailableMatchIDs.has(matchID))
     },
   }
-  return { storage, deletionGuard }
+  return { storage, deletionGuard, forceUpdateMetadata }
 }

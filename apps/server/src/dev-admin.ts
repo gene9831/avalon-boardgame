@@ -50,6 +50,10 @@ export class AvalonSocketRegistry {
 interface AdminContext {
   config: AvalonServerConfig
   db: StorageAPI.Sync | StorageAPI.Async
+  forceUpdateMetadata(
+    matchID: string,
+    update: (metadata: Server.MatchData) => void,
+  ): Server.MatchData | undefined | Promise<Server.MatchData | undefined>
   deletionGuard: MatchDeletionGuard
   registry: AvalonSocketRegistry
   queues: { getMatchQueue(matchID: string): MatchQueue }
@@ -117,13 +121,18 @@ export function registerDevAdminRoutes(
       const numericPlayerID = Number(playerID)
       const player = metadata.players[numericPlayerID]
       if (player === undefined || player.name === undefined) ctx.throw(409)
-      const updatedMetadata: Server.MatchData = structuredClone(metadata)
-      const updatedPlayer = updatedMetadata.players[numericPlayerID]
-      delete updatedPlayer.name
-      delete updatedPlayer.data
-      updatedPlayer.isConnected = false
-      updatedPlayer.credentials = randomUUID()
-      await context.db.setMetadata(matchID, updatedMetadata)
+      const updatedMetadata = await context.forceUpdateMetadata(matchID, (currentMetadata) => {
+        const updatedPlayer = currentMetadata.players[numericPlayerID]
+        if (updatedPlayer === undefined || updatedPlayer.name === undefined) ctx.throw(409)
+        delete updatedPlayer.name
+        delete updatedPlayer.data
+        updatedPlayer.isConnected = false
+        updatedPlayer.credentials = randomUUID()
+      })
+      if (updatedMetadata === undefined) {
+        ctx.throw(404)
+        throw new Error('unreachable')
+      }
       context.registry.disconnectPlayer(matchID, playerID)
       return toAvalonRoomSummary(matchID, updatedMetadata, state)
     })
