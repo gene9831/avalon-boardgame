@@ -10,7 +10,7 @@
 
 当前阶段：**LAN MVP 开发中 / 游戏流程 UI 未闭环**
 
-当前 HEAD：`f6e4635 feat(web): add team proposal and voting UI`
+当前分支和提交以 `git branch --show-current`、`git log -1 --oneline` 为准；本文件不固定记录 HEAD。
 
 已完成的基础能力：
 
@@ -20,6 +20,7 @@
 - PostgreSQL 持久化、房间列表过滤和日志级联删除。
 - 座位绑定、浏览器 client ID 防重复占座、房间路由和凭据重连。
 - Web 端角色信息、队伍提案和全员队伍投票。
+- Web 主页创建/加入房间入口、原生玩家名称弹窗、名称 localStorage 自动复用和失败重试。
 
 当前最大缺口：**任务出牌、刺杀、结算展示和 5–10 个真实浏览器的完整局域网验收**。
 
@@ -63,6 +64,7 @@
 | Socket.IO 游戏服务 | ✅ | 游戏端口 8000，Lobby API 8001；支持独立 match。 |
 | PostgreSQL 存储 | ✅ | `PostgresStorage`、schema、delta logs、列表过滤和 wipe 已实现；本地集成测试可执行。 |
 | 创建/加入/列出房间 | ✅ | Web Lobby 和 boardgame.io Lobby 流程已接入。 |
+| 玩家名称与入座入口 | ✅ | 主页不再内嵌名称表单；创建/加入前使用原生 `<dialog>` 收集名称，保存后自动复用，确认前不创建房间或占座。 |
 | 座位绑定与重连 | ✅ | 房间路由、按房间保存凭据、client ID 防重复占座、重新连接和清除本机凭据已实现。 |
 | Debug Panel 默认收起 | ✅ | 使用 boardgame.io `debug.collapseOnLoad`，仍可手动展开。 |
 | 角色与阶段展示 | ✅ | 当前房间页显示自己的角色、阵营和可见邪恶玩家。 |
@@ -114,7 +116,7 @@
 最近一次验证日期：2026-08-20
 
 ```text
-pnpm test       ✅ packages/game 28 tests, apps/server 13 tests, apps/web 12 tests
+pnpm test       ✅ packages/game 28 tests, apps/server 13 tests, apps/web 18 tests
 pnpm build      ✅ game typecheck + server typecheck + web TypeScript/Vite build
 pnpm lint       ✅ oxlint
 pnpm typecheck  ✅ game + server + web TypeScript checks
@@ -125,7 +127,7 @@ pnpm typecheck  ✅ game + server + web TypeScript checks
 ## 当前架构与运行方式
 
 ```text
-浏览器 :5173
+浏览器 :5183
   ├── Lobby API :8001
   └── Socket.IO 游戏服务 :8000
           └── boardgame.io Server
@@ -136,7 +138,7 @@ pnpm typecheck  ✅ game + server + web TypeScript checks
 
 ```bash
 # 终端 1：游戏服务和 Lobby API
-AVALON_ORIGINS=http://192.168.100.117:5173,http://192.168.100.118:5173,http://localhost:5173 pnpm dev:server
+pnpm dev:server
 
 # 终端 2：Vite Web
 pnpm dev
@@ -145,10 +147,10 @@ pnpm dev
 其他设备访问：
 
 ```text
-http://192.168.100.117:5173/
+http://192.168.100.117:5183/
 ```
 
-服务端会从 `apps/server/.env.local` 读取 `DATABASE_URL`；该文件不得提交到 Git。
+服务端会从 `apps/server/.env.local` 读取 `DATABASE_URL` 和 `AVALON_ORIGINS`；当前局域网来源已配置为 `localhost:5183`、`127.0.0.1:5183`、`192.168.100.117:5183` 和 `192.168.100.118:5183`。该文件不得提交到 Git。
 
 ## 重要约束与已知问题
 
@@ -173,6 +175,10 @@ http://192.168.100.117:5173/
 | `d836eb7` | 修复无 `crypto.randomUUID` 环境下的 Web fallback |
 | `b136a01` | Debug Panel 默认收起 |
 | `f6e4635` | 队伍提案与投票 UI |
+| `6a3fe1c` | 保存可复用玩家名称 |
+| `b63ed55` | 抽取创建/加入房间流程 |
+| `23afdb6` | 补充创建/加入流程回归断言 |
+| `089e943` | 玩家名称原生弹窗与自动复用 |
 
 每个独立模块完成后应：
 
