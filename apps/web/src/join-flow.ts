@@ -1,4 +1,5 @@
 import type { RoomSession } from './room-session'
+import { createClientID } from './client-identity'
 
 export type PendingJoin =
   | { type: 'create'; numPlayers: number }
@@ -13,7 +14,7 @@ export interface LobbyJoinClient {
     gameName: string,
     matchID: string,
     options: {
-      data: { clientID: string }
+      data: { clientID: string; sessionID: string }
       playerID: string
       playerName: string
     },
@@ -25,6 +26,7 @@ export async function executePendingJoin(
   intent: PendingJoin,
   options: {
     clientID: string
+    createSessionID?: () => string
     gameName: string
     playerName: string
   },
@@ -33,6 +35,7 @@ export async function executePendingJoin(
   if (playerName.length === 0) {
     throw new Error('玩家名称不能为空')
   }
+  const sessionID = options.createSessionID?.() ?? `join-${createClientID()}`
 
   let matchID: string
   let playerID: string
@@ -49,7 +52,7 @@ export async function executePendingJoin(
   }
 
   const joined = await lobby.joinMatch(options.gameName, matchID, {
-    data: { clientID: options.clientID },
+    data: { clientID: options.clientID, sessionID },
     playerID,
     playerName,
   })
@@ -59,5 +62,6 @@ export async function executePendingJoin(
     playerID: joined.playerID,
     credentials: joined.playerCredentials,
     playerName,
+    sessionID,
   }
 }
