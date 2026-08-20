@@ -7,6 +7,7 @@ import {
   listAvalonRoomSummaries,
   toAvalonRoomSummary,
 } from './room-directory'
+import type { MatchDeletionGuard } from './storage/deletion-safe'
 
 type MatchQueue = { add<T>(task: () => Promise<T>): Promise<T> }
 type SocketLike = { id: string; disconnect(close?: boolean): void; on(event: string, listener: (...args: any[]) => void): void }
@@ -49,6 +50,7 @@ export class AvalonSocketRegistry {
 interface AdminContext {
   config: AvalonServerConfig
   db: StorageAPI.Sync | StorageAPI.Async
+  deletionGuard: MatchDeletionGuard
   registry: AvalonSocketRegistry
   queues: { getMatchQueue(matchID: string): MatchQueue }
   unavailableMatchIDs: Set<string>
@@ -94,7 +96,7 @@ export function registerDevAdminRoutes(
     authenticate(ctx, context.config)
     const matchID = ctx.params.matchID
     await context.queues.getMatchQueue(matchID).add(async () => {
-      context.unavailableMatchIDs.add(matchID)
+      context.deletionGuard.markMatchDeleted(matchID)
       context.registry.disconnectMatch(matchID)
       try {
         await context.db.wipe(matchID)
