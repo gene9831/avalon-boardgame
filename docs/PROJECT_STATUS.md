@@ -18,11 +18,11 @@
 - boardgame.io phases、stages、activePlayers、Socket.IO 多人同步。
 - 服务端权威角色、秘密状态和 `playerView`。
 - PostgreSQL 持久化、房间列表过滤和日志级联删除。
-- 座位绑定、浏览器 client ID 防重复占座、每次加入独立 session ID、房间路由和凭据重连。
+- 座位绑定、浏览器 client ID 防重复占座、房间路由、凭据重连和服务端凭据会话校验。
 - Web 主页按等待中、进行中、已结束列出全部 Avalon 房间，并提供分页和开发删除入口。
 - Web 端角色信息、队伍提案和全员队伍投票。
 - Web 主页创建/加入房间入口、原生玩家名称弹窗、名称 localStorage 自动复用和失败重试。
-- 开发模式房间页控制：可删除任意状态房间、在大厅踢出占用座位；删除会阻止断线回调重新写回房间，被删除/踢出后会清理失效凭据并返回主页。
+- 开发模式房间页控制：可删除任意状态房间、在大厅踢出占用座位；删除 ID 在进程生命周期内保持不可用，匿名 Socket.IO 同步和延迟写入都不能复活房间，被删除/踢出后会清理失效凭据并返回主页；活动房间的过期 metadata 快照也不能恢复旧名称或凭据，kick 会在旧写入之后权威落盘。
 
 当前最大缺口：**任务出牌、刺杀、结算展示和 5–10 个真实浏览器的完整局域网验收**。
 
@@ -67,12 +67,12 @@
 | PostgreSQL 存储 | ✅ | `PostgresStorage`、schema、delta logs、列表过滤和 wipe 已实现；本地集成测试可执行。 |
 | 创建/加入/列出房间 | ✅ | Web Lobby 创建/加入流程已接入；主页通过无秘密状态目录分别展示 lobby/playing/finished 房间并分页。 |
 | 玩家名称与入座入口 | ✅ | 主页不再内嵌名称表单；创建/加入前使用原生 `<dialog>` 收集名称，保存后自动复用，确认前不创建房间或占座。 |
-| 座位绑定与重连 | ✅ | 房间路由、按房间保存凭据、client ID 防重复占座、每次加入的公开不透明 session ID 校验、重新连接和清除本机凭据已实现。旧 RoomSession 仅在服务端座位同样没有 session ID 时兼容。 |
+| 座位绑定与重连 | ✅ | 房间路由、按房间保存凭据、client ID 防重复占座和重新连接已实现。房间首次加载与轮询通过只返回 204/403/404 的服务端端点校验私有 player credential；公开 session ID 仅作提前失效优化，不能授权会话。 |
 | Debug Panel 默认收起 | ✅ | 使用 boardgame.io `debug.collapseOnLoad`，仍可手动展开。 |
 | 角色与阶段展示 | ✅ | 当前房间页显示自己的角色、阵营和可见邪恶玩家。 |
 | 队伍提案 | ✅ | 队长可选择正确人数，动作转发到服务端 `proposeTeam`。 |
 | 队伍投票 | ✅ | 所有玩家可独立提交 approve/reject；只显示自己的提交状态。 |
-| 开发房间删除与踢人 | ✅ | 主页和房间页开发控制默认收起；删除支持 lobby/playing/finished，踢人仅支持 lobby；连接中删除不会被延迟断线写入复活，快速复用座位会使旧会话失效。Web tests: 35 passed. |
+| 开发房间删除与踢人 | ✅ | `/dev/status` 确认启用后才显示主页 Token 面板；删除支持 lobby/playing/finished，踢人仅支持 lobby；连接中删除、匿名同步和延迟写入不会复活房间，快速复用座位即使复制旧公开数据也会由凭据校验拒绝旧会话；活动房间 metadata 使用按房间版本保护，延迟 fetch 不会被重新标记为当前版本，kick 后会在旧写入之后权威落盘。Server tests: 31 passed；Web tests: 39 passed. |
 | 任务出牌 UI | ⬜ | 服务端规则已完成，Web 端尚未提供 Success/Fail 操作。 |
 | 任务历史与公开结果 | ⬜ | `questHistory` 已在游戏状态，Web 端尚未展示。 |
 | 刺杀 UI 与最终结算 | ⬜ | 服务端 `assassinate` 已完成，Web 端尚未提供目标选择和结果页。 |
@@ -119,9 +119,9 @@
 最近一次验证日期：2026-08-20
 
 ```text
-pnpm test       ✅ packages/game 28 tests, apps/server 20 tests, apps/web 35 tests
+pnpm test       ✅ packages/game 28 tests, apps/server 31 tests, apps/web 39 tests（共 98）
 pnpm build      ✅ game typecheck + server typecheck + web TypeScript/Vite build
-pnpm lint       ✅ oxlint
+pnpm lint       ✅ exit 0；保留 1 个既有 App.tsx `sections` exhaustive-deps warning
 pnpm typecheck  ✅ game + server + web TypeScript checks
 ```
 
@@ -157,9 +157,11 @@ http://192.168.100.117:5183/
 
 ## 重要约束与已知问题
 
-- `playerCredentials` 是 boardgame.io 的座位访问凭据，当前保存在浏览器 `localStorage`，用于刷新和重连；`clientID` 仅用于防止同一浏览器在同一房间占多个座位。每次加入还会生成独立、公开且不具认证能力的 `sessionID`，用于识别座位是否已被替换；它不是凭据。
+- `playerCredentials` 是 boardgame.io 的座位访问凭据，当前保存在浏览器 `localStorage`，用于刷新、重连和服务端会话校验；校验请求只在 Authorization header 中发送凭据，响应不返回凭据。`clientID` 仅用于防止同一浏览器在同一房间占多个座位。每次加入还会生成独立、公开且不具认证能力的 `sessionID`，它只能提前识别明显替换，不能作为授权依据。
+- 已删除的 match ID 在当前服务进程生命周期内不允许复用；这是防止 boardgame.io 缺失房间按需同步复活和旧世代延迟写入污染的安全边界。正常创建继续使用随机新 ID。
 - 同一浏览器配置的多个 Tab 共享 `localStorage`，因此属于同一个客户端；多人测试必须使用不同浏览器、浏览器配置或设备。
 - 隐私窗口通常与普通窗口隔离，但同一隐私会话内的多个 Tab/窗口通常仍共享身份；关闭全部隐私窗口后本地凭据会消失，服务器座位不一定释放。
+- 开发房间控制需要在服务端 `.env.local` 同时设置 `AVALON_DEV_TOOLS=true` 和非空 `AVALON_DEV_ADMIN_TOKEN`；本地测试时由操作者手动输入页面，Token 不得提交、嵌入 Web 配置或持久化，其他场景仍是服务器 secret。
 - 不配置自动超时；断线玩家可能阻塞当前阶段，这是 MVP 的明确设计选择。
 - Debug Panel 是只读诊断入口，默认收起；不能绕过 `playerView` 或修改游戏状态。
 - 当前 Web 组件以一个房间页文件和阶段面板为主，任务/刺杀完成后再评估是否需要进一步拆分。
@@ -188,6 +190,12 @@ http://192.168.100.117:5183/
 | `1e9c20c` | 阻止连接中删除房间被延迟断线写入复活 |
 | `952c7fb` | 开发 mutation 端点 404 时保留本地会话 |
 | `22190a7` | 使用每次加入 session ID 识别快速复用座位 |
+| `16c723b` | 永久保留删除房间 tombstone，阻止匿名同步复活和 ID 复用 |
+| `b46535b` | 添加只返回成功/未授权/不存在的服务端房间凭据校验 |
+| `5bb570c` | 房间首次加载与轮询接入凭据校验，并按状态隐藏主页开发 Token 面板 |
+| `93bf0a9` | 显式覆盖删除后的延迟 delta log 写入 |
+| `605999c` | 为活动房间 metadata 增加 sync/async 版本保护，拒绝 kick 后的过期写入 |
+| `3a61898` | 修复延迟 metadata fetch 版本绑定，并让 kick 在旧写入后权威落盘 |
 
 每个独立模块完成后应：
 
