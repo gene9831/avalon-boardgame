@@ -11,6 +11,10 @@ export interface RoomSessionStorage {
   removeItem: (key: string) => void
 }
 
+interface RoomSessionRoom {
+  players: readonly { id: string | number; name?: string | null }[]
+}
+
 export const ROOM_SESSION_KEY = 'avalon:room-session'
 export const LAST_ROOM_SESSION_KEY = 'avalon:last-room'
 
@@ -92,6 +96,17 @@ export function clearRoomSession(
   }
 }
 
+export function clearDeletedLastRoomSession(
+  matchID: string,
+  lastRoomSession: RoomSession | null,
+  storage: RoomSessionStorage = browserStorage(),
+) {
+  if (lastRoomSession?.matchID !== matchID) return lastRoomSession
+
+  clearRoomSession(matchID, storage)
+  return null
+}
+
 function readRoomSession(raw: string | null): RoomSession | null {
   if (raw === null) return null
 
@@ -112,4 +127,9 @@ export function getAvailableSeatIDs(
   return Array.from({ length: numPlayers }, (_, index) => String(index)).filter(
     (playerID) => !occupied.has(playerID),
   )
+}
+
+export function isRoomSessionStillValid(room: RoomSessionRoom, playerID: string) {
+  const player = room.players.find((candidate) => String(candidate.id) === playerID)
+  return player?.name !== undefined && player.name !== null
 }

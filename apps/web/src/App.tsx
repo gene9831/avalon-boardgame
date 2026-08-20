@@ -29,14 +29,15 @@ import {
 
 import { webConfig } from './config'
 import { getClientID } from './client-identity'
+import { createDevToolsClient } from './dev-tools'
 import { executePendingJoin, type PendingJoin } from './join-flow'
+import { RoomDevTools } from './RoomDevTools'
 import { RoomGamePanel } from './RoomGamePanel'
 import {
   AVALON_GAME_NAME,
   createAvalonLobbyClient,
   getMatchPlayerCount,
   getOccupiedPlayerIDs,
-  isMatchFull,
   type AvalonMatch,
   type LobbyPlayer,
 } from './lobby'
@@ -46,13 +47,23 @@ import {
   savePlayerName,
 } from './player-name'
 import {
+  clearDeletedLastRoomSession,
   clearRoomSession,
-  getAvailableSeatIDs,
+  isRoomSessionStillValid,
   loadLastRoomSession,
   loadRoomSession,
   saveRoomSession,
   type RoomSession,
 } from './room-session'
+import {
+  canJoinRoom,
+  fetchRoomSummaries,
+  getOccupiedRoomPlayerIDs,
+  getRoomPlayerCount,
+  type AvalonRoomSummary,
+  type RoomStatus,
+  paginateRooms,
+} from './room-directory'
 
 type AvalonClient = ReturnType<typeof Client<AvalonG>>
 type AvalonRawClientState = NonNullable<ReturnType<AvalonClient['getState']>>
@@ -99,30 +110,39 @@ function App() {
 
 function LobbyRoute() {
   const lobby = useMemo(() => createAvalonLobbyClient(), [])
+  const devTools = useMemo(() => createDevToolsClient(webConfig.lobbyURL), [])
   const clientID = useMemo(() => getClientID(), [])
   const navigate = useNavigate()
-  const lastRoomSession = useMemo(() => loadLastRoomSession(), [])
+  const [lastRoomSession, setLastRoomSession] = useState<RoomSession | null>(() =>
+    loadLastRoomSession(),
+  )
   const [pendingJoin, setPendingJoin] = useState<PendingJoin | null>(null)
   const [nameDialogOpen, setNameDialogOpen] = useState(false)
   const [nameDialogValue, setNameDialogValue] = useState('')
   const [nameDialogError, setNameDialogError] = useState<string | null>(null)
   const [numPlayers, setNumPlayers] = useState(5)
-  const [matches, setMatches] = useState<AvalonMatch[]>([])
+  const [matches, setMatches] = useState<AvalonRoomSummary[]>([])
   const [selectedSeats, setSelectedSeats] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [devToolsEnabled, setDevToolsEnabled] = useState(false)
+  const [devToken, setDevToken] = useState('')
   const requestInFlightRef = useRef(false)
 
   const refreshMatches = useCallback(async () => {
     try {
-      const result = await lobby.listMatches(AVALON_GAME_NAME, {
-        isGameover: false,
-      })
-      setMatches(result.matches as AvalonMatch[])
+      setMatches(await fetchRoomSummaries(webConfig.lobbyURL))
     } catch (requestError) {
       setError(`无法加载房间列表：${errorMessage(requestError)}`)
     }
-  }, [lobby])
+  }, [])
+
+  useEffect(() => {
+    void devTools
+      .getStatus()
+      .then((status) => setDevToolsEnabled(status.enabled))
+      .catch(() => setDevToolsEnabled(false))
+  }, [devTools])
 
   useEffect(() => {
     void refreshMatches()
@@ -220,18 +240,35 @@ function LobbyRoute() {
     navigate(`/rooms/${encodeURIComponent(lastRoomSession.matchID)}`)
   }
 
+  const handleDeleteRoom = async (matchID: string) => {
+    if (!devToolsEnabled || devToken.length === 0) return
+    if (!window.confirm(`确定删除房间 ${matchID} 吗？`)) return
+
+    try {
+      await devTools.deleteRoom(matchID, devToken)
+      setLastRoomSession(clearDeletedLastRoomSession(matchID, lastRoomSession))
+      await refreshMatches()
+    } catch (requestError) {
+      setError(`无法删除房间：${errorMessage(requestError)}`)
+    }
+  }
+
   return (
     <>
       <LobbyView
         busy={busy}
         error={error}
         lastRoomSession={lastRoomSession}
+        devToken={devToken}
+        devToolsEnabled={devToolsEnabled}
         matches={matches}
         numPlayers={numPlayers}
         onCreate={handleCreate}
         onJoin={handleJoin}
         onRefresh={() => void refreshMatches()}
         onResumeRoom={handleResumeRoom}
+        onDeleteRoom={handleDeleteRoom}
+        onDevTokenChange={setDevToken}
         selectedSeats={selectedSeats}
         setNumPlayers={setNumPlayers}
         setSelectedSeats={setSelectedSeats}
@@ -253,6 +290,7 @@ function RoomRoute() {
   const { matchID = '' } = useParams()
   const navigate = useNavigate()
   const lobby = useMemo(() => createAvalonLobbyClient(), [])
+  const devTools = useMemo(() => createDevToolsClient(webConfig.lobbyURL), [])
   const clientRef = useRef<AvalonClient | null>(null)
   const [session, setSession] = useState<RoomSession | null>(() =>
     loadRoomSession(matchID),
@@ -261,16 +299,36 @@ function RoomRoute() {
   const [gameState, setGameState] = useState<AvalonClientState | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  const invalidateSession = useCallback(
+    (reason: string) => {
+      clientRef.current?.stop()
+      clearRoomSession(matchID)
+      setSession(null)
+      setError(reason)
+      navigate('/')
+    },
+    [matchID, navigate],
+  )
+
   const refreshRoom = useCallback(async (roomID: string, silent = false) => {
     try {
       const nextRoom = await lobby.getMatch(AVALON_GAME_NAME, roomID)
-      setRoom(nextRoom as AvalonMatch)
+      const nextRoomValue = nextRoom as AvalonMatch
+      if (!isRoomSessionStillValid(nextRoomValue, session?.playerID ?? '')) {
+        invalidateSession('你的房间座位已被释放，已返回主页。')
+        return
+      }
+      setRoom(nextRoomValue)
     } catch (requestError) {
+      if (requestError instanceof Error && requestError.message === 'HTTP status 404') {
+        invalidateSession('房间已被删除，已返回主页。')
+        return
+      }
       if (!silent) {
         setError(`无法加载房间：${errorMessage(requestError)}`)
       }
     }
-  }, [lobby])
+  }, [invalidateSession, lobby, session?.playerID])
 
   useEffect(() => {
     setSession((currentSession) => {
@@ -302,6 +360,11 @@ function RoomRoute() {
         const initialRoom = await lobby.getMatch(AVALON_GAME_NAME, matchID)
         if (!active) return
 
+        if (!isRoomSessionStillValid(initialRoom as AvalonMatch, routeSession.playerID)) {
+          invalidateSession('你的房间座位已被释放，已返回主页。')
+          return
+        }
+
         setRoom(initialRoom as AvalonMatch)
         client = Client({
           debug: { collapseOnLoad: true },
@@ -319,12 +382,17 @@ function RoomRoute() {
           if (!active) return
           setGameState(nextState as AvalonClientState | null)
           if (client?.matchData !== undefined) {
+            const players = client.matchData as unknown as LobbyPlayer[]
+            if (!isRoomSessionStillValid({ players }, routeSession.playerID)) {
+              invalidateSession('你的房间座位已被释放，已返回主页。')
+              return
+            }
             setRoom((previousRoom) =>
               previousRoom === null
                 ? previousRoom
                 : {
                     ...previousRoom,
-                    players: client?.matchData as unknown as LobbyPlayer[],
+                    players,
                   },
             )
           }
@@ -332,7 +400,11 @@ function RoomRoute() {
         client.start()
       } catch (requestError) {
         if (active) {
-          setError(`无法连接房间：${errorMessage(requestError)}`)
+          if (requestError instanceof Error && requestError.message === 'HTTP status 404') {
+            invalidateSession('房间已被删除，已返回主页。')
+          } else {
+            setError(`无法连接房间：${errorMessage(requestError)}`)
+          }
         }
       }
     }
@@ -350,7 +422,7 @@ function RoomRoute() {
       client?.stop()
       if (clientRef.current === client) clientRef.current = null
     }
-  }, [lobby, matchID, refreshRoom, routeSession])
+  }, [invalidateSession, lobby, matchID, refreshRoom, routeSession])
 
   const handleStart = () => {
     if (gameState?.isActive && routeSession?.playerID === '0') {
@@ -390,6 +462,26 @@ function RoomRoute() {
     navigate('/')
   }
 
+  const handleDeleteRoom = async (token: string) => {
+    await devTools.deleteRoom(matchID, token)
+    clientRef.current?.stop()
+    clearRoomSession(matchID)
+    setSession(null)
+    navigate('/')
+  }
+
+  const handleKickPlayer = async (playerID: string, token: string) => {
+    await devTools.kickPlayer(matchID, playerID, token)
+    if (playerID === routeSession?.playerID) {
+      clientRef.current?.stop()
+      clearRoomSession(matchID)
+      setSession(null)
+      navigate('/')
+      return
+    }
+    await refreshRoom(matchID)
+  }
+
   if (routeSession === null) {
     return <RoomAccessView matchID={matchID} onBackHome={() => navigate('/')} />
   }
@@ -407,6 +499,8 @@ function RoomRoute() {
       onProposeTeam={handleProposeTeam}
       onReconnect={handleReconnect}
       onStart={handleStart}
+      onDeleteRoom={handleDeleteRoom}
+      onKickPlayer={handleKickPlayer}
       room={room}
       session={routeSession}
     />
@@ -468,11 +562,15 @@ function RoomLoadingView({
 
 interface LobbyViewProps {
   busy: boolean
+  devToken: string
+  devToolsEnabled: boolean
   error: string | null
   lastRoomSession: RoomSession | null
-  matches: AvalonMatch[]
+  matches: AvalonRoomSummary[]
   numPlayers: number
   onCreate: () => void
+  onDeleteRoom: (matchID: string) => Promise<void>
+  onDevTokenChange: (value: string) => void
   onJoin: (matchID: string, playerID: string) => void
   onRefresh: () => void
   onResumeRoom: () => void
@@ -483,11 +581,15 @@ interface LobbyViewProps {
 
 function LobbyView({
   busy,
+  devToken,
+  devToolsEnabled,
   error,
   lastRoomSession,
   matches,
   numPlayers,
   onCreate,
+  onDeleteRoom,
+  onDevTokenChange,
   onJoin,
   onRefresh,
   onResumeRoom,
@@ -495,10 +597,90 @@ function LobbyView({
   setNumPlayers,
   setSelectedSeats,
 }: LobbyViewProps) {
+  const [pages, setPages] = useState<Record<RoomStatus, number>>({
+    lobby: 1,
+    playing: 1,
+    finished: 1,
+  })
+  const sections: { status: RoomStatus; title: string; empty: string }[] = [
+    { status: 'lobby', title: '等待加入', empty: '当前没有可加入的房间。你可以先创建一局。' },
+    { status: 'playing', title: '进行中', empty: '当前没有进行中的房间。' },
+    { status: 'finished', title: '已结束', empty: '当前没有已结束的房间。' },
+  ]
+
+  useEffect(() => {
+    setPages((current) => {
+      const next = { ...current }
+      for (const section of sections) {
+        const count = matches.filter((room) => room.status === section.status).length
+        next[section.status] = paginateRooms(
+          Array.from({ length: count }),
+          current[section.status],
+        ).page
+      }
+      return next
+    })
+  }, [matches])
+
+  const renderRoom = (room: AvalonRoomSummary) => {
+    const occupied = getOccupiedRoomPlayerIDs(room).length
+    const playerCount = getRoomPlayerCount(room)
+    const availableSeats = Array.from({ length: playerCount }, (_, index) => String(index)).filter(
+      (playerID) => !getOccupiedRoomPlayerIDs(room).includes(playerID),
+    )
+    const selectedSeat = selectedSeats[room.matchID] ?? availableSeats[0] ?? ''
+
+    return (
+      <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4" key={room.matchID}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="font-mono text-sm text-slate-200">{room.matchID}</p>
+            <p className="mt-1 text-xs text-slate-400">{occupied} / {playerCount} 人已入座</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {canJoinRoom(room) && (
+              availableSeats.length === 0 ? (
+                <span className="rounded-full bg-slate-700/70 px-3 py-1 text-xs text-slate-300">已满</span>
+              ) : (
+                <>
+                  <select
+                    className="rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-sm text-white"
+                    onChange={(event) => setSelectedSeats((previous) => ({ ...previous, [room.matchID]: event.target.value }))}
+                    value={selectedSeat}
+                  >
+                    {availableSeats.map((seatID) => <option key={seatID} value={seatID}>座位 {Number(seatID) + 1}</option>)}
+                  </select>
+                  <button
+                    className="rounded-lg bg-cyan-300 px-3 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={busy || selectedSeat === ''}
+                    onClick={() => onJoin(room.matchID, selectedSeat)}
+                    type="button"
+                  >加入</button>
+                </>
+              )
+            )}
+            {room.status === 'finished' && (
+              <button className="rounded-lg border border-white/10 px-3 py-2 text-sm text-slate-500" disabled type="button">
+                回放（即将支持）
+              </button>
+            )}
+            {devToolsEnabled && devToken.length > 0 && (
+              <button
+                className="rounded-lg border border-rose-300/40 px-3 py-2 text-sm text-rose-200 transition hover:border-rose-300 hover:bg-rose-300/10"
+                onClick={() => void onDeleteRoom(room.matchID)}
+                type="button"
+              >删除</button>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <PageShell eyebrow="LAN MVP" title="Avalon">
       <div className="grid gap-6 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-        <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8">
+        <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8 lg:col-span-2">
           <p className="mb-2 text-sm font-semibold uppercase tracking-[0.24em] text-amber-300">
             Create a room
           </p>
@@ -550,71 +732,40 @@ function LobbyView({
             </button>
           </div>
 
-          {matches.length === 0 ? (
-            <div className="mt-8 rounded-2xl border border-dashed border-white/15 p-8 text-center text-sm text-slate-400">
-              当前没有可加入的房间。你可以先创建一局。
-            </div>
-          ) : (
-            <div className="mt-6 space-y-3">
-              {matches.map((match) => {
-                const availableSeats = getAvailableSeatIDs(
-                  getMatchPlayerCount(match),
-                  getOccupiedPlayerIDs(match),
-                )
-                const selectedSeat = selectedSeats[match.matchID] ?? availableSeats[0] ?? ''
-
-                return (
-                  <div
-                    className="rounded-2xl border border-white/10 bg-slate-950/35 p-4"
-                    key={match.matchID}
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="font-mono text-sm text-slate-200">{match.matchID}</p>
-                        <p className="mt-1 text-xs text-slate-400">
-                          {getOccupiedPlayerIDs(match).length} / {getMatchPlayerCount(match)} 人已入座
-                        </p>
-                      </div>
-                      {isMatchFull(match) ? (
-                        <span className="rounded-full bg-slate-700/70 px-3 py-1 text-xs text-slate-300">
-                          已满
-                        </span>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <select
-                            className="rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-sm text-white"
-                            onChange={(event) =>
-                              setSelectedSeats((previous) => ({
-                                ...previous,
-                                [match.matchID]: event.target.value,
-                              }))
-                            }
-                            value={selectedSeat}
-                          >
-                            {availableSeats.map((seatID) => (
-                              <option key={seatID} value={seatID}>
-                                座位 {Number(seatID) + 1}
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            className="rounded-lg bg-cyan-300 px-3 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-50"
-                            disabled={busy || selectedSeat === ''}
-                            onClick={() => onJoin(match.matchID, selectedSeat)}
-                            type="button"
-                          >
-                            加入
-                          </button>
+          <div className="mt-6 space-y-6">
+            {sections.map((section) => {
+              const sectionRooms = matches.filter((room) => room.status === section.status)
+              const page = paginateRooms(sectionRooms, pages[section.status])
+              return (
+                <div key={section.status}>
+                  <h3 className="text-lg font-semibold text-white">{section.title}</h3>
+                  {sectionRooms.length === 0 ? (
+                    <div className="mt-3 rounded-2xl border border-dashed border-white/15 p-5 text-center text-sm text-slate-400">{section.empty}</div>
+                  ) : (
+                    <>
+                      <div className="mt-3 space-y-3">{page.items.map(renderRoom)}</div>
+                      {page.pageCount > 1 && (
+                        <div className="mt-3 flex items-center justify-between text-sm text-slate-400">
+                          <button className="rounded-lg border border-white/15 px-3 py-2 disabled:opacity-40" disabled={page.page === 1} onClick={() => setPages((current) => ({ ...current, [section.status]: page.page - 1 }))} type="button">上一页</button>
+                          <span>{page.page} / {page.pageCount}</span>
+                          <button className="rounded-lg border border-white/15 px-3 py-2 disabled:opacity-40" disabled={page.page === page.pageCount} onClick={() => setPages((current) => ({ ...current, [section.status]: page.page + 1 }))} type="button">下一页</button>
                         </div>
                       )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
+                    </>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </section>
       </div>
+
+      <details className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-5">
+        <summary className="cursor-pointer text-sm font-semibold text-slate-200">开发工具</summary>
+        <label className="mt-4 block text-sm text-slate-300" htmlFor="dev-token">开发管理员 Token</label>
+        <input className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 font-mono text-sm text-white" id="dev-token" onChange={(event) => onDevTokenChange(event.target.value)} placeholder="仅保存在当前页面内" type="password" value={devToken} />
+        <p className="mt-2 text-xs text-slate-500">开发工具状态：{devToolsEnabled ? '已启用' : '未启用'}</p>
+      </details>
 
       {lastRoomSession !== null && (
         <section className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-5 py-4">
@@ -742,6 +893,8 @@ interface RoomViewProps {
   onProposeTeam: (team: PlayerID[]) => void
   onReconnect: () => void
   onStart: () => void
+  onDeleteRoom: (token: string) => Promise<void>
+  onKickPlayer: (playerID: string, token: string) => Promise<void>
   room: AvalonMatch
   session: RoomSession
 }
@@ -754,6 +907,8 @@ function RoomView({
   onProposeTeam,
   onReconnect,
   onStart,
+  onDeleteRoom,
+  onKickPlayer,
   room,
   session,
 }: RoomViewProps) {
@@ -885,6 +1040,14 @@ function RoomView({
               清除本机凭据
             </button>
           </section>
+
+          <RoomDevTools
+            matchID={room.matchID}
+            onDeleteRoom={onDeleteRoom}
+            onKickPlayer={onKickPlayer}
+            phase={phase}
+            players={room.players}
+          />
         </aside>
       </div>
     </PageShell>
