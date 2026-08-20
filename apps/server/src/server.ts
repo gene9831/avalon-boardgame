@@ -125,6 +125,7 @@ export function createAvalonServer(options: AvalonServerOptions = {}) {
   registerDevAdminRoutes(boardgame.router, {
     config,
     db,
+    forceUpdateMetadata: guardedStorage.forceUpdateMetadata,
     deletionGuard: guardedStorage.deletionGuard,
     registry,
     queues: boardgame.transport,
