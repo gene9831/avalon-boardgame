@@ -10,6 +10,8 @@ import { createAvalonServer, startAvalonServer } from '../src/server'
 import { MemoryStorage } from '../src/storage/memory'
 import { PostgresStorage } from '../src/storage/postgres'
 
+const testConfig = { gamePort: 0, lobbyPort: 0, origins: ['*'], devToolsEnabled: false }
+
 type AvalonClient = ReturnType<typeof Client>
 type AvalonClientState = NonNullable<ReturnType<AvalonClient['getState']>>
 
@@ -46,7 +48,7 @@ describe('Avalon server', () => {
 
     try {
       const { db } = createAvalonServer({
-        config: { gamePort: 0, lobbyPort: 0, origins: ['*'] },
+        config: testConfig,
       })
 
       expect(db).toBeInstanceOf(PostgresStorage)
@@ -68,7 +70,7 @@ describe('Avalon server', () => {
 
     try {
       const { db } = createAvalonServer({
-        config: { gamePort: 0, lobbyPort: 0, origins: ['*'] },
+        config: testConfig,
       })
 
       expect(db).toBeInstanceOf(MemoryStorage)
@@ -88,7 +90,7 @@ describe('Avalon server', () => {
 
   it('starts the game server and Lobby API', async () => {
     const running = await startAvalonServer({
-      config: { gamePort: 0, lobbyPort: 0, origins: ['*'] },
+      config: testConfig,
       db: new MemoryStorage(),
     })
 
@@ -103,7 +105,7 @@ describe('Avalon server', () => {
 
   it('keeps multiple Lobby matches isolated', async () => {
     const running = await startAvalonServer({
-      config: { gamePort: 0, lobbyPort: 0, origins: ['*'] },
+      config: testConfig,
       db: new MemoryStorage(),
     })
     const lobby = new LobbyClient({
@@ -141,7 +143,7 @@ describe('Avalon server', () => {
 
   it('prevents one client identity from occupying multiple seats', async () => {
     const running = await startAvalonServer({
-      config: { gamePort: 0, lobbyPort: 0, origins: ['*'] },
+      config: testConfig,
       db: new MemoryStorage(),
     })
     const lobby = new LobbyClient({
@@ -171,7 +173,7 @@ describe('Avalon server', () => {
 
   it('synchronizes five seat-bound clients through Socket.IO', async () => {
     const running = await startAvalonServer({
-      config: { gamePort: 0, lobbyPort: 0, origins: ['*'] },
+      config: testConfig,
       db: new MemoryStorage(),
     })
     const lobby = new LobbyClient({

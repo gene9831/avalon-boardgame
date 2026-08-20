@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   clearRoomSession,
   getAvailableSeatIDs,
+  isRoomSessionStillValid,
   loadLastRoomSession,
   loadRoomSession,
   saveRoomSession,
@@ -79,5 +80,9 @@ describe('room session storage', () => {
 
   it('returns unoccupied seat IDs in ascending order', () => {
     expect(getAvailableSeatIDs(5, ['0', '3'])).toEqual(['1', '2', '4'])
+  })
+
+  it('recognizes an empty current seat as an invalidated session', () => {
+    expect(isRoomSessionStillValid({ players: [{ id: 0, name: undefined }] }, '0')).toBe(false)
   })
 })

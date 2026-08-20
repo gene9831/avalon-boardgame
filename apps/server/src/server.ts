@@ -9,6 +9,7 @@ import { AvalonGame } from '@avalon/game'
 import { loadServerConfig, type AvalonServerConfig } from './config'
 import { MemoryStorage } from './storage/memory'
 import { PostgresStorage } from './storage/postgres'
+import { AvalonSocketRegistry, registerDevAdminRoutes } from './dev-admin'
 
 type BoardgameServer = ReturnType<typeof createBoardgameServer>
 type ServerHandles = Awaited<ReturnType<BoardgameServer['run']>>
@@ -107,6 +108,21 @@ export function createAvalonServer(options: AvalonServerOptions = {}) {
     generateCredentials: createAvalonCredentialGenerator(db),
     origins: config.origins,
     apiOrigins: config.origins,
+  })
+
+  const registry = new AvalonSocketRegistry()
+  const app = boardgame.app as typeof boardgame.app & {
+    _io?: { of(name: string): { on(event: string, listener: (socket: unknown) => void): void } }
+  }
+  const namespace = app._io?.of('avalon')
+  if (namespace !== undefined) registry.attach(namespace as unknown as Parameters<typeof registry.attach>[0])
+  const unavailableMatchIDs = new Set<string>()
+  registerDevAdminRoutes(boardgame.router, {
+    config,
+    db,
+    registry,
+    queues: boardgame.transport,
+    unavailableMatchIDs,
   })
 
   return { boardgame, config, db }

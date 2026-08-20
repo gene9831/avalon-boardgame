@@ -8,6 +8,8 @@ describe('loadServerConfig', () => {
       gamePort: 8000,
       lobbyPort: 8001,
       origins: ['http://localhost:5173'],
+      devToolsEnabled: false,
+      devAdminToken: undefined,
     })
   })
 
@@ -20,6 +22,18 @@ describe('loadServerConfig', () => {
       gamePort: 9100,
       lobbyPort: 9101,
       origins: ['http://a.test', 'http://b.test'],
+      devToolsEnabled: false,
+      devAdminToken: undefined,
+    })
+  })
+
+  it('enables development tools only for an explicit flag and token', () => {
+    expect(loadServerConfig({
+      AVALON_DEV_TOOLS: 'true',
+      AVALON_DEV_ADMIN_TOKEN: 'local-dev-token',
+    })).toMatchObject({
+      devToolsEnabled: true,
+      devAdminToken: 'local-dev-token',
     })
   })
 

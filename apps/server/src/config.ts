@@ -2,6 +2,8 @@ export interface AvalonServerConfig {
   gamePort: number
   lobbyPort: number
   origins: string[]
+  devToolsEnabled: boolean
+  devAdminToken?: string
 }
 
 const DEFAULT_GAME_PORT = 8000
@@ -45,5 +47,10 @@ export function loadServerConfig(
     gamePort: parsePort('AVALON_GAME_PORT', env.AVALON_GAME_PORT, DEFAULT_GAME_PORT),
     lobbyPort: parsePort('AVALON_LOBBY_PORT', env.AVALON_LOBBY_PORT, DEFAULT_LOBBY_PORT),
     origins: parseOrigins(env.AVALON_ORIGINS),
+    devToolsEnabled:
+      env.AVALON_DEV_TOOLS === 'true' &&
+      typeof env.AVALON_DEV_ADMIN_TOKEN === 'string' &&
+      env.AVALON_DEV_ADMIN_TOKEN.length > 0,
+    devAdminToken: env.AVALON_DEV_ADMIN_TOKEN,
   }
 }
