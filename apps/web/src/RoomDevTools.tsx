@@ -6,6 +6,7 @@ import type { LobbyPlayer } from './lobby'
 
 interface RoomDevToolsProps {
   matchID: string
+  onClearLocalSession: () => void
   onDeleteRoom: (token: string) => Promise<void>
   onKickPlayer: (playerID: string, token: string) => Promise<void>
   phase: string | undefined
@@ -23,6 +24,7 @@ function developmentError(error: unknown) {
 
 export function RoomDevTools({
   matchID,
+  onClearLocalSession,
   onDeleteRoom,
   onKickPlayer,
   phase,
@@ -66,6 +68,20 @@ export function RoomDevTools({
             value={token}
           />
         </label>
+
+        <div className="rounded-2xl border border-white/10 bg-slate-950/20 p-3">
+          <p className="text-xs uppercase tracking-[0.18em] text-violet-300">本地恢复</p>
+          <p className="mt-2 text-xs leading-5 text-slate-400">
+            仅删除这台设备保存的座位凭据，不会释放服务器座位。
+          </p>
+          <button
+            className="mt-3 w-full rounded-xl border border-white/15 px-4 py-3 font-semibold text-slate-200 transition hover:border-violet-300/60"
+            onClick={onClearLocalSession}
+            type="button"
+          >
+            清除本地凭据（测试）
+          </button>
+        </div>
 
         <button
           className="w-full rounded-xl border border-rose-300/30 px-4 py-3 font-semibold text-rose-200 transition hover:border-rose-300/70"

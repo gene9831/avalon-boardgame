@@ -10,6 +10,7 @@ import { loadServerConfig, type AvalonServerConfig } from './config'
 import { MemoryStorage } from './storage/memory'
 import { PostgresStorage } from './storage/postgres'
 import { AvalonSocketRegistry, registerDevAdminRoutes } from './dev-admin'
+import { registerRoomParticipationRoutes } from './room-participation'
 import { registerRoomSessionValidationRoute } from './session-validation'
 import { createDeletionSafeStorage } from './storage/deletion-safe'
 
@@ -130,6 +131,13 @@ export function createAvalonServer(options: AvalonServerOptions = {}) {
     registry,
     queues: boardgame.transport,
     unavailableMatchIDs: guardedStorage.deletionGuard.unavailableMatchIDs,
+  })
+  registerRoomParticipationRoutes(boardgame.router, {
+    db,
+    forceUpdateMetadata: guardedStorage.forceUpdateMetadata,
+    deletionGuard: guardedStorage.deletionGuard,
+    registry,
+    queues: boardgame.transport,
   })
   registerRoomSessionValidationRoute(boardgame.router, db)
 
