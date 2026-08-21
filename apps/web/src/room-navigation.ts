@@ -20,3 +20,14 @@ export function isRoomRouteGenerationCurrent(
 ) {
   return currentGeneration === expectedGeneration
 }
+
+export function stopCurrentClient<TClient extends { stop(): void }>(
+  clientRef: { current: TClient | null },
+  expectedClient?: TClient,
+) {
+  const client = clientRef.current
+  if (client === null || (expectedClient !== undefined && client !== expectedClient)) return
+
+  clientRef.current = null
+  client.stop()
+}

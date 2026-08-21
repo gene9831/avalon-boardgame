@@ -8,6 +8,7 @@ import {
   loadLastRoomSession,
   loadRoomSession,
   saveRoomSession,
+  validateActiveRoomSessions,
   validateRoomSession,
   RoomSessionValidationHttpError,
   type RoomSessionStorage,
@@ -159,7 +160,60 @@ describe('room session storage', () => {
 
   it('classifies a missing room separately from an unauthorized seat', () => {
     expect(getRoomSessionInvalidationNotice(new RoomSessionValidationHttpError(404)))
-      .toBe('房间已被删除，已返回主页。')
+      .toBe('房主已解散房间，已返回主页。')
     expect(getRoomSessionInvalidationNotice(new Error('network unavailable'))).toBeNull()
+  })
+
+  it('keeps only credential-validated sessions for active rooms', async () => {
+    const finishedSession = { ...session, matchID: 'room-finished' }
+    const storage = createStorage()
+    saveRoomSession(session, storage)
+    saveRoomSession(finishedSession, storage)
+    const result = await validateActiveRoomSessions(
+      [
+        { matchID: session.matchID, status: 'playing' },
+        { matchID: finishedSession.matchID, status: 'finished' },
+      ],
+      'http://localhost:8001',
+      storage,
+      vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
+    )
+
+    expect(result).toEqual({
+      sessions: [session],
+      validationFailed: false,
+    })
+    expect(loadRoomSession(finishedSession.matchID, storage)).toEqual(finishedSession)
+  })
+
+  it('clears an active session rejected by credential validation', async () => {
+    const storage = createStorage()
+    saveRoomSession(session, storage)
+    const result = await validateActiveRoomSessions(
+      [{ matchID: session.matchID, status: 'lobby' }],
+      'http://localhost:8001',
+      storage,
+      vi.fn().mockResolvedValue(new Response(null, { status: 403 })),
+    )
+
+    expect(result).toEqual({ sessions: [], validationFailed: false })
+    expect(loadRoomSession(session.matchID, storage)).toBeNull()
+  })
+
+  it('keeps an active session locked when credential validation is unavailable', async () => {
+    const storage = createStorage()
+    saveRoomSession(session, storage)
+    const result = await validateActiveRoomSessions(
+      [{ matchID: session.matchID, status: 'lobby' }],
+      'http://localhost:8001',
+      storage,
+      vi.fn().mockRejectedValue(new Error('network unavailable')),
+    )
+
+    expect(result).toEqual({
+      sessions: [session],
+      validationFailed: true,
+    })
+    expect(loadRoomSession(session.matchID, storage)).toEqual(session)
   })
 })

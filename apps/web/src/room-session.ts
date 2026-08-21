@@ -32,6 +32,16 @@ interface RoomSessionRoom {
   }[]
 }
 
+interface ActiveRoomSummary {
+  matchID: string
+  status: 'lobby' | 'playing' | 'finished'
+}
+
+export interface ActiveRoomSessionValidation {
+  sessions: RoomSession[]
+  validationFailed: boolean
+}
+
 export const ROOM_SESSION_KEY = 'avalon:room-session'
 export const LAST_ROOM_SESSION_KEY = 'avalon:last-room'
 
@@ -187,9 +197,41 @@ export async function validateRoomSession(
   if (!response.ok) throw new RoomSessionValidationHttpError(response.status)
 }
 
+export async function validateActiveRoomSessions(
+  rooms: readonly ActiveRoomSummary[],
+  baseURL: string,
+  storage: RoomSessionStorage = browserStorage(),
+  fetcher: Fetcher = fetch,
+): Promise<ActiveRoomSessionValidation> {
+  let validationFailed = false
+  const candidates = rooms.flatMap((room) => {
+    if (room.status === 'finished') return []
+    const session = loadRoomSession(room.matchID, storage)
+    return session === null ? [] : [session]
+  })
+  const sessions = await Promise.all(candidates.map(async (session) => {
+    try {
+      await validateRoomSession(baseURL, session, fetcher)
+      return session
+    } catch (error) {
+      if (getRoomSessionInvalidationNotice(error) !== null) {
+        clearRoomSession(session.matchID, storage)
+        return null
+      }
+      validationFailed = true
+      return session
+    }
+  }))
+
+  return {
+    sessions: sessions.filter((session): session is RoomSession => session !== null),
+    validationFailed,
+  }
+}
+
 export function getRoomSessionInvalidationNotice(error: unknown) {
   if (!(error instanceof RoomSessionValidationHttpError)) return null
-  if (error.status === 404) return '房间已被删除，已返回主页。'
+  if (error.status === 404) return '房主已解散房间，已返回主页。'
   if (error.status === 403) return '你的房间座位已被释放，已返回主页。'
   return null
 }

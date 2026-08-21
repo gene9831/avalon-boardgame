@@ -9,14 +9,14 @@ type RouteContext = {
   throw(status: number, message?: string): never
 }
 
-function readBearerCredential(authorization: string) {
+export function readBearerCredential(authorization: string) {
   const prefix = 'Bearer '
   return authorization.startsWith(prefix)
     ? authorization.slice(prefix.length)
     : ''
 }
 
-function credentialsMatch(provided: string, stored: string | undefined) {
+export function credentialsMatch(provided: string, stored: string | undefined) {
   if (provided.length === 0 || stored === undefined) return false
 
   const providedBytes = Buffer.from(provided)
