@@ -14,11 +14,13 @@ function renderRoomView(overrides: Partial<RoomViewProps> = {}) {
   const props: RoomViewProps = {
     error: null,
     gameState: null,
+    onAssassinate: vi.fn(),
     onBackHome: vi.fn(),
     onCastTeamVote: vi.fn(),
     onClearLocalSession: vi.fn(),
     onDeleteRoom: vi.fn(),
     onKickPlayer: vi.fn(),
+    onPlayQuestCard: vi.fn(),
     onProposeTeam: vi.fn(),
     onReconnect: vi.fn(),
     onRequestRoomExit: vi.fn(),
@@ -42,6 +44,46 @@ function renderRoomView(overrides: Partial<RoomViewProps> = {}) {
   return renderToStaticMarkup(<RoomView {...props} />)
 }
 
+function playingGameState(): RoomViewProps['gameState'] {
+  return {
+    G: {
+      status: 'playing',
+      players: {
+        '0': { name: 'Alice' },
+        '1': { name: 'Bob' },
+        '2': { name: 'Claire' },
+        '3': { name: 'Dylan' },
+        '4': { name: 'Eve' },
+      },
+      leaderID: '0',
+      questIndex: 0,
+      proposedTeam: null,
+      voteHistory: [],
+      questHistory: [],
+      consecutiveRejectedTeams: 0,
+      goodSuccesses: 0,
+      evilFailures: 0,
+      rules: { timeouts: { enabled: false } },
+      viewer: {
+        role: 'merlin',
+        loyalty: 'good',
+        knownEvilPlayerIDs: ['3', '4'],
+      },
+    },
+    ctx: {
+      numPlayers: 5,
+      turn: 1,
+      currentPlayer: '0',
+      playOrder: ['0', '1', '2', '3', '4'],
+      playOrderPos: 0,
+      phase: 'teamProposal',
+      activePlayers: { '0': 'leader' },
+    },
+    isActive: true,
+    isConnected: true,
+  } as RoomViewProps['gameState']
+}
+
 describe('RoomView connection state', () => {
   it.each([
     ['room metadata', { room: null }],
@@ -52,5 +94,29 @@ describe('RoomView connection state', () => {
     expect(html).toContain('正在连接房间')
     expect(html.match(/<main\b/g)).toHaveLength(1)
     expect(html).not.toContain('玩家座位')
+  })
+})
+
+describe('RoomView playing layout', () => {
+  it('keeps the players around a round table with the quest board in its center', () => {
+    const html = renderRoomView({
+      gameState: playingGameState(),
+      room: {
+        gameName: 'avalon',
+        matchID: 'room-123',
+        players: [
+          { id: 0, name: 'Alice', isConnected: true },
+          { id: 1, name: 'Bob', isConnected: true },
+          { id: 2, name: 'Claire', isConnected: true },
+          { id: 3, name: 'Dylan', isConnected: true },
+          { id: 4, name: 'Eve', isConnected: true },
+        ],
+        setupData: { numPlayers: 5 },
+      },
+    })
+
+    expect(html).toContain('aria-label="阿瓦隆游戏圆桌"')
+    expect(html).toContain('aria-label="任务计分板"')
+    expect(html).not.toContain('>玩家座位<')
   })
 })

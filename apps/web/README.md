@@ -1,15 +1,17 @@
 # `@avalon/web`
 
-This package provides the LAN Lobby and the current in-room Avalon UI slice.
+This package provides the LAN Lobby and the complete in-room Avalon game flow.
 
 The browser uses two routes:
 
 - `/` is the lobby for creating and joining rooms.
-- `/rooms/:matchID` is the room page for one match. It includes seat status,
-  reconnect controls, role visibility, team proposal, and team voting. Quest
-  card, assassination, and final-result panels are planned next. The room page
-  has a `返回主页` button; returning home keeps this browser's seat credentials so
-  the recent room can be reopened.
+- `/rooms/:matchID` is the room page for one match. The waiting lobby and active
+  game share a responsive round-table layout. During play, a tabletop-inspired
+  quest board stays at the center while the surrounding seats handle team
+  selection and assassination targets. The page supports role visibility, team
+  proposal, voting, secret quest cards, public quest results, assassination,
+  final role reveal, reconnect, and returning home. Returning home keeps this
+  browser's seat credentials so the room can be reopened.
 
 Each browser profile uses a stable local client ID when joining. The server
 rejects that client ID (and duplicate player names) if it tries to occupy a
