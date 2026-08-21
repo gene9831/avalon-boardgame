@@ -23,6 +23,7 @@ import {
   type AvalonG,
   type AvalonPlayerView,
   type PlayerID,
+  type QuestCard,
   type TeamVote,
 } from '@avalon/game'
 
@@ -98,23 +99,6 @@ function roomInvalidationNotice(error: unknown) {
       ? '房主已解散房间，已返回主页。'
       : null
   )
-}
-
-function phaseLabel(phase: string | undefined) {
-  switch (phase) {
-    case 'lobby':
-      return '等待入座'
-    case 'teamProposal':
-      return '队伍提案'
-    case 'teamVote':
-      return '队伍投票'
-    case 'quest':
-      return '任务进行中'
-    case 'assassination':
-      return '刺杀阶段'
-    default:
-      return phase ?? '连接中'
-  }
 }
 
 function App() {
@@ -587,6 +571,18 @@ function RoomRoute() {
     }
   }
 
+  const handlePlayQuestCard = (card: QuestCard) => {
+    if (gameState?.isActive) {
+      clientRef.current?.moves.playQuestCard(card)
+    }
+  }
+
+  const handleAssassinate = (targetID: PlayerID) => {
+    if (gameState?.isActive) {
+      clientRef.current?.moves.assassinate(targetID)
+    }
+  }
+
   const handleReconnect = () => {
     const client = clientRef.current
     if (client === null) return
@@ -694,10 +690,12 @@ function RoomRoute() {
       <RoomView
         error={error}
         gameState={gameState}
+        onAssassinate={handleAssassinate}
         onBackHome={() => navigate('/')}
         onCastTeamVote={handleCastTeamVote}
         onClearLocalSession={handleClearLocalSessionForTesting}
         onProposeTeam={handleProposeTeam}
+        onPlayQuestCard={handlePlayQuestCard}
         onReconnect={handleReconnect}
         onRequestRoomExit={handleRequestRoomExit}
         onStart={handleStart}
@@ -871,10 +869,12 @@ function PlayerNameDialog({
 export interface RoomViewProps {
   error: string | null
   gameState: AvalonClientState | null
+  onAssassinate: (targetID: PlayerID) => void
   onBackHome: () => void
   onCastTeamVote: (vote: TeamVote) => void
   onClearLocalSession: () => void
   onProposeTeam: (team: PlayerID[]) => void
+  onPlayQuestCard: (card: QuestCard) => void
   onReconnect: () => void
   onRequestRoomExit: () => void
   onStart: () => void
@@ -888,10 +888,12 @@ export interface RoomViewProps {
 export function RoomView({
   error,
   gameState,
+  onAssassinate,
   onBackHome,
   onCastTeamVote,
   onClearLocalSession,
   onProposeTeam,
+  onPlayQuestCard,
   onReconnect,
   onRequestRoomExit,
   onStart,
@@ -959,114 +961,34 @@ export function RoomView({
   }
 
   return (
-    <PageShell eyebrow={`Room ${room.matchID}`} title="房间等待中">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
-        <div className="space-y-6">
-          <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p className="font-mono text-sm text-slate-400">{room.matchID}</p>
-                <h2 className="mt-2 text-2xl font-semibold text-white">玩家座位</h2>
-              </div>
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <button
-                  className="rounded-lg border border-white/15 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-amber-300/60 hover:text-white"
-                  onClick={onBackHome}
-                  type="button"
-                >
-                  返回主页
-                </button>
-                <ConnectionBadge connected={connected} />
-              </div>
-            </div>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              {Array.from({ length: numPlayers }, (_, index) => {
-                const player = room.players.find(({ id }) => id === index)
-                const occupied = player?.name !== undefined && player.name !== null
-                const isCurrentPlayer = String(index) === session.playerID
-
-                return (
-                  <div
-                    className={`rounded-2xl border p-4 ${
-                      isCurrentPlayer
-                        ? 'border-amber-300/70 bg-amber-300/10'
-                        : 'border-white/10 bg-slate-950/30'
-                    }`}
-                    key={index}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                        座位 {index + 1}
-                      </span>
-                      {isCurrentPlayer && (
-                        <span className="text-xs font-semibold text-amber-300">这是你</span>
-                      )}
-                    </div>
-                    <p className="mt-3 font-medium text-white">
-                      {occupied ? player?.name : '等待玩家加入'}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {player?.isConnected ? '已连接' : occupied ? '等待连接' : '空座位'}
-                    </p>
-                  </div>
-                )
-              })}
-            </div>
-          </section>
-
-          <RoomGamePanel
-            activeStage={activeStage}
-            game={gameState?.G ?? null}
-            onCastTeamVote={onCastTeamVote}
-            onProposeTeam={onProposeTeam}
-            phase={phase}
-            playerID={session.playerID}
-          />
-        </div>
-
-        <aside className="space-y-6">
-          <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-2xl shadow-black/20 backdrop-blur">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-300">
-              Game status
-            </p>
-            <div className="mt-5 space-y-4 text-sm">
-              <StatusRow label="当前阶段" value={phaseLabel(phase)} />
-              <StatusRow label="你的座位" value={`座位 ${Number(session.playerID) + 1}`} />
-              <StatusRow
-                label="队长"
-                value={
-                  gameState?.G.leaderID === null || gameState?.G.leaderID === undefined
-                    ? '尚未产生'
-                    : `座位 ${Number(gameState.G.leaderID) + 1}`
-                }
-              />
-            </div>
-
-          </section>
-
-          <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 text-sm leading-6 text-slate-400">
-            <p>刷新页面会使用本机保存的座位凭据自动重连。</p>
-            <button
-              className="mt-4 rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-300 transition hover:border-white/30 hover:text-white"
-              onClick={onReconnect}
-              type="button"
-            >
-              重新连接
-            </button>
-          </section>
-
-          <RoomDevTools
-            matchID={room.matchID}
-            onClearLocalSession={onClearLocalSession}
-            onDeleteRoom={onDeleteRoom}
-            onKickPlayer={onKickPlayer}
-            phase={phase}
-            players={room.players}
-          />
-        </aside>
-      </div>
-    </PageShell>
+    <ImmersiveLobbyShell
+      developmentControls={(
+        <RoomDevTools
+          matchID={room.matchID}
+          onClearLocalSession={onClearLocalSession}
+          onDeleteRoom={onDeleteRoom}
+          onKickPlayer={onKickPlayer}
+          phase={phase}
+          players={room.players}
+        />
+      )}
+    >
+      <RoomGamePanel
+        activeStage={activeStage}
+        connected={connected}
+        game={gameState.G}
+        matchID={room.matchID}
+        onAssassinate={onAssassinate}
+        onBackHome={onBackHome}
+        onCastTeamVote={onCastTeamVote}
+        onPlayQuestCard={onPlayQuestCard}
+        onProposeTeam={onProposeTeam}
+        onReconnect={onReconnect}
+        phase={phase ?? 'teamProposal'}
+        playerID={session.playerID}
+        players={room.players}
+      />
+    </ImmersiveLobbyShell>
   )
 }
 
@@ -1126,30 +1048,6 @@ function PageShell({
         </footer>
       </div>
     </main>
-  )
-}
-
-function ConnectionBadge({ connected }: { connected: boolean }) {
-  return (
-    <span
-      className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${
-        connected
-          ? 'bg-emerald-300/15 text-emerald-200'
-          : 'bg-rose-300/15 text-rose-200'
-      }`}
-    >
-      <span className={`h-2 w-2 rounded-full ${connected ? 'bg-emerald-300' : 'bg-rose-300'}`} />
-      {connected ? '已连接' : '连接中断'}
-    </span>
-  )
-}
-
-function StatusRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-3 last:border-b-0 last:pb-0">
-      <span className="text-slate-500">{label}</span>
-      <span className="font-medium text-slate-200">{value}</span>
-    </div>
   )
 }
 
