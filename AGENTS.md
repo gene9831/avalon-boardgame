@@ -128,6 +128,43 @@ multiplayer acceptance test.
 - Avoid duplicating game rules across server and web code.
 - Prefer existing project vocabulary from `CONTEXT.md`.
 
+## Branch-based development workflow
+
+This workflow applies to tasks that modify project files. Read-only analysis,
+status inspection, and advisory work do not require a branch.
+
+Before implementation:
+
+1. State the concrete goal, modification scope, acceptance criteria, and planned
+   validation.
+2. Resolve material ambiguity and obtain user approval for the proposed change.
+3. Confirm the working tree is clean or preserve unrelated existing changes.
+4. Start from `main` and create a focused branch named `codex/<short-topic>`.
+
+During implementation:
+
+- Keep all implementation work on the feature branch.
+- Use focused checkpoint commits when they improve recovery or review.
+- Do not create a commit for every minor edit.
+- Keep unrelated changes out of the branch.
+- Do not merge partially implemented or failing work into `main`.
+
+Before integration:
+
+1. Run focused tests during development.
+2. Run all validation required by the final scope.
+3. Report the actual test, build, lint, typecheck, and manual-validation results.
+4. Confirm that generated or temporary artifacts have been removed.
+5. Ask for user confirmation before integrating into `main`.
+
+After approval, squash the feature branch into one coherent commit on `main`.
+The squashed commit must include the implementation, permanent regression tests,
+and required documentation updates. Do not squash unrelated features together.
+
+If validation fails, the working tree is not clean, or `main` has moved in a way
+that creates conflicts, stop integration and report the condition instead of
+forcing the merge.
+
 ## Validation
 
 During implementation, run the narrowest relevant checks first.
@@ -175,7 +212,10 @@ Remove temporary planning artifacts after the related work is complete.
 ## Git and change hygiene
 
 - Do not overwrite or revert unrelated working-tree changes.
-- Do not commit, push, create branches, or open pull requests unless requested.
+- A user-approved implementation task authorizes creating its feature branch and
+  making local checkpoint commits under the branch workflow above.
+- Do not push, open pull requests, or integrate into `main` without explicit user
+  approval.
 - When commits are requested, keep them focused on one coherent change.
 - Before handoff, summarize changed files, validation performed, and remaining
   manual verification.
