@@ -119,9 +119,21 @@ multiplayer acceptance test.
 - Inspect the working tree before editing.
 - Preserve unrelated and pre-existing user changes.
 - Make the smallest coherent change that satisfies the requested behavior.
-- Use behavior-focused TDD for features and bug fixes.
+- Optimize for rapid prototype iteration. Do not require a full TDD cycle for
+  every change.
+- Use behavior-focused TDD when a change affects core or high-risk behavior:
+  shared game rules, hidden-information and authorization boundaries,
+  server-authoritative validation, credentials and sessions, room isolation or
+  lifecycle, persistence and reconnection, or an important production regression.
+- For low-risk UI styling, layout, copy, temporary prototype interactions,
+  mechanical refactors, and other easily inspected changes, implementation may
+  come first. Validate them with the narrowest useful combination of focused
+  tests, type checking, builds, and manual checks.
 - Add permanent tests for stable acceptance behavior, security boundaries,
   public contracts, and important regressions.
+- Do not add tests merely to increase coverage or to lock down private
+  implementation details. Every permanent test should identify an important
+  production regression that it prevents.
 - Remove temporary diagnostics and implementation-only tests before completion.
 - Do not weaken an existing valuable test unless expected behavior has changed.
 - Do not change production code merely to manufacture a failing test.
@@ -168,6 +180,11 @@ forcing the merge.
 ## Validation
 
 During implementation, run the narrowest relevant checks first.
+
+Validation must be proportional to the risk and scope of the change. Documentation,
+copy, and similarly non-executable changes require content and diff review, not an
+unrelated application test suite. Low-risk prototype UI changes may use focused
+build, type-check, or manual verification instead of adding automated tests.
 
 Before declaring a completed code change, run validation proportional to its scope.
 For changes spanning the application, run:
