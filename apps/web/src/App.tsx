@@ -909,7 +909,7 @@ function ImmersiveLobbyShell({
   return (
     <main className="relative h-screen h-dvh overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.16),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(34,211,238,0.14),_transparent_35%),#07111f] p-2 text-slate-200 sm:p-3 lg:p-4">
       <div className="mx-auto h-full min-h-0 max-w-7xl">{children}</div>
-      <aside className="absolute bottom-2 right-2 z-50 max-h-[calc(100dvh-1rem)] w-[min(24rem,calc(100%-1rem))] overflow-auto">
+      <aside className="pointer-events-none absolute bottom-2 right-2 z-50 max-h-[calc(100dvh-1rem)] w-[min(24rem,calc(100%-1rem))] overflow-auto">
         {developmentControls}
       </aside>
     </main>
