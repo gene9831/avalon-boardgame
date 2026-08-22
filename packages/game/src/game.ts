@@ -1,4 +1,6 @@
-import { INVALID_MOVE } from 'boardgame.io/core'
+/// <reference path="./boardgame-io-esm.d.ts" />
+
+import { INVALID_MOVE } from 'boardgame.io/dist/esm/core.js'
 import type { Game } from 'boardgame.io'
 
 import { getPlayerCountConfig } from './config'
@@ -97,7 +99,11 @@ function finishGame(
   endGame(result)
 }
 
-export const AvalonGame: Game<AvalonG, Record<string, never>, AvalonSetupData> = {
+const avalonGameDefinition: Game<
+  AvalonG,
+  Record<string, never>,
+  AvalonSetupData
+> = {
   name: 'avalon',
   minPlayers: 5,
   maxPlayers: 10,
@@ -422,3 +428,16 @@ export const AvalonGame: Game<AvalonG, Record<string, never>, AvalonSetupData> =
     },
   },
 }
+
+export interface AvalonGameOptions {
+  seed?: string | number
+}
+
+export function createAvalonGame(options: AvalonGameOptions = {}) {
+  return {
+    ...avalonGameDefinition,
+    seed: options.seed,
+  }
+}
+
+export const AvalonGame = createAvalonGame()

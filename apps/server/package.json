@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "node --env-file-if-exists=.env.local --import tsx src/index.ts",
     "test": "vitest run",
+    "test:postgres": "AVALON_REQUIRE_POSTGRES_TESTS=1 vitest run tests/postgres.test.ts tests/postgres-reconnect.test.ts",
+    "test:postgres:restart-probe": "tsx tests/support/postgres-restart-probe.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -14,6 +16,7 @@
     "pg": "^8.23.0"
   },
   "devDependencies": {
+    "@avalon/test-support": "workspace:*",
     "@types/pg": "^8.21.0",
     "@types/node": "^24.13.3",
     "tsx": "^4.23.12",

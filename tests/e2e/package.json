@@ -1,0 +1,19 @@
+{
+  "name": "@avalon/e2e",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:matrix": "E2E_MATRIX=1 playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@avalon/test-support": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/node": "^24.13.3",
+    "typescript": "~6.0.3"
+  }
+}

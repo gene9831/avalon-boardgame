@@ -6,7 +6,7 @@
 
 ## 当前结论
 
-项目已经完成从创建房间、入座开局到任务、刺杀和胜负结算的 Web 操作闭环；自动化测试覆盖主要页面契约，但尚未完成 5–10 个真实浏览器的完整局域网验收。
+项目已经完成从创建房间、入座开局到任务、刺杀和胜负结算的 Web 操作闭环；规则、Socket.IO、PostgreSQL 和 5–10 个隔离浏览器上下文已有分层自动化方案，但尚未完成 5–10 台真实设备的完整局域网验收。
 
 当前阶段：**LAN MVP 开发中 / Web 游戏流程已闭环，等待真实多人验收**
 
@@ -26,8 +26,10 @@
 - Web 主页和个人设备圆桌等待大厅已完成响应式重设计；大厅使用 `100dvh` 沉浸式固定视口，以当前玩家为底部锚点展示桌面圆桌和短屏移动端座位网格，并保留连接、重连、正式退出/解散和房主开局控制。
 - 等待大厅支持玩家凭据授权的主动离座：普通玩家只释放自己的座位，房主解散整个房间；游戏开始后拒绝这两类操作，返回主页仍是保留座位的无损导航。
 - 开发模式房间页控制：可删除任意状态房间、在大厅踢出占用座位；删除 ID 在进程生命周期内保持不可用，匿名 Socket.IO 同步和延迟写入都不能复活房间，被删除/踢出后会清理失效凭据并返回主页；活动房间的过期 metadata 快照也不能恢复旧名称或凭据，kick 会在旧写入之后权威落盘。
+- 游戏测试使用版本化 RNG seed、统一命令 transcript 和确定性 replay；同一失败可在规则层、Socket.IO 层或浏览器层重放。
+- Playwright 使用每玩家独立 browser context 自动完成创建、加入、刷新重连和整局游戏；GitHub Actions 负责 PR smoke/PostgreSQL 检查和每日 5–10 人分片矩阵，不依赖开发者电脑。
 
-当前最大缺口：**5–10 个真实浏览器的完整局域网验收，以及 PostgreSQL 服务重启后的凭据重连演练**。
+当前最大缺口：**5–10 台真实设备的完整局域网验收，以及部署环境中的 PostgreSQL 重启演练**。CI 已配置数据库容器重启探针，但首次远端运行结果仍需在分支推送后确认。
 
 ## 目标与范围
 
@@ -77,10 +79,13 @@
 | 角色与阶段展示 | ✅ | 游戏开始后保持圆桌布局；中央实体桌游式面板显示五次任务、每次队伍人数、当前任务和连续否决轨道，底部仅显示当前玩家角色、阵营和允许看到的邪恶玩家。 |
 | 队伍提案 | ✅ | 队长直接点击圆桌座位选择正确人数，动作转发到服务端 `proposeTeam`。 |
 | 队伍投票 | ✅ | 所有玩家可独立提交 approve/reject；中央操作区只显示自己的提交状态。 |
-| 开发房间删除与踢人 | ✅ | `/dev/status` 确认启用后才显示主页 Token 面板；删除支持 lobby/playing/finished，踢人仅支持 lobby；连接中删除、匿名同步和延迟写入不会复活房间，快速复用座位即使复制旧公开数据也会由凭据校验拒绝旧会话；活动房间 metadata 使用按房间版本保护，延迟 fetch 不会被重新标记为当前版本，kick 和正式离座都会在旧写入之后权威落盘。Server tests: 41 passed；当前 Web 全量 tests: 74 passed. |
+| 开发房间删除与踢人 | ✅ | `/dev/status` 确认启用后才显示主页 Token 面板；删除支持 lobby/playing/finished，踢人仅支持 lobby；连接中删除、匿名同步和延迟写入不会复活房间，快速复用座位即使复制旧公开数据也会由凭据校验拒绝旧会话；活动房间 metadata 使用按房间版本保护，延迟 fetch 不会被重新标记为当前版本，kick 和正式离座都会在旧写入之后权威落盘。当前 Server tests: 46 passed；Web tests: 75 passed. |
 | 任务出牌 UI | ✅ | 仅任务队员可以操作；Good 只有 Success，Evil 可选 Success/Fail，提交后只向本人显示自己的牌并进入等待。 |
 | 任务历史与公开结果 | ✅ | 中央任务板展示已结算任务的成功/失败状态和公开 Success/Fail 总数，不把任务牌关联到具体玩家。 |
 | 刺杀 UI 与最终结算 | ✅ | 刺客从圆桌座位选择非已知邪恶目标；其他玩家等待。结算展示胜方、原因和目标，并在每个座位公开最终角色。 |
+| 确定性随机与回放 | ✅ | `@avalon/test-support` 从 master seed 派生游戏/行动 seed，以统一 transcript 驱动规则层和 Socket.IO；失败 artifact 不包含凭据、Token 或秘密状态。 |
+| 自动化完整局流程 | ✅ | 属性测试覆盖 5–10 人规则与可见性不变量；Socket.IO 回放与规则层权威状态对比；Playwright smoke 和 5–10 人矩阵已在本地通过。 |
+| GitHub Actions 测试门禁 | 🟡 | PR/主分支质量、单元/Socket.IO、PostgreSQL、浏览器 smoke 及每日 5–10 人分片工作流已配置；待分支推送后确认首次 GitHub 执行。 |
 | 5–10 客户端人工验收 | ⬜ | 已提供 `docs/testing/lan-multiplayer-acceptance.md`，按 5 人四种结局、刷新与服务重启、7 人特殊规则、10 人容量和双房间隔离分级执行；需要测试者实际记录结果。 |
 | 重启后重连验收 | ⬜ | 存储与凭据机制已有测试，尚未完成部署环境手工演练。 |
 | 开发服务稳定运行方式 | ⚠️ | Codex 工具启动的长期进程会被环境回收；多人测试应在用户自己的两个终端中运行服务。 |
@@ -102,7 +107,17 @@
   - 展示胜者、胜利原因、目标和最终角色揭示。
   - 完成后支持回到主页，但不修改已结束房间。
 
-### P1：真实多人验收
+### P1：自动化回归门禁
+
+- [x] 规则层 5–10 人属性测试、版本化 seed 和 transcript replay。
+- [x] 使用同一 transcript 对比规则层与真实 Socket.IO 服务端权威状态。
+- [x] Playwright 使用独立浏览器上下文完成 5 人 smoke 和 5–10 人完整局矩阵。
+- [x] GitHub Actions 配置 PR smoke、PostgreSQL 服务/数据库重启凭据恢复和每日深度矩阵。
+- [ ] 推送功能分支，确认首次 GitHub Actions 全部 job 实际通过，并设置受保护分支 required checks。
+
+详细命令、seed 重放方法和 CI job 名称见 [自动化游戏流程测试](testing/automated-game-flow.md)。
+
+### P2：真实多人验收
 
 操作步骤、逐项预期结果和失败记录模板见 [LAN 多客户端人工验收手册](testing/lan-multiplayer-acceptance.md)。
 
@@ -116,7 +131,7 @@
 - [ ] 重启 Node 服务，使用原凭据回到未结束房间。
 - [ ] 安全重启 PostgreSQL 服务，确认原房间、座位凭据、进度和历史保持不变并可继续游戏。
 
-### P2：文档与运维收尾
+### P3：文档与运维收尾
 
 - [x] 把稳定的多人测试启动方式和分级验收步骤写入 README/人工验收手册，明确需要用户自己的终端保持进程。
 - [ ] 记录 PostgreSQL Compose 部署、备份和房间清理方式。
@@ -128,10 +143,15 @@
 最近一次验证日期：2026-08-22
 
 ```text
-pnpm test ✅ Game 28 passed；Server 41 passed；Web 74 passed（覆盖名称确认弹窗、trim/长度校验、同房间重名、并发座位冲突、错误分层恢复和既有游戏流程）
+pnpm test ✅ Game 29 passed；test-support 14 passed；Server 46 passed（包含本地 PostgreSQL）；Web 75 passed
 pnpm build ✅ Game、Server TypeScript 与 Web TypeScript + Vite build
 pnpm lint ✅ exit 0
-pnpm typecheck ✅ Game、Server、Web exit 0
+pnpm typecheck ✅ Game、test-support、Server、Web、E2E exit 0
+pnpm test:e2e ✅ 5 个独立浏览器上下文完成建房、加入、刷新重连、连续五次否决和结算；1 passed / 6 nightly skipped
+pnpm test:e2e:matrix ✅ 5–10 人完整局矩阵；7 passed
+PostgreSQL 本地集成测试 ✅ 5 个存储/重连用例实际连接本地 PostgreSQL 并通过；服务关闭会等待断连元数据写入完成后再关闭 pool
+PostgreSQL 容器重启探针 🟡 GitHub Actions service container 与数据库重启探针已配置，首次远端结果待确认
+GitHub Actions 配置检查 ✅ `ci.yml`、`nightly.yml` 可由 YAML parser 读取；实际 runner 执行待分支推送
 浏览器交互复测 ✅ 已加入房间置顶并显示“进入”，创建和其他房间加入入口被锁定；“进入”直接复用凭据且不打开名称对话框
 浏览器名称复测 ✅ 创建前必定显示名称确认弹窗；保存名称正确预填、自动聚焦并全选；取消不覆盖偏好；空白名称保留弹窗并显示字段错误；Console 无错误
 浏览器退出复测 ✅ 普通玩家正式退出后释放座位并返回主页；房主解散后房间消失；同浏览器第二标签页在 300ms 内同步返回主页
@@ -141,7 +161,7 @@ pnpm typecheck ✅ Game、Server、Web exit 0
 游戏圆桌交互复测 ✅ 桌面 5 人队长选择 2 名队员后，中央按钮从 `提交 0/2` 正确变为 `提交 2/2` 并触发提案；透明座位层不再拦截中央操作，外围座位仍可点击
 ```
 
-以上结果证明当前 Web 范围的类型、打包与单浏览器响应式布局通过，**不等价于已经完成真实 5–10 浏览器的局域网验收**。
+以上结果证明当前代码、构建和隔离浏览器自动化范围通过，**不等价于已经完成真实 5–10 台设备的局域网验收，也不代表尚未执行的 GitHub Actions/PostgreSQL 容器检查已经通过**。
 
 ## 当前架构与运行方式
 

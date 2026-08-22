@@ -10,6 +10,7 @@ describe('loadServerConfig', () => {
       origins: ['http://localhost:5173'],
       devToolsEnabled: false,
       devAdminToken: undefined,
+      testGameSeed: undefined,
     })
   })
 
@@ -24,6 +25,7 @@ describe('loadServerConfig', () => {
       origins: ['http://a.test', 'http://b.test'],
       devToolsEnabled: false,
       devAdminToken: undefined,
+      testGameSeed: undefined,
     })
   })
 
@@ -41,5 +43,16 @@ describe('loadServerConfig', () => {
     expect(() => loadServerConfig({ AVALON_GAME_PORT: '65536' })).toThrow(
       'AVALON_GAME_PORT must be an integer between 0 and 65535',
     )
+  })
+
+  it('loads a deterministic game seed only in the test environment', () => {
+    expect(loadServerConfig({
+      NODE_ENV: 'test',
+      AVALON_TEST_GAME_SEED: 'browser-replay-seed',
+    }).testGameSeed).toBe('browser-replay-seed')
+    expect(loadServerConfig({
+      NODE_ENV: 'production',
+      AVALON_TEST_GAME_SEED: 'must-be-ignored',
+    }).testGameSeed).toBeUndefined()
   })
 })

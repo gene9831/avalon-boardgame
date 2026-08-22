@@ -4,7 +4,7 @@ import type { AddressInfo } from 'node:net'
 import type { Server as BoardgameServerTypes, StorageAPI } from 'boardgame.io'
 import { Server as createBoardgameServer } from 'boardgame.io/server'
 
-import { AvalonGame } from '@avalon/game'
+import { createAvalonGame } from '@avalon/game'
 
 import { loadServerConfig, type AvalonServerConfig } from './config'
 import { MemoryStorage } from './storage/memory'
@@ -144,6 +144,7 @@ function createAvalonCredentialGenerator(
 export interface AvalonServerOptions {
   config?: AvalonServerConfig
   db?: StorageAPI.Sync | StorageAPI.Async
+  gameSeed?: string | number
 }
 
 export interface RunningAvalonServer {
@@ -159,6 +160,66 @@ type ClosableStorage = (StorageAPI.Sync | StorageAPI.Async) & {
   close?: () => Promise<void> | void
 }
 
+function createTrackedStorage(
+  storage: StorageAPI.Sync | StorageAPI.Async,
+) {
+  if (storage.type() === 0) {
+    return {
+      storage: storage as StorageAPI.Sync,
+      waitForIdle: async () => undefined,
+    }
+  }
+
+  const asyncStorage = storage as StorageAPI.Async
+  let activeOperations = 0
+  let activityVersion = 0
+  const idleWaiters = new Set<() => void>()
+  const track = async <T>(operation: () => Promise<T>) => {
+    activeOperations += 1
+    activityVersion += 1
+    try {
+      return await operation()
+    } finally {
+      activeOperations -= 1
+      activityVersion += 1
+      if (activeOperations === 0) {
+        for (const resolve of idleWaiters) resolve()
+        idleWaiters.clear()
+      }
+    }
+  }
+  const waitUntilCurrentlyIdle = () => activeOperations === 0
+    ? Promise.resolve()
+    : new Promise<void>((resolve) => idleWaiters.add(resolve))
+  const waitForIdle = async () => {
+    while (true) {
+      await waitUntilCurrentlyIdle()
+      const observedVersion = activityVersion
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      if (
+        activeOperations === 0 &&
+        activityVersion === observedVersion
+      ) return
+    }
+  }
+  const trackedStorage: StorageAPI.Async = {
+    type: () => 1,
+    connect: () => track(() => asyncStorage.connect()),
+    createMatch: (matchID, options) =>
+      track(() => asyncStorage.createMatch(matchID, options)),
+    setState: (matchID, state, deltalog) =>
+      track(() => asyncStorage.setState(matchID, state, deltalog)),
+    setMetadata: (matchID, metadata) =>
+      track(() => asyncStorage.setMetadata(matchID, metadata)),
+    fetch: (matchID, options) =>
+      track(() => asyncStorage.fetch(matchID, options)),
+    wipe: (matchID) => track(() => asyncStorage.wipe(matchID)),
+    listMatches: (options) =>
+      track(() => asyncStorage.listMatches(options)),
+  }
+  return { storage: trackedStorage, waitForIdle }
+}
+
 function getPort(server: NonNullable<ServerHandles['appServer']>) {
   const address = server.address()
   if (address === null || typeof address === 'string') {
@@ -171,16 +232,27 @@ function getPort(server: NonNullable<ServerHandles['appServer']>) {
 export function createAvalonServer(options: AvalonServerOptions = {}) {
   const config = options.config ?? loadServerConfig()
   const rawDb = options.db ?? createDefaultStorage()
+  const trackedStorage = createTrackedStorage(rawDb)
   const guardedStorageOptions = {
     prepareMetadata: prepareAvalonMetadata,
     getStaleMetadataError: getStaleJoinError,
   }
-  const guardedStorage = rawDb.type() === 0
-    ? createDeletionSafeStorage(rawDb as StorageAPI.Sync, guardedStorageOptions)
-    : createDeletionSafeStorage(rawDb as StorageAPI.Async, guardedStorageOptions)
+  const guardedStorage = trackedStorage.storage.type() === 0
+    ? createDeletionSafeStorage(
+      trackedStorage.storage as StorageAPI.Sync,
+      guardedStorageOptions,
+    )
+    : createDeletionSafeStorage(
+      trackedStorage.storage as StorageAPI.Async,
+      guardedStorageOptions,
+    )
   const db = guardedStorage.storage as StorageAPI.Sync | StorageAPI.Async
   const boardgame = createBoardgameServer({
-    games: [AvalonGame as unknown as BoardgameGame],
+    games: [
+      createAvalonGame({
+        seed: options.gameSeed ?? config.testGameSeed,
+      }) as unknown as BoardgameGame,
+    ],
     db,
     generateCredentials: createAvalonCredentialGenerator(db),
     origins: config.origins,
@@ -211,7 +283,12 @@ export function createAvalonServer(options: AvalonServerOptions = {}) {
   })
   registerRoomSessionValidationRoute(boardgame.router, db)
 
-  return { boardgame, config, db: rawDb }
+  return {
+    boardgame,
+    config,
+    db: rawDb,
+    waitForStorageIdle: trackedStorage.waitForIdle,
+  }
 }
 
 function createDefaultStorage(
@@ -247,7 +324,7 @@ function createDefaultStorage(
 export async function startAvalonServer(
   options: AvalonServerOptions = {},
 ): Promise<RunningAvalonServer> {
-  const { boardgame, config, db } = createAvalonServer(options)
+  const { boardgame, config, db, waitForStorageIdle } = createAvalonServer(options)
   const servers = await boardgame.run({
     port: config.gamePort,
     lobbyConfig: { apiPort: config.lobbyPort },
@@ -263,9 +340,17 @@ export async function startAvalonServer(
     close: async () => {
       if (closePromise !== undefined) return closePromise
 
+      const serverClosePromises = [servers.apiServer, servers.appServer]
+        .filter((server) => server !== undefined && server.listening)
+        .map((server) => new Promise<void>((resolve) => {
+          server.once('close', resolve)
+        }))
       boardgame.kill(servers)
-      const closeStorage = (db as ClosableStorage).close
-      closePromise = Promise.resolve(closeStorage?.()).then(() => undefined)
+      const closableStorage = db as ClosableStorage
+      closePromise = Promise.all(serverClosePromises)
+        .then(waitForStorageIdle)
+        .then(() => closableStorage.close?.())
+        .then(() => undefined)
       await closePromise
     },
   }
