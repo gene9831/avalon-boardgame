@@ -2,7 +2,7 @@
 
 An online implementation of the base rules of *The Resistance: Avalon* for 5–10 players on a local network. The runtime uses React, TypeScript, Vite, boardgame.io, Socket.IO, and PostgreSQL.
 
-The repository is now a pnpm workspace. The shared Avalon rule core, multiplayer transport, Lobby flow, PostgreSQL persistence, seat-bound reconnect, and the first team proposal/vote UI slice are implemented. Quest, assassination, result presentation, and full LAN acceptance testing remain in progress.
+The repository is a pnpm workspace. The shared Avalon rule core, multiplayer transport, Lobby flow, PostgreSQL persistence, seat-bound reconnect, and the complete in-room Web flow are implemented. Real 5–10-client LAN acceptance testing remains in progress.
 
 ## Workspace layout
 
@@ -17,6 +17,7 @@ infra/
 docs/
   rules/        Rule references and visibility constraints
   adr/          Architecture decisions
+  testing/      Manual multiplayer acceptance procedures
 ```
 
 The root package is orchestration-only. Browser dependencies and Vite/Oxlint configuration live in `apps/web`; server-only dependencies must not be imported by the browser or shared game package.
@@ -58,6 +59,7 @@ pnpm typecheck
 
 - [Confirmed game design](docs/superpowers/specs/2026-08-14-avalon-boardgame-design.md)
 - [Project status and next steps](docs/PROJECT_STATUS.md)
+- [LAN multiplayer manual acceptance](docs/testing/lan-multiplayer-acceptance.md)
 - [Domain glossary](CONTEXT.md)
 - [Rule summary](docs/rules/rulebook-summary.md)
 - [Role visibility rules](docs/rules/role-visibility.md)
