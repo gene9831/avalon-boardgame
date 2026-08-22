@@ -114,7 +114,7 @@ export function RoomGamePanel({
           <div className="absolute left-1/2 top-1/2 z-10 w-[min(35vw,30rem)] -translate-x-1/2 -translate-y-1/2">
             <QuestBoard game={game} numPlayers={playerIDs.length} phaseLabel={phaseLabel}>{phaseAction}</QuestBoard>
           </div>
-          <div className="absolute inset-x-0 inset-y-0 z-20">
+          <div className="pointer-events-none absolute inset-x-0 inset-y-0 z-20">
             {seats.map((seat) => (
               <GameSeat
                 canSelect={canSelectTeam}
@@ -267,7 +267,7 @@ function GameSeat({ canSelect, canSelectAsTarget, className, compact = false, ga
       : 'border-white/10 bg-slate-950/80'
 
   return (
-    <button aria-label={revealedRole === undefined ? (canSelectAsTarget ? `选择 ${seat.name} 作为刺杀目标` : undefined) : `${seat.name} · ${ROLE_LABELS[revealedRole]}`} aria-pressed={canSelect ? selected : canSelectAsTarget ? selectedAsTarget : undefined} className={`${className} rounded-2xl border text-left transition ${compact ? 'p-2' : 'p-2.5'} ${classes} ${canSelect || canSelectAsTarget ? 'cursor-pointer hover:border-cyan-200' : 'cursor-default'}`} disabled={!canSelect && !canSelectAsTarget} onClick={onSelect} style={style} type="button">
+    <button aria-label={revealedRole === undefined ? (canSelectAsTarget ? `选择 ${seat.name} 作为刺杀目标` : undefined) : `${seat.name} · ${ROLE_LABELS[revealedRole]}`} aria-pressed={canSelect ? selected : canSelectAsTarget ? selectedAsTarget : undefined} className={`${className} pointer-events-auto rounded-2xl border text-left transition ${compact ? 'p-2' : 'p-2.5'} ${classes} ${canSelect || canSelectAsTarget ? 'cursor-pointer hover:border-cyan-200' : 'cursor-default'}`} disabled={!canSelect && !canSelectAsTarget} onClick={onSelect} style={style} type="button">
       <div className="flex items-center justify-between gap-1">
         <span className="text-[0.6rem] uppercase tracking-[0.14em] text-slate-500">座位 {seat.seatNumber}</span>
         <span className="flex items-center gap-1 text-[0.6rem] font-semibold">
