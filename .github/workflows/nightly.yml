@@ -35,11 +35,11 @@ jobs:
       AVALON_PROPERTY_RUNS: ${{ inputs.property_runs || '1667' }}
       REQUESTED_MASTER_SEED: ${{ inputs.master_seed }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -70,7 +70,7 @@ jobs:
           pnpm --filter @avalon/test-support test 2>&1 | tee nightly-property.log
       - name: Upload replayable property failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: property-failure-${{ github.run_id }}
           path: nightly-property.log
@@ -88,11 +88,11 @@ jobs:
       E2E_PLAYER_COUNT: ${{ matrix.player_count }}
       REQUESTED_MASTER_SEED: ${{ inputs.master_seed }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -115,7 +115,7 @@ jobs:
       - run: pnpm --filter @avalon/e2e exec playwright test specs/matrix.spec.ts
       - name: Upload Playwright failure artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: browser-${{ matrix.player_count }}p-${{ github.run_id }}
           path: |
