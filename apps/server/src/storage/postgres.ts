@@ -21,7 +21,7 @@ interface SequenceRow {
   last_sequence: string | number | null
 }
 
-type ClosablePool = Pick<Pool, 'connect' | 'end' | 'query'>
+type ClosablePool = Pick<Pool, 'connect' | 'end' | 'off' | 'on' | 'query'>
 
 function matchNotFound(matchID: string) {
   return new Error(`Match ${matchID} was not found`)
@@ -38,21 +38,29 @@ function timestamp(milliseconds: number) {
 export class PostgresStorage implements StorageAPI.Async {
   private readonly pool: ClosablePool
   private readonly ownsPool: boolean
+  private readonly handlePoolError = (error: Error) => {
+    const code = (error as NodeJS.ErrnoException).code
+    console.error('PostgreSQL idle client error', {
+      ...(code === undefined ? {} : { code }),
+      message: error.message,
+    })
+  }
 
   constructor(options: PostgresStorageOptions = {}) {
     if (options.pool !== undefined) {
       this.pool = options.pool
       this.ownsPool = false
-      return
+    } else {
+      const connectionString = options.connectionString ?? process.env.DATABASE_URL
+      if (connectionString === undefined || connectionString.trim() === '') {
+        throw new Error('DATABASE_URL is required for PostgresStorage')
+      }
+
+      this.pool = new Pool({ connectionString })
+      this.ownsPool = true
     }
 
-    const connectionString = options.connectionString ?? process.env.DATABASE_URL
-    if (connectionString === undefined || connectionString.trim() === '') {
-      throw new Error('DATABASE_URL is required for PostgresStorage')
-    }
-
-    this.pool = new Pool({ connectionString })
-    this.ownsPool = true
+    this.pool.on('error', this.handlePoolError)
   }
 
   type(): 1 {
@@ -66,7 +74,11 @@ export class PostgresStorage implements StorageAPI.Async {
   }
 
   async close() {
-    if (this.ownsPool) await this.pool.end()
+    try {
+      if (this.ownsPool) await this.pool.end()
+    } finally {
+      this.pool.off('error', this.handlePoolError)
+    }
   }
 
   async createMatch(
