@@ -113,6 +113,18 @@ describe('pending join flow', () => {
     expect(calls).toEqual([])
   })
 
+  it('rejects a name longer than 24 characters before calling the lobby client', async () => {
+    await expect(
+      executePendingJoin(fakeLobby, intent, {
+        clientID: 'client-1',
+        createSessionID: () => 'join-session-too-long',
+        gameName: 'avalon',
+        playerName: 'A'.repeat(25),
+      }),
+    ).rejects.toThrow('玩家名称不能超过 24 个字符')
+    expect(calls).toEqual([])
+  })
+
   it('keeps the public join session ID distinct from player credentials', async () => {
     const result = await executePendingJoin(fakeLobby, intent, {
       clientID: 'client-1',

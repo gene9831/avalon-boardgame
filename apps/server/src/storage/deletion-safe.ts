@@ -14,6 +14,14 @@ interface DeletionSafeStorage<TStorage> {
   ): Server.MatchData | undefined | Promise<Server.MatchData | undefined>
 }
 
+export interface DeletionSafeStorageOptions {
+  prepareMetadata?: (metadata: Server.MatchData) => void
+  getStaleMetadataError?: (
+    currentMetadata: Server.MatchData,
+    staleMetadata: Server.MatchData,
+  ) => Error | undefined
+}
+
 interface MetadataVersion {
   matchID: string
   version: number
@@ -35,8 +43,10 @@ function cloneMetadata(
   metadata: Server.MatchData,
   matchID: string,
   version: number,
+  prepareMetadata?: (metadata: Server.MatchData) => void,
 ): Server.MatchData {
   const clone = structuredClone(metadata) as VersionedMetadata
+  prepareMetadata?.(clone)
   Object.defineProperty(clone, metadataVersionKey, {
     configurable: true,
     enumerable: true,
@@ -62,6 +72,7 @@ function versionFetchedMetadata<O extends StorageAPI.FetchOpts>(
   matchID: string,
   result: StorageAPI.FetchResult<O>,
   version: number,
+  prepareMetadata?: (metadata: Server.MatchData) => void,
 ): StorageAPI.FetchResult<O> {
   const resultWithMetadata = result as StorageAPI.FetchResult<O> & {
     metadata?: Server.MatchData
@@ -70,7 +81,12 @@ function versionFetchedMetadata<O extends StorageAPI.FetchOpts>(
 
   return {
     ...result,
-    metadata: cloneMetadata(resultWithMetadata.metadata, matchID, version),
+    metadata: cloneMetadata(
+      resultWithMetadata.metadata,
+      matchID,
+      version,
+      prepareMetadata,
+    ),
   } as StorageAPI.FetchResult<O>
 }
 
@@ -89,12 +105,15 @@ function emptyFetch<O extends StorageAPI.FetchOpts>(opts: O): StorageAPI.FetchRe
 
 export function createDeletionSafeStorage(
   rawStorage: StorageAPI.Sync,
+  options?: DeletionSafeStorageOptions,
 ): DeletionSafeStorage<StorageAPI.Sync>
 export function createDeletionSafeStorage(
   rawStorage: StorageAPI.Async,
+  options?: DeletionSafeStorageOptions,
 ): DeletionSafeStorage<StorageAPI.Async>
 export function createDeletionSafeStorage(
   rawStorage: StorageAPI.Sync | StorageAPI.Async,
+  options: DeletionSafeStorageOptions = {},
 ): DeletionSafeStorage<StorageAPI.Sync | StorageAPI.Async> {
   const unavailableMatchIDs = new Set<string>()
   const metadataVersions = new Map<string, number>()
@@ -127,15 +146,30 @@ export function createDeletionSafeStorage(
         return undefined
       }
 
-      const updatedMetadata = cloneMetadata(result.metadata, matchID, version)
+      const updatedMetadata = cloneMetadata(
+        result.metadata,
+        matchID,
+        version,
+        options.prepareMetadata,
+      )
       update(updatedMetadata)
       const nextVersion = version + 1
       syncStorage.setMetadata(
         matchID,
-        cloneMetadata(updatedMetadata, matchID, nextVersion),
+        cloneMetadata(
+          updatedMetadata,
+          matchID,
+          nextVersion,
+          options.prepareMetadata,
+        ),
       )
       metadataVersions.set(matchID, nextVersion)
-      return cloneMetadata(updatedMetadata, matchID, nextVersion)
+      return cloneMetadata(
+        updatedMetadata,
+        matchID,
+        nextVersion,
+        options.prepareMetadata,
+      )
     }
     const storage: StorageAPI.Sync = {
       type: () => 0,
@@ -144,7 +178,12 @@ export function createDeletionSafeStorage(
         if (unavailableMatchIDs.has(matchID)) return
         syncStorage.createMatch(matchID, {
           ...opts,
-          metadata: cloneMetadata(opts.metadata, matchID, 0),
+          metadata: cloneMetadata(
+            opts.metadata,
+            matchID,
+            0,
+            options.prepareMetadata,
+          ),
         })
         metadataVersions.set(matchID, 0)
       },
@@ -154,13 +193,27 @@ export function createDeletionSafeStorage(
         }
       },
       setMetadata: (matchID, metadata) => {
-        if (
-          unavailableMatchIDs.has(matchID) ||
-          !hasCurrentMetadataVersion(matchID, metadata, metadataVersions)
-        ) return
+        if (unavailableMatchIDs.has(matchID)) return
+        if (!hasCurrentMetadataVersion(matchID, metadata, metadataVersions)) {
+          const currentMetadata = syncStorage.fetch(
+            matchID,
+            { metadata: true },
+          ).metadata
+          if (currentMetadata !== undefined) {
+            const staleError = options.getStaleMetadataError?.(
+              currentMetadata,
+              metadata,
+            )
+            if (staleError !== undefined) throw staleError
+          }
+          return
+        }
 
         const version = metadataVersions.get(matchID) ?? 0
-        syncStorage.setMetadata(matchID, cloneMetadata(metadata, matchID, version + 1))
+        syncStorage.setMetadata(
+          matchID,
+          cloneMetadata(metadata, matchID, version + 1, options.prepareMetadata),
+        )
         metadataVersions.set(matchID, version + 1)
       },
       fetch: (matchID, opts) => {
@@ -168,7 +221,12 @@ export function createDeletionSafeStorage(
         const version = metadataVersions.get(matchID) ?? 0
         const result = syncStorage.fetch(matchID, opts)
         if (unavailableMatchIDs.has(matchID)) return emptyFetch(opts)
-        return versionFetchedMetadata(matchID, result, version)
+        return versionFetchedMetadata(
+          matchID,
+          result,
+          version,
+          options.prepareMetadata,
+        )
       },
       wipe: (matchID) => {
         deletionGuard.markMatchDeleted(matchID)
@@ -196,15 +254,30 @@ export function createDeletionSafeStorage(
         return
       }
 
-      const currentMetadata = cloneMetadata(result.metadata, matchID, version)
+      const currentMetadata = cloneMetadata(
+        result.metadata,
+        matchID,
+        version,
+        options.prepareMetadata,
+      )
       update(currentMetadata)
       const nextVersion = version + 1
       await asyncStorage.setMetadata(
         matchID,
-        cloneMetadata(currentMetadata, matchID, nextVersion),
+        cloneMetadata(
+          currentMetadata,
+          matchID,
+          nextVersion,
+          options.prepareMetadata,
+        ),
       )
       metadataVersions.set(matchID, nextVersion)
-      updatedMetadata = cloneMetadata(currentMetadata, matchID, nextVersion)
+      updatedMetadata = cloneMetadata(
+        currentMetadata,
+        matchID,
+        nextVersion,
+        options.prepareMetadata,
+      )
     })
     return updatedMetadata
   }
@@ -215,7 +288,12 @@ export function createDeletionSafeStorage(
       if (unavailableMatchIDs.has(matchID)) return
       await asyncStorage.createMatch(matchID, {
         ...opts,
-        metadata: cloneMetadata(opts.metadata, matchID, 0),
+        metadata: cloneMetadata(
+          opts.metadata,
+          matchID,
+          0,
+          options.prepareMetadata,
+        ),
       })
       metadataVersions.set(matchID, 0)
     },
@@ -226,15 +304,30 @@ export function createDeletionSafeStorage(
     },
     setMetadata: async (matchID, metadata) => {
       await enqueueMetadataWrite(matchID, async () => {
-        if (
-          unavailableMatchIDs.has(matchID) ||
-          !hasCurrentMetadataVersion(matchID, metadata, metadataVersions)
-        ) return
+        if (unavailableMatchIDs.has(matchID)) return
+        if (!hasCurrentMetadataVersion(matchID, metadata, metadataVersions)) {
+          const currentMetadata = (
+            await asyncStorage.fetch(matchID, { metadata: true })
+          ).metadata
+          if (currentMetadata !== undefined) {
+            const staleError = options.getStaleMetadataError?.(
+              currentMetadata,
+              metadata,
+            )
+            if (staleError !== undefined) throw staleError
+          }
+          return
+        }
 
         const version = metadataVersions.get(matchID) ?? 0
         await asyncStorage.setMetadata(
           matchID,
-          cloneMetadata(metadata, matchID, version + 1),
+          cloneMetadata(
+            metadata,
+            matchID,
+            version + 1,
+            options.prepareMetadata,
+          ),
         )
         metadataVersions.set(matchID, version + 1)
       })
@@ -249,6 +342,7 @@ export function createDeletionSafeStorage(
         matchID,
         result,
         version,
+        options.prepareMetadata,
       )
     },
     wipe: async (matchID) => {

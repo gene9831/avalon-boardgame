@@ -33,13 +33,75 @@ function normalizePlayerName(name: unknown) {
   return typeof name === 'string' ? name.trim().toLocaleLowerCase() : ''
 }
 
+function prepareAvalonMetadata(metadata: BoardgameServerTypes.MatchData) {
+  for (const player of Object.values(metadata.players)) {
+    if (typeof player.name === 'string') player.name = player.name.trim()
+  }
+}
+
+function lobbyConflict(message: string) {
+  return Object.assign(new Error(message), {
+    expose: true,
+    status: 409,
+    statusCode: 409,
+  })
+}
+
+function getStaleJoinError(
+  currentMetadata: BoardgameServerTypes.MatchData,
+  staleMetadata: BoardgameServerTypes.MatchData,
+) {
+  for (const stalePlayer of Object.values(staleMetadata.players)) {
+    const currentPlayer = currentMetadata.players[stalePlayer.id]
+    if (
+      typeof stalePlayer.credentials !== 'string' ||
+      stalePlayer.credentials === currentPlayer?.credentials
+    ) continue
+
+    if (currentPlayer?.name) {
+      return lobbyConflict(`Player ${stalePlayer.id} not available`)
+    }
+
+    const otherCurrentPlayers = Object.values(currentMetadata.players).filter(
+      (player) => player.id !== stalePlayer.id,
+    )
+    const stalePlayerName = normalizePlayerName(stalePlayer.name)
+    if (
+      stalePlayerName &&
+      otherCurrentPlayers.some(
+        (player) => normalizePlayerName(player.name) === stalePlayerName,
+      )
+    ) {
+      return lobbyConflict('Player name is already used in this match')
+    }
+
+    const staleClientID = readClientID(stalePlayer.data)
+    if (
+      staleClientID &&
+      otherCurrentPlayers.some(
+        (player) => readClientID(player.data) === staleClientID,
+      )
+    ) {
+      return lobbyConflict('Client has already joined this match')
+    }
+
+    return lobbyConflict('Room metadata changed; refresh and retry')
+  }
+
+  return undefined
+}
+
 function createAvalonCredentialGenerator(
   db: StorageAPI.Sync | StorageAPI.Async,
 ): BoardgameServerTypes.GenerateCredentials {
   return async (ctx) => {
     const matchID = ctx.params.id
     const playerID = ctx.request.body?.playerID
-    const playerName = normalizePlayerName(ctx.request.body?.playerName)
+    const submittedPlayerName = ctx.request.body?.playerName
+    const trimmedPlayerName = typeof submittedPlayerName === 'string'
+      ? submittedPlayerName.trim()
+      : ''
+    const playerName = normalizePlayerName(trimmedPlayerName)
     const clientID = readClientID(ctx.request.body?.data)
 
     if (typeof matchID === 'string') {
@@ -53,21 +115,25 @@ function createAvalonCredentialGenerator(
       const players = allPlayers.filter(
         (player) => String(player.id) !== String(playerID),
       )
-      const rejectJoin = (message: string): never => {
+      const rejectJoin = (status: number, message: string): never => {
         if (pendingPlayer !== undefined) {
           delete pendingPlayer.name
           delete pendingPlayer.data
         }
-        ctx.throw(409, message)
+        ctx.throw(status, message)
         throw new Error(message)
       }
 
+      if (trimmedPlayerName.length === 0 || trimmedPlayerName.length > 24) {
+        rejectJoin(400, 'Player name must contain 1 to 24 characters')
+      }
+
       if (clientID && players.some((player) => readClientID(player.data) === clientID)) {
-        rejectJoin('Client has already joined this match')
+        rejectJoin(409, 'Client has already joined this match')
       }
 
       if (playerName && players.some((player) => normalizePlayerName(player.name) === playerName)) {
-        rejectJoin('Player name is already used in this match')
+        rejectJoin(409, 'Player name is already used in this match')
       }
     }
 
@@ -105,9 +171,13 @@ function getPort(server: NonNullable<ServerHandles['appServer']>) {
 export function createAvalonServer(options: AvalonServerOptions = {}) {
   const config = options.config ?? loadServerConfig()
   const rawDb = options.db ?? createDefaultStorage()
+  const guardedStorageOptions = {
+    prepareMetadata: prepareAvalonMetadata,
+    getStaleMetadataError: getStaleJoinError,
+  }
   const guardedStorage = rawDb.type() === 0
-    ? createDeletionSafeStorage(rawDb as StorageAPI.Sync)
-    : createDeletionSafeStorage(rawDb as StorageAPI.Async)
+    ? createDeletionSafeStorage(rawDb as StorageAPI.Sync, guardedStorageOptions)
+    : createDeletionSafeStorage(rawDb as StorageAPI.Async, guardedStorageOptions)
   const db = guardedStorage.storage as StorageAPI.Sync | StorageAPI.Async
   const boardgame = createBoardgameServer({
     games: [AvalonGame as unknown as BoardgameGame],
