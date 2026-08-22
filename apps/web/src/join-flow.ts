@@ -1,5 +1,6 @@
 import type { RoomSession } from './room-session'
 import { createClientID } from './client-identity'
+import { getPlayerNameValidationError } from './player-name'
 
 export type PendingJoin =
   | { type: 'create'; numPlayers: number }
@@ -32,9 +33,8 @@ export async function executePendingJoin(
   },
 ): Promise<RoomSession> {
   const playerName = options.playerName.trim()
-  if (playerName.length === 0) {
-    throw new Error('玩家名称不能为空')
-  }
+  const validationError = getPlayerNameValidationError(playerName)
+  if (validationError !== null) throw new Error(validationError)
   const sessionID = options.createSessionID?.() ?? `join-${createClientID()}`
 
   let matchID: string

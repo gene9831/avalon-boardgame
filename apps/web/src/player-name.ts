@@ -15,6 +15,13 @@ function normalizePlayerName(value: string | null) {
   return trimmedValue.length > 0 ? trimmedValue : null
 }
 
+export function getPlayerNameValidationError(playerName: string) {
+  const trimmedName = playerName.trim()
+  if (trimmedName.length === 0) return '玩家名称不能为空'
+  if (trimmedName.length > 24) return '玩家名称不能超过 24 个字符'
+  return null
+}
+
 export function loadPlayerName(
   storage: RoomSessionStorage = browserStorage(),
 ): string | null {
@@ -30,17 +37,9 @@ export function savePlayerName(
   storage: RoomSessionStorage = browserStorage(),
 ) {
   const trimmedName = playerName.trim()
-  if (trimmedName.length === 0) {
-    throw new Error('玩家名称不能为空。')
-  }
+  const validationError = getPlayerNameValidationError(trimmedName)
+  if (validationError !== null) throw new Error(validationError)
 
   storage.setItem(PLAYER_NAME_KEY, trimmedName)
   return trimmedName
-}
-
-export function getPreferredPlayerName(
-  storedName: string | null,
-  fallbackName: string | null,
-) {
-  return normalizePlayerName(storedName) ?? normalizePlayerName(fallbackName)
 }

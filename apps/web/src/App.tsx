@@ -31,7 +31,9 @@ import { webConfig } from './config'
 import { getClientID } from './client-identity'
 import { createDevToolsClient } from './dev-tools'
 import { executePendingJoin, type PendingJoin } from './join-flow'
+import { classifyJoinError } from './join-error'
 import { LobbyView } from './LobbyView'
+import { PlayerNameDialog } from './PlayerNameDialog'
 import { RoomDevTools } from './RoomDevTools'
 import { RoomExitDialog } from './RoomExitDialog'
 import { RoomGamePanel } from './RoomGamePanel'
@@ -56,7 +58,7 @@ import {
   type LobbyPlayer,
 } from './lobby'
 import {
-  getPreferredPlayerName,
+  getPlayerNameValidationError,
   loadPlayerName,
   savePlayerName,
 } from './player-name'
@@ -67,7 +69,6 @@ import {
   getRoomSessionKey,
   getRoomSessionInvalidationNotice,
   isRoomSessionStillValid,
-  loadLastRoomSession,
   loadRoomSession,
   saveRoomSession,
   validateActiveRoomSessions,
@@ -119,9 +120,6 @@ function LobbyRoute() {
   const devTools = useMemo(() => createDevToolsClient(webConfig.lobbyURL), [])
   const clientID = useMemo(() => getClientID(), [])
   const navigate = useNavigate()
-  const [lastRoomSession, setLastRoomSession] = useState<RoomSession | null>(() =>
-    loadLastRoomSession(),
-  )
   const [activeRoomSessions, setActiveRoomSessions] = useState<RoomSession[]>([])
   const [roomAccessStatus, setRoomAccessStatus] = useState<'checking' | 'ready' | 'unavailable'>('checking')
   const [roomAccessError, setRoomAccessError] = useState<string | null>(null)
@@ -168,7 +166,6 @@ function LobbyRoute() {
       if (generation !== refreshGenerationRef.current) return
 
       setActiveRoomSessions(validation.sessions)
-      setLastRoomSession(loadLastRoomSession())
       setRoomAccessStatus(validation.validationFailed ? 'unavailable' : 'ready')
       setRoomAccessError(
         validation.validationFailed
@@ -240,38 +237,39 @@ function LobbyRoute() {
         setNameDialogError(null)
         navigate(`/rooms/${encodeURIComponent(session.matchID)}`)
       } catch (requestError) {
-        setNameDialogValue(playerName)
-        setNameDialogError(errorMessage(requestError))
-        setNameDialogOpen(true)
+        const joinError = classifyJoinError(requestError)
+        if (joinError.placement === 'dialog') {
+          setNameDialogValue(playerName)
+          setNameDialogError(joinError.message)
+          setNameDialogOpen(true)
+        } else {
+          setPendingJoin(null)
+          setNameDialogOpen(false)
+          setNameDialogValue('')
+          setNameDialogError(null)
+          setError(joinError.message)
+          if (joinError.refreshRooms) void refreshMatches()
+        }
       } finally {
         requestInFlightRef.current = false
         setBusy(false)
       }
     },
-    [clientID, lobby, navigate, roomAccessLocked],
+    [clientID, lobby, navigate, refreshMatches, roomAccessLocked],
   )
 
   const beginPendingJoin = useCallback(
     (intent: PendingJoin) => {
       if (requestInFlightRef.current || roomAccessLocked) return
 
-      const preferredName = getPreferredPlayerName(
-        loadPlayerName(),
-        lastRoomSession?.playerName ?? null,
-      )
+      const preferredName = loadPlayerName()
       setPendingJoin(intent)
       setError(null)
-
-      if (preferredName !== null) {
-        void executePendingJoinRequest(intent, preferredName)
-        return
-      }
-
-      setNameDialogValue('')
+      setNameDialogValue(preferredName ?? '')
       setNameDialogError(null)
       setNameDialogOpen(true)
     },
-    [executePendingJoinRequest, lastRoomSession, roomAccessLocked],
+    [roomAccessLocked],
   )
 
   const handleJoin = (matchID: string, playerID: string) => {
@@ -294,8 +292,9 @@ function LobbyRoute() {
   const handleNameDialogSubmit = () => {
     if (pendingJoin === null || requestInFlightRef.current || roomAccessLocked) return
 
-    if (nameDialogValue.trim().length === 0) {
-      setNameDialogError('玩家名称不能为空')
+    const validationError = getPlayerNameValidationError(nameDialogValue)
+    if (validationError !== null) {
+      setNameDialogError(validationError)
       return
     }
 
@@ -314,7 +313,6 @@ function LobbyRoute() {
     try {
       await devTools.deleteRoom(matchID, devToken)
       clearRoomSession(matchID)
-      setLastRoomSession(loadLastRoomSession())
       await refreshMatches()
     } catch (requestError) {
       setError(`无法删除房间：${errorMessage(requestError)}`)
@@ -345,6 +343,7 @@ function LobbyRoute() {
         setSelectedSeats={setSelectedSeats}
       />
       <PlayerNameDialog
+        action={pendingJoin?.type ?? 'join'}
         busy={busy}
         error={nameDialogError}
         onCancel={handleNameDialogCancel}
@@ -771,98 +770,6 @@ function RoomLoadingContent({
         </button>
       </div>
     </section>
-  )
-}
-
-function PlayerNameDialog({
-  busy,
-  error,
-  onCancel,
-  onChange,
-  onSubmit,
-  open,
-  value,
-}: {
-  busy: boolean
-  error: string | null
-  onCancel: () => void
-  onChange: (value: string) => void
-  onSubmit: () => void
-  open: boolean
-  value: string
-}) {
-  const dialogRef = useRef<HTMLDialogElement | null>(null)
-
-  useEffect(() => {
-    const dialog = dialogRef.current
-    if (dialog === null) return
-
-    if (open && !dialog.open) {
-      dialog.showModal()
-    } else if (!open && dialog.open) {
-      dialog.close()
-    }
-  }, [open])
-
-  return (
-    <dialog
-      aria-labelledby="player-name-dialog-title"
-      className="w-[calc(100%-2rem)] max-w-md rounded-3xl border border-white/15 bg-slate-900 p-0 text-slate-200 shadow-2xl shadow-black/40 backdrop:bg-slate-950/70"
-      onCancel={(event) => {
-        event.preventDefault()
-        if (!busy) onCancel()
-      }}
-      ref={dialogRef}
-    >
-      <form
-        className="p-6 sm:p-8"
-        onSubmit={(event) => {
-          event.preventDefault()
-          onSubmit()
-        }}
-      >
-        <h2 className="text-2xl font-semibold text-white" id="player-name-dialog-title">
-          输入玩家名称
-        </h2>
-        <p className="mt-3 text-sm leading-6 text-slate-300">
-          进入房间前，请告诉大家你想使用的名字。
-        </p>
-        <label className="mt-6 block text-sm font-medium text-slate-200" htmlFor="dialog-player-name">
-          玩家名称
-        </label>
-        <input
-          autoFocus
-          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-amber-300/70 focus:ring-2 focus:ring-amber-300/20"
-          id="dialog-player-name"
-          maxLength={24}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder="例如：亚瑟"
-          value={value}
-        />
-        {error !== null && (
-          <p className="mt-3 text-sm text-rose-200" role="alert">
-            {error}
-          </p>
-        )}
-        <div className="mt-6 flex justify-end gap-3">
-          <button
-            className="rounded-xl border border-white/15 px-4 py-3 font-semibold text-slate-200 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={busy}
-            onClick={onCancel}
-            type="button"
-          >
-            取消
-          </button>
-          <button
-            className="rounded-xl bg-amber-300 px-4 py-3 font-semibold text-slate-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={busy}
-            type="submit"
-          >
-            {busy ? '处理中…' : '确认并进入'}
-          </button>
-        </div>
-      </form>
-    </dialog>
   )
 }
 
