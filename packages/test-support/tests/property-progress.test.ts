@@ -1,8 +1,30 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { createPropertyProgress } from './property-progress'
 
 describe('property progress', () => {
+  it('writes directly to stdout so CI can stream checkpoints', () => {
+    const stdoutWrite = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true)
+    const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+
+    try {
+      createPropertyProgress({
+        label: '5 players',
+        now: () => 1_000,
+        totalRuns: 10,
+      })
+
+      expect(stdoutWrite).toHaveBeenCalledWith(
+        '[property] 5 players: 0/10 (0%) elapsed=0s\n',
+      )
+    } finally {
+      stdoutWrite.mockRestore()
+      consoleLog.mockRestore()
+    }
+  })
+
   it('reports start, ten-percent checkpoints, and completion with elapsed time', () => {
     const messages: string[] = []
     let now = 1_000

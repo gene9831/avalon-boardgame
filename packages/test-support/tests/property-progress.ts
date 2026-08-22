@@ -13,7 +13,7 @@ export function createPropertyProgress({
   label,
   now = Date.now,
   totalRuns,
-  write = console.log,
+  write = (message) => process.stdout.write(`${message}\n`),
 }: PropertyProgressOptions) {
   const startedAt = now()
   const reportEvery = Math.max(1, Math.ceil(totalRuns / 10))
