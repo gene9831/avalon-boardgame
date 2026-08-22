@@ -10,7 +10,7 @@ on:
         required: false
         type: string
       property_runs:
-        description: Property runs per player count
+        description: Property runs per player count (1-5000)
         default: '1667'
         required: true
         type: string
@@ -31,6 +31,7 @@ jobs:
   property-games:
     name: Property games
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       AVALON_PROPERTY_RUNS: ${{ inputs.property_runs || '1667' }}
       REQUESTED_MASTER_SEED: ${{ inputs.master_seed }}
@@ -46,8 +47,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Select reproducible nightly seed
         run: |
-          if [[ ! "$AVALON_PROPERTY_RUNS" =~ ^[1-9][0-9]*$ ]] || (( AVALON_PROPERTY_RUNS > 100000 )); then
-            echo "property_runs must be an integer from 1 through 100000" >&2
+          if [[ ! "$AVALON_PROPERTY_RUNS" =~ ^([1-9][0-9]{0,2}|[1-4][0-9]{3}|5000)$ ]]; then
+            echo "property_runs must be an integer from 1 through 5000" >&2
             exit 1
           fi
           if [[ -n "$REQUESTED_MASTER_SEED" ]]; then

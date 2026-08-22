@@ -10,6 +10,9 @@ import {
 import { playGeneratedGame } from '../src/index'
 
 const propertyRuns = Number(process.env.AVALON_PROPERTY_RUNS ?? 100)
+const propertyTimeoutMs = propertyRuns <= 100
+  ? 5_000
+  : Math.max(120_000, propertyRuns * 60)
 const replaySeed = process.env.FAST_CHECK_SEED === undefined
   ? undefined
   : Number(process.env.FAST_CHECK_SEED)
@@ -111,6 +114,6 @@ describe('generated Avalon games', () => {
           'assassination',
         ]),
       )
-    })
+    }, propertyTimeoutMs)
   }
 })
