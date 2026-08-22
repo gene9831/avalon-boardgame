@@ -8,8 +8,10 @@ import {
 } from '@avalon/game'
 
 import { playGeneratedGame } from '../src/index'
+import { createPropertyProgress } from './property-progress'
 
 const propertyRuns = Number(process.env.AVALON_PROPERTY_RUNS ?? 100)
+const propertyProgressEnabled = process.env.AVALON_PROPERTY_PROGRESS === '1'
 const propertyTimeoutMs = propertyRuns <= 100
   ? 5_000
   : Math.max(120_000, propertyRuns * 60)
@@ -65,6 +67,12 @@ describe('generated Avalon games', () => {
   for (const playerCount of [5, 6, 7, 8, 9, 10]) {
     it(`preserves rule and visibility invariants for ${playerCount} players`, () => {
       const visitedPhases = new Set<string>()
+      const progress = propertyProgressEnabled
+        ? createPropertyProgress({
+            label: `${playerCount} players`,
+            totalRuns: propertyRuns,
+          })
+        : undefined
 
       fc.assert(
         fc.property(
@@ -87,6 +95,7 @@ describe('generated Avalon games', () => {
                 )
               }
               expect(run.finalState.G.status).toBe('finished')
+              progress?.advance()
             } catch (error) {
               throw new Error(
                 `Generated game failed: ${JSON.stringify({
@@ -105,6 +114,8 @@ describe('generated Avalon games', () => {
           seed: replaySeed,
         },
       )
+
+      progress?.complete()
 
       expect([...visitedPhases]).toEqual(
         expect.arrayContaining([

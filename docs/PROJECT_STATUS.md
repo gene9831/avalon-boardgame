@@ -8,7 +8,7 @@
 
 项目已经完成从创建房间、入座开局到任务、刺杀和胜负结算的 Web 操作闭环；规则、Socket.IO、PostgreSQL 和 5–10 个隔离浏览器上下文已有分层自动化方案，但尚未完成 5–10 台真实设备的完整局域网验收。
 
-当前阶段：**LAN MVP 开发中 / Web 游戏流程已闭环，等待真实多人验收**
+当前阶段：**LAN MVP 开发中 / 应用数据验收已自动化，等待真实进程、数据库和 LAN 设备验收**
 
 当前分支和提交以 `git branch --show-current`、`git log -1 --oneline` 为准；本文件不固定记录 HEAD。
 
@@ -53,7 +53,7 @@
 相关决策见：
 
 - [已确认的游戏设计](superpowers/specs/2026-08-14-avalon-boardgame-design.md)
-- [LAN 多客户端人工验收手册](testing/lan-multiplayer-acceptance.md)
+- [真实环境人工验收手册](testing/lan-multiplayer-acceptance.md)
 - [服务端权威秘密状态](adr/0001-server-authoritative-secret-state.md)
 - [PostgreSQL 多房间持久化](adr/0002-postgresql-persistent-multi-room-storage.md)
 - [MVP 不自动超时或管理员修改](adr/0003-no-automatic-timeout-or-admin-mutation-in-mvp.md)
@@ -72,7 +72,7 @@
 | Socket.IO 游戏服务 | ✅ | 游戏端口 8000，Lobby API 8001；支持独立 match。 |
 | PostgreSQL 存储 | ✅ | `PostgresStorage`、schema、delta logs、列表过滤和 wipe 已实现；空闲连接错误由 Pool 监听器处理且不记录 Client/连接信息，本地集成测试可执行。 |
 | 创建/加入/列出房间 | ✅ | Web Lobby 创建/加入流程已接入；响应式主页将 lobby/playing 合并为进行中列表并在卡片显示具体状态，finished 房间单独分页展示。主页验证本机全部活动房间凭据，已加入房间置顶并直接进入；存在活动会话时禁用创建和其他房间的加入入口。等待大厅允许非房主凭据授权释放自己的座位，房主可解散房间，playing 状态拒绝两类操作。 |
-| 主页与等待大厅体验 | ✅ | 主页采用 LAN 圆桌主题；公共按钮统一使用 44px 高度、12px 圆角和一致的交互态，并用金色、青色、绿色、中性色区分创建、加入、进入和辅助操作。等待大厅使用 `100dvh` 固定视口，在桌面以当前玩家为底部锚点展示自适应圆桌，在移动端使用高度感知的座位网格，页面本身无滚动条，并保持房主开局、重连、返回主页和正式退出/解散入口；首个权威游戏状态到达前保持统一连接态，不会短暂渲染旧座位页；清除本地凭据仅保留为开发恢复工具。原型布局采用构建与目标尺寸人工检查，不保留绑定文案、静态 HTML 或精确座位坐标的实现细节测试。 |
+| 主页与等待大厅体验 | ✅ | 主页采用 LAN 圆桌主题；公共按钮统一使用 44px 高度、12px 圆角和一致的交互态，并用金色、青色、绿色、中性色区分创建、加入、进入和辅助操作。等待大厅使用 `100dvh` 固定视口，在桌面以当前玩家为底部锚点展示自适应圆桌，在移动端使用高度感知的座位网格，页面本身无滚动条，并保持房主开局、重连、返回主页和正式退出/解散入口；首个权威游戏状态到达前保持统一连接态，不会短暂渲染旧座位页。Playwright 使用 10 人房间在 1280×900 与 320×568 视口验证无页面溢出及开局、选队和投票可操作性；开发控制折叠层不会拦截底层操作。 |
 | 玩家名称与入座入口 | ✅ | 主页不再内嵌名称表单；每次创建/加入新房间前都使用原生 `<dialog>` 确认名称，已保存名称只负责预填且自动聚焦全选。客户端和服务端共同限制 trim 后 1–24 字符，服务端在同一房间按 trim 后、不区分大小写拒绝重名；仅成功入座更新名称偏好，取消或失败不覆盖。已加入房间的进入与重连不重复询问名称。 |
 | 座位绑定与重连 | ✅ | 房间路由、按房间保存凭据、client ID 防重复占座和重新连接已实现。房间首次加载与轮询通过只返回 204/403/404 的服务端端点校验私有 player credential；公开 session ID 仅作提前失效优化，不能授权会话。 |
 | Debug Panel 默认收起 | ✅ | 使用 boardgame.io `debug.collapseOnLoad`，仍可手动展开。 |
@@ -84,10 +84,10 @@
 | 任务历史与公开结果 | ✅ | 中央任务板展示已结算任务的成功/失败状态和公开 Success/Fail 总数，不把任务牌关联到具体玩家。 |
 | 刺杀 UI 与最终结算 | ✅ | 刺客从圆桌座位选择非已知邪恶目标；其他玩家等待。结算展示胜方、原因和目标，并在每个座位公开最终角色。 |
 | 确定性随机与回放 | ✅ | `@avalon/test-support` 从 master seed 派生游戏/行动 seed，以统一 transcript 驱动规则层和 Socket.IO；失败 artifact 不包含凭据、Token 或秘密状态。 |
-| 自动化完整局流程 | ✅ | 属性测试覆盖 5–10 人规则与可见性不变量；Socket.IO 回放与规则层权威状态对比；Playwright smoke 和 5–10 人矩阵已在本地通过。 |
+| 自动化完整局流程 | ✅ | 属性测试覆盖 5–10 人规则与可见性不变量；Socket.IO 回放与规则层权威状态对比；PR Playwright 门禁覆盖名称取消/预填/重名/并发抢座恢复、提案/投票/任务牌刷新、待结算秘密隔离、四种胜负结局和 10 人桌面/窄屏操作。Nightly 继续覆盖 5–10 人完整局矩阵，并增加 7 人第四次任务一败/两败和双活跃房间并行隔离。 |
 | GitHub Actions 测试门禁 | ✅ | `main` 已启用分支保护并将质量、单元/Socket.IO、PostgreSQL 和浏览器 smoke 配置为 required checks；Nightly 每个人数 1,667 次属性测试及 5–10 人浏览器分片也已在 GitHub 托管 runner 上实际通过，可按 seed 回放。 |
-| 5–10 客户端人工验收 | ⬜ | 已提供 `docs/testing/lan-multiplayer-acceptance.md`，按 5 人四种结局、刷新与服务重启、7 人特殊规则、10 人容量和双房间隔离分级执行；需要测试者实际记录结果。 |
-| 重启后重连验收 | ⬜ | 存储与凭据机制已有测试，尚未完成部署环境手工演练。 |
+| 真实环境人工验收 | ⬜ | 应用数据与模拟视口已自动化；人工只保留真实 Node 服务重启、目标 PostgreSQL 服务/volume 重启，以及手机、平板或其他电脑的实际 LAN/CORS/Socket.IO 链路。 |
+| 重启后重连验收 | ⬜ | 存储、凭据和 GitHub 临时 PostgreSQL 容器重启已有自动测试，尚未完成目标部署环境的 Node 与 PostgreSQL 手工演练。 |
 | 开发服务稳定运行方式 | ⚠️ | Codex 工具启动的长期进程会被环境回收；多人测试应在用户自己的两个终端中运行服务。 |
 
 ## 下一步执行顺序
@@ -119,19 +119,13 @@
 
 详细命令、seed 重放方法和 CI job 名称见 [自动化游戏流程测试](testing/automated-game-flow.md)。
 
-### P2：真实多人验收
+### P2：真实环境验收
 
 操作步骤、逐项预期结果和失败记录模板见 [LAN 多客户端人工验收手册](testing/lan-multiplayer-acceptance.md)。
 
-- [ ] 创建 5 人房间，使用 5 个独立浏览器配置/设备进入同一房间。
-- [ ] 按 A0-N 验证创建/加入必定先确认名称、取消不保存、成功后预填、同房间重名和并发座位冲突恢复。
-- [ ] 验证不同客户端都能看到正确的角色视图，不泄露完整 `secret`。
-- [ ] 验证队伍提案、投票和任务出牌可以同时提交。
-- [ ] 验证重复点击、刷新、断线重连不会重复提交或改变已结算事件。
-- [ ] 验证连续五次否决、三次任务失败、三次任务成功后刺杀命中/未命中四种结束路径。
-- [ ] 创建第二个房间并并行操作，确认房间状态隔离。
 - [ ] 重启 Node 服务，使用原凭据回到未结束房间。
 - [ ] 安全重启 PostgreSQL 服务，确认原房间、座位凭据、进度和历史保持不变并可继续游戏。
+- [ ] 使用手机、平板或其他电脑通过真实 LAN IP 完成加入、操作、断网恢复与重连，确认 CORS 和 Socket.IO 链路。
 
 ### P3：文档与运维收尾
 
@@ -142,17 +136,18 @@
 
 ## 当前验证基线
 
-最近一次验证日期：2026-08-22
+最近一次验证日期：2026-08-23
 
-2026-08-23 聚焦验证：Server tests 47 passed；Server typecheck exit 0；PostgreSQL 持久化/重连集成测试 5 passed；Pool 空闲连接错误回归测试完成 RED（未处理事件逸出）→ GREEN（安全日志并继续运行）。
+2026-08-23 自动化验收扩展验证：PR 浏览器门禁覆盖名称与冲突恢复、刷新与秘密提交、四种结局及 10 人响应式操作；Nightly 覆盖 5–10 人矩阵、7 人第四次任务一败/两败和双活跃房间。数据库 Pool 空闲连接错误回归仍保持 GREEN。
 
 ```text
-pnpm test ✅ Game 29 passed；test-support 14 passed；Server 46 passed（包含本地 PostgreSQL）；Web 75 passed
+pnpm test ✅ Game 29 passed；test-support 20 passed；Server 47 passed；Web 75 passed
 pnpm build ✅ Game、Server TypeScript 与 Web TypeScript + Vite build
 pnpm lint ✅ exit 0
 pnpm typecheck ✅ Game、test-support、Server、Web、E2E exit 0
-pnpm test:e2e ✅ 5 个独立浏览器上下文完成建房、加入、刷新重连、连续五次否决和结算；1 passed / 6 nightly skipped
-pnpm test:e2e:matrix ✅ 5–10 人完整局矩阵；7 passed
+pnpm test:e2e ✅ 名称/冲突恢复、阶段刷新与秘密隔离、四种结局、10 人桌面/窄屏操作；9 passed / 9 nightly skipped，51.4 秒
+pnpm test:e2e:matrix ✅ 5–10 人完整局、7 人第四次任务一败/两败、双活跃房间及 PR 场景；18 passed，2.7 分钟
+Playwright 本地日志 ⚠️ Node 子进程提示 `NO_COLOR` 被 `FORCE_COLOR` 覆盖；测试无业务 warning/error，待 GitHub runner 验证新 workflow
 PostgreSQL 本地集成测试 ✅ 5 个存储/重连用例实际连接本地 PostgreSQL 并通过；服务关闭会等待断连元数据写入完成后再关闭 pool
 PostgreSQL 容器重启探针 ✅ GitHub Actions service container 中已完成存档、重启 PostgreSQL 和使用原凭据重连
 GitHub Actions runner ✅ 质量、单元/Socket.IO、PostgreSQL 和浏览器 smoke 全部通过；workflow 已由 actionlint 校验，action 运行时为 Node.js 24，日志无 warning/deprecation

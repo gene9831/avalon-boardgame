@@ -9,21 +9,26 @@ export interface BrowserReplaySnapshot {
 
 export interface BrowserReplayHarness
   extends ReplayDriver<BrowserReplaySnapshot> {
+  matchID: string
   pages: Page[]
   close(): Promise<void>
 }
 
-function playerName(playerID: string) {
+export function playerName(playerID: string) {
   return `Replay Player ${Number(playerID) + 1}`
 }
 
-async function createRoom(page: Page, playerCount: number) {
+export async function createRoom(
+  page: Page,
+  playerCount: number,
+  name = playerName('0'),
+) {
   await page.goto('/')
   const createButton = page.getByRole('button', { name: '创建房间' })
   await expect(createButton).toBeEnabled()
   await page.locator('#player-count').selectOption(String(playerCount))
   await createButton.click()
-  await page.getByRole('dialog').getByLabel('玩家名称').fill(playerName('0'))
+  await page.getByRole('dialog').getByLabel('玩家名称').fill(name)
   await page.getByRole('button', { name: '确认创建' }).click()
   await expect(page).toHaveURL(/\/rooms\/[^/]+$/)
 
@@ -32,7 +37,12 @@ async function createRoom(page: Page, playerCount: number) {
   return decodeURIComponent(match[1])
 }
 
-async function joinRoom(page: Page, matchID: string, playerID: string) {
+export async function joinRoom(
+  page: Page,
+  matchID: string,
+  playerID: string,
+  name = playerName(playerID),
+) {
   await page.goto('/')
   const roomHeading = page.getByText(`房间 ${matchID}`, { exact: true })
   await expect(roomHeading).toBeVisible()
@@ -40,7 +50,7 @@ async function joinRoom(page: Page, matchID: string, playerID: string) {
   await room.getByLabel(`选择 ${matchID} 的座位`).selectOption(playerID)
   await room.getByRole('button', { name: '加入' }).click()
   await page.getByRole('dialog').getByLabel('玩家名称').fill(
-    playerName(playerID),
+    name,
   )
   await page.getByRole('button', { name: '确认加入' }).click()
   await expect(page).toHaveURL(new RegExp(`/rooms/${matchID}$`))
@@ -66,6 +76,7 @@ export async function createBrowserReplayHarness(options: {
     ).toBeEnabled()
 
     return {
+      matchID,
       pages,
       async dispatch(command: AvalonCommand) {
         const page = pages[Number(command.actor)]
@@ -126,7 +137,7 @@ export async function createBrowserReplayHarness(options: {
         }
       },
       async close() {
-        await Promise.all(contexts.map((context) => context.close()))
+        await Promise.allSettled(contexts.map((context) => context.close()))
       },
     }
   } catch (error) {
