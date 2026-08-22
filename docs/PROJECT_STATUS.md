@@ -29,7 +29,7 @@
 - 游戏测试使用版本化 RNG seed、统一命令 transcript 和确定性 replay；同一失败可在规则层、Socket.IO 层或浏览器层重放。
 - Playwright 使用每玩家独立 browser context 自动完成创建、加入、刷新重连和整局游戏；GitHub Actions 负责 PR smoke/PostgreSQL 检查和每日 5–10 人分片矩阵，不依赖开发者电脑。
 
-当前最大缺口：**5–10 台真实设备的完整局域网验收，以及部署环境中的 PostgreSQL 重启演练**。CI 的质量、单元/Socket.IO、数据库容器重启重连和浏览器 smoke 检查已在 GitHub 托管 runner 上通过。
+当前最大缺口：**5–10 台真实设备的完整局域网验收，以及部署环境中的 PostgreSQL 重启演练**。CI 的质量、单元/Socket.IO、数据库容器重启重连、浏览器 smoke、Nightly 10,002 局属性测试和 5–10 人浏览器矩阵均已在 GitHub 托管 runner 上通过。
 
 ## 目标与范围
 
@@ -85,7 +85,7 @@
 | 刺杀 UI 与最终结算 | ✅ | 刺客从圆桌座位选择非已知邪恶目标；其他玩家等待。结算展示胜方、原因和目标，并在每个座位公开最终角色。 |
 | 确定性随机与回放 | ✅ | `@avalon/test-support` 从 master seed 派生游戏/行动 seed，以统一 transcript 驱动规则层和 Socket.IO；失败 artifact 不包含凭据、Token 或秘密状态。 |
 | 自动化完整局流程 | ✅ | 属性测试覆盖 5–10 人规则与可见性不变量；Socket.IO 回放与规则层权威状态对比；Playwright smoke 和 5–10 人矩阵已在本地通过。 |
-| GitHub Actions 测试门禁 | ✅ | PR/主分支质量、单元/Socket.IO、PostgreSQL 和浏览器 smoke 已在 GitHub 托管 runner 上通过；每日 5–10 人分片工作流已配置，可按 seed 回放。 |
+| GitHub Actions 测试门禁 | ✅ | PR/主分支质量、单元/Socket.IO、PostgreSQL 和浏览器 smoke 已通过；Nightly 每个人数 1,667 次属性测试及 5–10 人浏览器分片也已在 GitHub 托管 runner 上实际通过，可按 seed 回放。 |
 | 5–10 客户端人工验收 | ⬜ | 已提供 `docs/testing/lan-multiplayer-acceptance.md`，按 5 人四种结局、刷新与服务重启、7 人特殊规则、10 人容量和双房间隔离分级执行；需要测试者实际记录结果。 |
 | 重启后重连验收 | ⬜ | 存储与凭据机制已有测试，尚未完成部署环境手工演练。 |
 | 开发服务稳定运行方式 | ⚠️ | Codex 工具启动的长期进程会被环境回收；多人测试应在用户自己的两个终端中运行服务。 |
@@ -114,6 +114,7 @@
 - [x] Playwright 使用独立浏览器上下文完成 5 人 smoke 和 5–10 人完整局矩阵。
 - [x] GitHub Actions 配置 PR smoke、PostgreSQL 服务/数据库重启凭据恢复和每日深度矩阵。
 - [x] GitHub Actions 的质量、单元/Socket.IO、PostgreSQL 服务重启凭据恢复和浏览器 smoke job 已实际通过。
+- [x] Nightly 10,002 局属性测试和 5–10 人浏览器矩阵已在功能分支实际通过，日志无 timeout、warning 或 deprecation。
 - [ ] 在仓库设置中将稳定的 CI job 配置为受保护分支 required checks。
 
 详细命令、seed 重放方法和 CI job 名称见 [自动化游戏流程测试](testing/automated-game-flow.md)。
@@ -153,6 +154,7 @@ pnpm test:e2e:matrix ✅ 5–10 人完整局矩阵；7 passed
 PostgreSQL 本地集成测试 ✅ 5 个存储/重连用例实际连接本地 PostgreSQL 并通过；服务关闭会等待断连元数据写入完成后再关闭 pool
 PostgreSQL 容器重启探针 ✅ GitHub Actions service container 中已完成存档、重启 PostgreSQL 和使用原凭据重连
 GitHub Actions runner ✅ 质量、单元/Socket.IO、PostgreSQL 和浏览器 smoke 全部通过；workflow 已由 actionlint 校验，action 运行时为 Node.js 24，日志无 warning/deprecation
+GitHub Actions Nightly ✅ 每个人数 1,667 次、共 10,002 局属性测试和 5–10 人浏览器矩阵全部通过；Property games 4 分 34 秒完成，完整日志无 timeout/warning/deprecation
 浏览器交互复测 ✅ 已加入房间置顶并显示“进入”，创建和其他房间加入入口被锁定；“进入”直接复用凭据且不打开名称对话框
 浏览器名称复测 ✅ 创建前必定显示名称确认弹窗；保存名称正确预填、自动聚焦并全选；取消不覆盖偏好；空白名称保留弹窗并显示字段错误；Console 无错误
 浏览器退出复测 ✅ 普通玩家正式退出后释放座位并返回主页；房主解散后房间消失；同浏览器第二标签页在 300ms 内同步返回主页
