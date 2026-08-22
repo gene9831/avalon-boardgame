@@ -54,7 +54,7 @@ export function RoomDevTools({
   }
 
   return (
-    <details className="rounded-3xl border border-violet-300/20 bg-violet-300/[0.06] p-6 text-sm">
+    <details className="pointer-events-auto ml-auto w-fit max-w-full rounded-3xl border border-violet-300/20 bg-violet-300/[0.06] p-6 text-sm open:w-full">
       <summary className="cursor-pointer font-semibold text-violet-200">开发控制</summary>
       <div className="mt-5 space-y-4">
         <label className="block text-slate-300">

@@ -18,5 +18,10 @@ export type {
 } from './rule-driver'
 export { playGeneratedGame } from './generated-game'
 export type { GeneratedGameOptions } from './generated-game'
+export { playScriptedScenario } from './scripted-scenarios'
+export type {
+  ScriptedScenario,
+  ScriptedScenarioOptions,
+} from './scripted-scenarios'
 export { replayTranscript } from './transcript'
 export type { AvalonCommand, ReplayDriver } from './transcript'

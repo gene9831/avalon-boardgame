@@ -113,7 +113,7 @@ jobs:
           shard_seed="$master_seed-${E2E_PLAYER_COUNT}p"
           echo "E2E_MASTER_SEED=$shard_seed" >> "$GITHUB_ENV"
           echo "Browser replay seed: $shard_seed"
-      - run: pnpm --filter @avalon/e2e exec playwright test specs/matrix.spec.ts
+      - run: pnpm --filter @avalon/e2e exec playwright test specs/matrix.spec.ts specs/nightly.spec.ts
       - name: Upload Playwright failure artifacts
         if: failure()
         uses: actions/upload-artifact@v7

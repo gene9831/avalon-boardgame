@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { playGeneratedGame, replayTranscript } from '@avalon/test-support'
+import { playScriptedScenario, replayTranscript } from '@avalon/test-support'
 
 import { createBrowserReplayHarness } from '../support/browser-replay'
 
@@ -8,10 +8,9 @@ test('five isolated browser players complete a rejected-team game', async ({
   browser,
 }) => {
   const masterSeed = process.env.E2E_MASTER_SEED ?? 'playwright-smoke'
-  const generated = playGeneratedGame({
-    decisions: [0],
+  const generated = playScriptedScenario({
     masterSeed,
-    playerCount: 5,
+    scenario: 'five-rejections',
   })
   const harness = await createBrowserReplayHarness({
     browser,
