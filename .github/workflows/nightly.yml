@@ -34,6 +34,7 @@ jobs:
     timeout-minutes: 20
     env:
       AVALON_PROPERTY_RUNS: ${{ inputs.property_runs || '1667' }}
+      AVALON_PROPERTY_PROGRESS: '1'
       REQUESTED_MASTER_SEED: ${{ inputs.master_seed }}
     steps:
       - uses: actions/checkout@v7
