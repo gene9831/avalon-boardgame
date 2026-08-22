@@ -1,0 +1,125 @@
+name: Nightly game-flow matrix
+
+on:
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+    inputs:
+      master_seed:
+        description: Optional replay seed (letters, digits, dot, colon, underscore, dash)
+        required: false
+        type: string
+      property_runs:
+        description: Property runs per player count
+        default: '1667'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-game-flow-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  PNPM_VERSION: 11.21.0
+  NODE_VERSION: 24
+
+jobs:
+  property-games:
+    name: Property games
+    runs-on: ubuntu-latest
+    env:
+      AVALON_PROPERTY_RUNS: ${{ inputs.property_runs || '1667' }}
+      REQUESTED_MASTER_SEED: ${{ inputs.master_seed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Select reproducible nightly seed
+        run: |
+          if [[ ! "$AVALON_PROPERTY_RUNS" =~ ^[1-9][0-9]*$ ]] || (( AVALON_PROPERTY_RUNS > 100000 )); then
+            echo "property_runs must be an integer from 1 through 100000" >&2
+            exit 1
+          fi
+          if [[ -n "$REQUESTED_MASTER_SEED" ]]; then
+            if [[ ! "$REQUESTED_MASTER_SEED" =~ ^[A-Za-z0-9._:-]{1,80}$ ]]; then
+              echo "master_seed has an unsupported format" >&2
+              exit 1
+            fi
+            master_seed="$REQUESTED_MASTER_SEED"
+          else
+            master_seed="nightly-$(date -u +%F)"
+          fi
+          fast_check_seed="$(printf '%s' "$master_seed" | cksum | awk '{print $1}')"
+          echo "AVALON_MASTER_SEED=$master_seed" >> "$GITHUB_ENV"
+          echo "FAST_CHECK_SEED=$fast_check_seed" >> "$GITHUB_ENV"
+          echo "Nightly master seed: $master_seed"
+          echo "fast-check seed: $fast_check_seed"
+      - name: Run generated games for every player count
+        run: |
+          set -o pipefail
+          pnpm --filter @avalon/test-support test 2>&1 | tee nightly-property.log
+      - name: Upload replayable property failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: property-failure-${{ github.run_id }}
+          path: nightly-property.log
+          retention-days: 30
+
+  browser-matrix:
+    name: Browser matrix (${{ matrix.player_count }} players)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        player_count: [5, 6, 7, 8, 9, 10]
+    env:
+      E2E_MATRIX: 1
+      E2E_PLAYER_COUNT: ${{ matrix.player_count }}
+      REQUESTED_MASTER_SEED: ${{ inputs.master_seed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @avalon/e2e exec playwright install --with-deps chromium
+      - name: Select reproducible nightly seed
+        run: |
+          if [[ -n "$REQUESTED_MASTER_SEED" ]]; then
+            if [[ ! "$REQUESTED_MASTER_SEED" =~ ^[A-Za-z0-9._:-]{1,80}$ ]]; then
+              echo "master_seed has an unsupported format" >&2
+              exit 1
+            fi
+            master_seed="$REQUESTED_MASTER_SEED"
+          else
+            master_seed="nightly-$(date -u +%F)"
+          fi
+          shard_seed="$master_seed-${E2E_PLAYER_COUNT}p"
+          echo "E2E_MASTER_SEED=$shard_seed" >> "$GITHUB_ENV"
+          echo "Browser replay seed: $shard_seed"
+      - run: pnpm --filter @avalon/e2e exec playwright test specs/matrix.spec.ts
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-${{ matrix.player_count }}p-${{ github.run_id }}
+          path: |
+            tests/e2e/playwright-report
+            tests/e2e/test-results
+          if-no-files-found: ignore
+          retention-days: 30

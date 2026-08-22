@@ -4,7 +4,7 @@ import { LobbyClient } from 'boardgame.io/client'
 import { Client } from 'boardgame.io/client'
 import { SocketIO } from 'boardgame.io/multiplayer'
 
-import { AvalonGame } from '@avalon/game'
+import { AvalonGame, type AvalonPlayerView } from '@avalon/game'
 
 import { createAvalonServer, startAvalonServer } from '../src/server'
 import { MemoryStorage } from '../src/storage/memory'
@@ -98,6 +98,29 @@ describe('Avalon server', () => {
       const response = await fetch(`http://127.0.0.1:${running.lobbyPort}/games`)
       expect(response.status).toBe(200)
       expect(await response.json()).toEqual(['avalon'])
+    } finally {
+      await running.close()
+    }
+  })
+
+  it('injects a private deterministic game seed for replay tests', async () => {
+    const storage = new MemoryStorage()
+    const running = await startAvalonServer({
+      config: testConfig,
+      db: storage,
+      gameSeed: 'server-replay-seed',
+    })
+    const lobby = new LobbyClient({
+      server: `http://127.0.0.1:${running.lobbyPort}`,
+    })
+
+    try {
+      const { matchID } = await lobby.createMatch('avalon', { numPlayers: 5 })
+      const { state } = storage.fetch(matchID, { state: true })
+
+      expect(state.plugins.random.data).toEqual({
+        seed: 'server-replay-seed',
+      })
     } finally {
       await running.close()
     }
@@ -348,4 +371,77 @@ describe('Avalon server', () => {
       await running.close()
     }
   }, 10000)
+
+  it('reconnects the same credential after the game server restarts', async () => {
+    const storage = new MemoryStorage()
+    let running = await startAvalonServer({
+      config: testConfig,
+      db: storage,
+      gameSeed: 'restart-replay-seed',
+    })
+    let client: AvalonClient | undefined
+
+    try {
+      const lobby = new LobbyClient({
+        server: `http://127.0.0.1:${running.lobbyPort}`,
+      })
+      const { matchID } = await lobby.createMatch('avalon', { numPlayers: 5 })
+      const player = await lobby.joinMatch('avalon', matchID, {
+        playerID: '0',
+        playerName: 'Alice',
+      })
+      const createClient = () => Client({
+        game: AvalonGame,
+        numPlayers: 5,
+        multiplayer: SocketIO({
+          server: `http://127.0.0.1:${running.gamePort}`,
+        }),
+        matchID,
+        playerID: player.playerID,
+        credentials: player.playerCredentials,
+      })
+
+      client = createClient()
+      client.start()
+      await waitForClientState(client, (state) => state.isConnected)
+      client.moves.startGame()
+      const started = await waitForClientState(
+        client,
+        (state) => state.ctx.phase === 'teamProposal',
+      )
+      const originalRole = (started.G as AvalonPlayerView).viewer.role
+
+      client.stop()
+      client = undefined
+      await running.close()
+      running = await startAvalonServer({
+        config: testConfig,
+        db: storage,
+        gameSeed: 'restart-replay-seed',
+      })
+
+      client = createClient()
+      client.start()
+      const reconnected = await waitForClientState(
+        client,
+        (state) => state.isConnected && state.ctx.phase === 'teamProposal',
+      )
+
+      expect((reconnected.G as AvalonPlayerView).viewer.role).toBe(originalRole)
+      expect(reconnected.G).not.toHaveProperty('secret')
+      const validation = await fetch(
+        `http://127.0.0.1:${running.lobbyPort}/rooms/avalon/${matchID}/players/${player.playerID}/session`,
+        {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${player.playerCredentials}`,
+          },
+        },
+      )
+      expect(validation.status).toBe(204)
+    } finally {
+      client?.stop()
+      await running.close()
+    }
+  }, 15000)
 })

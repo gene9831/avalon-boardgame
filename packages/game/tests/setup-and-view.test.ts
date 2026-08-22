@@ -1,7 +1,7 @@
 import { Client } from 'boardgame.io/client'
 import { describe, expect, it } from 'vitest'
 
-import { AvalonGame } from '../src/game'
+import { AvalonGame, createAvalonGame } from '../src/game'
 import { getAvalonPlayerView } from '../src/player-view'
 import type { AvalonG } from '../src/types'
 import { loyaltyForRole } from '../src/roles'
@@ -20,6 +20,29 @@ function getAuthoritativeGame(client: ReturnType<typeof createLocalClient>) {
 }
 
 describe('Avalon setup and player views', () => {
+  it('replays role assignment and initial leader from the same RNG seed', () => {
+    const first = Client({
+      game: createAvalonGame({ seed: 'replay-seed' }),
+      numPlayers: 7,
+      playerID: '0',
+    })
+    const second = Client({
+      game: createAvalonGame({ seed: 'replay-seed' }),
+      numPlayers: 7,
+      playerID: '0',
+    })
+
+    first.moves.startGame()
+    second.moves.startGame()
+
+    expect(getAuthoritativeGame(first).secret.roleByPlayer).toEqual(
+      getAuthoritativeGame(second).secret.roleByPlayer,
+    )
+    expect(getAuthoritativeGame(first).leaderID).toBe(
+      getAuthoritativeGame(second).leaderID,
+    )
+  })
+
   it('starts in the lobby with only seat 0 able to start', () => {
     const client = createLocalClient()
     const state = client.store.getState()

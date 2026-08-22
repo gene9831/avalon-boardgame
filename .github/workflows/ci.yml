@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  PNPM_VERSION: 11.21.0
+  NODE_VERSION: 24
+
+jobs:
+  quality:
+    name: Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm build
+
+  unit-and-socket:
+    name: Unit and Socket.IO replay
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+
+  postgres:
+    name: PostgreSQL persistence and reconnect
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: avalon_test
+          POSTGRES_PASSWORD: avalon
+          POSTGRES_USER: avalon
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U avalon -d avalon_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://avalon:avalon@127.0.0.1:5432/avalon_test
+      PROBE_STATE: ${{ runner.temp }}/avalon-postgres-restart.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:postgres
+      - name: Save a credential-bound game before database restart
+        run: pnpm --filter @avalon/server test:postgres:restart-probe prepare "$PROBE_STATE"
+      - name: Restart PostgreSQL service container
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker restart "$POSTGRES_CONTAINER"
+          for attempt in {1..30}; do
+            if docker exec "$POSTGRES_CONTAINER" pg_isready -U avalon -d avalon_test; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+      - name: Reconnect with the original credential
+        run: pnpm --filter @avalon/server test:postgres:restart-probe verify "$PROBE_STATE"
+
+  browser-smoke:
+    name: Browser smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @avalon/e2e exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-smoke-${{ github.run_id }}
+          path: |
+            tests/e2e/playwright-report
+            tests/e2e/test-results
+          if-no-files-found: ignore
+          retention-days: 14

@@ -90,6 +90,19 @@ describe('RoomGamePanel quest hand', () => {
   })
 })
 
+describe('RoomGamePanel team selection', () => {
+  it('names selectable seats as task-team controls', () => {
+    const html = renderPanel({
+      activeStage: 'leader',
+      game: gameView({ proposedTeam: null }),
+      phase: 'teamProposal',
+    })
+
+    expect(html).toContain('aria-label="选择 Alice 加入任务队伍"')
+    expect(html).toContain('aria-label="选择 Eve 加入任务队伍"')
+  })
+})
+
 describe('RoomGamePanel public quest history', () => {
   it('shows settled card totals without associating them with players', () => {
     const html = renderPanel({

@@ -1,5 +1,6 @@
 export { getPlayerCountConfig } from './config'
-export { AvalonGame } from './game'
+export { AvalonGame, createAvalonGame } from './game'
+export type { AvalonGameOptions } from './game'
 export { getAvalonPlayerView } from './player-view'
 export {
   assignRoles,

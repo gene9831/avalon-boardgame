@@ -10,6 +10,10 @@
     "lint": "pnpm --filter @avalon/web lint",
     "preview": "pnpm --filter @avalon/web preview",
     "test": "pnpm -r --if-present run test",
-    "typecheck": "pnpm --filter @avalon/game typecheck && pnpm --filter @avalon/server typecheck && pnpm --filter @avalon/web exec tsc -b"
+    "test:e2e": "pnpm --filter @avalon/e2e test:e2e",
+    "test:e2e:matrix": "pnpm --filter @avalon/e2e test:e2e:matrix",
+    "test:postgres": "pnpm --filter @avalon/server test:postgres",
+    "test:replay": "pnpm --filter @avalon/test-support replay --",
+    "typecheck": "pnpm --filter @avalon/game typecheck && pnpm --filter @avalon/test-support typecheck && pnpm --filter @avalon/server typecheck && pnpm --filter @avalon/web exec tsc -b && pnpm --filter @avalon/e2e typecheck"
   }
 }

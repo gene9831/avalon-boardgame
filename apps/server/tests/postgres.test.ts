@@ -11,6 +11,12 @@ const envFile = new URL('../.env.local', import.meta.url)
 if (existsSync(envFile)) loadEnvFile(envFile)
 
 const databaseUrl = process.env.DATABASE_URL
+if (
+  process.env.AVALON_REQUIRE_POSTGRES_TESTS === '1' &&
+  databaseUrl === undefined
+) {
+  throw new Error('DATABASE_URL is required for PostgreSQL integration tests')
+}
 const describeDatabase = databaseUrl === undefined ? describe.skip : describe
 
 function createState(value: number, stateID: number): State {

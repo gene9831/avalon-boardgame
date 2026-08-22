@@ -12,6 +12,9 @@ apps/
   server/       Node + boardgame.io server boundary
 packages/
   game/         Shared Avalon game definition and public types
+  test-support/ Deterministic seeds, transcripts, and replay drivers
+tests/
+  e2e/          Playwright multi-context browser flows
 infra/
   postgres/     PostgreSQL deployment boundary
 docs/
@@ -53,13 +56,25 @@ pnpm test
 pnpm typecheck
 ```
 
-`pnpm test` runs the rule-core tests and the server's Lobby/Socket.IO integration tests. The web package can also be addressed directly with `pnpm --filter @avalon/web <command>`. Tailwind CSS v4 is integrated through `@tailwindcss/vite`; the starter's focused CSS remains available for the future board and card visuals.
+`pnpm test` runs rule-core, generated-game, server Lobby/Socket.IO, and Web tests. Browser and PostgreSQL integration suites are explicit because they require Chromium or PostgreSQL:
+
+```bash
+pnpm test:e2e
+pnpm test:e2e:matrix
+pnpm test:postgres
+pnpm test:replay --seed example-seed --players 7
+```
+
+GitHub Actions runs the browser smoke and PostgreSQL suites for pull requests. A scheduled workflow runs seeded 5–10-player browser shards and deeper property tests nightly; it does not use the developer's computer. See [automated game-flow testing](docs/testing/automated-game-flow.md) for the test layers, replay controls, and CI check names.
+
+The web package can also be addressed directly with `pnpm --filter @avalon/web <command>`. Tailwind CSS v4 is integrated through `@tailwindcss/vite`; the starter's focused CSS remains available for the future board and card visuals.
 
 ## Design references
 
 - [Confirmed game design](docs/superpowers/specs/2026-08-14-avalon-boardgame-design.md)
 - [Project status and next steps](docs/PROJECT_STATUS.md)
 - [LAN multiplayer manual acceptance](docs/testing/lan-multiplayer-acceptance.md)
+- [Automated game-flow testing](docs/testing/automated-game-flow.md)
 - [Domain glossary](CONTEXT.md)
 - [Rule summary](docs/rules/rulebook-summary.md)
 - [Role visibility rules](docs/rules/role-visibility.md)

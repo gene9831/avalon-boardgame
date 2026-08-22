@@ -4,6 +4,7 @@ export interface AvalonServerConfig {
   origins: string[]
   devToolsEnabled: boolean
   devAdminToken?: string
+  testGameSeed?: string
 }
 
 const DEFAULT_GAME_PORT = 8000
@@ -52,5 +53,9 @@ export function loadServerConfig(
       typeof env.AVALON_DEV_ADMIN_TOKEN === 'string' &&
       env.AVALON_DEV_ADMIN_TOKEN.length > 0,
     devAdminToken: env.AVALON_DEV_ADMIN_TOKEN,
+    testGameSeed:
+      env.NODE_ENV === 'test' && env.AVALON_TEST_GAME_SEED?.trim()
+        ? env.AVALON_TEST_GAME_SEED
+        : undefined,
   }
 }
