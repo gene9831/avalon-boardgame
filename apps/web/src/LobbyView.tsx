@@ -199,14 +199,14 @@ export function LobbyView({
           <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">在同一个局域网内创建圆桌、选择座位并开始一局阿瓦隆。角色与秘密始终由服务器守护。</p>
         </header>
 
-        <section className="rounded-3xl border border-amber-300/20 bg-white/[0.06] p-5 shadow-2xl shadow-black/20 backdrop-blur sm:flex sm:items-end sm:justify-between sm:gap-6 sm:p-7">
+        <section className="flex items-end justify-between gap-4 rounded-3xl border border-amber-300/20 bg-white/[0.06] p-5 shadow-2xl shadow-black/20 backdrop-blur sm:gap-6 sm:p-7">
           <div>
             <label className="block text-sm font-medium text-slate-200" htmlFor="player-count">玩家人数</label>
             <select className="mt-2 rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-amber-300/70 focus:ring-2 focus:ring-amber-300/20" id="player-count" onChange={(event) => setNumPlayers(Number(event.target.value))} value={numPlayers}>
               {Array.from({ length: 6 }, (_, index) => index + 5).map((count) => <option key={count} value={count}>{count} 人</option>)}
             </select>
           </div>
-          <div className="mt-5 text-right sm:mt-0">
+          <div className="text-right">
             <button className={createButton} disabled={busy || roomAccessLocked} onClick={onCreate} type="button">{busy ? '处理中…' : '创建房间'}</button>
             {roomAccessLocked && <p className="mt-2 text-xs text-slate-400">{roomAccessMessage}</p>}
           </div>

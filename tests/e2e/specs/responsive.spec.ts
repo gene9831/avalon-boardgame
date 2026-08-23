@@ -123,6 +123,30 @@ async function expectRoundTableFits(page: Page, tableLabel: string) {
   expect(undersizedControlLabels).toEqual([])
 }
 
+test('lobby creation controls remain on one row at narrow widths', async ({ page }) => {
+  await page.goto('/')
+
+  for (const viewport of [
+    { width: 320, height: 568 },
+    { width: 578, height: 761 },
+  ]) {
+    await page.setViewportSize(viewport)
+
+    const playerCount = await page.getByLabel('玩家人数').boundingBox()
+    const createRoom = await page.getByRole('button', { name: '创建房间' }).boundingBox()
+
+    expect(playerCount).not.toBeNull()
+    expect(createRoom).not.toBeNull()
+    expect(
+      Math.abs(
+        playerCount!.y + playerCount!.height / 2
+        - (createRoom!.y + createRoom!.height / 2),
+      ),
+      `creation controls @ ${viewport.width}x${viewport.height}`,
+    ).toBeLessThanOrEqual(2)
+  }
+})
+
 test('five, seven, and ten-player round tables remain operable across target widths', async ({
   browser,
 }) => {

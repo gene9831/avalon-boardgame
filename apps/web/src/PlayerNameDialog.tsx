@@ -1,4 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useRef } from 'react'
+
+import { ModalDialog } from './ModalDialog'
 
 export interface PlayerNameDialogProps {
   action: 'create' | 'join'
@@ -21,32 +23,20 @@ export function PlayerNameDialog({
   open,
   value,
 }: PlayerNameDialogProps) {
-  const dialogRef = useRef<HTMLDialogElement | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const isCreate = action === 'create'
-
-  useEffect(() => {
-    const dialog = dialogRef.current
-    if (dialog === null) return
-
-    if (open && !dialog.open) {
-      dialog.showModal()
-      inputRef.current?.focus()
-      inputRef.current?.select()
-    } else if (!open && dialog.open) {
-      dialog.close()
-    }
-  }, [open])
+  const focusNameInput = useCallback(() => {
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [])
 
   return (
-    <dialog
-      aria-labelledby="player-name-dialog-title"
-      className="w-[calc(100%-2rem)] max-w-md rounded-3xl border border-white/15 bg-slate-900 p-0 text-slate-200 shadow-2xl shadow-black/40 backdrop:bg-slate-950/70"
-      onCancel={(event) => {
-        event.preventDefault()
-        if (!busy) onCancel()
-      }}
-      ref={dialogRef}
+    <ModalDialog
+      ariaLabelledBy="player-name-dialog-title"
+      closeDisabled={busy}
+      onAfterOpen={focusNameInput}
+      onRequestClose={onCancel}
+      open={open}
     >
       <form
         className="p-6 sm:p-8"
@@ -102,6 +92,6 @@ export function PlayerNameDialog({
           </button>
         </div>
       </form>
-    </dialog>
+    </ModalDialog>
   )
 }
