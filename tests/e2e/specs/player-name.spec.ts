@@ -34,7 +34,7 @@ test('name cancellation, persistence, prefill, and credential re-entry work', as
     await expect(page).toHaveURL(new RegExp(`/rooms/${matchID}$`))
     await expect(page.getByRole('dialog')).toHaveCount(0)
 
-    await page.getByText('开发控制', { exact: true }).click()
+    await page.getByRole('button', { name: '打开开发控制' }).click()
     page.once('dialog', (dialog) => dialog.accept())
     await page.getByRole('button', { name: '清除本地凭据（测试）' }).click()
     await expect(page).toHaveURL('/')

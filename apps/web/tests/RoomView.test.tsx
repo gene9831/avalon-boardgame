@@ -97,6 +97,17 @@ describe('RoomView connection state', () => {
   })
 })
 
+describe('RoomView viewport sizing', () => {
+  it('uses only the dynamic viewport height and suppresses room overscroll', () => {
+    const html = renderRoomView()
+    const mainClasses = /<main class="([^"]+)"/.exec(html)?.[1]?.split(' ') ?? []
+
+    expect(mainClasses).toContain('h-dvh')
+    expect(mainClasses).toContain('overscroll-none')
+    expect(mainClasses).not.toContain('h-screen')
+  })
+})
+
 describe('RoomView playing layout', () => {
   it('keeps the players around a round table with the quest board in its center', () => {
     const html = renderRoomView({

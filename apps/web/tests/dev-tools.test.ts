@@ -6,18 +6,23 @@ import { createDevToolsClient, DevToolsHttpError } from '../src/dev-tools'
 import { LobbyDevTools } from '../src/LobbyDevTools'
 
 describe('development tools client', () => {
-  it('renders the homepage token panel only when development tools are enabled', () => {
+  it('renders the homepage development tools as a floating debug trigger only when enabled', () => {
     const props = {
       enabled: false,
+      error: null,
       onTokenChange: vi.fn(),
       token: '',
     }
 
     expect(renderToStaticMarkup(createElement(LobbyDevTools, props))).toBe('')
-    expect(renderToStaticMarkup(createElement(LobbyDevTools, {
+    const enabledMarkup = renderToStaticMarkup(createElement(LobbyDevTools, {
       ...props,
       enabled: true,
-    }))).toContain('开发管理员 Token')
+    }))
+
+    expect(enabledMarkup).toContain('aria-label="打开开发控制"')
+    expect(enabledMarkup).toContain('aria-expanded="false"')
+    expect(enabledMarkup).not.toContain('<details')
   })
 
   it('sends the development Bearer token when deleting a room', async () => {
