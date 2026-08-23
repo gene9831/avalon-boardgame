@@ -7,6 +7,7 @@ import {
 } from '@avalon/game'
 
 import { createAvalonRuleDriver } from './rule-driver'
+import { getIdentityRecognitionCommands } from './identity-recognition'
 import type { AvalonCommand } from './transcript'
 
 export type ScriptedScenario =
@@ -103,6 +104,11 @@ export function playScriptedScenario(options: ScriptedScenarioOptions) {
   }
 
   dispatch({ actor: '0', command: 'startGame' })
+  while (state().ctx.phase === 'identityRecognition') {
+    for (const command of getIdentityRecognitionCommands(game())) {
+      dispatch(command)
+    }
+  }
 
   if (options.scenario === 'five-rejections') {
     for (let proposal = 0; proposal < 5; proposal += 1) {

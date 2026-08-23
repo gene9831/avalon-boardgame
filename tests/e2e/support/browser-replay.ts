@@ -88,8 +88,22 @@ export async function createBrowserReplayHarness(options: {
           case 'startGame':
             await page.getByRole('button', { name: '开始游戏' }).click()
             await expect(
-              pages[0].locator('[data-role-avatar]'),
+              pages[0].locator('[data-curtain-state="raised"]'),
             ).toBeVisible()
+            return
+          case 'confirmIdentityRecognition':
+            const confirmationButton = page.getByRole('button', {
+              name: /^我已(确认身份|辨认同伴|辨认邪恶阵营)$/,
+            })
+            const confirmationLabel = await confirmationButton.textContent()
+            if (confirmationLabel === null) {
+              throw new Error('Identity confirmation button has no label')
+            }
+            await confirmationButton.click()
+            await expect(page.getByRole('button', {
+              exact: true,
+              name: confirmationLabel,
+            })).toHaveCount(0)
             return
           case 'proposeTeam':
             for (const teamMemberID of command.payload.team) {

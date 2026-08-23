@@ -164,10 +164,16 @@ test('five, seven, and ten-player round tables remain operable across target wid
         await expectRoundTableFits(hostPage, `${playerCount} 人玩家圆桌`)
       }
 
-      await harness.dispatch(generated.transcript[0])
-      const propose = generated.transcript.find(
+      const proposeIndex = generated.transcript.findIndex(
         ({ command }) => command === 'proposeTeam',
-      )!
+      )
+      for (let index = 0; index < proposeIndex; index += 1) {
+        await harness.dispatch(generated.transcript[index])
+      }
+      const propose = generated.transcript[proposeIndex]
+      if (propose?.command !== 'proposeTeam') {
+        throw new Error('Generated game has no team proposal')
+      }
       const leaderPage = harness.pages[Number(propose.actor)]
       for (const viewport of viewports) {
         await leaderPage.setViewportSize(viewport)

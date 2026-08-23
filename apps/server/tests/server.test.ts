@@ -359,7 +359,10 @@ describe('Avalon server', () => {
       clients[0].moves.startGame()
       const states = await Promise.all(
         clients.map((client) =>
-          waitForClientState(client, (state) => state.ctx.phase === 'teamProposal'),
+          waitForClientState(
+            client,
+            (state) => state.ctx.phase === 'identityRecognition',
+          ),
         ),
       )
 
@@ -407,7 +410,7 @@ describe('Avalon server', () => {
       client.moves.startGame()
       const started = await waitForClientState(
         client,
-        (state) => state.ctx.phase === 'teamProposal',
+        (state) => state.ctx.phase === 'identityRecognition',
       )
       const originalRole = (started.G as AvalonPlayerView).viewer.role
 
@@ -424,7 +427,8 @@ describe('Avalon server', () => {
       client.start()
       const reconnected = await waitForClientState(
         client,
-        (state) => state.isConnected && state.ctx.phase === 'teamProposal',
+        (state) =>
+          state.isConnected && state.ctx.phase === 'identityRecognition',
       )
 
       expect((reconnected.G as AvalonPlayerView).viewer.role).toBe(originalRole)

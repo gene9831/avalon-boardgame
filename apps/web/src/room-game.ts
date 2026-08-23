@@ -16,6 +16,26 @@ export function getQuestTeamSize(numPlayers: number, questIndex: number) {
   return getPlayerCountConfig(numPlayers).questTeamSizes[questIndex] ?? 0
 }
 
+export function getIdentityRecognitionWakeDelay({
+  deadlineAt,
+  deadlineRefreshRequired,
+  serverNow,
+  playerID,
+}: {
+  deadlineAt: number
+  deadlineRefreshRequired: boolean
+  serverNow: number
+  playerID: PlayerID
+}) {
+  const wakeOrder = Number.parseInt(playerID, 10)
+  const staggerMs = 100 + (Number.isFinite(wakeOrder) ? wakeOrder * 100 : 0)
+  const remainingMs = deadlineRefreshRequired
+    ? 0
+    : Math.max(0, deadlineAt - serverNow)
+
+  return remainingMs + staggerMs
+}
+
 export function toggleTeamMember(
   selectedTeam: readonly PlayerID[],
   playerID: PlayerID,

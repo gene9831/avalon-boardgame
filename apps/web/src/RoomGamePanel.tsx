@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react'
-import type { AvalonPlayerView, PlayerID, QuestCard, Role, TeamVote } from '@avalon/game'
+import type {
+  AvalonPlayerView,
+  IdentityRecognitionStep,
+  PlayerID,
+  QuestCard,
+  Role,
+  TeamVote,
+} from '@avalon/game'
 
 import assassinAvatar from './assets/roles/assassin.png'
 import loyalServantAvatar from './assets/roles/loyal-servant.png'
 import merlinAvatar from './assets/roles/merlin.png'
 import minionAvatar from './assets/roles/minion-of-mordred.png'
 import { ConnectionRecoveryControl } from './ConnectionRecoveryControl'
+import { IdentityRecognitionLayer } from './IdentityRecognitionLayer'
 import type { LobbyPlayer } from './lobby'
 import { QuestBoard } from './QuestBoard'
 import {
@@ -25,6 +33,11 @@ interface RoomGamePanelProps {
   onAssassinate: (targetID: PlayerID) => void
   onBackHome: () => void
   onCastTeamVote: (vote: TeamVote) => void
+  onConfirmIdentityRecognition: () => void
+  onAdvanceIdentityRecognition: (
+    step: IdentityRecognitionStep,
+    deadlineAt: number,
+  ) => void
   onPlayQuestCard: (card: QuestCard) => void
   onProposeTeam: (team: PlayerID[]) => void
   onReconnect: () => void
@@ -42,6 +55,8 @@ export function RoomGamePanel({
   onAssassinate,
   onBackHome,
   onCastTeamVote,
+  onConfirmIdentityRecognition,
+  onAdvanceIdentityRecognition,
   onPlayQuestCard,
   onProposeTeam,
   onReconnect,
@@ -61,6 +76,12 @@ export function RoomGamePanel({
   const canSelectAssassinationTarget = phase === 'assassination' && activeStage === 'assassin' && game.viewer.role === 'assassin' && game.status === 'playing'
   const canSubmit = canSubmitTeam({ activeStage, leaderID: game.leaderID, playerID, requiredTeamSize, selectedTeam })
   const phaseLabel = game.status === 'finished' ? '游戏结束' : getPhaseLabel(phase)
+  const identityRecognitionActive =
+    phase === 'identityRecognition' && game.identityRecognition !== null
+  const showRecognitionKnowledge =
+    identityRecognitionActive &&
+    game.viewer.identityRecognition?.isParticipant === true &&
+    game.identityRecognition?.step !== 'roleReveal'
 
   useEffect(() => {
     setSelectedTeam([])
@@ -130,14 +151,14 @@ export function RoomGamePanel({
               seat={seat}
               selected={selectedTeam.includes(seat.playerID)}
               selectedAsTarget={selectedTarget === seat.playerID}
-              showKnownPlayerInfo={showKnownPlayerInfo}
+              showKnownPlayerInfo={showKnownPlayerInfo || showRecognitionKnowledge}
             />
           )}
           seats={seats}
         />
       </div>
 
-      <button
+      {!identityRecognitionActive && <button
         aria-label={showKnownPlayerInfo ? '隐藏已知角色信息' : '显示已知角色信息'}
         aria-pressed={showKnownPlayerInfo}
         className={`absolute bottom-2.5 left-2.5 z-40 grid min-h-11 min-w-11 place-items-center rounded-lg border shadow-lg backdrop-blur transition sm:bottom-3 sm:left-3 ${showKnownPlayerInfo ? 'border-rose-300/60 bg-rose-950/85 text-rose-100' : 'border-white/15 bg-slate-950/80 text-slate-300 hover:border-white/35'}`}
@@ -146,7 +167,17 @@ export function RoomGamePanel({
         type="button"
       >
         <EyeIcon hidden={!showKnownPlayerInfo} />
-      </button>
+      </button>}
+
+      {identityRecognitionActive && (
+        <IdentityRecognitionLayer
+          game={game}
+          key={game.identityRecognition?.step}
+          onAdvance={onAdvanceIdentityRecognition}
+          onConfirm={onConfirmIdentityRecognition}
+          playerID={playerID}
+        />
+      )}
     </section>
   )
 }
@@ -409,6 +440,7 @@ function getPhaseLabel(phase: string) {
     case 'teamVote': return '队伍投票'
     case 'assassination': return '刺杀阶段'
     case 'quest': return '任务进行中'
+    case 'identityRecognition': return '身份辨认'
     default: return phase
   }
 }

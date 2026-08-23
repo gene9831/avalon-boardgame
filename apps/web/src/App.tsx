@@ -22,6 +22,7 @@ import {
   AvalonGame,
   type AvalonG,
   type AvalonPlayerView,
+  type IdentityRecognitionStep,
   type PlayerID,
   type QuestCard,
   type TeamVote,
@@ -569,6 +570,21 @@ function RoomRoute() {
     }
   }
 
+  const handleConfirmIdentityRecognition = () => {
+    if (gameState?.isActive) {
+      clientRef.current?.moves.confirmIdentityRecognition()
+    }
+  }
+
+  const handleAdvanceIdentityRecognition = (
+    step: IdentityRecognitionStep,
+    deadlineAt: number,
+  ) => {
+    if (gameState?.isActive) {
+      clientRef.current?.moves.advanceIdentityRecognition(step, deadlineAt)
+    }
+  }
+
   const handlePlayQuestCard = (card: QuestCard) => {
     if (gameState?.isActive) {
       clientRef.current?.moves.playQuestCard(card)
@@ -691,6 +707,8 @@ function RoomRoute() {
         onAssassinate={handleAssassinate}
         onBackHome={() => navigate('/')}
         onCastTeamVote={handleCastTeamVote}
+        onConfirmIdentityRecognition={handleConfirmIdentityRecognition}
+        onAdvanceIdentityRecognition={handleAdvanceIdentityRecognition}
         onClearLocalSession={handleClearLocalSessionForTesting}
         onProposeTeam={handleProposeTeam}
         onPlayQuestCard={handlePlayQuestCard}
@@ -778,6 +796,11 @@ export interface RoomViewProps {
   onAssassinate: (targetID: PlayerID) => void
   onBackHome: () => void
   onCastTeamVote: (vote: TeamVote) => void
+  onConfirmIdentityRecognition: () => void
+  onAdvanceIdentityRecognition: (
+    step: IdentityRecognitionStep,
+    deadlineAt: number,
+  ) => void
   onClearLocalSession: () => void
   onProposeTeam: (team: PlayerID[]) => void
   onPlayQuestCard: (card: QuestCard) => void
@@ -797,6 +820,8 @@ export function RoomView({
   onAssassinate,
   onBackHome,
   onCastTeamVote,
+  onConfirmIdentityRecognition,
+  onAdvanceIdentityRecognition,
   onClearLocalSession,
   onProposeTeam,
   onPlayQuestCard,
@@ -898,6 +923,8 @@ export function RoomView({
         onAssassinate={onAssassinate}
         onBackHome={onBackHome}
         onCastTeamVote={onCastTeamVote}
+        onConfirmIdentityRecognition={onConfirmIdentityRecognition}
+        onAdvanceIdentityRecognition={onAdvanceIdentityRecognition}
         onPlayQuestCard={onPlayQuestCard}
         onProposeTeam={onProposeTeam}
         onReconnect={handleManualReconnect}
