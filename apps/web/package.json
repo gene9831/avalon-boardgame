@@ -14,6 +14,7 @@
     "@avalon/game": "workspace:*",
     "@tailwindcss/vite": "^4.3.3",
     "boardgame.io": "^0.50.2",
+    "lucide-react": "^1.33.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.2",

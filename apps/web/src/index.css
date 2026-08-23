@@ -13,6 +13,7 @@
 body {
   min-width: 320px;
   min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
   background: #07111f;
   color: #e2e8f0;
@@ -26,10 +27,163 @@ select {
   font: inherit;
 }
 
-@media (max-width: 1023px) and (max-height: 700px) {
-  .lobby-kicker,
-  .lobby-action-copy,
-  .lobby-seat-status {
+.round-table-layout {
+  width: min(100%, calc(100dvh - 8rem), 68rem);
+}
+
+.phase-action-compact-label {
+  display: none;
+}
+
+.lobby-center-compact-label {
+  display: none;
+}
+
+@media (min-height: 421px) and (max-height: 720px) {
+  :where([data-round-table-seat-count="5"], [data-round-table-seat-count="6"]) [data-round-table-player] {
+    width: clamp(4.2rem, min(17vw, 15dvh), 8rem);
+  }
+
+  :where([data-round-table-seat-count="5"], [data-round-table-seat-count="6"]) [data-round-table-avatar] {
+    width: clamp(3rem, min(12vw, 11dvh), 5.5rem);
+    height: clamp(3rem, min(12vw, 11dvh), 5.5rem);
+  }
+
+  :where([data-round-table-seat-count="7"], [data-round-table-seat-count="8"], [data-round-table-seat-count="9"], [data-round-table-seat-count="10"]) [data-round-table-player] {
+    width: clamp(3.1rem, min(14vw, 12dvh), 6.5rem);
+  }
+
+  :where([data-round-table-seat-count="7"], [data-round-table-seat-count="8"], [data-round-table-seat-count="9"], [data-round-table-seat-count="10"]) [data-round-table-avatar] {
+    width: clamp(2.5rem, min(9.5vw, 9dvh), 4.5rem);
+    height: clamp(2.5rem, min(9.5vw, 9dvh), 4.5rem);
+  }
+}
+
+@media (orientation: landscape) and (min-height: 421px) {
+  .round-table-header {
+    position: relative;
+    z-index: 30;
+  }
+
+  .round-table-stage {
+    margin-top: -3.5rem;
+  }
+
+  .round-table-layout {
+    transform: none;
+  }
+
+  :where([data-round-table-seat-count="7"], [data-round-table-seat-count="8"], [data-round-table-seat-count="9"], [data-round-table-seat-count="10"]).round-table-layout {
+    transform: translateY(1rem);
+  }
+}
+
+@media (max-height: 420px) {
+  .round-table-layout {
+    transform: translateY(-1.5rem);
+    width: min(100%, calc(100dvh - 4.75rem), 68rem);
+  }
+
+  .round-table-center-shell {
+    inset: 24%;
+    transform: none;
+  }
+
+  .quest-board {
+    max-width: 6.5rem;
+    padding: 0.25rem;
+    border-radius: 0.5rem;
+  }
+
+  .quest-progress {
+    margin-top: 0.125rem;
+    gap: 0.125rem;
+  }
+
+  .quest-rejection-track,
+  .quest-action {
+    margin-top: 0.125rem;
+    padding-top: 0.125rem;
+  }
+
+  .phase-action-buttons {
+    margin-top: 0.125rem;
+  }
+
+  .round-table-header-decoration,
+  .quest-board-decoration,
+  .quest-team-size,
+  .quest-latest-result,
+  .quest-rejection-label,
+  .phase-action-copy,
+  .phase-action-full-label,
+  .team-proposal-summary {
     display: none;
+  }
+
+  .phase-action-compact-label {
+    display: inline;
+  }
+
+  .lobby-center-decoration,
+  .lobby-center-full-label {
+    display: none;
+  }
+
+  .lobby-center-compact-label {
+    display: inline;
+  }
+
+  .lobby-center-count {
+    margin-top: 0;
+    font-size: 1.25rem;
+    line-height: 1.25rem;
+  }
+
+  .lobby-center-action {
+    margin-top: 0.25rem;
+  }
+
+  [data-round-table-player] {
+    width: 5rem;
+  }
+
+  [data-round-table-seat-count="10"] [data-round-table-player] {
+    position: relative;
+    width: 3rem;
+  }
+
+  [data-round-table-seat-count="10"] [data-round-table-nameplate] {
+    position: absolute;
+    margin: 0;
+  }
+
+  [data-round-table-seat-count="10"] [data-label-placement="bottom"] {
+    top: calc(100% - 0.875rem);
+  }
+
+  [data-round-table-seat-count="10"] [data-label-placement="top"] {
+    bottom: calc(100% - 0.375rem);
+  }
+
+  [data-round-table-seat-count="10"] [data-label-placement="left"] {
+    top: 50%;
+    right: calc(100% - 0.375rem);
+    transform: translateY(-50%);
+  }
+
+  [data-round-table-seat-count="10"] [data-label-placement="right"] {
+    top: 50%;
+    left: calc(100% - 0.375rem);
+    transform: translateY(-50%);
+  }
+
+  [data-round-table-avatar] {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  [data-round-table-nameplate] {
+    margin-top: 0.125rem;
   }
 }

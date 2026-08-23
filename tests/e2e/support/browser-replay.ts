@@ -88,7 +88,7 @@ export async function createBrowserReplayHarness(options: {
           case 'startGame':
             await page.getByRole('button', { name: '开始游戏' }).click()
             await expect(
-              pages[0].getByText('你的身份', { exact: true }),
+              pages[0].locator('[data-role-avatar]'),
             ).toBeVisible()
             return
           case 'proposeTeam':

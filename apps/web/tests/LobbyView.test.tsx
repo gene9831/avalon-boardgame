@@ -46,6 +46,7 @@ function renderLobby(overrides: Partial<LobbyViewProps> = {}) {
     busy: false,
     devToken: '',
     devToolsEnabled: false,
+    devToolsError: null,
     error: null,
     matches: [],
     numPlayers: 5,

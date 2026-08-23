@@ -16,6 +16,7 @@ export interface LobbyViewProps {
   busy: boolean
   devToken: string
   devToolsEnabled: boolean
+  devToolsError: string | null
   error: string | null
   matches: AvalonRoomSummary[]
   numPlayers: number
@@ -75,6 +76,7 @@ export function LobbyView({
   busy,
   devToken,
   devToolsEnabled,
+  devToolsError,
   error,
   matches,
   numPlayers,
@@ -216,7 +218,12 @@ export function LobbyView({
           <div className="mt-8">{renderSection(sections[1], { secondary: true })}</div>
         </section>
 
-        <LobbyDevTools enabled={devToolsEnabled} onTokenChange={onDevTokenChange} token={devToken} />
+        <LobbyDevTools
+          enabled={devToolsEnabled}
+          error={devToolsError}
+          onTokenChange={onDevTokenChange}
+          token={devToken}
+        />
         {error !== null && <div className="mt-6 rounded-2xl border border-rose-300/25 bg-rose-300/10 px-4 py-3 text-sm text-rose-100">{error}</div>}
       </div>
     </main>

@@ -37,11 +37,13 @@ function gameView(overrides: Partial<AvalonPlayerView> = {}): AvalonPlayerView {
 function renderPanel({
   activeStage = 'quest',
   game = gameView(),
+  lobbyPlayers = players,
   phase = 'quest',
   playerID = '0',
 }: {
   activeStage?: string
   game?: AvalonPlayerView
+  lobbyPlayers?: typeof players
   phase?: string
   playerID?: string
 } = {}) {
@@ -50,6 +52,7 @@ function renderPanel({
       activeStage={activeStage}
       connected
       game={game}
+      manualReconnectAvailable={false}
       matchID="room-123"
       onAssassinate={vi.fn()}
       onBackHome={vi.fn()}
@@ -59,7 +62,7 @@ function renderPanel({
       onReconnect={vi.fn()}
       phase={phase}
       playerID={playerID}
-      players={players}
+      players={lobbyPlayers}
     />,
   )
 }
@@ -86,7 +89,13 @@ describe('RoomGamePanel quest hand', () => {
 
     expect(html).toContain('让任务成功')
     expect(html).toContain('让任务失败')
-    expect(html).toContain('你知道的邪恶阵营：Eve')
+    expect(html).toContain('data-role-avatar="assassin"')
+    expect(html).toContain('>刺客<')
+    expect(html).toContain('aria-label="显示已知角色信息"')
+    expect(html).not.toContain('你知道的邪恶阵营：Eve')
+    expect(html).not.toContain('data-role-avatar="minion"')
+    expect(html).not.toContain('<aside')
+    expect(html).not.toContain('>重连<')
   })
 })
 
@@ -98,8 +107,28 @@ describe('RoomGamePanel team selection', () => {
       phase: 'teamProposal',
     })
 
-    expect(html).toContain('aria-label="选择 Alice 加入任务队伍"')
-    expect(html).toContain('aria-label="选择 Eve 加入任务队伍"')
+    expect(html.match(/aria-label="选择 Alice 加入任务队伍，队长"/g)).toHaveLength(1)
+    expect(html.match(/aria-label="选择 Eve 加入任务队伍"/g)).toHaveLength(1)
+    expect(html).not.toContain('♛ 队长')
+  })
+
+  it('keeps visual seat states available to assistive technology', () => {
+    const html = renderPanel({
+      activeStage: 'vote',
+      game: gameView(),
+      phase: 'teamVote',
+    })
+
+    expect(html).toContain('aria-label="Alice，你的身份：忠臣，队长，任务队员"')
+    expect(html).toContain('aria-label="Dylan，任务队员"')
+
+    const disconnectedHtml = renderPanel({
+      activeStage: 'vote',
+      game: gameView(),
+      lobbyPlayers: players.map((player) => player.id === 2 ? { ...player, isConnected: false } : player),
+      phase: 'teamVote',
+    })
+    expect(disconnectedHtml).toContain('aria-label="Claire，已断线"')
   })
 })
 
@@ -143,7 +172,7 @@ describe('RoomGamePanel assassination', () => {
       playerID: '3',
     })
 
-    expect(html).toContain('aria-label="选择 Alice 作为刺杀目标"')
+    expect(html).toContain('aria-label="选择 Alice 作为刺杀目标，队长"')
     expect(html).toContain('aria-label="选择 Claire 作为刺杀目标"')
     expect(html).not.toContain('aria-label="选择 Dylan 作为刺杀目标"')
     expect(html).not.toContain('aria-label="选择 Eve 作为刺杀目标"')
@@ -175,5 +204,56 @@ describe('RoomGamePanel result', () => {
     expect(html).not.toContain('目标 Player 2')
     expect(html).toContain('Alice · 梅林')
     expect(html).toContain('Dylan · 刺客')
+    expect(html.match(/data-role-avatar=/g)).toHaveLength(5)
+  })
+})
+
+describe('RoomGamePanel connection recovery', () => {
+  it('shows recovery progress before offering the manual reconnect action', () => {
+    const html = renderToStaticMarkup(
+      <RoomGamePanel
+        activeStage="leader"
+        connected={false}
+        game={gameView({ proposedTeam: null })}
+        manualReconnectAvailable={false}
+        matchID="room-123"
+        onAssassinate={vi.fn()}
+        onBackHome={vi.fn()}
+        onCastTeamVote={vi.fn()}
+        onPlayQuestCard={vi.fn()}
+        onProposeTeam={vi.fn()}
+        onReconnect={vi.fn()}
+        phase="teamProposal"
+        playerID="0"
+        players={players}
+      />,
+    )
+
+    expect(html).toContain('正在重连')
+    expect(html).not.toContain('>重连<')
+  })
+
+  it('offers manual reconnect in the header after automatic recovery has stalled', () => {
+    const html = renderToStaticMarkup(
+      <RoomGamePanel
+        activeStage="leader"
+        connected={false}
+        game={gameView({ proposedTeam: null })}
+        manualReconnectAvailable
+        matchID="room-123"
+        onAssassinate={vi.fn()}
+        onBackHome={vi.fn()}
+        onCastTeamVote={vi.fn()}
+        onPlayQuestCard={vi.fn()}
+        onProposeTeam={vi.fn()}
+        onReconnect={vi.fn()}
+        phase="teamProposal"
+        playerID="0"
+        players={players}
+      />,
+    )
+
+    expect(html).toContain('>重连<')
+    expect(html.indexOf('>重连<')).toBeLessThan(html.indexOf('aria-label="5 人游戏圆桌"'))
   })
 })
