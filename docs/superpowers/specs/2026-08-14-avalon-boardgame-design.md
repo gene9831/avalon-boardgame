@@ -210,6 +210,8 @@ Team votes and quest cards are accepted independently while their players are ac
 
 Identity recognition is non-strategic, but the first release still waits for all step participants to confirm. It shows no countdown and sends no automatic wake-up. Ordinary reconnects preserve the current confirmations. The server retains an internal, default-off deadline option with its original timeline and restart handling for future room configuration.
 
+The role-reveal step first lowers an opaque curtain over the entire round table, then reveals the player's role card and confirmation controls after the curtain settles. Evil and Merlin recognition instead raise the curtain for authorized participants so they can inspect the relevant seats; nonparticipants remain behind an opaque curtain.
+
 ## Timeout configuration
 
 Room setup accepts a timeout shape so later versions can enable server-authoritative deadlines:

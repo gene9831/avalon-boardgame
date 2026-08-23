@@ -70,7 +70,7 @@ function renderPanel({
 }
 
 describe('RoomGamePanel identity recognition', () => {
-  it('raises the curtain for a participant to confirm their full role card', () => {
+  it('lowers an opaque curtain before showing the first role card', () => {
     const html = renderPanel({
       activeStage: 'identityRecognition',
       game: gameView({
@@ -95,7 +95,10 @@ describe('RoomGamePanel identity recognition', () => {
       phase: 'identityRecognition',
     })
 
-    expect(html).toContain('data-curtain-state="raised"')
+    expect(html).toContain('data-curtain-state="lowered"')
+    expect(html).toContain('data-table-visibility="hidden"')
+    expect(html).toContain('identity-role-reveal-curtain')
+    expect(html).toContain('identity-role-reveal-content')
     expect(html).toContain('查看你的身份')
     expect(html).toContain('梅林')
     expect(html).toContain('正义阵营')

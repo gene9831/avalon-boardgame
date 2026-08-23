@@ -88,7 +88,7 @@ export async function createBrowserReplayHarness(options: {
           case 'startGame':
             await page.getByRole('button', { name: '开始游戏' }).click()
             await expect(
-              pages[0].locator('[data-curtain-state="raised"]'),
+              pages[0].locator('[data-curtain-state="lowered"]'),
             ).toBeVisible()
             return
           case 'confirmIdentityRecognition':

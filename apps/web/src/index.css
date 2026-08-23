@@ -47,8 +47,16 @@ select {
   animation: identity-curtain-lower 200ms ease-out both;
 }
 
+.identity-curtain--lowering {
+  animation: identity-curtain-lower 200ms ease-out both;
+}
+
 .identity-curtain--raising {
   animation: identity-curtain-raise 200ms ease-in both;
+}
+
+.identity-role-reveal-content {
+  animation: identity-role-reveal-content 180ms ease-out 200ms both;
 }
 
 @keyframes identity-curtain-lower {
@@ -71,9 +79,22 @@ select {
   }
 }
 
+@keyframes identity-role-reveal-content {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .identity-curtain,
-  .identity-curtain * {
+  .identity-curtain *,
+  .identity-role-reveal-content {
     animation: none !important;
     scroll-behavior: auto !important;
     transition: none !important;

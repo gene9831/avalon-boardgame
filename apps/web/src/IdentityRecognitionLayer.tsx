@@ -96,6 +96,34 @@ export function IdentityRecognitionLayer({
     )
   }
 
+  if (recognition.step === 'roleReveal' && game.viewer.role !== null) {
+    return (
+      <section
+        aria-label="身份辨认"
+        className="pointer-events-none absolute inset-0 z-[60] overflow-hidden"
+        data-curtain-state="lowered"
+        data-identity-step={recognition.step}
+        data-table-visibility="hidden"
+      >
+        <div
+          aria-hidden="true"
+          className="identity-curtain identity-curtain--lowering identity-role-reveal-curtain pointer-events-none absolute inset-0 z-0 overflow-hidden bg-[radial-gradient(circle_at_center,_rgba(56,45,24,0.3),_transparent_34%),linear-gradient(180deg,_#0b1728,_#030812)]"
+        >
+          <CurtainDecoration />
+        </div>
+        <div className="identity-role-reveal-content relative z-10 flex h-full flex-col items-center justify-between p-3 sm:p-5">
+          <RecognitionHeader copy={copy} progress={progress} />
+          <RoleRevealCard role={game.viewer.role} />
+          <RecognitionConfirmation
+            confirmed={viewerRecognition.confirmed}
+            copy={copy}
+            onConfirm={onConfirm}
+          />
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section
       aria-label="身份辨认"
@@ -109,33 +137,58 @@ export function IdentityRecognitionLayer({
       >
         <CurtainDecoration />
       </div>
-      <div className="pointer-events-auto rounded-2xl border border-amber-200/30 bg-slate-950/90 px-4 py-2 text-center shadow-xl shadow-black/40 backdrop-blur">
-        <h2 className="font-serif text-base font-semibold text-amber-50 sm:text-xl">
-          {copy.title}
-        </h2>
-        <p className="mt-1 text-xs text-slate-300">{progress}</p>
-      </div>
-
-      {recognition.step === 'roleReveal' && game.viewer.role !== null && (
-        <RoleRevealCard role={game.viewer.role} />
-      )}
-
-      <div className="pointer-events-auto rounded-2xl border border-white/15 bg-slate-950/90 p-2 shadow-xl shadow-black/40 backdrop-blur">
-        <button
-          className="min-h-11 min-w-44 rounded-xl bg-amber-300 px-5 py-2 text-sm font-bold text-slate-950 transition hover:bg-amber-200 disabled:cursor-wait disabled:bg-slate-700 disabled:text-slate-200"
-          disabled={viewerRecognition.confirmed}
-          onClick={onConfirm}
-          type="button"
-        >
-          {viewerRecognition.confirmed ? '等待中' : copy.confirmation}
-        </button>
-        {viewerRecognition.confirmed && (
-          <p className="mt-1 text-center text-[0.65rem] text-slate-400">
-            {copy.waiting}
-          </p>
-        )}
-      </div>
+      <RecognitionHeader copy={copy} progress={progress} />
+      <RecognitionConfirmation
+        confirmed={viewerRecognition.confirmed}
+        copy={copy}
+        onConfirm={onConfirm}
+      />
     </section>
+  )
+}
+
+function RecognitionHeader({
+  copy,
+  progress,
+}: {
+  copy: (typeof STEP_COPY)[IdentityRecognitionStep]
+  progress: string
+}) {
+  return (
+    <div className="pointer-events-auto rounded-2xl border border-amber-200/30 bg-slate-950/90 px-4 py-2 text-center shadow-xl shadow-black/40 backdrop-blur">
+      <h2 className="font-serif text-base font-semibold text-amber-50 sm:text-xl">
+        {copy.title}
+      </h2>
+      <p className="mt-1 text-xs text-slate-300">{progress}</p>
+    </div>
+  )
+}
+
+function RecognitionConfirmation({
+  confirmed,
+  copy,
+  onConfirm,
+}: {
+  confirmed: boolean
+  copy: (typeof STEP_COPY)[IdentityRecognitionStep]
+  onConfirm: () => void
+}) {
+  return (
+    <div className="pointer-events-auto rounded-2xl border border-white/15 bg-slate-950/90 p-2 shadow-xl shadow-black/40 backdrop-blur">
+      <button
+        className="min-h-11 min-w-44 rounded-xl bg-amber-300 px-5 py-2 text-sm font-bold text-slate-950 transition hover:bg-amber-200 disabled:cursor-wait disabled:bg-slate-700 disabled:text-slate-200"
+        disabled={confirmed}
+        onClick={onConfirm}
+        type="button"
+      >
+        {confirmed ? '等待中' : copy.confirmation}
+      </button>
+      {confirmed && (
+        <p className="mt-1 text-center text-[0.65rem] text-slate-400">
+          {copy.waiting}
+        </p>
+      )}
+    </div>
   )
 }
 

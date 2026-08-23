@@ -36,7 +36,7 @@ test('players complete the curtain-based identity recognition ceremony', async (
     for (const page of harness.pages) {
       await expect(page.locator('[data-identity-step="roleReveal"]')).toHaveAttribute(
         'data-curtain-state',
-        'raised',
+        'lowered',
       )
       await expect(page.getByText('本局目标：')).toBeVisible()
       await expect(page.getByText(/\d+ 秒/)).toHaveCount(0)
