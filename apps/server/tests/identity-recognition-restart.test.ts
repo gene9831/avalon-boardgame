@@ -49,6 +49,7 @@ describe('identity recognition server recovery', () => {
     let running = await startAvalonServer({
       config: testConfig,
       db: storage,
+      identityRecognitionDeadlineEnabled: true,
       identityRecognitionNow: () => now,
       serverInstanceID: 'server-one',
     })
@@ -108,6 +109,7 @@ describe('identity recognition server recovery', () => {
       running = await startAvalonServer({
         config: testConfig,
         db: storage,
+        identityRecognitionDeadlineEnabled: true,
         identityRecognitionNow: () => now,
         serverInstanceID: 'server-two',
       })

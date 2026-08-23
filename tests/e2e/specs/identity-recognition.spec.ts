@@ -39,6 +39,7 @@ test('players complete the curtain-based identity recognition ceremony', async (
         'raised',
       )
       await expect(page.getByText('本局目标：')).toBeVisible()
+      await expect(page.getByText(/\d+ 秒/)).toHaveCount(0)
       await expect(page.getByRole('button', {
         name: '显示已知角色信息',
       })).toHaveCount(0)

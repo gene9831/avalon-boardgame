@@ -145,6 +145,7 @@ export interface AvalonServerOptions {
   config?: AvalonServerConfig
   db?: StorageAPI.Sync | StorageAPI.Async
   gameSeed?: string | number
+  identityRecognitionDeadlineEnabled?: boolean
   identityRecognitionNow?: () => number
   identityRecognitionStepMs?: number
   serverInstanceID?: string
@@ -253,6 +254,8 @@ export function createAvalonServer(options: AvalonServerOptions = {}) {
   const boardgame = createBoardgameServer({
     games: [
       createAvalonGame({
+        identityRecognitionDeadlineEnabled:
+          options.identityRecognitionDeadlineEnabled,
         identityRecognitionStepMs: options.identityRecognitionStepMs,
         now: options.identityRecognitionNow,
         seed: options.gameSeed ?? config.testGameSeed,

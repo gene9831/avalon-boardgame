@@ -59,7 +59,6 @@ function renderPanel({
       onBackHome={vi.fn()}
       onCastTeamVote={vi.fn()}
       onConfirmIdentityRecognition={vi.fn()}
-      onAdvanceIdentityRecognition={vi.fn()}
       onPlayQuestCard={vi.fn<(card: QuestCard) => void>()}
       onProposeTeam={vi.fn()}
       onReconnect={vi.fn()}
@@ -101,6 +100,7 @@ describe('RoomGamePanel identity recognition', () => {
     expect(html).toContain('梅林')
     expect(html).toContain('正义阵营')
     expect(html).toContain('我已确认身份')
+    expect(html).not.toContain('秒')
     expect(html).not.toContain('aria-label="显示已知角色信息"')
   })
 
@@ -132,6 +132,7 @@ describe('RoomGamePanel identity recognition', () => {
     expect(html).toContain('data-curtain-state="closed"')
     expect(html).toContain('邪恶阵营，请睁眼并辨认同伴')
     expect(html).toContain('1/2 已确认')
+    expect(html).not.toContain('秒')
     expect(html).not.toContain('我已辨认同伴')
   })
 

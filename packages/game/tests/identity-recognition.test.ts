@@ -6,9 +6,13 @@ import { getAvalonPlayerView } from '../src/player-view'
 import { loyaltyForRole } from '../src/roles'
 import type { AvalonG } from '../src/types'
 
-function createRecognitionClient(now: () => number) {
+function createRecognitionClient(
+  now: () => number,
+  identityRecognitionDeadlineEnabled = false,
+) {
   return Client({
     game: createAvalonGame({
+      identityRecognitionDeadlineEnabled,
       identityRecognitionStepMs: 10_000,
       now,
       serverInstanceID: 'server-one',
@@ -83,7 +87,13 @@ describe('Avalon identity recognition', () => {
         .identityRecognition?.deadlineRefreshRequired,
     ).toBe(false)
     expect(
-      getAvalonPlayerView(game, merlinID ?? null, 'server-two').viewer
+      getAvalonPlayerView(
+        game,
+        merlinID ?? null,
+        'server-two',
+        1_000,
+        true,
+      ).viewer
         .identityRecognition?.deadlineRefreshRequired,
     ).toBe(true)
   })
@@ -205,7 +215,7 @@ describe('Avalon identity recognition', () => {
 
   it('advances at the server deadline without waiting for confirmations', () => {
     let now = 1_000
-    const client = createRecognitionClient(() => now)
+    const client = createRecognitionClient(() => now, true)
     client.moves.startGame()
 
     expect(client.moves.advanceIdentityRecognition).toBeTypeOf('function')
@@ -236,7 +246,7 @@ describe('Avalon identity recognition', () => {
 
   it('catches up expired steps on the original timeline after reconnect', () => {
     let now = 1_000
-    const client = createRecognitionClient(() => now)
+    const client = createRecognitionClient(() => now, true)
     client.moves.startGame()
 
     now = 31_000
@@ -256,7 +266,7 @@ describe('Avalon identity recognition', () => {
 
   it('advances an expired step on its original timeline without counting a late confirmation', () => {
     let now = 1_000
-    const client = createRecognitionClient(() => now)
+    const client = createRecognitionClient(() => now, true)
     client.moves.startGame()
 
     now = 12_000
@@ -271,6 +281,30 @@ describe('Avalon identity recognition', () => {
       participantCount: 2,
     })
     expect(game.secret.identityRecognitionConfirmedPlayerIDs).toEqual([])
+  })
+
+  it('waits for confirmations when the identity deadline is disabled by default', () => {
+    let now = 1_000
+    const client = createRecognitionClient(() => now)
+    client.moves.startGame()
+
+    now = 12_000
+    client.updatePlayerID('0')
+    client.moves.confirmIdentityRecognition()
+
+    let game = client.store.getState().G as AvalonG
+    expect(game.identityRecognition).toEqual({
+      step: 'roleReveal',
+      deadlineAt: 11_000,
+      confirmedCount: 1,
+      participantCount: 5,
+    })
+
+    const stateIDBeforeWake = client.store.getState()._stateID
+    client.moves.advanceIdentityRecognition('roleReveal', 11_000)
+    game = client.store.getState().G as AvalonG
+    expect(client.store.getState()._stateID).toBe(stateIDBeforeWake)
+    expect(game.identityRecognition?.step).toBe('roleReveal')
   })
 
   it('omits secret identity-recognition actors from the game log', () => {

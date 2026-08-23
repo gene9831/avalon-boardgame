@@ -1,55 +1,12 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import {
   canSubmitTeam,
-  getIdentityRecognitionWakeDelay,
   getQuestTeamSize,
   toggleTeamMember,
 } from '../src/room-game'
 
 describe('room game interaction helpers', () => {
-  it('uses the authoritative recognition deadline for wake-up requests', () => {
-    expect(getIdentityRecognitionWakeDelay({
-      deadlineAt: 11_000,
-      deadlineRefreshRequired: false,
-      serverNow: 4_000,
-      playerID: '0',
-    })).toBe(7_100)
-    expect(getIdentityRecognitionWakeDelay({
-      deadlineAt: 11_000,
-      deadlineRefreshRequired: false,
-      serverNow: 12_000,
-      playerID: '0',
-    })).toBe(100)
-    expect(getIdentityRecognitionWakeDelay({
-      deadlineAt: 11_000,
-      deadlineRefreshRequired: true,
-      serverNow: 4_000,
-      playerID: '3',
-    })).toBe(400)
-    expect(getIdentityRecognitionWakeDelay({
-      deadlineAt: 11_000,
-      deadlineRefreshRequired: false,
-      serverNow: 4_000,
-      playerID: '3',
-    })).toBe(7_400)
-  })
-
-  it('does not use the browser wall clock to schedule recognition wake-up', () => {
-    vi.useFakeTimers()
-    try {
-      vi.setSystemTime(new Date('2099-01-01T00:00:00Z'))
-      expect(getIdentityRecognitionWakeDelay({
-        deadlineAt: 11_000,
-        deadlineRefreshRequired: false,
-        serverNow: 4_000,
-        playerID: '0',
-      })).toBe(7_100)
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
   it('uses the configured team size for the current quest', () => {
     expect(getQuestTeamSize(5, 0)).toBe(2)
     expect(getQuestTeamSize(7, 3)).toBe(4)

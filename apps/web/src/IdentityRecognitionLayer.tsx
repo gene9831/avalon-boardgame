@@ -1,8 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
 import type {
   AvalonPlayerView,
   IdentityRecognitionStep,
-  PlayerID,
   Role,
 } from '@avalon/game'
 
@@ -10,11 +8,7 @@ import assassinAvatar from './assets/roles/assassin.png'
 import loyalServantAvatar from './assets/roles/loyal-servant.png'
 import merlinAvatar from './assets/roles/merlin.png'
 import minionAvatar from './assets/roles/minion-of-mordred.png'
-import {
-  getIdentityRecognitionWakeDelay,
-  LOYALTY_LABELS,
-  ROLE_LABELS,
-} from './room-game'
+import { LOYALTY_LABELS, ROLE_LABELS } from './room-game'
 
 const ROLE_AVATARS: Record<Role, string> = {
   assassin: assassinAvatar,
@@ -65,99 +59,15 @@ const STEP_COPY: Record<
 
 interface IdentityRecognitionLayerProps {
   game: AvalonPlayerView
-  onAdvance: (
-    step: IdentityRecognitionStep,
-    deadlineAt: number,
-  ) => void
   onConfirm: () => void
-  playerID: PlayerID
 }
 
 export function IdentityRecognitionLayer({
   game,
-  onAdvance,
   onConfirm,
-  playerID,
 }: IdentityRecognitionLayerProps) {
   const recognition = game.identityRecognition
   const viewerRecognition = game.viewer.identityRecognition
-  const recognitionStep = recognition?.step
-  const deadlineAt = recognition?.deadlineAt
-  const deadlineRefreshRequired =
-    viewerRecognition?.deadlineRefreshRequired
-  const serverNow = viewerRecognition?.serverNow
-  const onAdvanceRef = useRef(onAdvance)
-  const [remainingSeconds, setRemainingSeconds] = useState(() =>
-    recognition === null
-      ? 0
-      : Math.max(
-          0,
-          Math.ceil(
-            (recognition.deadlineAt -
-              (game.viewer.identityRecognition?.serverNow ??
-                recognition.deadlineAt)) / 1_000,
-          ),
-        ),
-  )
-  onAdvanceRef.current = onAdvance
-
-  useEffect(() => {
-    if (
-      recognitionStep === undefined ||
-      deadlineAt === undefined ||
-      deadlineRefreshRequired === undefined ||
-      serverNow === undefined
-    ) return
-
-    const authoritativeRemainingMs = deadlineRefreshRequired
-      ? 0
-      : Math.max(0, deadlineAt - serverNow)
-    const localStartedAt = Date.now()
-    let retryInterval: number | undefined
-    const requestAdvance = () => {
-      onAdvanceRef.current(recognitionStep, deadlineAt)
-      retryInterval ??= window.setInterval(() => {
-        onAdvanceRef.current(recognitionStep, deadlineAt)
-      }, 500)
-    }
-
-    const updateCountdown = () => {
-      setRemainingSeconds(
-        Math.max(
-          0,
-          Math.ceil(
-            (authoritativeRemainingMs - (Date.now() - localStartedAt)) / 1_000,
-          ),
-        ),
-      )
-    }
-    updateCountdown()
-    const interval = window.setInterval(updateCountdown, 250)
-    const wakeDelay = getIdentityRecognitionWakeDelay({
-      deadlineAt,
-      deadlineRefreshRequired,
-      serverNow,
-      playerID,
-    })
-    const timeout = window.setTimeout(
-      requestAdvance,
-      wakeDelay,
-    )
-
-    return () => {
-      window.clearInterval(interval)
-      window.clearTimeout(timeout)
-      if (retryInterval !== undefined) {
-        window.clearInterval(retryInterval)
-      }
-    }
-  }, [
-    deadlineAt,
-    deadlineRefreshRequired,
-    playerID,
-    recognitionStep,
-    serverNow,
-  ])
 
   if (recognition === null || viewerRecognition === undefined) return null
 
@@ -180,10 +90,7 @@ export function IdentityRecognitionLayer({
           <h2 className="mt-4 font-serif text-2xl font-semibold text-amber-50 sm:text-4xl">
             {copy.title}
           </h2>
-          <p className="mt-5 text-5xl font-light tabular-nums text-white sm:text-6xl">
-            {remainingSeconds}
-          </p>
-          <p className="mt-3 text-sm text-slate-300">{progress}</p>
+          <p className="mt-5 text-sm text-slate-300">{progress}</p>
         </div>
       </section>
     )
@@ -206,9 +113,7 @@ export function IdentityRecognitionLayer({
         <h2 className="font-serif text-base font-semibold text-amber-50 sm:text-xl">
           {copy.title}
         </h2>
-        <p className="mt-1 text-xs text-slate-300">
-          {remainingSeconds} 秒 · {progress}
-        </p>
+        <p className="mt-1 text-xs text-slate-300">{progress}</p>
       </div>
 
       {recognition.step === 'roleReveal' && game.viewer.role !== null && (

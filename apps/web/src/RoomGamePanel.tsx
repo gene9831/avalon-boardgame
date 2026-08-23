@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import type {
   AvalonPlayerView,
-  IdentityRecognitionStep,
   PlayerID,
   QuestCard,
   Role,
@@ -34,10 +33,6 @@ interface RoomGamePanelProps {
   onBackHome: () => void
   onCastTeamVote: (vote: TeamVote) => void
   onConfirmIdentityRecognition: () => void
-  onAdvanceIdentityRecognition: (
-    step: IdentityRecognitionStep,
-    deadlineAt: number,
-  ) => void
   onPlayQuestCard: (card: QuestCard) => void
   onProposeTeam: (team: PlayerID[]) => void
   onReconnect: () => void
@@ -56,7 +51,6 @@ export function RoomGamePanel({
   onBackHome,
   onCastTeamVote,
   onConfirmIdentityRecognition,
-  onAdvanceIdentityRecognition,
   onPlayQuestCard,
   onProposeTeam,
   onReconnect,
@@ -173,9 +167,7 @@ export function RoomGamePanel({
         <IdentityRecognitionLayer
           game={game}
           key={game.identityRecognition?.step}
-          onAdvance={onAdvanceIdentityRecognition}
           onConfirm={onConfirmIdentityRecognition}
-          playerID={playerID}
         />
       )}
     </section>

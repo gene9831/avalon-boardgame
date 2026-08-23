@@ -130,6 +130,8 @@ function createAvalonGameDefinition(
   options: AvalonGameOptions,
 ): Game<AvalonG, Record<string, never>, AvalonSetupData> {
   const now = options.now ?? Date.now
+  const identityRecognitionDeadlineEnabled =
+    options.identityRecognitionDeadlineEnabled ?? false
   const identityRecognitionStepMs = options.identityRecognitionStepMs ?? 10_000
   const serverInstanceID = options.serverInstanceID ?? 'default'
   const enterIdentityRecognitionStep = (
@@ -199,7 +201,13 @@ function createAvalonGameDefinition(
   setup: ({ ctx }, setupData) =>
     createInitialGame(ctx.playOrder, setupData),
   playerView: ({ G, playerID }) =>
-    getAvalonPlayerView(G, playerID, serverInstanceID, now()),
+    getAvalonPlayerView(
+      G,
+      playerID,
+      serverInstanceID,
+      now(),
+      identityRecognitionDeadlineEnabled,
+    ),
   phases: {
     lobby: {
       start: true,
@@ -253,12 +261,16 @@ function createAvalonGameDefinition(
                   const currentNow = now()
 
                   if (
+                    identityRecognitionDeadlineEnabled &&
                     refreshIdentityRecognitionForServerInstance(G, currentNow)
                   ) {
                     return
                   }
 
-                  if (currentNow >= recognition.deadlineAt) {
+                  if (
+                    identityRecognitionDeadlineEnabled &&
+                    currentNow >= recognition.deadlineAt
+                  ) {
                     advanceIdentityRecognition(
                       G,
                       events.setPhase,
@@ -297,6 +309,7 @@ function createAvalonGameDefinition(
                 ) => {
                   const recognition = G.identityRecognition
                   if (recognition === null) return INVALID_MOVE
+                  if (!identityRecognitionDeadlineEnabled) return INVALID_MOVE
                   const currentNow = now()
 
                   if (
@@ -611,6 +624,7 @@ function createAvalonGameDefinition(
 }
 
 export interface AvalonGameOptions {
+  identityRecognitionDeadlineEnabled?: boolean
   identityRecognitionStepMs?: number
   now?: () => number
   seed?: string | number

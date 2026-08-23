@@ -139,9 +139,9 @@ type AvalonG = {
 }
 ```
 
-The filtered viewer recognition state also includes a server-time snapshot used
-to calculate the local countdown without trusting the browser wall clock. The
-server-instance marker and confirmed player IDs never cross `playerView`.
+The server-instance marker and confirmed player IDs never cross `playerView`.
+Deadline metadata remains in the state shape for the disabled optional deadline
+architecture and is not rendered by the first-release web client.
 
 The role map and pending choices are server secrets. After a vote is settled, the individual vote choices may be moved into public vote history. After a quest is settled, only the team, Success count, Fail count, and quest result are retained publicly; the mapping from a quest card to a player is discarded.
 
@@ -150,14 +150,14 @@ The role map and pending choices are server secrets. After a vote is settled, th
 | Phase | Active players and stage | Move | Completion |
 | --- | --- | --- | --- |
 | `lobby` | Seat 0 in `start` | `startGame` | All seats occupied; roles and leader assigned; enter `identityRecognition` |
-| `identityRecognition` | All players in `identityRecognition`; only the current step's participants may confirm | `confirmIdentityRecognition`; server-validated `advanceIdentityRecognition` wake-up | All participants confirm or the 10-second deadline expires; advance through role, Evil, and Merlin recognition, then enter `teamProposal` |
+| `identityRecognition` | All players in `identityRecognition`; only the current step's participants may confirm | `confirmIdentityRecognition` | All participants confirm; advance through role, Evil, and Merlin recognition, then enter `teamProposal` |
 | `teamProposal` | Current leader in `leader` | `proposeTeam(playerIDs)` | Exact team size, seated players, and no duplicates; enter `teamVote` |
 | `teamVote` | All players in `vote` | `castTeamVote(approve)` | One vote per player; settle after all votes |
 | `quest` | Proposed team in `quest` | `playQuestCard(result)` | One card per team member; settle after all cards |
 | `assassination` | Assassin in `assassin` | `assassinate(targetID)` | Target must be Good; resolve victory |
 | `gameOver` | None | None | Read-only result |
 
-Each active player has at most one strategic move in the relevant stage. Identity recognition separately permits a private confirmation or a deadline wake-up request. Boardgame.io validates the acting player before the move reaches the game logic; the game logic additionally validates role, phase, team membership, deadline, expected recognition step, and expected deadline. Recognition confirmations and wake-ups are removed from client-visible and persisted game logs because even a redacted move log otherwise retains the acting player ID.
+Each active player has at most one strategic move in the relevant stage. Identity recognition separately permits a private confirmation. Boardgame.io validates the acting player before the move reaches the game logic; the game logic additionally validates role, phase, and step participation. Recognition confirmations are removed from client-visible and persisted game logs because even a redacted move log otherwise retains the acting player ID. The dormant deadline move retains server-side step/deadline validation and the same log protection.
 
 ### Team vote settlement
 
@@ -208,7 +208,7 @@ The Socket.IO client reconnects with the same match ID, player ID, and credentia
 
 Team votes and quest cards are accepted independently while their players are active. The per-match server queue serializes arrival, and `maxMoves: 1` makes a repeated action invalid. A disconnected player leaves these strategic stages incomplete until reconnecting because automatic strategic timeout is disabled.
 
-Identity recognition is non-strategic: each step advances after all step participants confirm or after its server-authoritative 10-second deadline. Reconnects use the persisted deadline and can catch up multiple expired steps along the original timeline. A server restart preserves completed steps, resets only the current step's anonymous confirmations, and gives that step a fresh 10-second deadline.
+Identity recognition is non-strategic, but the first release still waits for all step participants to confirm. It shows no countdown and sends no automatic wake-up. Ordinary reconnects preserve the current confirmations. The server retains an internal, default-off deadline option with its original timeline and restart handling for future room configuration.
 
 ## Timeout configuration
 
@@ -226,7 +226,7 @@ type TimeoutConfig = {
 
 The default is `{ enabled: false }`. The first implementation does not add a wall-clock timer, timeout move, or automatic default choice to any strategic phase. Enabling those timeouts later requires a separate design decision covering default choices, server-side deadline validation, and recovery when all clients disconnect.
 
-The opening identity-recognition deadline is deliberately separate from this configuration because it ends only a private information display and never creates a game choice. ADR-0006 records its server-clock validation and restart behavior.
+The internal identity-recognition deadline is also disabled by default. A future change may expose it as a separate room-creation option because it ends only a private information display and never creates a game choice. ADR-0006 records the retained server-side architecture.
 
 ## PostgreSQL storage
 

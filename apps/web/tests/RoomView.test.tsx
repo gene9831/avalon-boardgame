@@ -18,7 +18,6 @@ function renderRoomView(overrides: Partial<RoomViewProps> = {}) {
     onBackHome: vi.fn(),
     onCastTeamVote: vi.fn(),
     onConfirmIdentityRecognition: vi.fn(),
-    onAdvanceIdentityRecognition: vi.fn(),
     onClearLocalSession: vi.fn(),
     onDeleteRoom: vi.fn(),
     onKickPlayer: vi.fn(),

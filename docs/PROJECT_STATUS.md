@@ -22,7 +22,7 @@
 - Web 主页将等待开局和游戏中的房间统一列入“进行中的圆桌”，卡片显示具体状态并提供分页；已结束房间单独列出。
 - Web 主页会验证本机保存的全部活动房间凭据；已加入房间置顶并直接“进入”，存在活动房间时禁止从正常浏览器流程创建或加入其他房间，并同步同一浏览器的其他标签页。
 - Web 等待大厅和游戏页共用单一圆桌结构，PC、平板和移动端都将当前玩家固定在底部、其他玩家顺时针排布；中央采用实体桌游式五任务计分板，并已接入角色信息、队伍提案、全员投票、任务秘密出牌、公开任务结果、刺杀和最终角色揭示。
-- 开局在首次组队前依次进行全员身份查看、邪恶阵营互认和梅林辨认邪恶阵营；每步参与者可确认，或由服务端权威 10 秒截止线推进，其他玩家保持在不透明幕布后。
+- 开局在首次组队前依次进行全员身份查看、邪恶阵营互认和梅林辨认邪恶阵营；当前版本不显示或使用倒计时，每步等待全部参与者确认，其他玩家保持在不透明幕布后。
 - Web 主页每次创建/加入新房间前都显示名称确认弹窗；`localStorage` 仅作为默认值来源，成功入座后更新，取消或失败不覆盖，并支持名称冲突与过期座位状态的分层恢复。
 - Web 主页和个人设备圆桌等待大厅已完成响应式重设计；大厅以当前玩家为底部锚点，在所有宽度采用同一套圆形座位 DOM。房主开局进入桌面中央，退出/解散进入顶部房间菜单；健康连接不显示状态，连续断线 8 秒后才在顶部提供手动重连。房间页在最低 320×568 竖屏与 568×320 横屏内按宽高可用空间缩放，不产生页面滚动。
 - 等待大厅支持玩家凭据授权的主动离座：普通玩家只释放自己的座位，房主解散整个房间；游戏开始后拒绝这两类操作，返回主页仍是保留座位的无损导航。
@@ -59,7 +59,7 @@
 - [服务端权威秘密状态](adr/0001-server-authoritative-secret-state.md)
 - [PostgreSQL 多房间持久化](adr/0002-postgresql-persistent-multi-room-storage.md)
 - [MVP 不自动超时或管理员修改](adr/0003-no-automatic-timeout-or-admin-mutation-in-mvp.md)
-- [开局身份辨认使用服务端权威截止线](adr/0006-server-authoritative-identity-recognition-deadlines.md)
+- [预留可选的服务端权威身份辨认截止线](adr/0006-server-authoritative-identity-recognition-deadlines.md)
 - [pnpm workspace 边界](adr/0004-pnpm-workspace-package-boundaries.md)
 
 ## 里程碑状态
@@ -80,7 +80,7 @@
 | 座位绑定与重连 | ✅ | 房间路由、按房间保存凭据、client ID 防重复占座和自动重新连接已实现。健康连接不占用界面；断线时顶部先显示自动恢复状态，连续失败 8 秒后才出现手动重连。房间首次加载与轮询通过只返回 204/403/404 的服务端端点校验私有 player credential；公开 session ID 仅作提前失效优化，不能授权会话。 |
 | Debug Panel 默认收起 | ✅ | 使用 boardgame.io `debug.collapseOnLoad`，仍可手动展开。 |
 | 角色与阶段展示 | ✅ | 游戏开始后保持统一圆桌布局；中央面板显示五次任务、当前任务和连续否决轨道。游戏页不再使用底部身份栏，当前玩家头像直接使用自己的角色素材并在名牌第二行显示短角色名；其他玩家在隐藏状态保持中性头像，最终结算才全部展示角色素材和角色名。“眼睛”按钮固定在左下角且默认关闭，只控制当前玩家被允许知道的其他角色信息；当前 MVP 以暗红光环和无文字徽记表示已知邪恶阵营，不泄露精确角色。断线、队长和任务队员分别通过头像灰度、头冠和高亮表达。 |
-| 开局身份辨认 | ✅ | `startGame` 后先进入三步身份辨认：全员查看自己的完整身份牌，邪恶阵营辨认其他邪恶座位，梅林辨认全部邪恶座位。参与者确认后保留信息并显示“等待中”，非参与者处于深蓝不透明幕布后；公开进度仅为匿名 `x/n`。全部参与者确认或服务端验证 10 秒截止线后推进，仪式结束才进入首次组队。普通重连沿原截止线追赶；服务重启保留已完成步骤、重置当前步骤确认并刷新 10 秒。浏览器以服务端时间快照显示倒计时并安全重试唤醒；实时及持久化日志不记录确认者座位。仪式期间隐藏眼睛按钮，结束后恢复原功能。 |
+| 开局身份辨认 | ✅ | `startGame` 后先进入三步身份辨认：全员查看自己的完整身份牌，邪恶阵营辨认其他邪恶座位，梅林辨认全部邪恶座位。参与者确认后保留信息并显示“等待中”，非参与者处于深蓝不透明幕布后；公开进度仅为匿名 `x/n`。当前版本不显示倒计时、不发送自动唤醒，必须等待当前步骤全部参与者确认，仪式结束才进入首次组队。服务端保留默认关闭的截止线、原时间线追赶与重启保护架构，供未来创建房间配置使用；实时及持久化日志不记录确认者或唤醒者座位。仪式期间隐藏眼睛按钮，结束后恢复原功能。 |
 | 队伍提案 | ✅ | 队长直接点击圆桌座位选择正确人数，动作转发到服务端 `proposeTeam`。 |
 | 队伍投票 | ✅ | 所有玩家可独立提交 approve/reject；中央操作区只显示自己的提交状态。 |
 | 开发房间删除与踢人 | ✅ | `/dev/status` 确认启用后，主页与房间统一显示右下角 Lucide `Bug` 悬浮入口；桌面使用悬浮面板，移动端使用最大 70dvh 的底部抽屉，Token 仅保存在当前路由内存中。面板支持遮罩、再次点击、Escape、焦点循环和安全区避让，操作错误通过触发器圆点和面板详情反馈；状态接口关闭或失败时不暴露入口。主页删除仍保留在对应房间卡片，房间内删除支持 lobby/playing/finished，踢人仅支持 lobby；连接中删除、匿名同步和延迟写入不会复活房间，快速复用座位即使复制旧公开数据也会由凭据校验拒绝旧会话；活动房间 metadata 使用按房间版本保护，延迟 fetch 不会被重新标记为当前版本，kick 和正式离座都会在旧写入之后权威落盘。当前 Server tests: 44 passed / PostgreSQL 5 skipped；Web tests: 89 passed. |
@@ -140,9 +140,9 @@
 
 ## 当前验证基线
 
-最近一次验证日期：2026-08-23
+最近一次验证日期：2026-08-24
 
-2026-08-23 开局身份辨认验证：规则核心新增 `identityRecognition` 阶段、三步参与者确认、服务端权威 10 秒截止线、断线后按原时间线追赶，以及服务重启后当前步骤确认重置/截止线刷新；迟到确认不会计入下一步，服务重启后的首次确认只触发安全刷新。`playerView` 分步释放自己的角色、邪恶同伴座位和梅林可见的邪恶座位，不公开精确邪恶角色或确认者座位；确认及唤醒动作从实时与持久化游戏日志中移除。Web 使用服务端时间快照抵抗浏览器时钟偏差，并对相同步骤/截止线安全重试唤醒；界面采用深蓝不透明幕布、匿名进度、等待态和无声音的 200ms 升降动画，仪式期间移除眼睛按钮。Game tests 37 passed；test-support 22 passed；Server tests 44 passed / PostgreSQL 5 skipped；Web tests 90 passed；build、lint、typecheck exit 0。完整 PR 级 Playwright 13 passed / 9 nightly skipped，覆盖专项身份仪式、刷新隐私、5 人 smoke 和 5/7/10 人目标视口；应用内浏览器另外验证身份卡内容、无页面滚动、仪式期间无眼睛按钮、离线参与者的截止线推进和空 error/warn 控制台。本地仅出现既有的 `NO_COLOR`/`FORCE_COLOR` Node 警告。
+2026-08-24 开局身份辨认验证：规则核心使用 `identityRecognition` 三步参与者确认，当前产品默认关闭截止线；超过内部 `deadlineAt` 后确认仍计入当前步骤，直接调用唤醒 move 也不会推进。Web 已移除倒计时显示、计时器和自动唤醒回调，只保留匿名 `x/n`、确认与等待态。服务端保留显式启用的权威截止线、原时间线追赶、重启保护和日志隐私回归，供未来创建房间配置接入。`playerView` 继续分步释放自己的角色、邪恶同伴座位和梅林可见的邪恶座位，不公开精确邪恶角色或确认者座位。界面继续使用深蓝不透明幕布、无声音的 200ms 升降动画，并在仪式期间隐藏眼睛按钮。Game tests 38 passed；test-support 22 passed；Server tests 44 passed / PostgreSQL 5 skipped；Web tests 88 passed；build、lint、typecheck exit 0。完整 PR 级 Playwright 13 passed / 9 nightly skipped，覆盖无倒计时的专项身份仪式、刷新隐私、5 人 smoke 和 5/7/10 人目标视口。本地仅出现既有的 `NO_COLOR`/`FORCE_COLOR` Node 警告。
 
 2026-08-23 业务确认弹窗统一验证：创建/加入名称与退出/解散房间弹窗迁移到共享原生 `ModalDialog`，显式恢复被 Tailwind preflight 重置的自动 margin，并统一视口安全边距、最大动态视口高度、内部滚动、Escape 和忙碌态关闭规则；开发控制抽屉/浮层保持不变。聚焦 Playwright 在 320×568 下通过真实创建与解散流程验证两个弹窗水平垂直居中且四边至少保留 16px；当前 543×761 浏览器实测中心偏差为 0。Web tests 85 passed；Web build、lint 和 E2E typecheck exit 0。测试服务仅出现 `NO_COLOR` 被 `FORCE_COLOR` 覆盖的 Node 警告。
 
@@ -155,7 +155,7 @@
 2026-08-23 PostgreSQL 网络中断崩溃修复验证：确认 `a90095d` 的范围仅是空闲客户端触发的 `pg.Pool` `error` 事件，不包含活动 `query()` 返回的 rejected Promise。新增 boardgame.io Socket.IO `update`、`sync`、`disconnect`、`chat` 请求错误边界；聚焦回归测试完成 RED（`sync` rejection 逸出）→ GREEN（安全日志并关闭底层连接）；Server tests 48 passed；Server typecheck exit 0。
 
 ```text
-pnpm test ✅ Game 37 passed；test-support 22 passed；Server 44 passed / PostgreSQL 5 skipped；Web 90 passed
+pnpm test ✅ Game 38 passed；test-support 22 passed；Server 44 passed / PostgreSQL 5 skipped；Web 88 passed
 pnpm build ✅ Game、Server TypeScript 与 Web TypeScript + Vite build
 pnpm lint ✅ exit 0
 pnpm typecheck ✅ Game、test-support、Server、Web、E2E exit 0
@@ -215,7 +215,7 @@ http://192.168.100.117:5183/
 - 隐私窗口通常与普通窗口隔离，但同一隐私会话内的多个 Tab/窗口通常仍共享身份；关闭全部隐私窗口后本地凭据会消失，服务器座位不一定释放。
 - 开发房间控制需要在服务端 `.env.local` 同时设置 `AVALON_DEV_TOOLS=true` 和非空 `AVALON_DEV_ADMIN_TOKEN`；本地测试时由操作者手动输入页面，Token 不得提交、嵌入 Web 配置或持久化，其他场景仍是服务器 secret。
 - PostgreSQL 或 LAN 短暂不可达时，进行中的请求仍可能失败，需要在网络恢复后重试。提交 `a90095d` 只处理空闲客户端的 Pool `error` 事件；活动查询失败是独立的 Promise rejection 路径。当前空闲连接错误由 `PostgresStorage` 记录，boardgame.io Socket.IO 活动请求错误由请求边界记录并关闭底层连接以触发客户端重连；两者都只记录事件、错误码和消息，不记录凭据或请求参数，也不会把数据库故障伪装成房间不存在。
-- 不为组队、投票、任务牌或刺杀配置自动超时；断线玩家可能阻塞这些战略阶段。仅开局身份辨认使用服务端权威 10 秒截止线，因为它只结束信息展示，不替玩家作出游戏选择。
+- 当前版本不为任何阶段配置自动超时；断线玩家可能阻塞身份辨认、组队、投票、任务牌或刺杀。身份辨认保留默认关闭的服务端权威截止线架构，未来只有在创建房间显式配置后才会启用。
 - Debug Panel 是只读诊断入口，默认收起；不能绕过 `playerView` 或修改游戏状态。
 - 等待大厅和游戏页通过共享 `RoundTable` 维护圆桌几何与单一响应式 DOM；`QuestBoard` 负责中央任务板，阶段操作、角色头像、私密知识开关和当前玩家身份由 `RoomGamePanel` 统一编排。房间页不使用底部操作栏，并在最低 320×568 竖屏和 568×320 横屏下保持无页面滚动。
 

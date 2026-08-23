@@ -18,6 +18,7 @@ export function getAvalonPlayerView(
   playerID: PlayerID | null,
   serverInstanceID?: string,
   serverNow = Date.now(),
+  identityRecognitionDeadlineEnabled = false,
 ): AvalonPlayerView {
   const { secret, ...publicGame } = G
   const role = playerID === null ? undefined : secret.roleByPlayer[playerID]
@@ -56,6 +57,7 @@ export function getAvalonPlayerView(
               playerID !== null &&
               secret.identityRecognitionConfirmedPlayerIDs.includes(playerID),
             deadlineRefreshRequired:
+              identityRecognitionDeadlineEnabled &&
               serverInstanceID !== undefined &&
               secret.identityRecognitionServerInstanceID !== serverInstanceID,
             serverNow,
