@@ -28,8 +28,10 @@ import {
 } from '@avalon/game'
 
 import { webConfig } from './config'
+import { ConnectionRecoveryTimer } from './connection-recovery'
 import { getClientID } from './client-identity'
 import { createDevToolsClient } from './dev-tools'
+import { useDevTools } from './use-dev-tools'
 import { executePendingJoin, type PendingJoin } from './join-flow'
 import { classifyJoinError } from './join-error'
 import { LobbyView } from './LobbyView'
@@ -144,8 +146,13 @@ function LobbyRoute() {
       state: consumeRoomNavigationNotice(location.state),
     })
   }, [location.pathname, location.state, navigate, roomNotice])
-  const [devToolsEnabled, setDevToolsEnabled] = useState(false)
-  const [devToken, setDevToken] = useState('')
+  const {
+    enabled: devToolsEnabled,
+    error: devToolsError,
+    run: runDevTool,
+    setToken: setDevToken,
+    token: devToken,
+  } = useDevTools(devTools)
   const requestInFlightRef = useRef(false)
   const refreshGenerationRef = useRef(0)
   const roomAccessPending = roomAccessStatus === 'checking'
@@ -178,13 +185,6 @@ function LobbyRoute() {
       setError(`无法加载房间列表：${errorMessage(requestError)}`)
     }
   }, [])
-
-  useEffect(() => {
-    void devTools
-      .getStatus()
-      .then((status) => setDevToolsEnabled(status.enabled))
-      .catch(() => setDevToolsEnabled(false))
-  }, [devTools])
 
   useEffect(() => {
     void refreshMatches()
@@ -310,13 +310,11 @@ function LobbyRoute() {
     if (!devToolsEnabled || devToken.length === 0) return
     if (!window.confirm(`确定删除房间 ${matchID} 吗？`)) return
 
-    try {
+    await runDevTool(async () => {
       await devTools.deleteRoom(matchID, devToken)
       clearRoomSession(matchID)
       await refreshMatches()
-    } catch (requestError) {
-      setError(`无法删除房间：${errorMessage(requestError)}`)
-    }
+    })
   }
 
   return (
@@ -325,6 +323,7 @@ function LobbyRoute() {
         activeRoomSessions={activeRoomSessions}
         busy={busy}
         error={roomNotice ?? error ?? roomAccessError}
+        devToolsError={devToolsError}
         devToken={devToken}
         devToolsEnabled={devToolsEnabled}
         matches={matches}
@@ -810,6 +809,16 @@ export function RoomView({
   roomExitBusy,
   session,
 }: RoomViewProps) {
+  const connected = gameState?.isConnected === true
+  const {
+    beginManualReconnect,
+    manualReconnectAvailable,
+  } = useDelayedManualReconnect(connected, gameState !== null)
+  const handleManualReconnect = useCallback(() => {
+    beginManualReconnect()
+    onReconnect()
+  }, [beginManualReconnect, onReconnect])
+
   if (room === null || gameState === null) {
     return (
       <ImmersiveLobbyShell developmentControls={null}>
@@ -827,7 +836,6 @@ export function RoomView({
   const isFull = occupiedPlayerIDs.length === numPlayers
   const phase = gameState?.ctx.phase
   const activeStage = gameState?.ctx.activePlayers?.[session.playerID]
-  const connected = gameState?.isConnected === true
   const canStart =
     connected &&
     gameState?.isActive === true &&
@@ -853,11 +861,12 @@ export function RoomView({
           canStart={canStart}
           connected={connected}
           currentPlayerID={session.playerID}
+          manualReconnectAvailable={manualReconnectAvailable}
           matchID={room.matchID}
           numPlayers={numPlayers}
           occupiedPlayerIDs={occupiedPlayerIDs}
           onBackHome={onBackHome}
-          onReconnect={onReconnect}
+          onReconnect={handleManualReconnect}
           onRequestRoomExit={onRequestRoomExit}
           onStart={onStart}
           players={room.players}
@@ -884,13 +893,14 @@ export function RoomView({
         activeStage={activeStage}
         connected={connected}
         game={gameState.G}
+        manualReconnectAvailable={manualReconnectAvailable}
         matchID={room.matchID}
         onAssassinate={onAssassinate}
         onBackHome={onBackHome}
         onCastTeamVote={onCastTeamVote}
         onPlayQuestCard={onPlayQuestCard}
         onProposeTeam={onProposeTeam}
-        onReconnect={onReconnect}
+        onReconnect={handleManualReconnect}
         phase={phase ?? 'teamProposal'}
         playerID={session.playerID}
         players={room.players}
@@ -907,13 +917,31 @@ function ImmersiveLobbyShell({
   developmentControls: ReactNode
 }) {
   return (
-    <main className="relative h-screen h-dvh overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.16),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(34,211,238,0.14),_transparent_35%),#07111f] p-2 text-slate-200 sm:p-3 lg:p-4">
+    <main className="relative h-dvh overflow-hidden overscroll-none bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.16),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(34,211,238,0.14),_transparent_35%),#07111f] p-2 text-slate-200 sm:p-3 lg:p-4">
       <div className="mx-auto h-full min-h-0 max-w-7xl">{children}</div>
-      <aside className="pointer-events-none absolute bottom-2 right-2 z-50 max-h-[calc(100dvh-1rem)] w-[min(24rem,calc(100%-1rem))] overflow-auto">
-        {developmentControls}
-      </aside>
+      {developmentControls}
     </main>
   )
+}
+
+function useDelayedManualReconnect(connected: boolean, active: boolean) {
+  const [manualReconnectAvailable, setManualReconnectAvailable] = useState(false)
+  const recoveryTimerRef = useRef<ConnectionRecoveryTimer | null>(null)
+  if (recoveryTimerRef.current === null) {
+    recoveryTimerRef.current = new ConnectionRecoveryTimer(setManualReconnectAvailable)
+  }
+
+  useEffect(() => {
+    const recoveryTimer = recoveryTimerRef.current!
+    recoveryTimer.setConnection(active, connected)
+    return () => recoveryTimer.suspend()
+  }, [active, connected])
+
+  const beginManualReconnect = useCallback(() => {
+    recoveryTimerRef.current?.retry()
+  }, [])
+
+  return { beginManualReconnect, manualReconnectAvailable }
 }
 
 function PageShell({

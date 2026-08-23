@@ -28,7 +28,7 @@ test('refresh restores server data and keeps pending choices private', async ({
     await harness.dispatch(run.transcript[0])
     const leaderPage = harness.pages[Number(run.transcript[proposeIndex].actor)]
     await leaderPage.reload()
-    await expect(leaderPage.getByText('你的身份', { exact: true })).toBeVisible()
+    await expect(leaderPage.locator('[data-role-avatar]')).toBeVisible()
     await expect(leaderPage.getByRole('button', { name: /^提交 0\// })).toBeDisabled()
 
     await harness.dispatch(run.transcript[proposeIndex])

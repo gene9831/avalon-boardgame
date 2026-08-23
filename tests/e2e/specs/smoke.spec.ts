@@ -20,8 +20,13 @@ test('five isolated browser players complete a rejected-team game', async ({
   try {
     await harness.pages[4].reload()
     await expect(
-      harness.pages[4].getByRole('button', { name: '等待房主开始' }),
-    ).toBeDisabled()
+      harness.pages[4].getByText('等待房主开始', { exact: true }),
+    ).toBeVisible()
+    await harness.pages[4].getByRole('button', { name: '房间操作' }).click()
+    await expect(
+      harness.pages[4].getByRole('button', { name: '退出房间' }),
+    ).toBeVisible()
+    await harness.pages[4].getByRole('button', { name: '房间操作' }).click()
 
     const snapshot = await replayTranscript(harness, generated.transcript)
 
