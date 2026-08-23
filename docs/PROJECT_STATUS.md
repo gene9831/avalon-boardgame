@@ -17,7 +17,7 @@
 - 5–10 人独立房间和多房间 Lobby。
 - boardgame.io phases、stages、activePlayers、Socket.IO 多人同步。
 - 服务端权威角色、秘密状态和 `playerView`。
-- PostgreSQL 持久化、房间列表过滤和日志级联删除；空闲连接的后台网络错误会输出凭据安全的诊断摘要，不再因未处理的 Pool 事件终止 Node 进程。
+- PostgreSQL 持久化、房间列表过滤和日志级联删除；空闲连接的 Pool 错误和活动查询从 boardgame.io Socket.IO 事件逸出的错误都会输出凭据安全的诊断摘要，不再以未处理事件或 Promise rejection 终止 Node 进程。
 - 座位绑定、浏览器 client ID 防重复占座、房间路由、凭据重连和服务端凭据会话校验。
 - Web 主页将等待开局和游戏中的房间统一列入“进行中的圆桌”，卡片显示具体状态并提供分页；已结束房间单独列出。
 - Web 主页会验证本机保存的全部活动房间凭据；已加入房间置顶并直接“进入”，存在活动房间时禁止从正常浏览器流程创建或加入其他房间，并同步同一浏览器的其他标签页。
@@ -70,7 +70,7 @@
 | Avalon 规则核心 | ✅ | 角色分配、队伍、投票、任务、五拒绝、三任务、刺杀规则已在 `packages/game` 实现。 |
 | 秘密状态与玩家视图 | ✅ | `packages/game/src/player-view.ts` 过滤 `secret`，只返回当前玩家允许看到的信息。 |
 | Socket.IO 游戏服务 | ✅ | 游戏端口 8000，Lobby API 8001；支持独立 match。 |
-| PostgreSQL 存储 | ✅ | `PostgresStorage`、schema、delta logs、列表过滤和 wipe 已实现；空闲连接错误由 Pool 监听器处理且不记录 Client/连接信息，本地集成测试可执行。 |
+| PostgreSQL 存储 | ✅ | `PostgresStorage`、schema、delta logs、列表过滤和 wipe 已实现；空闲连接错误由 Pool 监听器处理，活动查询错误在 boardgame.io Socket.IO 请求边界处理，两类日志都不记录 Client、连接信息或请求参数，本地集成测试可执行。 |
 | 创建/加入/列出房间 | ✅ | Web Lobby 创建/加入流程已接入；响应式主页将 lobby/playing 合并为进行中列表并在卡片显示具体状态，finished 房间单独分页展示。主页验证本机全部活动房间凭据，已加入房间置顶并直接进入；存在活动会话时禁用创建和其他房间的加入入口。等待大厅允许非房主凭据授权释放自己的座位，房主可解散房间，playing 状态拒绝两类操作。 |
 | 主页与等待大厅体验 | ✅ | 主页采用 LAN 圆桌主题；公共按钮统一使用 44px 高度、12px 圆角和一致的交互态，并用金色、青色、绿色、中性色区分创建、加入、进入和辅助操作。等待大厅使用 `100dvh` 固定视口，在桌面以当前玩家为底部锚点展示自适应圆桌，在移动端使用高度感知的座位网格，页面本身无滚动条，并保持房主开局、重连、返回主页和正式退出/解散入口；首个权威游戏状态到达前保持统一连接态，不会短暂渲染旧座位页。Playwright 使用 10 人房间在 1280×900 与 320×568 视口验证无页面溢出及开局、选队和投票可操作性；开发控制折叠层不会拦截底层操作。 |
 | 玩家名称与入座入口 | ✅ | 主页不再内嵌名称表单；每次创建/加入新房间前都使用原生 `<dialog>` 确认名称，已保存名称只负责预填且自动聚焦全选。客户端和服务端共同限制 trim 后 1–24 字符，服务端在同一房间按 trim 后、不区分大小写拒绝重名；仅成功入座更新名称偏好，取消或失败不覆盖。已加入房间的进入与重连不重复询问名称。 |
@@ -79,7 +79,7 @@
 | 角色与阶段展示 | ✅ | 游戏开始后保持圆桌布局；中央实体桌游式面板显示五次任务、每次队伍人数、当前任务和连续否决轨道，底部仅显示当前玩家角色、阵营和允许看到的邪恶玩家。 |
 | 队伍提案 | ✅ | 队长直接点击圆桌座位选择正确人数，动作转发到服务端 `proposeTeam`。 |
 | 队伍投票 | ✅ | 所有玩家可独立提交 approve/reject；中央操作区只显示自己的提交状态。 |
-| 开发房间删除与踢人 | ✅ | `/dev/status` 确认启用后才显示主页 Token 面板；删除支持 lobby/playing/finished，踢人仅支持 lobby；连接中删除、匿名同步和延迟写入不会复活房间，快速复用座位即使复制旧公开数据也会由凭据校验拒绝旧会话；活动房间 metadata 使用按房间版本保护，延迟 fetch 不会被重新标记为当前版本，kick 和正式离座都会在旧写入之后权威落盘。当前 Server tests: 47 passed；Web tests: 75 passed. |
+| 开发房间删除与踢人 | ✅ | `/dev/status` 确认启用后才显示主页 Token 面板；删除支持 lobby/playing/finished，踢人仅支持 lobby；连接中删除、匿名同步和延迟写入不会复活房间，快速复用座位即使复制旧公开数据也会由凭据校验拒绝旧会话；活动房间 metadata 使用按房间版本保护，延迟 fetch 不会被重新标记为当前版本，kick 和正式离座都会在旧写入之后权威落盘。当前 Server tests: 48 passed；Web tests: 75 passed. |
 | 任务出牌 UI | ✅ | 仅任务队员可以操作；Good 只有 Success，Evil 可选 Success/Fail，提交后只向本人显示自己的牌并进入等待。 |
 | 任务历史与公开结果 | ✅ | 中央任务板展示已结算任务的成功/失败状态和公开 Success/Fail 总数，不把任务牌关联到具体玩家。 |
 | 刺杀 UI 与最终结算 | ✅ | 刺客从圆桌座位选择非已知邪恶目标；其他玩家等待。结算展示胜方、原因和目标，并在每个座位公开最终角色。 |
@@ -140,8 +140,10 @@
 
 2026-08-23 自动化验收扩展验证：PR 浏览器门禁覆盖名称与冲突恢复、刷新与秘密提交、四种结局及 10 人响应式操作；Nightly 覆盖 5–10 人矩阵、7 人第四次任务一败/两败和双活跃房间。数据库 Pool 空闲连接错误回归仍保持 GREEN。
 
+2026-08-23 PostgreSQL 网络中断崩溃修复验证：确认 `a90095d` 的范围仅是空闲客户端触发的 `pg.Pool` `error` 事件，不包含活动 `query()` 返回的 rejected Promise。新增 boardgame.io Socket.IO `update`、`sync`、`disconnect`、`chat` 请求错误边界；聚焦回归测试完成 RED（`sync` rejection 逸出）→ GREEN（安全日志并关闭底层连接）；Server tests 48 passed；Server typecheck exit 0。
+
 ```text
-pnpm test ✅ Game 29 passed；test-support 20 passed；Server 47 passed；Web 75 passed
+pnpm test ✅ Game 29 passed；test-support 20 passed；Server 48 passed；Web 75 passed
 pnpm build ✅ Game、Server TypeScript 与 Web TypeScript + Vite build
 pnpm lint ✅ exit 0
 pnpm typecheck ✅ Game、test-support、Server、Web、E2E exit 0
@@ -200,7 +202,7 @@ http://192.168.100.117:5183/
 - 等待大厅的正式离座与解散使用 boardgame.io player credential 授权并在 match queue 内重新校验状态；普通玩家只能释放自己的座位，座位 0 只能解散房间。playing 状态返回冲突并保留凭据；“返回主页”不会释放座位。
 - 隐私窗口通常与普通窗口隔离，但同一隐私会话内的多个 Tab/窗口通常仍共享身份；关闭全部隐私窗口后本地凭据会消失，服务器座位不一定释放。
 - 开发房间控制需要在服务端 `.env.local` 同时设置 `AVALON_DEV_TOOLS=true` 和非空 `AVALON_DEV_ADMIN_TOKEN`；本地测试时由操作者手动输入页面，Token 不得提交、嵌入 Web 配置或持久化，其他场景仍是服务器 secret。
-- PostgreSQL 或 LAN 短暂不可达时，进行中的请求仍可能失败，需要在网络恢复后重试；空闲连接错误只记录错误码和消息，`pg-pool` 会移除失效连接，Node 服务不会再因缺少 Pool 错误监听器退出。
+- PostgreSQL 或 LAN 短暂不可达时，进行中的请求仍可能失败，需要在网络恢复后重试。提交 `a90095d` 只处理空闲客户端的 Pool `error` 事件；活动查询失败是独立的 Promise rejection 路径。当前空闲连接错误由 `PostgresStorage` 记录，boardgame.io Socket.IO 活动请求错误由请求边界记录并关闭底层连接以触发客户端重连；两者都只记录事件、错误码和消息，不记录凭据或请求参数，也不会把数据库故障伪装成房间不存在。
 - 不配置自动超时；断线玩家可能阻塞当前阶段，这是 MVP 的明确设计选择。
 - Debug Panel 是只读诊断入口，默认收起；不能绕过 `playerView` 或修改游戏状态。
 - 游戏页将中央实体桌游式任务板拆为独立 `QuestBoard`，阶段操作、圆桌座位和当前玩家身份仍由 `RoomGamePanel` 统一编排；后续仅在行为继续扩展时再拆分阶段组件。

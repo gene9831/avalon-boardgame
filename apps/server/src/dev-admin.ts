@@ -10,14 +10,63 @@ import {
 import type { MatchDeletionGuard } from './storage/deletion-safe'
 
 type MatchQueue = { add<T>(task: () => Promise<T>): Promise<T> }
-type SocketLike = { id: string; disconnect(close?: boolean): void; on(event: string, listener: (...args: any[]) => void): void }
+type SocketListener = (...args: any[]) => unknown
+type SocketLike = {
+  id: string
+  conn?: { close(): void }
+  disconnect(close?: boolean): void
+  listeners(event: string): SocketListener[]
+  on(event: string, listener: SocketListener): void
+  removeListener(event: string, listener: SocketListener): void
+}
 type NamespaceLike = { on(event: string, listener: (socket: SocketLike) => void): void }
+
+const BOARDGAME_SOCKET_EVENTS = ['update', 'sync', 'disconnect', 'chat'] as const
+
+function handleSocketRequestError(
+  socket: SocketLike,
+  event: string,
+  error: unknown,
+) {
+  const normalizedError = error instanceof Error ? error : new Error(String(error))
+  const code = (normalizedError as NodeJS.ErrnoException).code
+  console.error('Socket.IO request failed', {
+    event,
+    ...(code === undefined ? {} : { code }),
+    message: normalizedError.message,
+  })
+
+  if (socket.conn !== undefined) {
+    socket.conn.close()
+  } else {
+    socket.disconnect(true)
+  }
+}
+
+function wrapSocketRequestListeners(socket: SocketLike) {
+  for (const event of BOARDGAME_SOCKET_EVENTS) {
+    for (const listener of socket.listeners(event)) {
+      socket.removeListener(event, listener)
+      socket.on(event, (...args: any[]) => {
+        try {
+          return Promise.resolve(listener.apply(socket, args)).catch((error: unknown) => {
+            handleSocketRequestError(socket, event, error)
+          })
+        } catch (error) {
+          handleSocketRequestError(socket, event, error)
+        }
+      })
+    }
+  }
+}
 
 export class AvalonSocketRegistry {
   private readonly sockets = new Map<string, { matchID: string; playerID: string; socket: SocketLike }>()
 
   attach(namespace: NamespaceLike) {
     namespace.on('connection', (socket) => {
+      // boardgame.io registers its request listeners before this registry is attached.
+      wrapSocketRequestListeners(socket)
       let tracked: { matchID: string; playerID: string } | undefined
       socket.on('sync', (matchID: string, playerID: string) => {
         tracked = { matchID, playerID }
