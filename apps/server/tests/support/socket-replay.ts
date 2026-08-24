@@ -132,6 +132,9 @@ export async function createSocketReplayHarness(options: {
         case 'startGame':
           client.moves.startGame()
           break
+        case 'confirmIdentityRecognition':
+          client.moves.confirmIdentityRecognition()
+          break
         case 'proposeTeam':
           client.moves.proposeTeam(command.payload.team)
           break

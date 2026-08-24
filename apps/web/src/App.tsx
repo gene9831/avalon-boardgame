@@ -569,6 +569,12 @@ function RoomRoute() {
     }
   }
 
+  const handleConfirmIdentityRecognition = () => {
+    if (gameState?.isActive) {
+      clientRef.current?.moves.confirmIdentityRecognition()
+    }
+  }
+
   const handlePlayQuestCard = (card: QuestCard) => {
     if (gameState?.isActive) {
       clientRef.current?.moves.playQuestCard(card)
@@ -691,6 +697,7 @@ function RoomRoute() {
         onAssassinate={handleAssassinate}
         onBackHome={() => navigate('/')}
         onCastTeamVote={handleCastTeamVote}
+        onConfirmIdentityRecognition={handleConfirmIdentityRecognition}
         onClearLocalSession={handleClearLocalSessionForTesting}
         onProposeTeam={handleProposeTeam}
         onPlayQuestCard={handlePlayQuestCard}
@@ -778,6 +785,7 @@ export interface RoomViewProps {
   onAssassinate: (targetID: PlayerID) => void
   onBackHome: () => void
   onCastTeamVote: (vote: TeamVote) => void
+  onConfirmIdentityRecognition: () => void
   onClearLocalSession: () => void
   onProposeTeam: (team: PlayerID[]) => void
   onPlayQuestCard: (card: QuestCard) => void
@@ -797,6 +805,7 @@ export function RoomView({
   onAssassinate,
   onBackHome,
   onCastTeamVote,
+  onConfirmIdentityRecognition,
   onClearLocalSession,
   onProposeTeam,
   onPlayQuestCard,
@@ -898,6 +907,7 @@ export function RoomView({
         onAssassinate={onAssassinate}
         onBackHome={onBackHome}
         onCastTeamVote={onCastTeamVote}
+        onConfirmIdentityRecognition={onConfirmIdentityRecognition}
         onPlayQuestCard={onPlayQuestCard}
         onProposeTeam={onProposeTeam}
         onReconnect={handleManualReconnect}

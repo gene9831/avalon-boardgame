@@ -27,6 +27,15 @@ _Avoid_: team, side
 **Role visibility**: The information a player is allowed to know about roles and loyalties. A player always knows their own role; Merlin and Evil players receive the limited faction information defined by the MVP rules.
 _Avoid_: permissions, role access
 
+**Identity recognition**: The opening ceremony in which players privately learn their own role, Evil players recognize one another, and Merlin recognizes Evil seats before the first team proposal.
+_Avoid_: night phase, role reveal phase
+
+**Recognition step**: One ordered part of identity recognition: role reveal, Evil recognition, or Merlin recognition. Only that step's participants may view and confirm its private information.
+_Avoid_: recognition round, night action
+
+**Identity confirmation**: A participant's acknowledgement that they have finished viewing the current recognition step. It is not a game decision and carries no strategic choice.
+_Avoid_: identity vote, ready vote
+
 ## Game flow
 
 **Quest team**: The players selected by the current leader to attempt the current quest.

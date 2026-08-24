@@ -94,7 +94,7 @@ async function prepare(statePath: string) {
     client.moves.startGame()
     const started = await waitForClientState(
       client,
-      (state) => state.ctx.phase === 'teamProposal',
+      (state) => state.ctx.phase === 'identityRecognition',
     )
     const role = (started.G as AvalonPlayerView).viewer.role
     if (role === null) throw new Error('Restart probe did not receive a role')
@@ -141,7 +141,8 @@ async function verify(statePath: string) {
     client.start()
     const restored = await waitForClientState(
       client,
-      (state) => state.isConnected && state.ctx.phase === 'teamProposal',
+      (state) =>
+        state.isConnected && state.ctx.phase === 'identityRecognition',
     )
     const restoredGame = restored.G as AvalonPlayerView
     const viewer = restoredGame.viewer

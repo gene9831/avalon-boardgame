@@ -24,7 +24,11 @@ export interface AvalonRuleDriver
 export function createAvalonRuleDriver(options: AvalonRuleDriverOptions) {
   const { gameSeed } = deriveAvalonSeeds(options.masterSeed)
   const client = Client({
-    game: createAvalonGame({ seed: gameSeed }),
+    game: createAvalonGame({
+      now: () => 0,
+      seed: gameSeed,
+      serverInstanceID: 'replay-server',
+    }),
     numPlayers: options.playerCount,
     playerID: '0',
   })
@@ -35,6 +39,9 @@ export function createAvalonRuleDriver(options: AvalonRuleDriverOptions) {
       switch (command.command) {
         case 'startGame':
           client.moves.startGame()
+          return
+        case 'confirmIdentityRecognition':
+          client.moves.confirmIdentityRecognition()
           return
         case 'proposeTeam':
           client.moves.proposeTeam(command.payload.team)

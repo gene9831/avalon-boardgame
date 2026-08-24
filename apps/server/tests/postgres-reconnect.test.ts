@@ -93,7 +93,7 @@ describeDatabase('PostgreSQL credential reconnection', () => {
       client.moves.startGame()
       const started = await waitForClientState(
         client,
-        (state) => state.ctx.phase === 'teamProposal',
+        (state) => state.ctx.phase === 'identityRecognition',
       )
       const originalRole = (started.G as AvalonPlayerView).viewer.role
 
@@ -110,7 +110,8 @@ describeDatabase('PostgreSQL credential reconnection', () => {
       client.start()
       const restored = await waitForClientState(
         client,
-        (state) => state.isConnected && state.ctx.phase === 'teamProposal',
+        (state) =>
+          state.isConnected && state.ctx.phase === 'identityRecognition',
       )
 
       expect((restored.G as AvalonPlayerView).viewer.role).toBe(originalRole)

@@ -359,12 +359,37 @@ describe('Avalon server', () => {
       clients[0].moves.startGame()
       const states = await Promise.all(
         clients.map((client) =>
-          waitForClientState(client, (state) => state.ctx.phase === 'teamProposal'),
+          waitForClientState(
+            client,
+            (state) => state.ctx.phase === 'identityRecognition',
+          ),
         ),
       )
 
       for (const state of states) {
         expect(state.G).not.toHaveProperty('secret')
+      }
+
+      clients[2].moves.confirmIdentityRecognition()
+      const confirmedStates = await Promise.all(
+        clients.map((client) =>
+          waitForClientState(
+            client,
+            (state) =>
+              (state.G as AvalonPlayerView).identityRecognition
+                ?.confirmedCount === 1,
+          ),
+        ),
+      )
+
+      for (const state of confirmedStates) {
+        expect(state.ctx._activePlayersNumMoves).toEqual({
+          '0': 0,
+          '1': 0,
+          '2': 0,
+          '3': 0,
+          '4': 0,
+        })
       }
     } finally {
       clients.forEach((client) => client.stop())
@@ -407,7 +432,7 @@ describe('Avalon server', () => {
       client.moves.startGame()
       const started = await waitForClientState(
         client,
-        (state) => state.ctx.phase === 'teamProposal',
+        (state) => state.ctx.phase === 'identityRecognition',
       )
       const originalRole = (started.G as AvalonPlayerView).viewer.role
 
@@ -424,7 +449,8 @@ describe('Avalon server', () => {
       client.start()
       const reconnected = await waitForClientState(
         client,
-        (state) => state.isConnected && state.ctx.phase === 'teamProposal',
+        (state) =>
+          state.isConnected && state.ctx.phase === 'identityRecognition',
       )
 
       expect((reconnected.G as AvalonPlayerView).viewer.role).toBe(originalRole)

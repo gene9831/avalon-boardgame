@@ -8,6 +8,7 @@ import {
 } from '@avalon/game'
 
 import { createAvalonRuleDriver } from './rule-driver'
+import { getIdentityRecognitionCommands } from './identity-recognition'
 import { generateSeededDecisions } from './seed'
 import type { AvalonCommand } from './transcript'
 
@@ -66,6 +67,11 @@ export function playGeneratedGame(options: GeneratedGameOptions) {
     switch (state.ctx.phase) {
       case 'lobby':
         dispatch({ actor: '0', command: 'startGame' })
+        break
+      case 'identityRecognition':
+        for (const command of getIdentityRecognitionCommands(G)) {
+          dispatch(command)
+        }
         break
       case 'teamProposal': {
         if (G.leaderID === null) {
