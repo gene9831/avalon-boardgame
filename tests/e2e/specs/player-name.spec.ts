@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-import { createRoom } from '../support/browser-replay'
+import { createRoom, setPlayerProfileName } from '../support/browser-replay'
 
 function roomCard(page: Page, matchID: string) {
   return page
@@ -8,7 +8,7 @@ function roomCard(page: Page, matchID: string) {
     .locator('xpath=ancestor::article')
 }
 
-test('name cancellation, persistence, prefill, and credential re-entry work', async ({
+test('profile persistence, room locking, and credential re-entry work', async ({
   browser,
 }) => {
   const context = await browser.newContext()
@@ -16,37 +16,42 @@ test('name cancellation, persistence, prefill, and credential re-entry work', as
 
   try {
     await page.goto('/')
+    await setPlayerProfileName(page, 'Saved Arthur')
     await page.getByRole('button', { name: '创建房间' }).click()
-    const nameInput = page.getByRole('dialog').getByLabel('玩家名称')
-    await nameInput.fill('Cancelled Name')
-    await page.getByRole('button', { name: '取消' }).click()
-    await expect(page.getByRole('dialog')).not.toBeVisible()
-
-    await page.getByRole('button', { name: '创建房间' }).click()
-    await expect(nameInput).toHaveValue('')
-    await nameInput.fill('Saved Arthur')
-    await page.getByRole('button', { name: '确认创建' }).click()
+    const createDialog = page.getByRole('dialog', { name: '创建一局阿瓦隆' })
+    await createDialog.getByRole('button', { name: '5', exact: true }).click()
+    await createDialog.getByRole('button', { name: '创建房间' }).click()
     await expect(page).toHaveURL(/\/rooms\/[^/]+$/)
     const matchID = decodeURIComponent(new URL(page.url()).pathname.split('/').at(-1)!)
 
+    await page.getByRole('button', { name: '打开用户中心' }).click()
+    const lockedProfile = page.getByRole('dialog', { name: '用户中心' })
+    await expect(lockedProfile.getByText('Saved Arthur', { exact: true })).toBeVisible()
+    await expect(lockedProfile.getByText('退出房间后可修改名称和头像。')).toBeVisible()
+    await expect(lockedProfile.getByRole('textbox')).toHaveCount(0)
+    await lockedProfile.getByRole('button', { name: '关闭用户中心' }).click()
+
     await page.getByRole('button', { name: '返回主页' }).click()
+    await page.getByRole('button', { name: '打开用户中心' }).click()
+    const retainedSeatProfile = page.getByRole('dialog', { name: '用户中心' })
+    await expect(retainedSeatProfile.getByText('Saved Arthur', { exact: true })).toBeVisible()
+    await expect(retainedSeatProfile.getByRole('textbox')).toHaveCount(0)
+    await retainedSeatProfile.getByRole('button', { name: '关闭用户中心' }).click()
     await roomCard(page, matchID).getByRole('button', { name: '进入' }).click()
     await expect(page).toHaveURL(new RegExp(`/rooms/${matchID}$`))
-    await expect(page.getByRole('dialog')).toHaveCount(0)
 
     await page.getByRole('button', { name: '打开开发控制' }).click()
     page.once('dialog', (dialog) => dialog.accept())
     await page.getByRole('button', { name: '清除本地凭据（测试）' }).click()
     await expect(page).toHaveURL('/')
-    await page.getByRole('button', { name: '创建房间' }).click()
-    await expect(nameInput).toHaveValue('Saved Arthur')
-    await page.getByRole('button', { name: '取消' }).click()
+    await page.getByRole('button', { name: '打开用户中心' }).click()
+    await expect(page.getByRole('dialog', { name: '用户中心' }).getByRole('textbox', { name: '显示名称' })).toHaveValue('Saved Arthur')
   } finally {
     await context.close()
   }
 })
 
-test('duplicate name stays editable in the dialog', async ({ browser }) => {
+test('duplicate names can occupy distinct seats', async ({ browser }) => {
   const hostContext = await browser.newContext()
   const joinContext = await browser.newContext()
   const hostPage = await hostContext.newPage()
@@ -55,20 +60,14 @@ test('duplicate name stays editable in the dialog', async ({ browser }) => {
   try {
     const matchID = await createRoom(hostPage, 5, 'Duplicate Arthur')
     await joinPage.goto('/')
+    await setPlayerProfileName(joinPage, 'Duplicate Arthur')
     const card = roomCard(joinPage, matchID)
     await card.getByLabel(`选择 ${matchID} 的座位`).selectOption('1')
     await card.getByRole('button', { name: '加入' }).click()
-    const input = joinPage.getByRole('dialog').getByLabel('玩家名称')
-    await input.fill('Duplicate Arthur')
-    await joinPage.getByRole('button', { name: '确认加入' }).click()
-    await expect(
-      joinPage.getByText('这个名字已被本房间的其他玩家使用。'),
-    ).toBeVisible()
-    await expect(input).toHaveValue('Duplicate Arthur')
-
-    await input.fill('Unique Lancelot')
-    await joinPage.getByRole('button', { name: '确认加入' }).click()
     await expect(joinPage).toHaveURL(new RegExp(`/rooms/${matchID}$`))
+    await expect(
+      joinPage.locator('[data-round-table-nameplate]').filter({ hasText: 'Duplicate Arthur' }),
+    ).toHaveCount(2)
   } finally {
     await Promise.all([hostContext.close(), joinContext.close()])
   }
@@ -89,15 +88,14 @@ test('a concurrent seat loser can refresh and join another seat', async ({ brows
       [secondPage, 'Race Two'],
     ] as const) {
       await page.goto('/')
+      await setPlayerProfileName(page, name)
       const card = roomCard(page, matchID)
       await card.getByLabel(`选择 ${matchID} 的座位`).selectOption('1')
-      await card.getByRole('button', { name: '加入' }).click()
-      await page.getByRole('dialog').getByLabel('玩家名称').fill(name)
     }
 
     await Promise.all([
-      firstPage.getByRole('button', { name: '确认加入' }).click(),
-      secondPage.getByRole('button', { name: '确认加入' }).click(),
+      roomCard(firstPage, matchID).getByRole('button', { name: '加入' }).click(),
+      roomCard(secondPage, matchID).getByRole('button', { name: '加入' }).click(),
     ])
     await expect.poll(() =>
       [firstPage, secondPage].filter((page) =>
@@ -114,10 +112,6 @@ test('a concurrent seat loser can refresh and join another seat', async ({ brows
     const card = roomCard(loser, matchID)
     await card.getByLabel(`选择 ${matchID} 的座位`).selectOption('2')
     await card.getByRole('button', { name: '加入' }).click()
-    const recoveryInput = loser.getByRole('dialog').getByLabel('玩家名称')
-    await expect(recoveryInput).toHaveValue('')
-    await recoveryInput.fill('Race Recovery')
-    await loser.getByRole('button', { name: '确认加入' }).click()
     await expect(loser).toHaveURL(new RegExp(`/rooms/${matchID}$`))
   } finally {
     await Promise.all(contexts.map((context) => context.close()))

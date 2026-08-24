@@ -13,10 +13,13 @@ The browser uses two routes:
   final role reveal, reconnect, and returning home. Returning home keeps this
   browser's seat credentials so the room can be reopened.
 
-Each browser profile uses a stable local client ID when joining. The server
-rejects that client ID (and duplicate player names) if it tries to occupy a
-second seat in the same room. This is a seat-binding guard for the no-account
-LAN MVP, not an account-level identity system.
+Each browser has a local cosmetic profile with a random default name and avatar,
+plus a stable client ID used when joining. The profile can be edited outside a
+room and is locked while seated. Duplicate display names are allowed because
+seat numbers remain the stable public identity; the server rejects a client ID
+if the same browser tries to occupy a second seat in one room. This is a
+seat-binding guard for the no-account LAN MVP, not an account-level identity
+system.
 
 Run it from the workspace root:
 
@@ -29,4 +32,4 @@ The Vite server binds to `0.0.0.0` for LAN testing. By default, the browser deri
 - Lobby API: `http://<browser-host>:8001`
 - Game transport: `http://<browser-host>:8000`
 
-When the web client and game server run on different hosts, copy `.env.example` to `.env.local` and set `VITE_LOBBY_URL` and `VITE_GAME_URL` explicitly. The browser stores only its room ID, seat ID, player name, and boardgame.io reconnect credentials in local storage; game secrets remain server-side.
+When the web client and game server run on different hosts, copy `.env.example` to `.env.local` and set `VITE_LOBBY_URL` and `VITE_GAME_URL` explicitly. Local storage holds the browser profile (name and avatar), client and public session IDs, preferred player count, room and seat IDs, and the boardgame.io seat credential needed for reconnecting. Game secrets and other players' credentials remain server-side.

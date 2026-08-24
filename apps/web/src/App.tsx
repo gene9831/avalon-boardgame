@@ -29,13 +29,17 @@ import {
 
 import { webConfig } from './config'
 import { ConnectionRecoveryTimer } from './connection-recovery'
+import { CreateGameDialog } from './CreateGameDialog'
+import {
+  loadPreferredPlayerCount,
+  savePreferredPlayerCount,
+} from './create-game-preference'
 import { getClientID } from './client-identity'
 import { createDevToolsClient } from './dev-tools'
 import { useDevTools } from './use-dev-tools'
 import { executePendingJoin, type PendingJoin } from './join-flow'
 import { classifyJoinError } from './join-error'
 import { LobbyView } from './LobbyView'
-import { PlayerNameDialog } from './PlayerNameDialog'
 import { RoomDevTools } from './RoomDevTools'
 import { RoomExitDialog } from './RoomExitDialog'
 import { RoomGamePanel } from './RoomGamePanel'
@@ -60,10 +64,18 @@ import {
   type LobbyPlayer,
 } from './lobby'
 import {
-  getPlayerNameValidationError,
-  loadPlayerName,
-  savePlayerName,
-} from './player-name'
+  loadOrCreatePlayerProfile,
+  PLAYER_PROFILE_KEY,
+  savePlayerProfile,
+  type PlayerProfile,
+} from './player-profile'
+import { getSeatAvatarID } from './seat-avatar'
+import {
+  buildGameLogEntries,
+  buildPresenceLogChanges,
+  createPresenceBaselineEntry,
+  type RoomLogEntry,
+} from './room-log'
 import {
   LAST_ROOM_SESSION_KEY,
   ROOM_SESSION_KEY,
@@ -81,6 +93,8 @@ import {
   fetchRoomSummaries,
   type AvalonRoomSummary,
 } from './room-directory'
+import { ToastProvider } from './toast'
+import { useToast } from './toast-context'
 
 type AvalonClient = ReturnType<typeof Client<AvalonG>>
 type AvalonRawClientState = NonNullable<ReturnType<AvalonClient['getState']>>
@@ -106,17 +120,49 @@ function roomInvalidationNotice(error: unknown) {
 
 function App() {
   return (
+    <ToastProvider>
+      <AppRoutes />
+    </ToastProvider>
+  )
+}
+
+function AppRoutes() {
+  const { pushToast } = useToast()
+  const [profile, setProfile] = useState(() => loadOrCreatePlayerProfile())
+  const handleSaveProfile = useCallback((nextProfile: PlayerProfile) => {
+    const savedProfile = savePlayerProfile(nextProfile)
+    setProfile(savedProfile)
+    pushToast({ message: '用户资料已保存。', tone: 'success' })
+  }, [pushToast])
+
+  useEffect(() => {
+    const handleProfileStorage = (event: StorageEvent) => {
+      if (event.storageArea !== window.localStorage || event.key !== PLAYER_PROFILE_KEY) return
+      setProfile(loadOrCreatePlayerProfile())
+    }
+
+    window.addEventListener('storage', handleProfileStorage)
+    return () => window.removeEventListener('storage', handleProfileStorage)
+  }, [])
+
+  return (
     <BrowserRouter>
       <Routes>
-        <Route element={<LobbyRoute />} path="/" />
-        <Route element={<RoomRoute />} path="/rooms/:matchID" />
+        <Route element={<LobbyRoute onSaveProfile={handleSaveProfile} profile={profile} />} path="/" />
+        <Route element={<RoomRoute onSaveProfile={handleSaveProfile} profile={profile} />} path="/rooms/:matchID" />
         <Route element={<Navigate replace to="/" />} path="*" />
       </Routes>
     </BrowserRouter>
   )
 }
 
-function LobbyRoute() {
+function LobbyRoute({
+  onSaveProfile,
+  profile,
+}: {
+  onSaveProfile: (profile: PlayerProfile) => void
+  profile: PlayerProfile
+}) {
   const location = useLocation()
   const lobby = useMemo(() => createAvalonLobbyClient(), [])
   const devTools = useMemo(() => createDevToolsClient(webConfig.lobbyURL), [])
@@ -125,27 +171,22 @@ function LobbyRoute() {
   const [activeRoomSessions, setActiveRoomSessions] = useState<RoomSession[]>([])
   const [roomAccessStatus, setRoomAccessStatus] = useState<'checking' | 'ready' | 'unavailable'>('checking')
   const [roomAccessError, setRoomAccessError] = useState<string | null>(null)
-  const [pendingJoin, setPendingJoin] = useState<PendingJoin | null>(null)
-  const [nameDialogOpen, setNameDialogOpen] = useState(false)
-  const [nameDialogValue, setNameDialogValue] = useState('')
-  const [nameDialogError, setNameDialogError] = useState<string | null>(null)
-  const [numPlayers, setNumPlayers] = useState(5)
+  const { pushToast } = useToast()
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [numPlayers, setNumPlayers] = useState(loadPreferredPlayerCount)
   const [matches, setMatches] = useState<AvalonRoomSummary[]>([])
   const [selectedSeats, setSelectedSeats] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(() =>
-    getRoomNavigationNotice(location.state),
-  )
   const roomNotice = getRoomNavigationNotice(location.state)
   useEffect(() => {
     if (roomNotice === null) return
 
-    setError(roomNotice)
+    pushToast({ message: roomNotice, tone: 'info' })
     navigate(location.pathname, {
       replace: true,
       state: consumeRoomNavigationNotice(location.state),
     })
-  }, [location.pathname, location.state, navigate, roomNotice])
+  }, [location.pathname, location.state, navigate, pushToast, roomNotice])
   const {
     enabled: devToolsEnabled,
     error: devToolsError,
@@ -182,9 +223,14 @@ function LobbyRoute() {
     } catch (requestError) {
       if (generation !== refreshGenerationRef.current) return
       setRoomAccessStatus('unavailable')
-      setError(`无法加载房间列表：${errorMessage(requestError)}`)
+      setRoomAccessError(`无法加载房间列表：${errorMessage(requestError)}`)
     }
   }, [])
+
+  useEffect(() => {
+    if (roomAccessError === null) return
+    pushToast({ message: roomAccessError, tone: 'error' })
+  }, [pushToast, roomAccessError])
 
   useEffect(() => {
     void refreshMatches()
@@ -202,10 +248,7 @@ function LobbyRoute() {
         !event.key.startsWith(`${ROOM_SESSION_KEY}:`)
       ) return
 
-      setPendingJoin(null)
-      setNameDialogOpen(false)
-      setNameDialogValue('')
-      setNameDialogError(null)
+      setCreateDialogOpen(false)
       setRoomAccessStatus('checking')
       void refreshMatches()
     }
@@ -215,90 +258,53 @@ function LobbyRoute() {
   }, [refreshMatches])
 
   const executePendingJoinRequest = useCallback(
-    async (intent: PendingJoin, playerName: string) => {
+    async (intent: PendingJoin) => {
       if (requestInFlightRef.current || roomAccessLocked) return
 
       requestInFlightRef.current = true
       setBusy(true)
-      setError(null)
-      setNameDialogError(null)
 
       try {
         const session = await executePendingJoin(lobby, intent, {
+          avatarID: profile.avatarID,
           clientID,
           gameName: AVALON_GAME_NAME,
-          playerName,
+          playerName: profile.name,
         })
-        savePlayerName(session.playerName)
         saveRoomSession(session)
-        setPendingJoin(null)
-        setNameDialogOpen(false)
-        setNameDialogValue('')
-        setNameDialogError(null)
+        setCreateDialogOpen(false)
         navigate(`/rooms/${encodeURIComponent(session.matchID)}`)
       } catch (requestError) {
         const joinError = classifyJoinError(requestError)
-        if (joinError.placement === 'dialog') {
-          setNameDialogValue(playerName)
-          setNameDialogError(joinError.message)
-          setNameDialogOpen(true)
-        } else {
-          setPendingJoin(null)
-          setNameDialogOpen(false)
-          setNameDialogValue('')
-          setNameDialogError(null)
-          setError(joinError.message)
-          if (joinError.refreshRooms) void refreshMatches()
+        pushToast({ message: joinError.message, tone: 'error' })
+        if (joinError.refreshRooms) {
+          void refreshMatches()
         }
       } finally {
         requestInFlightRef.current = false
         setBusy(false)
       }
     },
-    [clientID, lobby, navigate, refreshMatches, roomAccessLocked],
-  )
-
-  const beginPendingJoin = useCallback(
-    (intent: PendingJoin) => {
-      if (requestInFlightRef.current || roomAccessLocked) return
-
-      const preferredName = loadPlayerName()
-      setPendingJoin(intent)
-      setError(null)
-      setNameDialogValue(preferredName ?? '')
-      setNameDialogError(null)
-      setNameDialogOpen(true)
-    },
-    [roomAccessLocked],
+    [clientID, lobby, navigate, profile, pushToast, refreshMatches, roomAccessLocked],
   )
 
   const handleJoin = (matchID: string, playerID: string) => {
-    beginPendingJoin({ type: 'join', matchID, playerID })
+    void executePendingJoinRequest({ type: 'join', matchID, playerID })
   }
 
   const handleCreate = () => {
-    beginPendingJoin({ type: 'create', numPlayers })
+    if (!roomAccessLocked) setCreateDialogOpen(true)
   }
 
-  const handleNameDialogCancel = () => {
+  const handleCreateDialogCancel = () => {
     if (requestInFlightRef.current) return
-
-    setPendingJoin(null)
-    setNameDialogOpen(false)
-    setNameDialogValue('')
-    setNameDialogError(null)
+    setCreateDialogOpen(false)
   }
 
-  const handleNameDialogSubmit = () => {
-    if (pendingJoin === null || requestInFlightRef.current || roomAccessLocked) return
-
-    const validationError = getPlayerNameValidationError(nameDialogValue)
-    if (validationError !== null) {
-      setNameDialogError(validationError)
-      return
-    }
-
-    void executePendingJoinRequest(pendingJoin, nameDialogValue)
+  const handleCreateDialogConfirm = () => {
+    if (requestInFlightRef.current || roomAccessLocked) return
+    savePreferredPlayerCount(numPlayers)
+    void executePendingJoinRequest({ type: 'create', numPlayers })
   }
 
   const handleEnterRoom = (matchID: string) => {
@@ -322,44 +328,48 @@ function LobbyRoute() {
       <LobbyView
         activeRoomSessions={activeRoomSessions}
         busy={busy}
-        error={roomNotice ?? error ?? roomAccessError}
         devToolsError={devToolsError}
         devToken={devToken}
         devToolsEnabled={devToolsEnabled}
         matches={matches}
-        numPlayers={numPlayers}
         onCreate={handleCreate}
         onEnterRoom={handleEnterRoom}
         onJoin={handleJoin}
         onRefresh={() => void refreshMatches()}
+        onSaveProfile={onSaveProfile}
         onDeleteRoom={handleDeleteRoom}
         onDevTokenChange={setDevToken}
         roomAccessLocked={roomAccessLocked}
         roomAccessPending={roomAccessPending}
         roomAccessUnavailable={roomAccessUnavailable}
+        profile={profile}
         selectedSeats={selectedSeats}
-        setNumPlayers={setNumPlayers}
         setSelectedSeats={setSelectedSeats}
       />
-      <PlayerNameDialog
-        action={pendingJoin?.type ?? 'join'}
+      <CreateGameDialog
         busy={busy}
-        error={nameDialogError}
-        onCancel={handleNameDialogCancel}
-        onChange={setNameDialogValue}
-        onSubmit={handleNameDialogSubmit}
-        open={nameDialogOpen}
-        value={nameDialogValue}
+        numPlayers={numPlayers}
+        onCancel={handleCreateDialogCancel}
+        onConfirm={handleCreateDialogConfirm}
+        onPlayerCountChange={setNumPlayers}
+        open={createDialogOpen}
       />
     </>
   )
 }
 
-function RoomRoute() {
+function RoomRoute({
+  onSaveProfile,
+  profile,
+}: {
+  onSaveProfile: (profile: PlayerProfile) => void
+  profile: PlayerProfile
+}) {
   const { matchID = '' } = useParams()
   const navigate = useNavigate()
   const lobby = useMemo(() => createAvalonLobbyClient(), [])
   const devTools = useMemo(() => createDevToolsClient(webConfig.lobbyURL), [])
+  const { pushToast } = useToast()
   const clientRef = useRef<AvalonClient | null>(null)
   const routeGenerationRef = useRef(0)
   const [session, setSession] = useState<RoomSession | null>(() =>
@@ -367,10 +377,8 @@ function RoomRoute() {
   )
   const [room, setRoom] = useState<AvalonMatch | null>(null)
   const [gameState, setGameState] = useState<AvalonClientState | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [roomExitDialogOpen, setRoomExitDialogOpen] = useState(false)
   const [roomExitBusy, setRoomExitBusy] = useState(false)
-  const [roomExitError, setRoomExitError] = useState<string | null>(null)
 
   const invalidateSession = useCallback(
     (reason: string, generation: number) => {
@@ -379,7 +387,6 @@ function RoomRoute() {
       stopCurrentClient(clientRef)
       clearRoomSession(matchID)
       setSession(null)
-      setError(reason)
       navigate('/', { state: { roomNotice: reason } })
     },
     [matchID, navigate],
@@ -415,11 +422,14 @@ function RoomRoute() {
           return
         }
         if (!silent) {
-          setError(`无法加载房间：${errorMessage(requestError)}`)
+          pushToast({
+            message: `无法加载房间：${errorMessage(requestError)}`,
+            tone: 'error',
+          })
         }
       }
     },
-    [invalidateSession, lobby],
+    [invalidateSession, lobby, pushToast],
   )
 
   useEffect(() => {
@@ -429,10 +439,8 @@ function RoomRoute() {
     })
     setRoom(null)
     setGameState(null)
-    setError(null)
     setRoomExitDialogOpen(false)
     setRoomExitBusy(false)
-    setRoomExitError(null)
   }, [matchID])
 
   const routeSession = session?.matchID === matchID ? session : null
@@ -452,7 +460,6 @@ function RoomRoute() {
       setSession(null)
       setRoomExitDialogOpen(false)
       setRoomExitBusy(false)
-      setRoomExitError(null)
       navigate('/', {
         state: { roomNotice: '本机房间会话已结束，已返回主页。' },
       })
@@ -528,7 +535,10 @@ function RoomRoute() {
           if (invalidationNotice !== null) {
             invalidateSession(invalidationNotice, generation)
           } else {
-            setError(`无法连接房间：${errorMessage(requestError)}`)
+            pushToast({
+              message: `无法连接房间：${errorMessage(requestError)}`,
+              tone: 'error',
+            })
           }
         }
       }
@@ -549,7 +559,7 @@ function RoomRoute() {
       unsubscribe()
       if (client !== null) stopCurrentClient(clientRef, client)
     }
-  }, [invalidateSession, lobby, matchID, refreshRoom, routeSession])
+  }, [invalidateSession, lobby, matchID, pushToast, refreshRoom, routeSession])
 
   const handleStart = () => {
     if (gameState?.isActive && routeSession?.playerID === '0') {
@@ -603,14 +613,12 @@ function RoomRoute() {
     stopCurrentClient(clientRef)
     clearRoomSession(matchID)
     setSession(null)
-    setError(null)
     navigate('/')
   }
 
   const handleRequestRoomExit = () => {
     if (routeSession === null || gameState?.ctx.phase !== 'lobby' || roomExitBusy) return
 
-    setRoomExitError(null)
     setRoomExitDialogOpen(true)
   }
 
@@ -618,7 +626,6 @@ function RoomRoute() {
     if (roomExitBusy) return
 
     setRoomExitDialogOpen(false)
-    setRoomExitError(null)
   }
 
   const handleConfirmRoomExit = async () => {
@@ -628,7 +635,6 @@ function RoomRoute() {
     const generation = routeGenerationRef.current
     const isHost = currentSession.playerID === '0'
     setRoomExitBusy(true)
-    setRoomExitError(null)
 
     try {
       if (isHost) {
@@ -651,7 +657,10 @@ function RoomRoute() {
       })
     } catch (actionError) {
       if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
-      setRoomExitError(getRoomExitErrorMessage(actionError, isHost))
+      pushToast({
+        message: getRoomExitErrorMessage(actionError, isHost),
+        tone: 'error',
+      })
     } finally {
       if (isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) {
         setRoomExitBusy(false)
@@ -692,7 +701,6 @@ function RoomRoute() {
   return (
     <>
       <RoomView
-        error={error}
         gameState={gameState}
         onAssassinate={handleAssassinate}
         onBackHome={() => navigate('/')}
@@ -706,13 +714,14 @@ function RoomRoute() {
         onStart={handleStart}
         onDeleteRoom={handleDeleteRoom}
         onKickPlayer={handleKickPlayer}
+        onSaveProfile={onSaveProfile}
+        profile={profile}
         room={room}
         roomExitBusy={roomExitBusy}
         session={routeSession}
       />
       <RoomExitDialog
         busy={roomExitBusy}
-        error={roomExitError}
         isHost={routeSession.playerID === '0'}
         onCancel={handleCancelRoomExit}
         onConfirm={() => void handleConfirmRoomExit()}
@@ -748,11 +757,9 @@ function RoomAccessView({
 }
 
 function RoomLoadingContent({
-  error,
   matchID,
   onBackHome,
 }: {
-  error: string | null
   matchID: string
   onBackHome: () => void
 }) {
@@ -766,7 +773,6 @@ function RoomLoadingContent({
         <p className="text-sm leading-6 text-slate-300">
           正在读取房间状态并建立实时连接，请稍候。
         </p>
-        <ErrorNotice error={error} />
         <button
           className="mt-6 rounded-xl border border-white/15 px-4 py-3 font-semibold text-slate-200 transition hover:border-amber-300/60 hover:text-white"
           onClick={onBackHome}
@@ -780,7 +786,6 @@ function RoomLoadingContent({
 }
 
 export interface RoomViewProps {
-  error: string | null
   gameState: AvalonClientState | null
   onAssassinate: (targetID: PlayerID) => void
   onBackHome: () => void
@@ -794,13 +799,14 @@ export interface RoomViewProps {
   onStart: () => void
   onDeleteRoom: (token: string) => Promise<void>
   onKickPlayer: (playerID: string, token: string) => Promise<void>
+  onSaveProfile: (profile: PlayerProfile) => void
+  profile: PlayerProfile
   room: AvalonMatch | null
   roomExitBusy: boolean
   session: RoomSession
 }
 
 export function RoomView({
-  error,
   gameState,
   onAssassinate,
   onBackHome,
@@ -814,11 +820,14 @@ export function RoomView({
   onStart,
   onDeleteRoom,
   onKickPlayer,
+  onSaveProfile,
+  profile,
   room,
   roomExitBusy,
   session,
 }: RoomViewProps) {
   const connected = gameState?.isConnected === true
+  const logEntries = useRoomLogEntries(room, gameState)
   const {
     beginManualReconnect,
     manualReconnectAvailable,
@@ -832,7 +841,6 @@ export function RoomView({
     return (
       <ImmersiveLobbyShell developmentControls={null}>
         <RoomLoadingContent
-          error={error}
           matchID={session.matchID}
           onBackHome={onBackHome}
         />
@@ -851,6 +859,16 @@ export function RoomView({
     session.playerID === '0' &&
     phase === 'lobby' &&
     isFull
+  const currentRoomPlayer = room.players.find(
+    ({ id }) => String(id) === session.playerID,
+  )
+  const roomProfile: PlayerProfile = {
+    avatarID: getSeatAvatarID(
+      currentRoomPlayer?.data,
+      Number(session.playerID),
+    ),
+    name: currentRoomPlayer?.name ?? session.playerName ?? profile.name,
+  }
 
   if (phase === 'lobby') {
     return (
@@ -871,6 +889,7 @@ export function RoomView({
           connected={connected}
           currentPlayerID={session.playerID}
           manualReconnectAvailable={manualReconnectAvailable}
+          logEntries={logEntries}
           matchID={room.matchID}
           numPlayers={numPlayers}
           occupiedPlayerIDs={occupiedPlayerIDs}
@@ -878,7 +897,9 @@ export function RoomView({
           onReconnect={handleManualReconnect}
           onRequestRoomExit={onRequestRoomExit}
           onStart={onStart}
+          onSaveProfile={onSaveProfile}
           players={room.players}
+          profile={roomProfile}
           roomExitBusy={roomExitBusy}
         />
       </ImmersiveLobbyShell>
@@ -903,6 +924,7 @@ export function RoomView({
         connected={connected}
         game={gameState.G}
         manualReconnectAvailable={manualReconnectAvailable}
+        logEntries={logEntries}
         matchID={room.matchID}
         onAssassinate={onAssassinate}
         onBackHome={onBackHome}
@@ -911,12 +933,70 @@ export function RoomView({
         onPlayQuestCard={onPlayQuestCard}
         onProposeTeam={onProposeTeam}
         onReconnect={handleManualReconnect}
+        onSaveProfile={onSaveProfile}
         phase={phase ?? 'teamProposal'}
         playerID={session.playerID}
         players={room.players}
+        profile={roomProfile}
       />
     </ImmersiveLobbyShell>
   )
+}
+
+function useRoomLogEntries(
+  room: AvalonMatch | null,
+  gameState: AvalonClientState | null,
+) {
+  const [presenceEntries, setPresenceEntries] = useState<RoomLogEntry[]>([])
+  const presenceRef = useRef<{
+    matchID: string
+    nextIndex: number
+    players: readonly LobbyPlayer[]
+  } | null>(null)
+  const snapshotPlayers = (players: readonly LobbyPlayer[]) =>
+    players.map((player) => ({ ...player }))
+
+  useEffect(() => {
+    if (room === null) return
+
+    const previous = presenceRef.current
+    if (previous === null || previous.matchID !== room.matchID) {
+      setPresenceEntries([createPresenceBaselineEntry(room.players)])
+      presenceRef.current = {
+        matchID: room.matchID,
+        nextIndex: 1,
+        players: snapshotPlayers(room.players),
+      }
+      return
+    }
+
+    const changes = buildPresenceLogChanges(
+      previous.players,
+      room.players,
+      previous.nextIndex,
+    )
+    if (changes.length > 0) {
+      setPresenceEntries((entries) => [...entries, ...changes])
+    }
+    presenceRef.current = {
+      matchID: room.matchID,
+      nextIndex: previous.nextIndex + changes.length,
+      players: snapshotPlayers(room.players),
+    }
+  }, [room])
+
+  return useMemo(() => {
+    if (room === null || gameState === null) return presenceEntries
+
+    return [
+      ...presenceEntries,
+      ...buildGameLogEntries(
+        gameState.G,
+        room.players,
+        gameState.ctx.phase ?? 'teamProposal',
+      ),
+    ]
+  }, [gameState, presenceEntries, room])
 }
 
 function ImmersiveLobbyShell({
@@ -993,16 +1073,6 @@ function PageShell({
         </footer>
       </div>
     </main>
-  )
-}
-
-function ErrorNotice({ error }: { error: string | null }) {
-  if (error === null) return null
-
-  return (
-    <div className="mt-6 rounded-2xl border border-rose-300/25 bg-rose-300/10 px-4 py-3 text-sm text-rose-100">
-      {error}
-    </div>
   )
 }
 

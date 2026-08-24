@@ -12,7 +12,6 @@ vi.mock('../src/config', () => ({
 
 function renderRoomView(overrides: Partial<RoomViewProps> = {}) {
   const props: RoomViewProps = {
-    error: null,
     gameState: null,
     onAssassinate: vi.fn(),
     onBackHome: vi.fn(),

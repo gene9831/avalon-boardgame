@@ -157,27 +157,39 @@ function expectWideSeatMetricsAtLeast({
   )
 }
 
-test('lobby creation controls remain on one row at narrow widths', async ({ page }) => {
+test('the create-game configuration remains fully usable at narrow widths', async ({ page }) => {
   await page.goto('/')
+  await expect(page.getByRole('button', { name: '创建房间' })).toBeEnabled()
 
   for (const viewport of [
     { width: 320, height: 568 },
     { width: 578, height: 761 },
   ]) {
     await page.setViewportSize(viewport)
+    await page.getByRole('button', { name: '创建房间' }).click()
+    const dialog = page.getByRole('dialog', { name: '创建一局阿瓦隆' })
+    const geometry = await dialog.evaluate((element) => {
+      const rect = element.getBoundingClientRect()
+      const countButtons = Array.from(element.querySelectorAll('fieldset button'))
+        .map((button) => button.getBoundingClientRect())
+      return {
+        bottom: rect.bottom,
+        left: rect.left,
+        minButtonHeight: Math.min(...countButtons.map(({ height }) => height)),
+        minButtonWidth: Math.min(...countButtons.map(({ width }) => width)),
+        right: rect.right,
+        top: rect.top,
+      }
+    })
 
-    const playerCount = await page.getByLabel('玩家人数').boundingBox()
-    const createRoom = await page.getByRole('button', { name: '创建房间' }).boundingBox()
-
-    expect(playerCount).not.toBeNull()
-    expect(createRoom).not.toBeNull()
-    expect(
-      Math.abs(
-        playerCount!.y + playerCount!.height / 2
-        - (createRoom!.y + createRoom!.height / 2),
-      ),
-      `creation controls @ ${viewport.width}x${viewport.height}`,
-    ).toBeLessThanOrEqual(2)
+    expect(geometry.left).toBeGreaterThanOrEqual(16)
+    expect(geometry.right).toBeLessThanOrEqual(viewport.width - 16)
+    expect(geometry.top).toBeGreaterThanOrEqual(16)
+    expect(geometry.bottom).toBeLessThanOrEqual(viewport.height - 16)
+    expect(geometry.minButtonWidth).toBeGreaterThanOrEqual(44)
+    expect(geometry.minButtonHeight).toBeGreaterThanOrEqual(44)
+    await expect(dialog.getByLabel('5 人规则摘要')).toBeVisible()
+    await dialog.getByRole('button', { name: '取消' }).click()
   }
 })
 

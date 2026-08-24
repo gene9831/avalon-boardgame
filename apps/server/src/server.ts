@@ -29,10 +29,6 @@ function readClientID(data: unknown) {
     : undefined
 }
 
-function normalizePlayerName(name: unknown) {
-  return typeof name === 'string' ? name.trim().toLocaleLowerCase() : ''
-}
-
 function prepareAvalonMetadata(metadata: BoardgameServerTypes.MatchData) {
   for (const player of Object.values(metadata.players)) {
     if (typeof player.name === 'string') player.name = player.name.trim()
@@ -65,16 +61,6 @@ function getStaleJoinError(
     const otherCurrentPlayers = Object.values(currentMetadata.players).filter(
       (player) => player.id !== stalePlayer.id,
     )
-    const stalePlayerName = normalizePlayerName(stalePlayer.name)
-    if (
-      stalePlayerName &&
-      otherCurrentPlayers.some(
-        (player) => normalizePlayerName(player.name) === stalePlayerName,
-      )
-    ) {
-      return lobbyConflict('Player name is already used in this match')
-    }
-
     const staleClientID = readClientID(stalePlayer.data)
     if (
       staleClientID &&
@@ -101,7 +87,6 @@ function createAvalonCredentialGenerator(
     const trimmedPlayerName = typeof submittedPlayerName === 'string'
       ? submittedPlayerName.trim()
       : ''
-    const playerName = normalizePlayerName(trimmedPlayerName)
     const clientID = readClientID(ctx.request.body?.data)
 
     if (typeof matchID === 'string') {
@@ -130,10 +115,6 @@ function createAvalonCredentialGenerator(
 
       if (clientID && players.some((player) => readClientID(player.data) === clientID)) {
         rejectJoin(409, 'Client has already joined this match')
-      }
-
-      if (playerName && players.some((player) => normalizePlayerName(player.name) === playerName)) {
-        rejectJoin(409, 'Player name is already used in this match')
       }
     }
 

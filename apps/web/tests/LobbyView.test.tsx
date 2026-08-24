@@ -47,20 +47,19 @@ function renderLobby(overrides: Partial<LobbyViewProps> = {}) {
     devToken: '',
     devToolsEnabled: false,
     devToolsError: null,
-    error: null,
     matches: [],
-    numPlayers: 5,
     onCreate: vi.fn(),
     onDeleteRoom: vi.fn(async () => undefined),
     onDevTokenChange: vi.fn(),
     onEnterRoom: vi.fn(),
     onJoin: vi.fn(),
     onRefresh: vi.fn(),
+    onSaveProfile: vi.fn(),
+    profile: { avatarID: 'merlin', name: '银月骑士' },
     roomAccessLocked: false,
     roomAccessPending: false,
     roomAccessUnavailable: false,
     selectedSeats: {},
-    setNumPlayers: vi.fn(),
     setSelectedSeats: vi.fn(),
     ...overrides,
   }
@@ -69,6 +68,17 @@ function renderLobby(overrides: Partial<LobbyViewProps> = {}) {
 }
 
 describe('LobbyView room access', () => {
+  it('shows the browser profile in the header and defers configuration to the create dialog', () => {
+    const html = renderLobby()
+
+    expect(html).toContain('打开用户中心')
+    expect(html).toContain('银月骑士')
+    expect(html).toContain('>创建房间<')
+    expect(html).not.toContain('id="player-count"')
+    expect(html).not.toContain('查看操作日志')
+    expect(html).not.toContain('查看通知')
+  })
+
   it('offers entering a joined active room without offering another join', () => {
     const html = renderLobby({
       activeRoomSessions: [currentSession],
@@ -77,6 +87,7 @@ describe('LobbyView room access', () => {
     })
 
     expect(html).toContain('>进入<')
+    expect(html).toContain('data-profile-locked="true"')
     expect(html).not.toContain('>加入<')
     expect(html).not.toContain('最近的房间')
   })
