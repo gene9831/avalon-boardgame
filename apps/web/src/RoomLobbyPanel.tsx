@@ -72,7 +72,7 @@ export function RoomLobbyPanel({
           <ConnectionRecoveryControl connected={connected} manualReconnectAvailable={manualReconnectAvailable} onReconnect={onReconnect} />
           <RoomLogControl entries={logEntries} />
           <PlayerProfileControl locked onSave={onSaveProfile} profile={profile} />
-          <div className="relative">
+          {connected && <div className="relative">
             <button
               aria-expanded={roomMenuOpen}
               aria-label="房间操作"
@@ -87,7 +87,7 @@ export function RoomLobbyPanel({
                 {roomExitBusy ? (isHost ? '正在解散…' : '正在退出…') : isHost ? '解散房间' : '退出房间'}
               </button>
             </div>
-          </div>
+          </div>}
         </div>
       </header>
 

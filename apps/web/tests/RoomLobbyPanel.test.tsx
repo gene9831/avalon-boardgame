@@ -99,9 +99,12 @@ describe('RoomLobbyPanel connection recovery', () => {
     const retryHtml = renderPanel({ connected: false, manualReconnectAvailable: true })
 
     expect(connectedHtml).not.toContain('已连接')
+    expect(connectedHtml).toContain('aria-label="房间操作"')
     expect(recoveringHtml).toContain('正在重连')
     expect(recoveringHtml).not.toContain('>重连<')
+    expect(recoveringHtml).not.toContain('aria-label="房间操作"')
     expect(retryHtml).toContain('>重连<')
+    expect(retryHtml).not.toContain('aria-label="房间操作"')
   })
 })
 

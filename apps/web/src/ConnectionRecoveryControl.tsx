@@ -1,3 +1,5 @@
+import { RefreshCw } from 'lucide-react'
+
 interface ConnectionRecoveryControlProps {
   connected: boolean
   manualReconnectAvailable: boolean
@@ -14,19 +16,27 @@ export function ConnectionRecoveryControl({
   if (manualReconnectAvailable) {
     return (
       <button
-        className="min-h-11 rounded-lg border border-rose-300/40 bg-rose-300/10 px-3 py-2 text-xs font-semibold text-rose-100 transition hover:border-rose-200/80 hover:bg-rose-300/20"
+        aria-label="重连"
+        className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-rose-300/40 bg-rose-300/10 px-2 py-2 text-xs font-semibold text-rose-100 transition hover:border-rose-200/80 hover:bg-rose-300/20 sm:px-3"
         onClick={onReconnect}
+        title="重连"
         type="button"
       >
-        重连
+        <RefreshCw aria-hidden="true" className="size-4" />
+        <span className="hidden sm:inline">重连</span>
       </button>
     )
   }
 
   return (
-    <span className="inline-flex min-h-11 items-center gap-2 rounded-full bg-amber-300/10 px-3 py-2 text-xs font-semibold text-amber-100" role="status">
-      <span className="size-2 animate-pulse rounded-full bg-amber-300" />
-      正在重连
+    <span
+      aria-label="正在重连"
+      className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg bg-amber-300/10 px-2 py-2 text-xs font-semibold text-amber-100 sm:px-3"
+      role="status"
+      title="正在重连"
+    >
+      <RefreshCw aria-hidden="true" className="size-4 animate-spin" />
+      <span className="hidden sm:inline">正在重连</span>
     </span>
   )
 }

@@ -32,4 +32,4 @@ The Vite server binds to `0.0.0.0` for LAN testing. By default, the browser deri
 - Lobby API: `http://<browser-host>:8001`
 - Game transport: `http://<browser-host>:8000`
 
-When the web client and game server run on different hosts, copy `.env.example` to `.env.local` and set `VITE_LOBBY_URL` and `VITE_GAME_URL` explicitly. The browser stores only its room ID, seat ID, player name, and boardgame.io reconnect credentials in local storage; game secrets remain server-side.
+When the web client and game server run on different hosts, copy `.env.example` to `.env.local` and set `VITE_LOBBY_URL` and `VITE_GAME_URL` explicitly. Local storage holds the browser profile (name and avatar), client and public session IDs, preferred player count, room and seat IDs, and the boardgame.io seat credential needed for reconnecting. Game secrets and other players' credentials remain server-side.
