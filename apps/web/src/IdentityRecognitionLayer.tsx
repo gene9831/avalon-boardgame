@@ -38,18 +38,21 @@ const ROLE_GUIDANCE: Record<Role, { ability: string; objective: string }> = {
 
 const STEP_COPY: Record<
   IdentityRecognitionStep,
-  { title: string; confirmation: string }
+  { title: string; compactTitle: string; confirmation: string }
 > = {
   roleReveal: {
     title: '查看你的身份',
+    compactTitle: '查看身份',
     confirmation: '我已确认身份',
   },
   evilRecognition: {
     title: '邪恶阵营，请睁眼并辨认同伴',
+    compactTitle: '辨认同伴',
     confirmation: '我已辨认同伴',
   },
   merlinRecognition: {
     title: '梅林，请睁眼并辨认邪恶阵营',
+    compactTitle: '辨认邪恶阵营',
     confirmation: '我已辨认邪恶阵营',
   },
 }
@@ -124,7 +127,7 @@ export function IdentityRecognitionLayer({
   return (
     <section
       aria-label="身份辨认"
-      className="pointer-events-none absolute inset-0 z-[55] flex flex-col items-center justify-between p-3 sm:p-5"
+      className="pointer-events-none absolute inset-0 z-[55] p-3 sm:p-5"
       data-curtain-state="raised"
       data-identity-step={recognition.step}
     >
@@ -134,12 +137,16 @@ export function IdentityRecognitionLayer({
       >
         <CurtainDecoration />
       </div>
-      <RecognitionHeader copy={copy} progress={progress} />
-      <RecognitionConfirmation
-        confirmed={viewerRecognition.confirmed}
-        copy={copy}
-        onConfirm={onConfirm}
-      />
+      <div className="identity-recognition-raised-content relative z-10 flex h-full w-full flex-col items-center justify-between">
+        <div className="identity-recognition-responsive-panel">
+          <RecognitionHeader copy={copy} progress={progress} />
+          <RecognitionConfirmation
+            confirmed={viewerRecognition.confirmed}
+            copy={copy}
+            onConfirm={onConfirm}
+          />
+        </div>
+      </div>
     </section>
   )
 }
@@ -152,11 +159,12 @@ function RecognitionHeader({
   progress: string
 }) {
   return (
-    <div className="pointer-events-auto rounded-2xl border border-amber-200/30 bg-slate-950/90 px-4 py-2 text-center shadow-xl shadow-black/40 backdrop-blur">
-      <h2 className="font-serif text-base font-semibold text-amber-50 sm:text-xl">
-        {copy.title}
+    <div className="identity-recognition-header pointer-events-auto rounded-2xl border border-amber-200/30 bg-slate-950/90 px-4 py-2 text-center shadow-xl shadow-black/40 backdrop-blur">
+      <h2 aria-label={copy.title} className="font-serif text-base font-semibold text-amber-50 sm:text-xl">
+        <span aria-hidden="true" className="identity-recognition-full-title">{copy.title}</span>
+        <span aria-hidden="true" className="identity-recognition-compact-title">{copy.compactTitle}</span>
       </h2>
-      <p className="mt-1 text-xs text-slate-300">{progress}</p>
+      <p aria-live="polite" className="mt-1 text-xs text-slate-300" role="status">{progress}</p>
     </div>
   )
 }
@@ -171,7 +179,7 @@ function RecognitionConfirmation({
   onConfirm: () => void
 }) {
   return (
-    <div className="pointer-events-auto rounded-2xl border border-white/15 bg-slate-950/90 p-2 shadow-xl shadow-black/40 backdrop-blur">
+    <div className="identity-recognition-confirmation pointer-events-auto rounded-2xl border border-white/15 bg-slate-950/90 p-2 shadow-xl shadow-black/40 backdrop-blur">
       <button
         className="min-h-11 min-w-44 rounded-xl bg-amber-300 px-5 py-2 text-sm font-bold text-slate-950 transition hover:bg-amber-200 disabled:cursor-wait disabled:bg-slate-700 disabled:text-slate-200"
         disabled={confirmed}
