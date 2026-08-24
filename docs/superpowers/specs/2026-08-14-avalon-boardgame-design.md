@@ -157,7 +157,7 @@ The role map and pending choices are server secrets. After a vote is settled, th
 | `assassination` | Assassin in `assassin` | `assassinate(targetID)` | Target must be Good; resolve victory |
 | `gameOver` | None | None | Read-only result |
 
-Each active player has at most one strategic move in the relevant stage. Identity recognition separately permits a private confirmation. Boardgame.io validates the acting player before the move reaches the game logic; the game logic additionally validates role, phase, and step participation. Recognition confirmations are removed from client-visible and persisted game logs because even a redacted move log otherwise retains the acting player ID. The dormant deadline move retains server-side step/deadline validation and the same log protection.
+Each active player has at most one strategic move in the relevant stage. Identity recognition separately permits a private confirmation. Boardgame.io validates the acting player before the move reaches the game logic; the game logic additionally validates role, phase, and step participation. Private recognition moves use `noLimit` so public active-player move counters remain neutral, and they are removed from client-visible and persisted game logs because either framework metadata channel would otherwise retain the acting player ID. The dormant deadline move retains server-side step/deadline validation and the same metadata and log protection.
 
 ### Team vote settlement
 
@@ -210,7 +210,7 @@ Team votes and quest cards are accepted independently while their players are ac
 
 Identity recognition is non-strategic, but the first release still waits for all step participants to confirm. It shows no countdown and sends no automatic wake-up. Ordinary reconnects preserve the current confirmations. The server retains an internal, default-off deadline option with its original timeline and restart handling for future room configuration.
 
-The role-reveal step first lowers an opaque curtain over the entire round table, then reveals the player's role card and confirmation controls after the curtain settles. Evil and Merlin recognition instead raise the curtain for authorized participants so they can inspect the relevant seats; nonparticipants remain behind an opaque curtain.
+The role-reveal step first lowers an opaque curtain over the entire round-table stage, then reveals the player's role card and confirmation controls after the curtain settles. Evil and Merlin recognition instead raise the curtain for authorized participants so they can inspect the relevant seats; nonparticipants remain behind a continuously opaque, static curtain. The room header stays above the curtain so navigation and connection recovery remain visible and operable.
 
 ## Timeout configuration
 

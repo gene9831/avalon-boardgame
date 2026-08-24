@@ -255,6 +255,7 @@ function createAvalonGameDefinition(
             moves: {
               confirmIdentityRecognition: {
                 client: false,
+                noLimit: true,
                 move: ({ G, events, playerID }) => {
                   const recognition = G.identityRecognition
                   if (recognition === null) return INVALID_MOVE
@@ -302,6 +303,7 @@ function createAvalonGameDefinition(
               advanceIdentityRecognition: {
                 client: false,
                 ignoreStaleStateID: true,
+                noLimit: true,
                 move: (
                   { G, events },
                   expectedStep: IdentityRecognitionStep,

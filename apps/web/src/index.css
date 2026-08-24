@@ -44,7 +44,7 @@ select {
 }
 
 .identity-curtain--closed {
-  animation: identity-curtain-lower 200ms ease-out both;
+  transform: translateY(0);
 }
 
 .identity-curtain--lowering {
@@ -124,7 +124,7 @@ select {
 @media (orientation: landscape) and (min-height: 421px) {
   .round-table-header {
     position: relative;
-    z-index: 30;
+    z-index: 80;
   }
 
   .round-table-stage {

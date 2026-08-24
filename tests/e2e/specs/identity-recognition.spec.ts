@@ -34,7 +34,8 @@ test('players complete the curtain-based identity recognition ceremony', async (
 
     await harness.dispatch(run.transcript[0])
     for (const page of harness.pages) {
-      await expect(page.locator('[data-identity-step="roleReveal"]')).toHaveAttribute(
+      const recognitionLayer = page.locator('[data-identity-step="roleReveal"]')
+      await expect(recognitionLayer).toHaveAttribute(
         'data-curtain-state',
         'lowered',
       )
@@ -43,6 +44,14 @@ test('players complete the curtain-based identity recognition ceremony', async (
       await expect(page.getByRole('button', {
         name: '显示已知角色信息',
       })).toHaveCount(0)
+
+      const headerZIndex = await page.locator('.round-table-header').evaluate(
+        (header) => Number.parseInt(getComputedStyle(header).zIndex, 10) || 0,
+      )
+      const recognitionZIndex = await recognitionLayer.evaluate(
+        (layer) => Number.parseInt(getComputedStyle(layer).zIndex, 10) || 0,
+      )
+      expect(headerZIndex).toBeGreaterThan(recognitionZIndex)
     }
 
     await harness.dispatch(roleRevealCommands[0])
@@ -65,6 +74,28 @@ test('players complete the curtain-based identity recognition ceremony', async (
         evilPlayerIDs.has(String(index)) ? 'raised' : 'closed',
       )
     }
+    const nonParticipantPage = harness.pages.find(
+      (_, index) => !evilPlayerIDs.has(String(index)),
+    )
+    if (nonParticipantPage === undefined) {
+      throw new Error('Expected an Evil-recognition nonparticipant')
+    }
+    const closedCurtain = nonParticipantPage.locator(
+      '[data-curtain-state="closed"]',
+    )
+    await expect(closedCurtain).toHaveCSS('animation-name', 'none')
+    const backButton = nonParticipantPage.getByRole('button', {
+      name: '返回主页',
+    })
+    await expect(backButton).toBeVisible()
+    expect(await backButton.evaluate((button) => {
+      const bounds = button.getBoundingClientRect()
+      const topmost = document.elementFromPoint(
+        bounds.left + bounds.width / 2,
+        bounds.top + bounds.height / 2,
+      )
+      return topmost === button || button.contains(topmost)
+    })).toBe(true)
     await expect(
       harness.pages[Number(evilRecognitionCommands[0].actor)]
         .locator('[data-known-player-info]'),

@@ -369,6 +369,28 @@ describe('Avalon server', () => {
       for (const state of states) {
         expect(state.G).not.toHaveProperty('secret')
       }
+
+      clients[2].moves.confirmIdentityRecognition()
+      const confirmedStates = await Promise.all(
+        clients.map((client) =>
+          waitForClientState(
+            client,
+            (state) =>
+              (state.G as AvalonPlayerView).identityRecognition
+                ?.confirmedCount === 1,
+          ),
+        ),
+      )
+
+      for (const state of confirmedStates) {
+        expect(state.ctx._activePlayersNumMoves).toEqual({
+          '0': 0,
+          '1': 0,
+          '2': 0,
+          '3': 0,
+          '4': 0,
+        })
+      }
     } finally {
       clients.forEach((client) => client.stop())
       await running.close()
