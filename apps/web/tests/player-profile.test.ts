@@ -32,6 +32,15 @@ describe('browser player profile', () => {
     expect(JSON.parse(values.get(PLAYER_PROFILE_KEY)!)).toEqual(profile)
   })
 
+  it('can generate a medieval-style name beyond the original name pool', () => {
+    const { storage } = createStorage()
+
+    expect(loadOrCreatePlayerProfile(storage, () => 0.999)).toEqual({
+      avatarID: 'percival',
+      name: '星辉领航者',
+    })
+  })
+
   it('migrates the previous saved name into the new profile', () => {
     const { storage } = createStorage({
       [PLAYER_NAME_KEY]: '  Guinevere  ',

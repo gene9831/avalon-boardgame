@@ -78,7 +78,7 @@
 | PostgreSQL 存储 | ✅ | `PostgresStorage`、schema、delta logs、列表过滤和 wipe 已实现；空闲连接错误由 Pool 监听器处理，活动查询错误在 boardgame.io Socket.IO 请求边界处理，两类日志都不记录 Client、连接信息或请求参数，本地集成测试可执行。 |
 | 创建/加入/列出房间 | ✅ | Web Lobby 创建/加入流程已接入；响应式主页将 lobby/playing 合并为进行中列表并在卡片显示具体状态，finished 房间单独分页展示。主页验证本机全部活动房间凭据，已加入房间置顶并直接进入；存在活动会话时禁用创建和其他房间的加入入口。等待大厅允许非房主凭据授权释放自己的座位，房主可解散房间，playing 状态拒绝两类操作。 |
 | 主页与等待大厅体验 | ✅ | 主页采用 LAN 圆桌主题；公共按钮统一使用至少 44px 的触控尺寸和一致交互态。创建配置与退出/解散房间的业务弹窗共用原生 `ModalDialog`，统一管理打开、关闭、Escape、遮罩、危险色、视口内滚动及水平垂直居中；开发控制面板继续保持独立的响应式抽屉/浮层。创建配置当前提供 5–10 人按钮、阵营构成和五次任务人数摘要。等待大厅在 PC、平板和移动端使用同一套圆桌座位 DOM，当前玩家固定在底部，空位显示虚线头像与座位号；不再使用底部操作栏，房主开局位于桌面中央，退出/解散位于顶部房间菜单。房间 Header 为 boardgame.io Debug 入口预留宽度，420px 以下隐藏英文装饰行，避免日志、资料和房间菜单互相遮挡。房间壳层仅使用 `100dvh` 并关闭 overscroll，避免 iOS Chrome 的 `100vh` 包含动态工具栏而产生页面滚动；主页仍可按内容滚动。高度至少 421px 的横屏会回收 Header 中部空白供圆桌舞台使用，同时保持 Header 左右内容位于更高层级；5–6 人桌底部座位与裁剪边界至少保留 24px，7–10 人桌会向下补偿以保护顶部密集座位。Playwright 使用 5、7、10 人房间在 320×568、568×320、390×844、768×1024、1024×768、1077×722、1280×685、1440×900 验证页面无滚动、座位不被面板裁切、Header 左右内容不与座位重叠、座位与中央区无实质重叠，以及开局、选队和投票可操作。 |
-| 玩家名称与入座入口 | ✅ | 浏览器首次使用生成随机中文名称与八款随机装饰头像，并在 `localStorage` 保存；主页 Header 用户中心支持名称校验、头像选择和重新随机，跨标签页同步。只要本机仍保存并验证出活动房间座位，即使返回主页也只展示锁定资料，真正退出/解散后才恢复编辑。创建和加入直接使用当前资料，不再询问名称；客户端和服务端共同限制 trim 后 1–24 字符。同一房间允许同名，所有公开日志使用名称加座位号区分；client ID 仍防止同一浏览器重复占座。头像采用 ImperialOctopus/avalon-printable 的八款角色图标并按 CC BY 4.0 署名，但仅作为装饰，不表达隐藏角色。 |
+| 玩家名称与入座入口 | ✅ | 浏览器首次使用从 24 个中世纪奇幻意象与 24 个身份词中组合随机中文名称（576 种组合），并随机选择八款装饰头像，一并保存在 `localStorage`；主页 Header 用户中心支持名称校验、头像选择和重新随机，跨标签页同步。只要本机仍保存并验证出活动房间座位，即使返回主页也只展示锁定资料，真正退出/解散后才恢复编辑。创建和加入直接使用当前资料，不再询问名称；客户端和服务端共同限制 trim 后 1–24 字符。同一房间允许同名，所有公开日志使用名称加座位号区分；client ID 仍防止同一浏览器重复占座。头像采用 ImperialOctopus/avalon-printable 的八款角色图标并按 CC BY 4.0 署名，但仅作为装饰，不表达隐藏角色。 |
 | 通知与房间操作日志 | ✅ | 系统通知统一显示为顶部 Toast：桌面右上、移动端顶部居中，普通/成功 4 秒、错误 8 秒，最多保留三条且可手动关闭；主页不显示铃铛或通知历史。房间 Header 使用日志图标且不显示未读圆点/数量，桌面为右侧抽屉、移动端为底部抽屉；日志按旧到新记录公开玩家操作，不含时间戳、清空或分页。等待房间只记录当前客户端实际观察到的加入/退出；开局后可从公开状态重建开局、提案、已结算的逐人投票、匿名 Success/Fail 总数、刺杀目标和胜负，不读取 viewer 私密信息。 |
 | 座位绑定与重连 | ✅ | 房间路由、按房间保存凭据、client ID 防重复占座和自动重新连接已实现。健康连接不占用界面；断线时顶部先显示自动恢复状态，连续失败 8 秒后才出现手动重连。房间首次加载与轮询通过只返回 204/403/404 的服务端端点校验私有 player credential；公开 session ID 仅作提前失效优化，不能授权会话。 |
 | Debug Panel 默认收起 | ✅ | 使用 boardgame.io `debug.collapseOnLoad`，仍可手动展开。 |
@@ -86,7 +86,7 @@
 | 开局身份辨认 | ✅ | `startGame` 后先进入三步身份辨认：全员查看自己的完整身份牌，邪恶阵营辨认其他邪恶座位，梅林辨认全部邪恶座位。第一幕先让深蓝实体幕布落下并完全遮住圆桌，落定后才淡入身份牌、进度和确认按钮；第二、三幕参与者升幕查看获授权的圆桌座位。参与者确认后保留信息并显示“等待中”，非参与者始终处于静态不透明幕布后；顶部返回与连接恢复控件在仪式期间保持可见可操作。公开进度仅为匿名 `x/n`。当前版本不显示倒计时、不发送自动唤醒，必须等待当前步骤全部参与者确认，仪式结束才进入首次组队。服务端保留默认关闭的截止线、原时间线追赶与重启保护架构，供未来创建房间配置使用；实时及持久化日志和公开框架 `ctx` 均不记录或编码确认者、唤醒者座位。仪式期间隐藏眼睛按钮，结束后恢复原功能。 |
 | 队伍提案 | ✅ | 队长直接点击圆桌座位选择正确人数，动作转发到服务端 `proposeTeam`。 |
 | 队伍投票 | ✅ | 所有玩家可独立提交 approve/reject；中央操作区只显示自己的提交状态。 |
-| 开发房间删除与踢人 | ✅ | `/dev/status` 确认启用后，主页与房间统一显示右下角 Lucide `Bug` 悬浮入口；桌面使用悬浮面板，移动端使用最大 70dvh 的底部抽屉，Token 仅保存在当前路由内存中。面板支持遮罩、再次点击、Escape、焦点循环和安全区避让，操作错误通过触发器圆点和面板详情反馈；状态接口关闭或失败时不暴露入口。主页删除仍保留在对应房间卡片，房间内删除支持 lobby/playing/finished，踢人仅支持 lobby；连接中删除、匿名同步和延迟写入不会复活房间，快速复用座位即使复制旧公开数据也会由凭据校验拒绝旧会话；活动房间 metadata 使用按房间版本保护，延迟 fetch 不会被重新标记为当前版本，kick 和正式离座都会在旧写入之后权威落盘。当前 Server tests: 44 passed / PostgreSQL 5 skipped；Web tests: 111 passed. |
+| 开发房间删除与踢人 | ✅ | `/dev/status` 确认启用后，主页与房间统一显示右下角 Lucide `Bug` 悬浮入口；桌面使用悬浮面板，移动端使用最大 70dvh 的底部抽屉，Token 仅保存在当前路由内存中。面板支持遮罩、再次点击、Escape、焦点循环和安全区避让，操作错误通过触发器圆点和面板详情反馈；状态接口关闭或失败时不暴露入口。主页删除仍保留在对应房间卡片，房间内删除支持 lobby/playing/finished，踢人仅支持 lobby；连接中删除、匿名同步和延迟写入不会复活房间，快速复用座位即使复制旧公开数据也会由凭据校验拒绝旧会话；活动房间 metadata 使用按房间版本保护，延迟 fetch 不会被重新标记为当前版本，kick 和正式离座都会在旧写入之后权威落盘。当前 Server tests: 44 passed / PostgreSQL 5 skipped；Web tests: 112 passed. |
 | 任务出牌 UI | ✅ | 仅任务队员可以操作；Good 只有 Success，Evil 可选 Success/Fail，提交后只向本人显示自己的牌并进入等待。 |
 | 任务历史与公开结果 | ✅ | 中央任务板展示已结算任务的成功/失败状态和公开 Success/Fail 总数，不把任务牌关联到具体玩家。 |
 | 刺杀 UI 与最终结算 | ✅ | 刺客从圆桌座位选择非已知邪恶目标；其他玩家等待。结算展示胜方、原因和目标，并在每个座位公开最终角色。 |
@@ -145,7 +145,7 @@
 
 最近一次验证日期：2026-08-24
 
-2026-08-24 整体 UI 基础优化验证：主页和房间 Header 接入浏览器本地用户中心，首次生成随机中文名称与八款 ImperialOctopus/avalon-printable 装饰头像，资料在活动房间座位存在期间保持锁定；创建/加入不再弹出名称表单，同房间允许同名且公开日志使用座位号区分。创建入口迁移到 5–10 人配置弹窗。系统消息迁移到顶部 Toast，主页无通知历史入口；房间 Header 新增无未读徽标的公开操作日志，桌面使用右侧抽屉、移动端使用底部抽屉，任务结果只显示匿名聚合。用户中心和日志面板支持焦点循环、Escape 关闭、关闭后焦点恢复与页面滚动锁定。游戏核心为已结算投票保存公开 proposer ID，同时保持旧持久化记录兼容。浏览器人工检查覆盖桌面与 390×844 的主页、用户中心、创建弹窗、等待圆桌、锁定资料、日志抽屉和 Header Debug 入口避让。Game tests 38 passed；test-support 22 passed；Server tests 44 passed / PostgreSQL 5 skipped；Web tests 111 passed；build、lint、typecheck exit 0 且 lint 无 warning；完整 PR Playwright 14 passed / 9 nightly skipped。Playwright 仅出现既有的 `NO_COLOR`/`FORCE_COLOR` Node 警告；未执行真实 LAN 设备或目标 PostgreSQL 重启演练。
+2026-08-24 整体 UI 基础优化验证：主页和房间 Header 接入浏览器本地用户中心，首次从 24 个中世纪奇幻意象与 24 个身份词中组合随机中文名称（576 种组合），并生成八款 ImperialOctopus/avalon-printable 装饰头像，资料在活动房间座位存在期间保持锁定；创建/加入不再弹出名称表单，同房间允许同名且公开日志使用座位号区分。创建入口迁移到 5–10 人配置弹窗。系统消息迁移到顶部 Toast，主页无通知历史入口；房间 Header 新增无未读徽标的公开操作日志，桌面使用右侧抽屉、移动端使用底部抽屉，任务结果只显示匿名聚合。用户中心和日志面板支持焦点循环、Escape 关闭、关闭后焦点恢复与页面滚动锁定。游戏核心为已结算投票保存公开 proposer ID，同时保持旧持久化记录兼容。浏览器人工检查覆盖桌面与 390×844 的主页、用户中心、创建弹窗、等待圆桌、锁定资料、日志抽屉和 Header Debug 入口避让。Game tests 38 passed；test-support 22 passed；Server tests 44 passed / PostgreSQL 5 skipped；Web tests 112 passed；build、lint、typecheck exit 0 且 lint 无 warning；完整 PR Playwright 14 passed / 9 nightly skipped。Playwright 仅出现既有的 `NO_COLOR`/`FORCE_COLOR` Node 警告；未执行真实 LAN 设备或目标 PostgreSQL 重启演练。
 
 2026-08-24 开局身份辨认验证：规则核心使用 `identityRecognition` 三步参与者确认，当前产品默认关闭截止线；超过内部 `deadlineAt` 后确认仍计入当前步骤，直接调用唤醒 move 也不会推进。Web 已移除倒计时显示、计时器和自动唤醒回调，只保留匿名 `x/n`、确认与等待态；确认后操作区只保留固定的“等待中”按钮，不渲染额外辅助文案。第一幕使用 200ms 实体幕布落下并完全遮住圆桌舞台，身份牌和操作在落幕结束后延迟淡入；第二、三幕仍升幕查看圆桌座位，非参与者使用无动画的静态闭幕，reduced-motion 下直接显示终态。顶部返回和连接恢复控件始终位于幕布上方。服务端保留显式启用的权威截止线、原时间线追赶、重启保护和日志隐私回归，供未来创建房间配置接入。私密辨认 move 不计入 boardgame.io 公开 active-player move 计数；`playerView`、框架 `ctx` 与实时/持久化日志都不公开确认者或唤醒者座位。`playerView` 继续分步释放自己的角色、邪恶同伴座位和梅林可见的邪恶座位，不公开精确邪恶角色。仪式期间隐藏眼睛按钮。Game tests 38 passed；test-support 22 passed；Server tests 44 passed / PostgreSQL 5 skipped；Web tests 89 passed；build、lint、typecheck exit 0。完整 PR 级 Playwright 13 passed / 9 nightly skipped，覆盖无倒计时的专项身份仪式、刷新隐私、5 人 smoke 和 5/7/10 人目标视口；应用内浏览器在 1280×720 验证第一幕无页面滚动且圆桌完全不可见。本地仅出现既有的 `NO_COLOR`/`FORCE_COLOR` Node 警告。
 
@@ -162,7 +162,7 @@
 2026-08-23 PostgreSQL 网络中断崩溃修复验证：确认 `a90095d` 的范围仅是空闲客户端触发的 `pg.Pool` `error` 事件，不包含活动 `query()` 返回的 rejected Promise。新增 boardgame.io Socket.IO `update`、`sync`、`disconnect`、`chat` 请求错误边界；聚焦回归测试完成 RED（`sync` rejection 逸出）→ GREEN（安全日志并关闭底层连接）；Server tests 48 passed；Server typecheck exit 0。
 
 ```text
-pnpm test ✅ Game 38 passed；test-support 22 passed；Server 44 passed / PostgreSQL 5 skipped；Web 111 passed
+pnpm test ✅ Game 38 passed；test-support 22 passed；Server 44 passed / PostgreSQL 5 skipped；Web 112 passed
 pnpm build ✅ Game、Server TypeScript 与 Web TypeScript + Vite build
 pnpm lint ✅ exit 0
 pnpm typecheck ✅ Game、test-support、Server、Web、E2E exit 0

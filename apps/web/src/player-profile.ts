@@ -21,8 +21,58 @@ export interface PlayerProfile {
   name: string
 }
 
-const NAME_PREFIXES = ['银月', '雾林', '晨星', '赤羽', '青岚', '暮色'] as const
-const NAME_SUFFIXES = ['骑士', '旅人', '守望者', '游侠', '贤者', '信使'] as const
+const NAME_PREFIXES = [
+  '银月',
+  '雾林',
+  '晨星',
+  '赤羽',
+  '青岚',
+  '暮色',
+  '白鹿',
+  '暮鸦',
+  '荆棘',
+  '霜塔',
+  '赤狐',
+  '灰狼',
+  '月桂',
+  '橡木',
+  '黑羽',
+  '银烛',
+  '金狮',
+  '雪松',
+  '苍鹰',
+  '深谷',
+  '长夜',
+  '曙光',
+  '铁冠',
+  '星辉',
+] as const
+const NAME_SUFFIXES = [
+  '骑士',
+  '旅人',
+  '守望者',
+  '游侠',
+  '贤者',
+  '信使',
+  '侍从',
+  '守卫',
+  '猎手',
+  '铸剑师',
+  '吟游诗人',
+  '守塔人',
+  '巡林客',
+  '旅法师',
+  '旗手',
+  '弓手',
+  '驯鹰人',
+  '药草师',
+  '抄写员',
+  '护林人',
+  '修士',
+  '占星师',
+  '盾卫',
+  '领航者',
+] as const
 
 function browserStorage(): RoomSessionStorage {
   if (typeof window === 'undefined') {
