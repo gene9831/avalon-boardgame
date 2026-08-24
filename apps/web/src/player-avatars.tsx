@@ -29,7 +29,7 @@ export function PlayerAvatar({
   return (
     <img
       alt=""
-      className={className}
+      className={`bg-[#efe3c6] ${className}`}
       data-player-avatar={avatarID}
       draggable={false}
       src={PLAYER_AVATARS[avatarID]}

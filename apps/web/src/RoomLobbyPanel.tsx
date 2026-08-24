@@ -140,7 +140,7 @@ function SeatCard({
     <div aria-label={accessibleName} className={`pointer-events-auto flex flex-col items-center ${dense ? 'w-[clamp(3.1rem,14vw,6.5rem)]' : 'w-[clamp(4.2rem,17vw,8rem)]'}`} data-round-table-player role="group">
       <div
         aria-hidden="true"
-        className={`${dense ? 'size-[clamp(2.5rem,9.5vw,4.5rem)]' : 'size-[clamp(3rem,12vw,5.5rem)]'} grid shrink-0 place-items-center overflow-hidden rounded-full border-2 text-[clamp(0.9rem,4vw,1.8rem)] font-semibold shadow-lg ${seat.isCurrentPlayer ? 'border-amber-200 bg-gradient-to-br from-amber-200/35 to-amber-950 text-amber-50 shadow-amber-300/20' : seat.occupied ? 'border-slate-500 bg-gradient-to-br from-slate-500 to-slate-900 text-slate-50' : 'border-dashed border-slate-500/70 bg-slate-950/70 text-slate-500'} ${seat.occupied && !seat.connected ? 'grayscale opacity-45' : ''}`}
+        className={`${dense ? 'size-[clamp(2.5rem,9.5vw,4.5rem)]' : 'size-[clamp(3rem,12vw,5.5rem)]'} grid shrink-0 place-items-center overflow-hidden rounded-full border-2 text-[clamp(0.9rem,4vw,1.8rem)] font-semibold shadow-lg ${seat.isCurrentPlayer ? 'border-amber-200 bg-[#efe3c6] text-amber-50 shadow-amber-300/20' : seat.occupied ? 'border-[#d8c69f]/70 bg-[#efe3c6] text-slate-900' : 'border-dashed border-slate-500/70 bg-slate-950/70 text-slate-500'} ${seat.occupied && !seat.connected ? 'grayscale opacity-45' : ''}`}
         data-round-table-avatar
       >
         {seat.occupied ? (

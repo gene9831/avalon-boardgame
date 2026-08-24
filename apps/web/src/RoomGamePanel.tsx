@@ -300,8 +300,8 @@ function GameSeat({ canSelect, canSelectAsTarget, dense, game, onSelect, seat, s
       : knownEvil
         ? 'border-rose-700 bg-gradient-to-br from-rose-950 to-slate-950 text-rose-100 shadow-[0_0_24px_rgba(127,29,29,0.65)]'
     : seat.isCurrentPlayer
-      ? 'border-amber-200 bg-gradient-to-br from-amber-200/35 to-amber-950 text-amber-50 shadow-[0_0_22px_rgba(251,191,36,0.4)]'
-      : 'border-slate-500 bg-gradient-to-br from-slate-500 to-slate-950 text-slate-50'
+      ? 'border-amber-200 bg-[#efe3c6] text-amber-50 shadow-[0_0_22px_rgba(251,191,36,0.4)]'
+      : 'border-[#d8c69f]/70 bg-[#efe3c6] text-slate-900'
   const seatAction = canSelect
     ? `选择 ${seat.name} 加入任务队伍`
     : canSelectAsTarget

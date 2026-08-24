@@ -60,13 +60,13 @@ export function PlayerProfileControl({
       <button
         aria-expanded={open}
         aria-label="打开用户中心"
-        className="flex min-h-11 items-center gap-2 rounded-xl border border-white/15 bg-slate-950/55 px-1.5 py-1.5 text-left text-slate-100 transition hover:border-amber-200/50 hover:bg-slate-900/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+        className="flex min-h-11 items-center gap-2 rounded-xl px-1.5 py-1.5 text-left text-slate-100 transition hover:bg-white/[0.06] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
         data-profile-locked={locked || undefined}
         onClick={() => setOpen((value) => !value)}
         ref={triggerRef}
         type="button"
       >
-        <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-full border border-amber-200/55 bg-slate-900">
+        <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-full border border-amber-200/55 bg-[#efe3c6]">
           <PlayerAvatar avatarID={profile.avatarID} className="size-full object-contain p-1" />
         </span>
         <span className="hidden max-w-28 truncate pr-1 text-sm font-semibold sm:block">
