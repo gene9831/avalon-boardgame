@@ -12,7 +12,9 @@ const viewports = [
   { width: 1024, height: 768 },
   { width: 1077, height: 722 },
   { width: 1280, height: 685 },
+  { width: 1339, height: 786 },
   { width: 1440, height: 900 },
+  { width: 1920, height: 1080 },
 ]
 
 async function expectRoundTableFits(page: Page, tableLabel: string) {
@@ -29,6 +31,7 @@ async function expectRoundTableFits(page: Page, tableLabel: string) {
   expect(dimensions.scrollHeight).toBeLessThanOrEqual(dimensions.innerHeight)
 
   const geometry = await page.getByLabel(tableLabel, { exact: true }).evaluate((table) => {
+    const tableRect = table.getBoundingClientRect()
     const seatRects = Array.from(table.querySelectorAll('[data-round-table-seat]'))
       .map((seat) => Array.from(seat.querySelectorAll('[data-round-table-avatar], [data-round-table-nameplate]'))
         .map((part) => ({
@@ -56,6 +59,14 @@ async function expectRoundTableFits(page: Page, tableLabel: string) {
       && window.innerHeight >= 421
     const seatCount = Number(table.getAttribute('data-round-table-seat-count'))
     const requiredBottomSafetyGap = usesHeaderSpace ? (seatCount <= 6 ? 24 : 6) : null
+    const maxAvatarWidth = Math.max(
+      ...Array.from(table.querySelectorAll('[data-round-table-avatar]'))
+        .map((avatar) => avatar.getBoundingClientRect().width),
+    )
+    const maxNameFontSize = Math.max(
+      ...Array.from(table.querySelectorAll('[data-round-table-nameplate] p'))
+        .map((name) => Number.parseFloat(getComputedStyle(name).fontSize)),
+    )
 
     return {
       bottomSafetyGap: clippingRect === undefined || bottomSeatPart === undefined
@@ -96,11 +107,15 @@ async function expectRoundTableFits(page: Page, tableLabel: string) {
           ? []
           : [`${index + 1}:${kind}:${Math.round(rect.left)},${Math.round(rect.top)},${Math.round(rect.right)},${Math.round(rect.bottom)}`]
       ))),
+      tableSize: Math.max(tableRect.width, tableRect.height),
+      maxAvatarWidth,
+      maxNameFontSize,
       viewport: `${window.innerWidth}x${window.innerHeight}`,
       requiredBottomSafetyGap,
     }
   })
 
+  expect(geometry.tableSize, `${tableLabel} @ ${geometry.viewport}`).toBeLessThanOrEqual(640)
   expect(geometry.seatsOutsideViewport, `${tableLabel} @ ${geometry.viewport}`).toEqual([])
   expect(geometry.clippedSeatParts, `${tableLabel} @ ${geometry.viewport}`).toEqual([])
   expect(geometry.overlappingSeatPairs, `${tableLabel} @ ${geometry.viewport}`).toEqual([])
@@ -121,6 +136,25 @@ async function expectRoundTableFits(page: Page, tableLabel: string) {
       .map((button) => button.getAttribute('aria-label') ?? button.textContent?.trim() ?? '')
   ))
   expect(undersizedControlLabels).toEqual([])
+
+  return geometry
+}
+
+function expectWideSeatMetricsAtLeast({
+  baseline,
+  tableLabel,
+  wide,
+}: {
+  baseline: { maxAvatarWidth: number, maxNameFontSize: number }
+  tableLabel: string
+  wide: { maxAvatarWidth: number, maxNameFontSize: number }
+}) {
+  expect(wide.maxAvatarWidth, `${tableLabel} avatar`).toBeGreaterThanOrEqual(
+    baseline.maxAvatarWidth - 0.5,
+  )
+  expect(wide.maxNameFontSize, `${tableLabel} name`).toBeGreaterThanOrEqual(
+    baseline.maxNameFontSize - 0.1,
+  )
 }
 
 test('lobby creation controls remain on one row at narrow widths', async ({ page }) => {
@@ -147,7 +181,7 @@ test('lobby creation controls remain on one row at narrow widths', async ({ page
   }
 })
 
-test('five, seven, and ten-player round tables remain operable across target widths', async ({
+test('five, seven, and ten-player round tables remain compact and operable across target widths', async ({
   browser,
 }) => {
   test.setTimeout(180_000)
@@ -159,9 +193,19 @@ test('five, seven, and ten-player round tables remain operable across target wid
 
     try {
       const hostPage = harness.pages[0]
+      let lobbyBaseline: Awaited<ReturnType<typeof expectRoundTableFits>> | null = null
       for (const viewport of viewports) {
         await hostPage.setViewportSize(viewport)
-        await expectRoundTableFits(hostPage, `${playerCount} 人玩家圆桌`)
+        const geometry = await expectRoundTableFits(hostPage, `${playerCount} 人玩家圆桌`)
+        if (viewport.width === 1280 && viewport.height === 685) lobbyBaseline = geometry
+        if (viewport.width === 1339 && viewport.height === 786) {
+          expect(lobbyBaseline).not.toBeNull()
+          expectWideSeatMetricsAtLeast({
+            baseline: lobbyBaseline!,
+            tableLabel: `${playerCount} 人玩家圆桌 @ 1339x786`,
+            wide: geometry,
+          })
+        }
       }
 
       const proposeIndex = generated.transcript.findIndex(
@@ -175,10 +219,20 @@ test('five, seven, and ten-player round tables remain operable across target wid
         throw new Error('Generated game has no team proposal')
       }
       const leaderPage = harness.pages[Number(propose.actor)]
+      let gameBaseline: Awaited<ReturnType<typeof expectRoundTableFits>> | null = null
       for (const viewport of viewports) {
         await leaderPage.setViewportSize(viewport)
         await expect(leaderPage.getByLabel('阿瓦隆游戏圆桌')).toBeVisible()
-        await expectRoundTableFits(leaderPage, `${playerCount} 人游戏圆桌`)
+        const geometry = await expectRoundTableFits(leaderPage, `${playerCount} 人游戏圆桌`)
+        if (viewport.width === 1280 && viewport.height === 685) gameBaseline = geometry
+        if (viewport.width === 1339 && viewport.height === 786) {
+          expect(gameBaseline).not.toBeNull()
+          expectWideSeatMetricsAtLeast({
+            baseline: gameBaseline!,
+            tableLabel: `${playerCount} 人游戏圆桌 @ 1339x786`,
+            wide: geometry,
+          })
+        }
       }
 
       if (playerCount === 5) {
