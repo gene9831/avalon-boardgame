@@ -16,6 +16,7 @@ function gameView(overrides: Partial<AvalonPlayerView> = {}): AvalonPlayerView {
   return {
     status: 'playing',
     players: Object.fromEntries(players.map((player) => [String(player.id), { name: `Player ${player.id + 1}` }])),
+    identityRecognition: null,
     leaderID: '0',
     questIndex: 0,
     proposedTeam: ['0', '3'],
@@ -57,6 +58,7 @@ function renderPanel({
       onAssassinate={vi.fn()}
       onBackHome={vi.fn()}
       onCastTeamVote={vi.fn()}
+      onConfirmIdentityRecognition={vi.fn()}
       onPlayQuestCard={vi.fn<(card: QuestCard) => void>()}
       onProposeTeam={vi.fn()}
       onReconnect={vi.fn()}
@@ -66,6 +68,140 @@ function renderPanel({
     />,
   )
 }
+
+describe('RoomGamePanel identity recognition', () => {
+  it('lowers an opaque curtain before showing the first role card', () => {
+    const html = renderPanel({
+      activeStage: 'identityRecognition',
+      game: gameView({
+        identityRecognition: {
+          step: 'roleReveal',
+          deadlineAt: Date.now() + 10_000,
+          confirmedCount: 0,
+          participantCount: 5,
+        },
+        viewer: {
+          role: 'merlin',
+          loyalty: 'good',
+          knownEvilPlayerIDs: [],
+          identityRecognition: {
+            isParticipant: true,
+            confirmed: false,
+            deadlineRefreshRequired: false,
+            serverNow: 1_000,
+          },
+        },
+      }),
+      phase: 'identityRecognition',
+    })
+
+    expect(html).toContain('data-curtain-state="lowered"')
+    expect(html).toContain('data-table-visibility="hidden"')
+    expect(html).toContain('identity-role-reveal-curtain')
+    expect(html).toContain('identity-role-reveal-content')
+    expect(html).toContain('查看你的身份')
+    expect(html).toContain('梅林')
+    expect(html).toContain('正义阵营')
+    expect(html).toContain('我已确认身份')
+    expect(html).not.toContain('秒')
+    expect(html).not.toContain('aria-label="显示已知角色信息"')
+  })
+
+  it('keeps non-participants behind an opaque curtain with anonymous progress', () => {
+    const html = renderPanel({
+      activeStage: 'identityRecognition',
+      game: gameView({
+        identityRecognition: {
+          step: 'evilRecognition',
+          deadlineAt: Date.now() + 10_000,
+          confirmedCount: 1,
+          participantCount: 2,
+        },
+        viewer: {
+          role: 'loyal_servant',
+          loyalty: 'good',
+          knownEvilPlayerIDs: [],
+          identityRecognition: {
+            isParticipant: false,
+            confirmed: false,
+            deadlineRefreshRequired: false,
+            serverNow: 1_000,
+          },
+        },
+      }),
+      phase: 'identityRecognition',
+    })
+
+    expect(html).toContain('data-curtain-state="closed"')
+    expect(html).toContain('邪恶阵营，请睁眼并辨认同伴')
+    expect(html).toContain('1/2 已确认')
+    expect(html).not.toContain('秒')
+    expect(html).not.toContain('我已辨认同伴')
+  })
+
+  it('does not shift the first role card with extra waiting copy', () => {
+    const html = renderPanel({
+      activeStage: 'identityRecognition',
+      game: gameView({
+        identityRecognition: {
+          step: 'roleReveal',
+          deadlineAt: Date.now() + 10_000,
+          confirmedCount: 1,
+          participantCount: 5,
+        },
+        viewer: {
+          role: 'merlin',
+          loyalty: 'good',
+          knownEvilPlayerIDs: [],
+          identityRecognition: {
+            isParticipant: true,
+            confirmed: true,
+            deadlineRefreshRequired: false,
+            serverNow: 1_000,
+          },
+        },
+      }),
+      phase: 'identityRecognition',
+    })
+
+    expect(html).toContain('>等待中<')
+    expect(html).toContain('disabled=""')
+    expect(html).not.toContain('等待其他玩家确认身份')
+  })
+
+  it('keeps recognition information visible with only a fixed waiting button', () => {
+    const html = renderPanel({
+      activeStage: 'identityRecognition',
+      game: gameView({
+        identityRecognition: {
+          step: 'evilRecognition',
+          deadlineAt: Date.now() + 10_000,
+          confirmedCount: 1,
+          participantCount: 2,
+        },
+        viewer: {
+          role: 'assassin',
+          loyalty: 'evil',
+          knownEvilPlayerIDs: ['4'],
+          identityRecognition: {
+            isParticipant: true,
+            confirmed: true,
+            deadlineRefreshRequired: false,
+            serverNow: 1_000,
+          },
+        },
+      }),
+      phase: 'identityRecognition',
+      playerID: '3',
+    })
+
+    expect(html).toContain('data-curtain-state="raised"')
+    expect(html).toContain('data-known-player-info="true"')
+    expect(html).toContain('>等待中<')
+    expect(html).toContain('disabled=""')
+    expect(html).not.toContain('等待其他邪恶阵营玩家')
+  })
+})
 
 describe('RoomGamePanel quest hand', () => {
   it('gives a Good quest member only the Success action', () => {

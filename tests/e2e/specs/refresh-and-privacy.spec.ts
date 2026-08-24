@@ -25,10 +25,12 @@ test('refresh restores server data and keeps pending choices private', async ({
     )
     expect([proposeIndex, firstVoteIndex, firstQuestCardIndex]).not.toContain(-1)
 
-    await harness.dispatch(run.transcript[0])
+    for (let index = 0; index < proposeIndex; index += 1) {
+      await harness.dispatch(run.transcript[index])
+    }
     const leaderPage = harness.pages[Number(run.transcript[proposeIndex].actor)]
     await leaderPage.reload()
-    await expect(leaderPage.locator('[data-role-avatar]')).toBeVisible()
+    await expect(leaderPage.getByLabel('阿瓦隆游戏圆桌')).toBeVisible()
     await expect(leaderPage.getByRole('button', { name: /^提交 0\// })).toBeDisabled()
 
     await harness.dispatch(run.transcript[proposeIndex])

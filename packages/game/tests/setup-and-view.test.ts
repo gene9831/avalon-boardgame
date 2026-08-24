@@ -19,6 +19,29 @@ function getAuthoritativeGame(client: ReturnType<typeof createLocalClient>) {
   return client.store.getState().G as AvalonG
 }
 
+function completeIdentityRecognition(
+  client: ReturnType<typeof createLocalClient>,
+) {
+  while (client.store.getState().ctx.phase === 'identityRecognition') {
+    const game = getAuthoritativeGame(client)
+    const step = game.identityRecognition?.step
+    const participantIDs = step === 'roleReveal'
+      ? client.store.getState().ctx.playOrder
+      : step === 'evilRecognition'
+        ? Object.entries(game.secret.roleByPlayer)
+          .filter(([, role]) => loyaltyForRole(role) === 'evil')
+          .map(([playerID]) => playerID)
+        : Object.entries(game.secret.roleByPlayer)
+          .filter(([, role]) => role === 'merlin')
+          .map(([playerID]) => playerID)
+
+    for (const playerID of participantIDs) {
+      client.updatePlayerID(playerID)
+      client.moves.confirmIdentityRecognition()
+    }
+  }
+}
+
 describe('Avalon setup and player views', () => {
   it('replays role assignment and initial leader from the same RNG seed', () => {
     const first = Client({
@@ -53,10 +76,11 @@ describe('Avalon setup and player views', () => {
     expect(state.G.status).toBe('lobby')
   })
 
-  it('assigns roles and enters team proposal after startGame', () => {
+  it('assigns roles and enters team proposal after identity recognition', () => {
     const client = createLocalClient()
 
     client.moves.startGame()
+    completeIdentityRecognition(client)
 
     const state = client.store.getState()
     const game = state.G as AvalonG
@@ -78,6 +102,7 @@ describe('Avalon setup and player views', () => {
   it('filters role visibility by the observing player', () => {
     const client = createLocalClient()
     client.moves.startGame()
+    completeIdentityRecognition(client)
 
     const game = getAuthoritativeGame(client)
     const roleByPlayer = game.secret.roleByPlayer

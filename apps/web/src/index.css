@@ -39,6 +39,68 @@ select {
   display: none;
 }
 
+.identity-curtain {
+  transform-origin: top;
+}
+
+.identity-curtain--closed {
+  transform: translateY(0);
+}
+
+.identity-curtain--lowering {
+  animation: identity-curtain-lower 200ms ease-out both;
+}
+
+.identity-curtain--raising {
+  animation: identity-curtain-raise 200ms ease-in both;
+}
+
+.identity-role-reveal-content {
+  animation: identity-role-reveal-content 180ms ease-out 200ms both;
+}
+
+@keyframes identity-curtain-lower {
+  from {
+    transform: translateY(-102%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes identity-curtain-raise {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(-102%);
+  }
+}
+
+@keyframes identity-role-reveal-content {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .identity-curtain,
+  .identity-curtain *,
+  .identity-role-reveal-content {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}
+
 @media (min-height: 421px) and (max-height: 720px) {
   :where([data-round-table-seat-count="5"], [data-round-table-seat-count="6"]) [data-round-table-player] {
     width: clamp(4.2rem, min(17vw, 15dvh), 8rem);
@@ -62,7 +124,7 @@ select {
 @media (orientation: landscape) and (min-height: 421px) {
   .round-table-header {
     position: relative;
-    z-index: 30;
+    z-index: 80;
   }
 
   .round-table-stage {
@@ -71,6 +133,10 @@ select {
 
   .round-table-layout {
     transform: none;
+  }
+
+  :where([data-round-table-seat-count="5"], [data-round-table-seat-count="6"]).round-table-layout {
+    transform: translateY(-1px);
   }
 
   :where([data-round-table-seat-count="7"], [data-round-table-seat-count="8"], [data-round-table-seat-count="9"], [data-round-table-seat-count="10"]).round-table-layout {
@@ -181,6 +247,11 @@ select {
   [data-round-table-avatar] {
     width: 2.75rem;
     height: 2.75rem;
+  }
+
+  :where([data-round-table-seat-count="5"], [data-round-table-seat-count="6"]) [data-round-table-avatar] {
+    width: 2.625rem;
+    height: 2.625rem;
   }
 
   [data-round-table-nameplate] {

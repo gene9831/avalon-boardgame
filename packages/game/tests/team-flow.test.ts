@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { AvalonGame } from '../src/game'
 import { getAvalonPlayerView } from '../src/player-view'
+import { loyaltyForRole } from '../src/roles'
 import type { AvalonG, PlayerID, TeamVote } from '../src/types'
 
 function createStartedClient(numPlayers = 5) {
@@ -14,6 +15,23 @@ function createStartedClient(numPlayers = 5) {
   })
 
   client.moves.startGame()
+  while (client.store.getState().ctx.phase === 'identityRecognition') {
+    const game = client.store.getState().G as AvalonG
+    const step = game.identityRecognition?.step
+    const participantIDs = step === 'roleReveal'
+      ? client.store.getState().ctx.playOrder
+      : step === 'evilRecognition'
+        ? Object.entries(game.secret.roleByPlayer)
+          .filter(([, role]) => loyaltyForRole(role) === 'evil')
+          .map(([playerID]) => playerID)
+        : Object.entries(game.secret.roleByPlayer)
+          .filter(([, role]) => role === 'merlin')
+          .map(([playerID]) => playerID)
+    for (const playerID of participantIDs) {
+      client.updatePlayerID(playerID)
+      client.moves.confirmIdentityRecognition()
+    }
+  }
   return client
 }
 

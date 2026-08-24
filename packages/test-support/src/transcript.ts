@@ -2,6 +2,7 @@ import type { PlayerID, QuestCard, TeamVote } from '@avalon/game'
 
 export type AvalonCommand =
   | { actor: PlayerID; command: 'startGame' }
+  | { actor: PlayerID; command: 'confirmIdentityRecognition' }
   | {
       actor: PlayerID
       command: 'proposeTeam'

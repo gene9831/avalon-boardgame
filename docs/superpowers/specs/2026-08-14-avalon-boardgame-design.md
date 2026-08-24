@@ -18,6 +18,7 @@ Build a LAN-hosted online version of the base rules of The Resistance: Avalon fo
 - Five-player through ten-player room sizes.
 - Merlin, Assassin, Loyal Servant of Arthur, and Minion of Mordred.
 - Server-side role assignment and role visibility.
+- Server-authoritative opening identity recognition before the first team proposal.
 - Simultaneous team votes and quest-card submissions.
 - PostgreSQL persistence through a custom boardgame.io asynchronous storage adapter.
 - Seat-bound reconnect using boardgame.io player credentials.
@@ -28,7 +29,7 @@ Build a LAN-hosted online version of the base rules of The Resistance: Avalon fo
 
 - Percival, Morgana, Mordred, Oberon, Lady of the Lake, and other expansions.
 - Accounts, dedicated administrators, room-admin powers, arbitrary state editing, and game rewind.
-- Automatic timeout advancement in the first implementation.
+- Automatic timeout advancement for team proposals, votes, quest cards, or assassination in the first implementation.
 - Voice, text chat, AI, ranking, and persistent player profiles.
 - Multiple game-server instances, distributed Socket.IO, Pub/Sub, and distributed locks.
 - In-memory persistence in the deployed server.
@@ -77,8 +78,9 @@ The root package delegates web development, server development, lint, and previe
 3. The Lobby API binds each joined player to a seat and returns credentials.
 4. Credentials are stored locally by the browser under the room identity so a reload can reconnect to the same seat.
 5. Seat 0 may start the room only after all seats are occupied. Seat 0 has no administrative authority once the game starts.
-6. `startGame` assigns roles and the initial leader on the server using the boardgame.io random plugin, then enters the team-proposal phase.
-7. A finished room is hidden from the default open-room list but remains in PostgreSQL. The MVP has no automatic room deletion.
+6. `startGame` assigns roles and the initial leader on the server using the boardgame.io random plugin, then enters identity recognition.
+7. Identity recognition reveals each player's own role, then Evil seats to Evil players, then Evil seats to Merlin; after all three steps, the first team proposal begins.
+8. A finished room is hidden from the default open-room list but remains in PostgreSQL. The MVP has no automatic room deletion.
 
 If a player loses their credentials, the seat cannot be reclaimed in the MVP. If seat 0 loses its credentials before starting, the room is not recoverable through a replacement seat; a new room must be created. This is an intentional consequence of account-free seat binding.
 
@@ -96,11 +98,19 @@ type AvalonG = {
 
   secret: {
     roleByPlayer: Record<PlayerID, Role>
+    identityRecognitionConfirmedPlayerIDs: PlayerID[]
+    identityRecognitionServerInstanceID: string | null
     pendingVotes: Partial<Record<PlayerID, TeamVote>>
     pendingQuestCards: Partial<Record<PlayerID, QuestCard>>
   }
 
   leaderID: PlayerID | null
+  identityRecognition: {
+    step: 'roleReveal' | 'evilRecognition' | 'merlinRecognition'
+    deadlineAt: number
+    confirmedCount: number
+    participantCount: number
+  } | null
   questIndex: number
   proposedTeam: PlayerID[] | null
 
@@ -129,20 +139,25 @@ type AvalonG = {
 }
 ```
 
+The server-instance marker and confirmed player IDs never cross `playerView`.
+Deadline metadata remains in the state shape for the disabled optional deadline
+architecture and is not rendered by the first-release web client.
+
 The role map and pending choices are server secrets. After a vote is settled, the individual vote choices may be moved into public vote history. After a quest is settled, only the team, Success count, Fail count, and quest result are retained publicly; the mapping from a quest card to a player is discarded.
 
 ## Phases, stages, and moves
 
 | Phase | Active players and stage | Move | Completion |
 | --- | --- | --- | --- |
-| `lobby` | Seat 0 in `start` | `startGame` | All seats occupied; roles and leader assigned; enter `teamProposal` |
+| `lobby` | Seat 0 in `start` | `startGame` | All seats occupied; roles and leader assigned; enter `identityRecognition` |
+| `identityRecognition` | All players in `identityRecognition`; only the current step's participants may confirm | `confirmIdentityRecognition` | All participants confirm; advance through role, Evil, and Merlin recognition, then enter `teamProposal` |
 | `teamProposal` | Current leader in `leader` | `proposeTeam(playerIDs)` | Exact team size, seated players, and no duplicates; enter `teamVote` |
 | `teamVote` | All players in `vote` | `castTeamVote(approve)` | One vote per player; settle after all votes |
 | `quest` | Proposed team in `quest` | `playQuestCard(result)` | One card per team member; settle after all cards |
 | `assassination` | Assassin in `assassin` | `assassinate(targetID)` | Target must be Good; resolve victory |
 | `gameOver` | None | None | Read-only result |
 
-Each active player has at most one move in the relevant stage. Boardgame.io validates the acting player before the move reaches the game logic; the game logic additionally validates role, phase, team membership, and payload shape.
+Each active player has at most one strategic move in the relevant stage. Identity recognition separately permits a private confirmation. Boardgame.io validates the acting player before the move reaches the game logic; the game logic additionally validates role, phase, and step participation. Private recognition moves use `noLimit` so public active-player move counters remain neutral, and they are removed from client-visible and persisted game logs because either framework metadata channel would otherwise retain the acting player ID. The dormant deadline move retains server-side step/deadline validation and the same metadata and log protection.
 
 ### Team vote settlement
 
@@ -175,10 +190,11 @@ Each active player has at most one move in the relevant stage. Boardgame.io vali
 
 `playerView` returns a player-specific view rather than the complete `AvalonG`:
 
-- The current player sees their own exact role.
-- Merlin sees the player IDs of all Evil players.
-- Evil players see the player IDs of other Evil players.
+- During role reveal, the current player sees their own exact role and no other role knowledge.
+- During Evil recognition, Evil players begin seeing the player IDs of other Evil players.
+- During Merlin recognition, Merlin begins seeing the player IDs of all Evil players.
 - Known faction seats do not expose the exact Assassin or Minion role during play.
+- Identity-recognition views expose only whether the current player participates or has confirmed, plus anonymous aggregate progress; they never expose confirmed seat IDs.
 - Before a team vote is complete, a player sees only their own submitted vote and safe progress information.
 - Before a quest is complete, a player sees only their own submitted card and safe progress information.
 - Public team proposals, settled vote history, quest history, score, leader, phase, and result remain visible.
@@ -190,7 +206,11 @@ The Debug mode consumes only this filtered client state and safe context fields.
 
 The Socket.IO client reconnects with the same match ID, player ID, and credentials. The server sends the current player view after synchronization. No move is replayed from the browser's local UI; the server state is authoritative.
 
-Team votes and quest cards are accepted independently while their players are active. The per-match server queue serializes arrival, and `maxMoves: 1` makes a repeated action invalid. A disconnected player leaves the stage incomplete until reconnecting because automatic timeout is disabled.
+Team votes and quest cards are accepted independently while their players are active. The per-match server queue serializes arrival, and `maxMoves: 1` makes a repeated action invalid. A disconnected player leaves these strategic stages incomplete until reconnecting because automatic strategic timeout is disabled.
+
+Identity recognition is non-strategic, but the first release still waits for all step participants to confirm. It shows no countdown and sends no automatic wake-up. Ordinary reconnects preserve the current confirmations. The server retains an internal, default-off deadline option with its original timeline and restart handling for future room configuration.
+
+The role-reveal step first lowers an opaque curtain over the entire round-table stage, then reveals the player's role card and confirmation controls after the curtain settles. Evil and Merlin recognition instead raise the curtain for authorized participants so they can inspect the relevant seats; nonparticipants remain behind a continuously opaque, static curtain. The room header stays above the curtain so navigation and connection recovery remain visible and operable.
 
 ## Timeout configuration
 
@@ -206,7 +226,9 @@ type TimeoutConfig = {
 }
 ```
 
-The default is `{ enabled: false }`. The first implementation does not add a wall-clock timer, timeout move, or automatic default choice. Enabling timeout later requires a separate design decision covering default choices, server-side deadline validation, and recovery when all clients disconnect.
+The default is `{ enabled: false }`. The first implementation does not add a wall-clock timer, timeout move, or automatic default choice to any strategic phase. Enabling those timeouts later requires a separate design decision covering default choices, server-side deadline validation, and recovery when all clients disconnect.
+
+The internal identity-recognition deadline is also disabled by default. A future change may expose it as a separate room-creation option because it ends only a private information display and never creates a game choice. ADR-0006 records the retained server-side architecture.
 
 ## PostgreSQL storage
 

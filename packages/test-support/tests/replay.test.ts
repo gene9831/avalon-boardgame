@@ -6,6 +6,7 @@ import {
   createAvalonRuleDriver,
   deriveAvalonSeeds,
   generateSeededDecisions,
+  getIdentityRecognitionCommands,
   playGeneratedGame,
   replayAvalonArtifact,
   replayTranscript,
@@ -76,7 +77,13 @@ describe('Avalon replay support', () => {
       playerCount: 10,
     })
 
-    const firstSnapshot = await replayTranscript(first, transcript)
+    await replayTranscript(first, transcript)
+    while (first.snapshot().ctx.phase === 'identityRecognition') {
+      const commands = getIdentityRecognitionCommands(first.snapshot().G)
+      transcript.push(...commands)
+      await replayTranscript(first, commands)
+    }
+    const firstSnapshot = first.snapshot()
     const secondSnapshot = await replayTranscript(second, transcript)
 
     expect(firstSnapshot).toEqual(secondSnapshot)
