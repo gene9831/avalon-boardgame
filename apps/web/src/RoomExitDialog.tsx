@@ -2,7 +2,6 @@ import { ModalDialog } from './ModalDialog'
 
 export interface RoomExitDialogProps {
   busy: boolean
-  error: string | null
   isHost: boolean
   onCancel: () => void
   onConfirm: () => void
@@ -11,7 +10,6 @@ export interface RoomExitDialogProps {
 
 export function RoomExitDialog({
   busy,
-  error,
   isHost,
   onCancel,
   onConfirm,
@@ -43,11 +41,6 @@ export function RoomExitDialog({
           {title}
         </h2>
         <p className="mt-3 text-sm leading-6 text-slate-300">{description}</p>
-        {error !== null && (
-          <p className="mt-4 rounded-xl border border-rose-300/20 bg-rose-300/10 px-3 py-2 text-sm text-rose-100" role="alert">
-            {error}
-          </p>
-        )}
         <div className="mt-6 flex justify-end gap-3">
           <button
             autoFocus

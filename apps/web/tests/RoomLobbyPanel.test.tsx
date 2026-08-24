@@ -9,6 +9,7 @@ function renderPanel(overrides: Partial<RoomLobbyPanelProps> = {}) {
     connected: true,
     currentPlayerID: '1',
     manualReconnectAvailable: false,
+    logEntries: [{ group: '等待房间', id: 'presence-0', kind: 'presence', title: '当前房间共有 2 名玩家' }],
     matchID: 'room-123',
     numPlayers: 5,
     occupiedPlayerIDs: ['0', '1'],
@@ -16,10 +17,12 @@ function renderPanel(overrides: Partial<RoomLobbyPanelProps> = {}) {
     onReconnect: vi.fn(),
     onRequestRoomExit: vi.fn(),
     onStart: vi.fn(),
+    onSaveProfile: vi.fn(),
     players: [
       { id: 0, name: 'Alice', isConnected: true },
       { id: 1, name: 'Bob', isConnected: true },
     ],
+    profile: { avatarID: 'merlin', name: 'Bob' },
     roomExitBusy: false,
     ...overrides,
   }
@@ -96,8 +99,20 @@ describe('RoomLobbyPanel connection recovery', () => {
     const retryHtml = renderPanel({ connected: false, manualReconnectAvailable: true })
 
     expect(connectedHtml).not.toContain('已连接')
+    expect(connectedHtml).toContain('aria-label="房间操作"')
     expect(recoveringHtml).toContain('正在重连')
     expect(recoveringHtml).not.toContain('>重连<')
+    expect(recoveringHtml).not.toContain('aria-label="房间操作"')
     expect(retryHtml).toContain('>重连<')
+    expect(retryHtml).not.toContain('aria-label="房间操作"')
+  })
+})
+
+describe('RoomLobbyPanel operation log', () => {
+  it('places the log control in the room header without an unread badge', () => {
+    const html = renderPanel()
+
+    expect(html).toContain('aria-label="查看操作日志"')
+    expect(html).not.toContain('data-unread')
   })
 })

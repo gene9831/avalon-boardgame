@@ -54,6 +54,7 @@ function renderPanel({
       connected
       game={game}
       manualReconnectAvailable={false}
+      logEntries={[{ group: '游戏开始', id: 'game-start', kind: 'game-start', title: 'Alice（1号位）开始了游戏' }]}
       matchID="room-123"
       onAssassinate={vi.fn()}
       onBackHome={vi.fn()}
@@ -62,12 +63,23 @@ function renderPanel({
       onPlayQuestCard={vi.fn<(card: QuestCard) => void>()}
       onProposeTeam={vi.fn()}
       onReconnect={vi.fn()}
+      onSaveProfile={vi.fn()}
       phase={phase}
       playerID={playerID}
       players={lobbyPlayers}
+      profile={{ avatarID: 'merlin', name: 'Alice' }}
     />,
   )
 }
+
+describe('RoomGamePanel operation log', () => {
+  it('keeps a public operation-log control in the room header without a badge', () => {
+    const html = renderPanel()
+
+    expect(html).toContain('aria-label="查看操作日志"')
+    expect(html).not.toContain('data-unread')
+  })
+})
 
 describe('RoomGamePanel identity recognition', () => {
   it('lowers an opaque curtain before showing the first role card', () => {
@@ -225,11 +237,12 @@ describe('RoomGamePanel quest hand', () => {
 
     expect(html).toContain('让任务成功')
     expect(html).toContain('让任务失败')
-    expect(html).toContain('data-role-avatar="assassin"')
+    expect(html).toContain('data-visible-role="assassin"')
+    expect(html.match(/data-player-avatar=/g)).toHaveLength(6)
     expect(html).toContain('>刺客<')
     expect(html).toContain('aria-label="显示已知角色信息"')
     expect(html).not.toContain('你知道的邪恶阵营：Eve')
-    expect(html).not.toContain('data-role-avatar="minion"')
+    expect(html).not.toContain('data-visible-role="minion"')
     expect(html).not.toContain('<aside')
     expect(html).not.toContain('>重连<')
   })
@@ -340,7 +353,7 @@ describe('RoomGamePanel result', () => {
     expect(html).not.toContain('目标 Player 2')
     expect(html).toContain('Alice · 梅林')
     expect(html).toContain('Dylan · 刺客')
-    expect(html.match(/data-role-avatar=/g)).toHaveLength(5)
+    expect(html.match(/data-visible-role=/g)).toHaveLength(5)
   })
 })
 
@@ -356,12 +369,15 @@ describe('RoomGamePanel connection recovery', () => {
         onAssassinate={vi.fn()}
         onBackHome={vi.fn()}
         onCastTeamVote={vi.fn()}
+        onConfirmIdentityRecognition={vi.fn()}
         onPlayQuestCard={vi.fn()}
         onProposeTeam={vi.fn()}
         onReconnect={vi.fn()}
+        onSaveProfile={vi.fn()}
         phase="teamProposal"
         playerID="0"
         players={players}
+        profile={{ avatarID: 'merlin', name: 'Alice' }}
       />,
     )
 
@@ -380,12 +396,15 @@ describe('RoomGamePanel connection recovery', () => {
         onAssassinate={vi.fn()}
         onBackHome={vi.fn()}
         onCastTeamVote={vi.fn()}
+        onConfirmIdentityRecognition={vi.fn()}
         onPlayQuestCard={vi.fn()}
         onProposeTeam={vi.fn()}
         onReconnect={vi.fn()}
+        onSaveProfile={vi.fn()}
         phase="teamProposal"
         playerID="0"
         players={players}
+        profile={{ avatarID: 'merlin', name: 'Alice' }}
       />,
     )
 

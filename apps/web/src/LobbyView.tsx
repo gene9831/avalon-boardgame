@@ -1,6 +1,8 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 
 import { LobbyDevTools } from './LobbyDevTools'
+import { PlayerProfileControl } from './PlayerProfileControl'
+import type { PlayerProfile } from './player-profile'
 import type { RoomSession } from './room-session'
 import {
   canJoinRoom,
@@ -17,20 +19,19 @@ export interface LobbyViewProps {
   devToken: string
   devToolsEnabled: boolean
   devToolsError: string | null
-  error: string | null
   matches: AvalonRoomSummary[]
-  numPlayers: number
   onCreate: () => void
   onDeleteRoom: (matchID: string) => Promise<void>
   onDevTokenChange: (value: string) => void
   onEnterRoom: (matchID: string) => void
   onJoin: (matchID: string, playerID: string) => void
   onRefresh: () => void
+  onSaveProfile: (profile: PlayerProfile) => void
+  profile: PlayerProfile
   roomAccessLocked: boolean
   roomAccessPending: boolean
   roomAccessUnavailable: boolean
   selectedSeats: Record<string, string>
-  setNumPlayers: (value: number) => void
   setSelectedSeats: Dispatch<SetStateAction<Record<string, string>>>
 }
 
@@ -77,20 +78,19 @@ export function LobbyView({
   devToken,
   devToolsEnabled,
   devToolsError,
-  error,
   matches,
-  numPlayers,
   onCreate,
   onDeleteRoom,
   onDevTokenChange,
   onEnterRoom,
   onJoin,
   onRefresh,
+  onSaveProfile,
+  profile,
   roomAccessLocked,
   roomAccessPending,
   roomAccessUnavailable,
   selectedSeats,
-  setNumPlayers,
   setSelectedSeats,
 }: LobbyViewProps) {
   const activeRoomMatchIDs = new Set(activeRoomSessions.map(({ matchID }) => matchID))
@@ -193,18 +193,19 @@ export function LobbyView({
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.16),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(34,211,238,0.14),_transparent_35%)] px-4 py-6 text-slate-200 sm:px-8 sm:py-10">
       <div className="mx-auto max-w-6xl">
-        <header className="mb-8 max-w-3xl sm:mb-10">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-300">局域网阿瓦隆</p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white sm:text-6xl">今晚，谁值得信任？</h1>
-          <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">在同一个局域网内创建圆桌、选择座位并开始一局阿瓦隆。角色与秘密始终由服务器守护。</p>
+        <header className="mb-8 flex items-start justify-between gap-4 sm:mb-10">
+          <div className="min-w-0 max-w-3xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-300">局域网阿瓦隆</p>
+            <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white sm:text-6xl">今晚，谁值得信任？</h1>
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">在同一个局域网内创建圆桌、选择座位并开始一局阿瓦隆。角色与秘密始终由服务器守护。</p>
+          </div>
+          <PlayerProfileControl locked={roomAccessLocked} onSave={onSaveProfile} profile={profile} />
         </header>
 
-        <section className="flex items-end justify-between gap-4 rounded-3xl border border-amber-300/20 bg-white/[0.06] p-5 shadow-2xl shadow-black/20 backdrop-blur sm:gap-6 sm:p-7">
-          <div>
-            <label className="block text-sm font-medium text-slate-200" htmlFor="player-count">玩家人数</label>
-            <select className="mt-2 rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-amber-300/70 focus:ring-2 focus:ring-amber-300/20" id="player-count" onChange={(event) => setNumPlayers(Number(event.target.value))} value={numPlayers}>
-              {Array.from({ length: 6 }, (_, index) => index + 5).map((count) => <option key={count} value={count}>{count} 人</option>)}
-            </select>
+        <section className="flex items-center justify-between gap-4 rounded-3xl border border-amber-300/20 bg-white/[0.06] p-5 shadow-2xl shadow-black/20 backdrop-blur sm:gap-6 sm:p-7">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-white sm:text-xl">创建新的圆桌</h2>
+            <p className="mt-1 text-sm text-slate-400">选择人数并确认本局配置后创建房间。</p>
           </div>
           <div className="text-right">
             <button className={createButton} disabled={busy || roomAccessLocked} onClick={onCreate} type="button">{busy ? '处理中…' : '创建房间'}</button>
@@ -224,7 +225,6 @@ export function LobbyView({
           onTokenChange={onDevTokenChange}
           token={devToken}
         />
-        {error !== null && <div className="mt-6 rounded-2xl border border-rose-300/25 bg-rose-300/10 px-4 py-3 text-sm text-rose-100">{error}</div>}
       </div>
     </main>
   )

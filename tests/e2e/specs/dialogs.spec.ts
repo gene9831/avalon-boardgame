@@ -1,5 +1,7 @@
 import { expect, test, type Locator } from '@playwright/test'
 
+import { createRoom } from '../support/browser-replay'
+
 async function expectCenteredWithinViewport(dialog: Locator) {
   const geometry = await dialog.evaluate((element) => {
     const rect = element.getBoundingClientRect()
@@ -26,12 +28,12 @@ test('business dialogs remain centered within a narrow viewport', async ({ page 
   await page.goto('/')
 
   await page.getByRole('button', { name: '创建房间' }).click()
-  const playerNameDialog = page.getByRole('dialog', {
-    name: '创建房间前确认名称',
+  const createGameDialog = page.getByRole('dialog', {
+    name: '创建一局阿瓦隆',
   })
-  await expectCenteredWithinViewport(playerNameDialog)
-  await playerNameDialog.getByLabel('玩家名称').fill('Centered Dialog Host')
-  await playerNameDialog.getByRole('button', { name: '确认创建' }).click()
+  await expectCenteredWithinViewport(createGameDialog)
+  await createGameDialog.getByRole('button', { name: '5', exact: true }).click()
+  await createGameDialog.getByRole('button', { name: '创建房间' }).click()
   await expect(page).toHaveURL(/\/rooms\/[^/]+$/)
 
   await page.getByRole('button', { name: '房间操作' }).evaluate((button) => {
@@ -45,4 +47,38 @@ test('business dialogs remain centered within a narrow viewport', async ({ page 
   await expectCenteredWithinViewport(
     page.getByRole('dialog', { name: '确认解散房间' }),
   )
+})
+
+test('user center and room log contain focus and restore it after closing', async ({
+  page,
+}) => {
+  await page.goto('/')
+
+  const profileTrigger = page.getByRole('button', { name: '打开用户中心' })
+  await profileTrigger.click()
+  const profile = page.getByRole('dialog', { name: '用户中心' })
+  const profileClose = profile.getByRole('button', { name: '关闭用户中心' })
+  const licenseLink = profile.getByRole('link', { name: 'CC BY 4.0' })
+
+  await expect(profileClose).toBeFocused()
+  await page.keyboard.press('Shift+Tab')
+  await expect(licenseLink).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(profileClose).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(profile).not.toBeVisible()
+  await expect(profileTrigger).toBeFocused()
+
+  await createRoom(page, 5, 'Keyboard Host')
+  const logTrigger = page.getByRole('button', { name: '查看操作日志' })
+  await logTrigger.click()
+  const roomLog = page.getByRole('dialog', { name: '操作日志' })
+  const logClose = roomLog.getByRole('button', { name: '关闭操作日志' })
+
+  await expect(logClose).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(logClose).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(roomLog).not.toBeVisible()
+  await expect(logTrigger).toBeFocused()
 })

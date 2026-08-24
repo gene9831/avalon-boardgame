@@ -1,7 +1,10 @@
+import type { PlayerAvatarID } from './player-profile'
+
 export interface RoomSession {
   matchID: string
   playerID: string
   credentials: string
+  avatarID?: PlayerAvatarID
   playerName: string
   sessionID?: string
 }

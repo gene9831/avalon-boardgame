@@ -18,18 +18,26 @@ export function playerName(playerID: string) {
   return `Replay Player ${Number(playerID) + 1}`
 }
 
+export async function setPlayerProfileName(page: Page, name: string) {
+  await page.getByRole('button', { name: '打开用户中心' }).click()
+  const profile = page.getByRole('dialog', { name: '用户中心' })
+  await profile.getByRole('textbox', { name: '显示名称' }).fill(name)
+  await profile.getByRole('button', { name: '保存资料' }).click()
+}
+
 export async function createRoom(
   page: Page,
   playerCount: number,
   name = playerName('0'),
 ) {
   await page.goto('/')
+  await setPlayerProfileName(page, name)
   const createButton = page.getByRole('button', { name: '创建房间' })
   await expect(createButton).toBeEnabled()
-  await page.locator('#player-count').selectOption(String(playerCount))
   await createButton.click()
-  await page.getByRole('dialog').getByLabel('玩家名称').fill(name)
-  await page.getByRole('button', { name: '确认创建' }).click()
+  const createDialog = page.getByRole('dialog', { name: '创建一局阿瓦隆' })
+  await createDialog.getByRole('button', { name: String(playerCount), exact: true }).click()
+  await createDialog.getByRole('button', { name: '创建房间' }).click()
   await expect(page).toHaveURL(/\/rooms\/[^/]+$/)
 
   const match = /\/rooms\/([^/]+)$/.exec(new URL(page.url()).pathname)
@@ -44,15 +52,12 @@ export async function joinRoom(
   name = playerName(playerID),
 ) {
   await page.goto('/')
+  await setPlayerProfileName(page, name)
   const roomHeading = page.getByText(`房间 ${matchID}`, { exact: true })
   await expect(roomHeading).toBeVisible()
   const room = roomHeading.locator('xpath=ancestor::article')
   await room.getByLabel(`选择 ${matchID} 的座位`).selectOption(playerID)
   await room.getByRole('button', { name: '加入' }).click()
-  await page.getByRole('dialog').getByLabel('玩家名称').fill(
-    name,
-  )
-  await page.getByRole('button', { name: '确认加入' }).click()
   await expect(page).toHaveURL(new RegExp(`/rooms/${matchID}$`))
 }
 

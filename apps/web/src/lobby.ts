@@ -1,6 +1,7 @@
 import { LobbyClient } from 'boardgame.io/client'
 
 import { webConfig } from './config'
+import type { PlayerAvatarID } from './player-profile'
 
 export const AVALON_GAME_NAME = 'avalon'
 
@@ -9,6 +10,7 @@ export interface LobbyPlayer {
   name?: string
   isConnected?: boolean
   data?: {
+    avatarID?: PlayerAvatarID
     clientID?: string
     sessionID?: string
     [key: string]: unknown

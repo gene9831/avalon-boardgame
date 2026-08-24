@@ -2,6 +2,11 @@ import { useState } from 'react'
 
 import { ConnectionRecoveryControl } from './ConnectionRecoveryControl'
 import type { LobbyPlayer } from './lobby'
+import { PlayerAvatar } from './player-avatars'
+import { PlayerProfileControl } from './PlayerProfileControl'
+import type { PlayerProfile } from './player-profile'
+import { RoomLogControl } from './RoomLogControl'
+import type { RoomLogEntry } from './room-log'
 import { buildRoundTableSeats, RoundTable, type RoundTableSeat } from './RoundTable'
 
 export interface RoomLobbyPanelProps {
@@ -9,6 +14,7 @@ export interface RoomLobbyPanelProps {
   connected: boolean
   currentPlayerID: string
   manualReconnectAvailable: boolean
+  logEntries: readonly RoomLogEntry[]
   matchID: string
   numPlayers: number
   occupiedPlayerIDs: readonly string[]
@@ -16,7 +22,9 @@ export interface RoomLobbyPanelProps {
   onReconnect: () => void
   onRequestRoomExit: () => void
   onStart: () => void
+  onSaveProfile: (profile: PlayerProfile) => void
   players: readonly LobbyPlayer[]
+  profile: PlayerProfile
   roomExitBusy: boolean
 }
 
@@ -25,6 +33,7 @@ export function RoomLobbyPanel({
   connected,
   currentPlayerID,
   manualReconnectAvailable,
+  logEntries,
   matchID,
   numPlayers,
   occupiedPlayerIDs,
@@ -32,7 +41,9 @@ export function RoomLobbyPanel({
   onReconnect,
   onRequestRoomExit,
   onStart,
+  onSaveProfile,
   players,
+  profile,
   roomExitBusy,
 }: RoomLobbyPanelProps) {
   const seats = buildRoundTableSeats(players, numPlayers, currentPlayerID)
@@ -57,9 +68,11 @@ export function RoomLobbyPanel({
             <h1 className="truncate text-sm font-semibold text-white sm:mt-0.5 sm:text-xl">房间 {matchID}</h1>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="mr-12 flex shrink-0 items-center gap-2">
           <ConnectionRecoveryControl connected={connected} manualReconnectAvailable={manualReconnectAvailable} onReconnect={onReconnect} />
-          <div className="relative">
+          <RoomLogControl entries={logEntries} />
+          <PlayerProfileControl locked onSave={onSaveProfile} profile={profile} />
+          {connected && <div className="relative">
             <button
               aria-expanded={roomMenuOpen}
               aria-label="房间操作"
@@ -74,7 +87,7 @@ export function RoomLobbyPanel({
                 {roomExitBusy ? (isHost ? '正在解散…' : '正在退出…') : isHost ? '解散房间' : '退出房间'}
               </button>
             </div>
-          </div>
+          </div>}
         </div>
       </header>
 
@@ -115,7 +128,6 @@ function SeatCard({
   dense: boolean
   seat: RoundTableSeat
 }) {
-  const initial = seat.occupied ? Array.from(seat.name.trim())[0] : seat.seatNumber
   const seatStates = [
     seat.isCurrentPlayer ? '这是你' : null,
     seat.occupied && !seat.connected ? '已断线' : null,
@@ -128,10 +140,12 @@ function SeatCard({
     <div aria-label={accessibleName} className={`pointer-events-auto flex flex-col items-center ${dense ? 'w-[clamp(3.1rem,14vw,6.5rem)]' : 'w-[clamp(4.2rem,17vw,8rem)]'}`} data-round-table-player role="group">
       <div
         aria-hidden="true"
-        className={`${dense ? 'size-[clamp(2.5rem,9.5vw,4.5rem)]' : 'size-[clamp(3rem,12vw,5.5rem)]'} grid shrink-0 place-items-center rounded-full border-2 text-[clamp(0.9rem,4vw,1.8rem)] font-semibold shadow-lg ${seat.isCurrentPlayer ? 'border-amber-200 bg-gradient-to-br from-amber-200/35 to-amber-950 text-amber-50 shadow-amber-300/20' : seat.occupied ? 'border-slate-500 bg-gradient-to-br from-slate-500 to-slate-900 text-slate-50' : 'border-dashed border-slate-500/70 bg-slate-950/70 text-slate-500'} ${seat.occupied && !seat.connected ? 'grayscale opacity-45' : ''}`}
+        className={`${dense ? 'size-[clamp(2.5rem,9.5vw,4.5rem)]' : 'size-[clamp(3rem,12vw,5.5rem)]'} grid shrink-0 place-items-center overflow-hidden rounded-full border-2 text-[clamp(0.9rem,4vw,1.8rem)] font-semibold shadow-lg ${seat.isCurrentPlayer ? 'border-amber-200 bg-[#efe3c6] text-amber-50 shadow-amber-300/20' : seat.occupied ? 'border-[#d8c69f]/70 bg-[#efe3c6] text-slate-900' : 'border-dashed border-slate-500/70 bg-slate-950/70 text-slate-500'} ${seat.occupied && !seat.connected ? 'grayscale opacity-45' : ''}`}
         data-round-table-avatar
       >
-        {initial}
+        {seat.occupied ? (
+          <PlayerAvatar avatarID={seat.avatarID} className="size-full object-contain p-[12%]" />
+        ) : seat.seatNumber}
       </div>
       <div className={`mt-1 w-full rounded-md border px-1.5 py-0.5 text-center shadow-lg ${seat.isCurrentPlayer ? 'border-amber-200/70 bg-amber-950/90' : seat.occupied ? 'border-white/15 bg-slate-950/90' : 'border-dashed border-white/20 bg-slate-950/75'}`} data-label-placement={seat.labelPlacement} data-round-table-nameplate title={`${seat.seatNumber}. ${seat.name}`}>
         <p className="truncate text-[clamp(0.58rem,2.4vw,0.8rem)] font-medium text-white">
