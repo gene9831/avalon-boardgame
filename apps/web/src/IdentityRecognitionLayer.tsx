@@ -38,22 +38,19 @@ const ROLE_GUIDANCE: Record<Role, { ability: string; objective: string }> = {
 
 const STEP_COPY: Record<
   IdentityRecognitionStep,
-  { title: string; confirmation: string; waiting: string }
+  { title: string; confirmation: string }
 > = {
   roleReveal: {
     title: '查看你的身份',
     confirmation: '我已确认身份',
-    waiting: '等待其他玩家确认身份',
   },
   evilRecognition: {
     title: '邪恶阵营，请睁眼并辨认同伴',
     confirmation: '我已辨认同伴',
-    waiting: '等待其他邪恶阵营玩家',
   },
   merlinRecognition: {
     title: '梅林，请睁眼并辨认邪恶阵营',
     confirmation: '我已辨认邪恶阵营',
-    waiting: '等待梅林确认',
   },
 }
 
@@ -183,11 +180,6 @@ function RecognitionConfirmation({
       >
         {confirmed ? '等待中' : copy.confirmation}
       </button>
-      {confirmed && (
-        <p className="mt-1 text-center text-[0.65rem] text-slate-400">
-          {copy.waiting}
-        </p>
-      )}
     </div>
   )
 }

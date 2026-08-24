@@ -139,7 +139,37 @@ describe('RoomGamePanel identity recognition', () => {
     expect(html).not.toContain('我已辨认同伴')
   })
 
-  it('keeps confirmed recognition information visible while waiting', () => {
+  it('does not shift the first role card with extra waiting copy', () => {
+    const html = renderPanel({
+      activeStage: 'identityRecognition',
+      game: gameView({
+        identityRecognition: {
+          step: 'roleReveal',
+          deadlineAt: Date.now() + 10_000,
+          confirmedCount: 1,
+          participantCount: 5,
+        },
+        viewer: {
+          role: 'merlin',
+          loyalty: 'good',
+          knownEvilPlayerIDs: [],
+          identityRecognition: {
+            isParticipant: true,
+            confirmed: true,
+            deadlineRefreshRequired: false,
+            serverNow: 1_000,
+          },
+        },
+      }),
+      phase: 'identityRecognition',
+    })
+
+    expect(html).toContain('>等待中<')
+    expect(html).toContain('disabled=""')
+    expect(html).not.toContain('等待其他玩家确认身份')
+  })
+
+  it('keeps recognition information visible with only a fixed waiting button', () => {
     const html = renderPanel({
       activeStage: 'identityRecognition',
       game: gameView({
@@ -169,6 +199,7 @@ describe('RoomGamePanel identity recognition', () => {
     expect(html).toContain('data-known-player-info="true"')
     expect(html).toContain('>等待中<')
     expect(html).toContain('disabled=""')
+    expect(html).not.toContain('等待其他邪恶阵营玩家')
   })
 })
 
