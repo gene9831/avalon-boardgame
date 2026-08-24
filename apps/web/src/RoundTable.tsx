@@ -1,8 +1,11 @@
 import type { CSSProperties, ReactNode } from 'react'
 
 import type { LobbyPlayer } from './lobby'
+import { getSeatAvatarID } from './seat-avatar'
+import type { PlayerAvatarID } from './player-profile'
 
 export interface RoundTableSeat {
+  avatarID: PlayerAvatarID
   playerID: string
   seatNumber: number
   name: string
@@ -38,6 +41,7 @@ export function buildRoundTableSeats(
     const vertical = Math.sin(angle)
 
     return {
+      avatarID: getSeatAvatarID(player?.data, index),
       playerID: String(index),
       seatNumber: index + 1,
       name: occupied ? player.name! : '等待加入',

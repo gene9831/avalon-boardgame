@@ -44,6 +44,7 @@ export interface TimeoutConfig {
 export type TeamVote = 'approve' | 'reject'
 
 export interface TeamVoteResult {
+  proposerID?: PlayerID
   questIndex: number
   team: PlayerID[]
   votes: Record<PlayerID, TeamVote>

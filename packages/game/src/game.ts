@@ -425,6 +425,7 @@ function createAvalonGameDefinition(
                   const approved = approvalCount > ctx.numPlayers / 2
 
                   G.voteHistory.push({
+                    proposerID: G.leaderID ?? undefined,
                     questIndex: G.questIndex,
                     team: [...G.proposedTeam],
                     votes,

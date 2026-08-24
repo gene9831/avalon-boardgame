@@ -25,6 +25,7 @@ function createStorage(initialValues: Record<string, string> = {}): RoomSessionS
 }
 
 const session = {
+  avatarID: 'merlin' as const,
   matchID: 'room-123',
   playerID: '2',
   credentials: 'credential-123',

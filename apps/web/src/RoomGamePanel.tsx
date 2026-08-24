@@ -7,10 +7,6 @@ import type {
   TeamVote,
 } from '@avalon/game'
 
-import assassinAvatar from './assets/roles/assassin.png'
-import loyalServantAvatar from './assets/roles/loyal-servant.png'
-import merlinAvatar from './assets/roles/merlin.png'
-import minionAvatar from './assets/roles/minion-of-mordred.png'
 import { ConnectionRecoveryControl } from './ConnectionRecoveryControl'
 import { IdentityRecognitionLayer } from './IdentityRecognitionLayer'
 import type { LobbyPlayer } from './lobby'
@@ -22,12 +18,18 @@ import {
   toggleTeamMember,
 } from './room-game'
 import { buildRoundTableSeats, RoundTable, type RoundTableSeat } from './RoundTable'
+import { PlayerProfileControl } from './PlayerProfileControl'
+import { PlayerAvatar } from './player-avatars'
+import type { PlayerProfile } from './player-profile'
+import { RoomLogControl } from './RoomLogControl'
+import type { RoomLogEntry } from './room-log'
 
 interface RoomGamePanelProps {
   activeStage: string | undefined
   connected: boolean
   game: AvalonPlayerView
   manualReconnectAvailable: boolean
+  logEntries: readonly RoomLogEntry[]
   matchID: string
   onAssassinate: (targetID: PlayerID) => void
   onBackHome: () => void
@@ -36,9 +38,11 @@ interface RoomGamePanelProps {
   onPlayQuestCard: (card: QuestCard) => void
   onProposeTeam: (team: PlayerID[]) => void
   onReconnect: () => void
+  onSaveProfile: (profile: PlayerProfile) => void
   phase: string
   playerID: PlayerID
   players: readonly LobbyPlayer[]
+  profile: PlayerProfile
 }
 
 export function RoomGamePanel({
@@ -46,6 +50,7 @@ export function RoomGamePanel({
   connected,
   game,
   manualReconnectAvailable,
+  logEntries,
   matchID,
   onAssassinate,
   onBackHome,
@@ -54,9 +59,11 @@ export function RoomGamePanel({
   onPlayQuestCard,
   onProposeTeam,
   onReconnect,
+  onSaveProfile,
   phase,
   playerID,
   players,
+  profile,
 }: RoomGamePanelProps) {
   const playerIDs = Object.keys(game.players).sort((left, right) => Number(left) - Number(right))
   const seats = buildRoundTableSeats(players, playerIDs.length, playerID)
@@ -126,8 +133,10 @@ export function RoomGamePanel({
             <h1 className="truncate text-sm font-semibold text-white sm:mt-0.5 sm:text-xl">房间 {matchID}</h1>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="mr-12 flex shrink-0 items-center gap-2">
           <ConnectionRecoveryControl connected={connected} manualReconnectAvailable={manualReconnectAvailable} onReconnect={onReconnect} />
+          <RoomLogControl entries={logEntries} />
+          <PlayerProfileControl locked onSave={onSaveProfile} profile={profile} />
         </div>
       </header>
 
@@ -293,7 +302,6 @@ function GameSeat({ canSelect, canSelectAsTarget, dense, game, onSelect, seat, s
     : seat.isCurrentPlayer
       ? 'border-amber-200 bg-gradient-to-br from-amber-200/35 to-amber-950 text-amber-50 shadow-[0_0_22px_rgba(251,191,36,0.4)]'
       : 'border-slate-500 bg-gradient-to-br from-slate-500 to-slate-950 text-slate-50'
-  const initial = Array.from(seat.name.trim())[0] ?? seat.seatNumber
   const seatAction = canSelect
     ? `选择 ${seat.name} 加入任务队伍`
     : canSelectAsTarget
@@ -324,14 +332,7 @@ function GameSeat({ canSelect, canSelectAsTarget, dense, game, onSelect, seat, s
       <div className="relative">
         {isLeader && <CrownIcon />}
         <div className={`${dense ? 'size-[clamp(2.5rem,9.5vw,4.5rem)]' : 'size-[clamp(3rem,12vw,5.5rem)]'} grid shrink-0 place-items-center overflow-hidden rounded-full border-2 text-[clamp(0.9rem,4vw,1.8rem)] font-semibold transition ${avatarClasses} ${!seat.connected ? 'grayscale opacity-45' : ''}`} data-round-table-avatar>
-          {visibleRole === null ? initial : (
-            <img
-              alt=""
-              className="h-full w-full object-cover"
-              data-role-avatar={visibleRole}
-              src={ROLE_AVATARS[visibleRole]}
-            />
-          )}
+          <PlayerAvatar avatarID={seat.avatarID} className="size-full object-contain p-[12%]" />
         </div>
         {knownEvil && <KnownEvilEmblem />}
       </div>
@@ -339,7 +340,7 @@ function GameSeat({ canSelect, canSelectAsTarget, dense, game, onSelect, seat, s
         <p className="truncate text-[clamp(0.58rem,2.4vw,0.8rem)] font-medium leading-tight text-white">
           {seat.seatNumber}. {seat.name}
         </p>
-        {visibleRole !== null && <p className="truncate text-[clamp(0.5rem,2vw,0.7rem)] font-semibold leading-tight text-amber-200">{SHORT_ROLE_LABELS[visibleRole]}</p>}
+        {visibleRole !== null && <p className="truncate text-[clamp(0.5rem,2vw,0.7rem)] font-semibold leading-tight text-amber-200" data-visible-role={visibleRole}>{SHORT_ROLE_LABELS[visibleRole]}</p>}
       </div>
     </button>
   )
@@ -404,13 +405,6 @@ function isEligibleAssassinationTarget(
   targetID: PlayerID,
 ) {
   return targetID !== playerID && !game.viewer.knownEvilPlayerIDs.includes(targetID)
-}
-
-const ROLE_AVATARS: Record<Role, string> = {
-  assassin: assassinAvatar,
-  loyal_servant: loyalServantAvatar,
-  merlin: merlinAvatar,
-  minion: minionAvatar,
 }
 
 const SHORT_ROLE_LABELS: Record<Role, string> = {

@@ -63,6 +63,12 @@ select {
   animation: identity-role-reveal-content 180ms ease-out 200ms both;
 }
 
+@media (max-width: 420px) {
+  .round-table-header-decoration {
+    display: none;
+  }
+}
+
 @keyframes identity-curtain-lower {
   from {
     transform: translateY(-102%);

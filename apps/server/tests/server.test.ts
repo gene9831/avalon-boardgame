@@ -193,7 +193,7 @@ describe('Avalon server', () => {
     }
   })
 
-  it('rejects trimmed case-insensitive duplicate names within one match', async () => {
+  it('allows duplicate display names because seats remain the stable identity', async () => {
     const running = await startAvalonServer({
       config: testConfig,
       db: new MemoryStorage(),
@@ -205,17 +205,22 @@ describe('Avalon server', () => {
     try {
       const { matchID } = await lobby.createMatch('avalon', { numPlayers: 5 })
       await lobby.joinMatch('avalon', matchID, {
+        data: { avatarID: 'merlin', clientID: 'client-alice-1' },
         playerID: '0',
         playerName: 'Alice',
       })
 
-      await expect(lobby.joinMatch('avalon', matchID, {
+      await lobby.joinMatch('avalon', matchID, {
+        data: { avatarID: 'morgana', clientID: 'client-alice-2' },
         playerID: '1',
         playerName: '  ALICE  ',
-      })).rejects.toThrow('HTTP status 409')
+      })
 
       const match = await lobby.getMatch('avalon', matchID)
-      expect(match.players.find(({ id }) => id === 1)?.name).toBeUndefined()
+      expect(match.players.find(({ id }) => id === 0)?.name).toBe('Alice')
+      expect(match.players.find(({ id }) => id === 1)?.name).toBe('ALICE')
+      expect(match.players.find(({ id }) => id === 0)?.data).toMatchObject({ avatarID: 'merlin' })
+      expect(match.players.find(({ id }) => id === 1)?.data).toMatchObject({ avatarID: 'morgana' })
     } finally {
       await running.close()
     }

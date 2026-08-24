@@ -40,6 +40,7 @@ describe('pending join flow', () => {
         numPlayers: 5,
       },
       {
+        avatarID: 'percival',
         clientID: 'client-1',
         createSessionID: () => 'join-session-1',
         gameName: 'avalon',
@@ -51,6 +52,7 @@ describe('pending join flow', () => {
       matchID: 'room-created',
       playerID: '0',
       credentials: 'credential-0',
+      avatarID: 'percival',
       playerName: 'Alice',
       sessionID: 'join-session-1',
     })
@@ -61,7 +63,11 @@ describe('pending join flow', () => {
         'avalon',
         'room-created',
         {
-          data: { clientID: 'client-1', sessionID: 'join-session-1' },
+          data: {
+            avatarID: 'percival',
+            clientID: 'client-1',
+            sessionID: 'join-session-1',
+          },
           playerID: '0',
           playerName: 'Alice',
         },
@@ -78,6 +84,7 @@ describe('pending join flow', () => {
         playerID: '3',
       },
       {
+        avatarID: 'morgana',
         clientID: 'client-1',
         createSessionID: () => 'join-session-2',
         gameName: 'avalon',
@@ -93,7 +100,11 @@ describe('pending join flow', () => {
         'avalon',
         'room-existing',
         {
-          data: { clientID: 'client-1', sessionID: 'join-session-2' },
+          data: {
+            avatarID: 'morgana',
+            clientID: 'client-1',
+            sessionID: 'join-session-2',
+          },
           playerID: '3',
           playerName: 'Bob',
         },
@@ -104,6 +115,7 @@ describe('pending join flow', () => {
   it('rejects a blank name before calling the lobby client', async () => {
     await expect(
       executePendingJoin(fakeLobby, intent, {
+        avatarID: 'assassin',
         clientID: 'client-1',
         createSessionID: () => 'join-session-3',
         gameName: 'avalon',
@@ -116,6 +128,7 @@ describe('pending join flow', () => {
   it('rejects a name longer than 24 characters before calling the lobby client', async () => {
     await expect(
       executePendingJoin(fakeLobby, intent, {
+        avatarID: 'assassin',
         clientID: 'client-1',
         createSessionID: () => 'join-session-too-long',
         gameName: 'avalon',
@@ -127,6 +140,7 @@ describe('pending join flow', () => {
 
   it('keeps the public join session ID distinct from player credentials', async () => {
     const result = await executePendingJoin(fakeLobby, intent, {
+      avatarID: 'merlin',
       clientID: 'client-1',
       createSessionID: () => 'opaque-join-session',
       gameName: 'avalon',
@@ -140,6 +154,7 @@ describe('pending join flow', () => {
 
   it('namespaces default public session IDs away from credential UUIDs', async () => {
     const result = await executePendingJoin(fakeLobby, intent, {
+      avatarID: 'loyal-servant',
       clientID: 'client-1',
       gameName: 'avalon',
       playerName: 'Alice',

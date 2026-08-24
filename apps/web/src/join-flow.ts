@@ -1,6 +1,7 @@
 import type { RoomSession } from './room-session'
 import { createClientID } from './client-identity'
 import { getPlayerNameValidationError } from './player-name'
+import type { PlayerAvatarID } from './player-profile'
 
 export type PendingJoin =
   | { type: 'create'; numPlayers: number }
@@ -15,7 +16,11 @@ export interface LobbyJoinClient {
     gameName: string,
     matchID: string,
     options: {
-      data: { clientID: string; sessionID: string }
+      data: {
+        avatarID: PlayerAvatarID
+        clientID: string
+        sessionID: string
+      }
       playerID: string
       playerName: string
     },
@@ -26,6 +31,7 @@ export async function executePendingJoin(
   lobby: LobbyJoinClient,
   intent: PendingJoin,
   options: {
+    avatarID: PlayerAvatarID
     clientID: string
     createSessionID?: () => string
     gameName: string
@@ -52,7 +58,11 @@ export async function executePendingJoin(
   }
 
   const joined = await lobby.joinMatch(options.gameName, matchID, {
-    data: { clientID: options.clientID, sessionID },
+    data: {
+      avatarID: options.avatarID,
+      clientID: options.clientID,
+      sessionID,
+    },
     playerID,
     playerName,
   })
@@ -61,6 +71,7 @@ export async function executePendingJoin(
     matchID,
     playerID: joined.playerID,
     credentials: joined.playerCredentials,
+    avatarID: options.avatarID,
     playerName,
     sessionID,
   }

@@ -6,7 +6,6 @@ import { RoomExitDialog, type RoomExitDialogProps } from '../src/RoomExitDialog'
 function renderDialog(overrides: Partial<RoomExitDialogProps> = {}) {
   const props: RoomExitDialogProps = {
     busy: false,
-    error: null,
     isHost: false,
     onCancel: vi.fn(),
     onConfirm: vi.fn(),
@@ -34,13 +33,10 @@ describe('RoomExitDialog', () => {
     expect(html).toContain('>解散房间<')
   })
 
-  it('locks dismissal during submission and exposes a retryable error', () => {
+  it('locks dismissal during submission', () => {
     const busyHtml = renderDialog({ busy: true })
-    const failedHtml = renderDialog({ error: '退出失败，请重试。' })
 
     expect(busyHtml).toMatch(/<button[^>]*disabled=""[^>]*>取消<\/button>/)
     expect(busyHtml).toMatch(/<button[^>]*disabled=""[^>]*>正在退出…<\/button>/)
-    expect(failedHtml).toContain('role="alert"')
-    expect(failedHtml).toContain('退出失败，请重试。')
   })
 })

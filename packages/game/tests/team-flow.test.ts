@@ -123,6 +123,7 @@ describe('Avalon team proposal and vote flow', () => {
 
   it('approves a proposal only with a strict majority', () => {
     const client = createStartedClient()
+    const leader = getGame(client).leaderID
     proposeTeam(client, ['0', '1'])
     castVotes(client, {
       '0': 'approve',
@@ -136,6 +137,7 @@ describe('Avalon team proposal and vote flow', () => {
     expect(client.store.getState().ctx.phase).toBe('quest')
     expect(game.voteHistory).toEqual([
       {
+        proposerID: leader,
         questIndex: 0,
         team: ['0', '1'],
         votes: {
