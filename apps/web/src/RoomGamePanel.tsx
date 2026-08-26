@@ -140,7 +140,10 @@ export function RoomGamePanel({
         </div>
       </header>
 
-      <div className="round-table-stage relative flex min-h-0 flex-1 items-center justify-center py-1">
+      <div
+        className="round-table-stage relative flex min-h-0 flex-1 items-center justify-center py-1"
+        data-recognition-layout={showRecognitionKnowledge ? 'responsive' : undefined}
+      >
         <RoundTable
           ariaLabel={`${playerIDs.length} 人游戏圆桌`}
           center={<QuestBoard game={game} numPlayers={playerIDs.length} phaseLabel={phaseLabel}>{phaseAction}</QuestBoard>}
