@@ -209,6 +209,8 @@ describe('RoomGamePanel identity recognition', () => {
 
     expect(html).toContain('data-curtain-state="raised"')
     expect(html).toContain('data-known-player-info="true"')
+    expect(html).toContain('role="status"')
+    expect(html).toContain('aria-live="polite"')
     expect(html).toContain('>等待中<')
     expect(html).toContain('disabled=""')
     expect(html).not.toContain('等待其他邪恶阵营玩家')

@@ -28,11 +28,16 @@ select {
 }
 
 .round-table-layout {
-  width: min(100%, calc(100dvh - 8rem), 640px);
+  width: var(--round-table-size, min(100%, calc(100dvh - 8rem), 640px));
   min-width: 0;
   min-height: 0;
   max-width: 640px;
   max-height: 640px;
+}
+
+.round-table-stage {
+  --round-table-center-size: min(52%, calc(52dvh - 4.16rem), 20.8rem);
+  --round-table-size: min(100%, calc(100dvh - 8rem), 640px);
 }
 
 .phase-action-compact-label {
@@ -61,6 +66,14 @@ select {
 
 .identity-role-reveal-content {
   animation: identity-role-reveal-content 180ms ease-out 200ms both;
+}
+
+.identity-recognition-responsive-panel {
+  display: contents;
+}
+
+.identity-recognition-compact-title {
+  display: none;
 }
 
 @media (max-width: 420px) {
@@ -154,10 +167,53 @@ select {
   }
 }
 
+@media (orientation: landscape) {
+  .round-table-stage[data-recognition-layout="responsive"] .quest-board {
+    display: none;
+  }
+
+  .identity-recognition-raised-content {
+    justify-content: center;
+  }
+
+  .identity-recognition-responsive-panel {
+    display: flex;
+    width: var(--round-table-center-size);
+    max-height: var(--round-table-center-size);
+    flex-direction: column;
+    justify-content: center;
+    gap: clamp(0.25rem, 1.2dvh, 0.75rem);
+    overflow: hidden;
+    border: 1px solid rgb(253 230 138 / 0.35);
+    border-radius: clamp(0.8rem, 3vw, 1.75rem);
+    background: linear-gradient(135deg, rgb(38 61 48 / 0.98), rgb(17 40 34 / 0.98) 52%, rgb(43 31 20 / 0.98));
+    padding: clamp(0.45rem, 1.4vw, 1rem);
+    box-shadow: 0 22px 55px rgb(0 0 0 / 0.5), inset 0 0 45px rgb(245 158 11 / 0.08);
+  }
+
+  .identity-recognition-header,
+  .identity-recognition-confirmation {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
+  .identity-recognition-confirmation button {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
 @media (max-height: 420px) {
+  .round-table-stage {
+    --round-table-center-size: min(48%, calc(48dvh - 2.28rem), 19.2rem);
+    --round-table-size: min(100%, calc(100dvh - 4.75rem), 640px);
+  }
+
   .round-table-layout {
     transform: translateY(-1.5rem);
-    width: min(100%, calc(100dvh - 4.75rem), 640px);
   }
 
   .round-table-center-shell {
@@ -266,5 +322,35 @@ select {
 
   [data-round-table-nameplate] {
     margin-top: 0.125rem;
+  }
+
+  .identity-recognition-responsive-panel {
+    gap: 0.125rem;
+    padding: 0.35rem;
+    transform: translateY(-1.5rem);
+  }
+
+  .identity-recognition-full-title {
+    display: none;
+  }
+
+  .identity-recognition-compact-title {
+    display: inline;
+  }
+
+  .identity-recognition-header h2 {
+    font-size: 0.875rem;
+    line-height: 1.1rem;
+  }
+
+  .identity-recognition-header p {
+    margin-top: 0;
+    font-size: 0.625rem;
+  }
+
+  .identity-recognition-confirmation button {
+    min-height: 2.75rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
   }
 }
