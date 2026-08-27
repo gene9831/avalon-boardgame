@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { loadEnvFile } from 'node:process'
 
-import { Client, LobbyClient } from 'boardgame.io/client'
+import { Client } from 'boardgame.io/client'
 import { SocketIO } from 'boardgame.io/multiplayer'
 import { describe, expect, it } from 'vitest'
 
@@ -9,6 +9,7 @@ import { AvalonGame, type AvalonPlayerView } from '@avalon/game'
 
 import { startAvalonServer } from '../src/server'
 import { PostgresStorage } from '../src/storage/postgres'
+import { AvalonTestLobbyClient as LobbyClient } from './support/lobby-client'
 
 const envFile = new URL('../.env.local', import.meta.url)
 if (existsSync(envFile)) loadEnvFile(envFile)

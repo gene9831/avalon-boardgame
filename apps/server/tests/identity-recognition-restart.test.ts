@@ -1,4 +1,4 @@
-import { Client, LobbyClient } from 'boardgame.io/client'
+import { Client } from 'boardgame.io/client'
 import { SocketIO } from 'boardgame.io/multiplayer'
 import { describe, expect, it } from 'vitest'
 
@@ -6,6 +6,7 @@ import { AvalonGame, type AvalonG } from '@avalon/game'
 
 import { startAvalonServer } from '../src/server'
 import { MemoryStorage } from '../src/storage/memory'
+import { AvalonTestLobbyClient as LobbyClient } from './support/lobby-client'
 
 const testConfig = {
   gamePort: 0,

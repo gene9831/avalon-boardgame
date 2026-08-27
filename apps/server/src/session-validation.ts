@@ -1,6 +1,6 @@
-import { timingSafeEqual } from 'node:crypto'
-
 import type { StorageAPI } from 'boardgame.io'
+
+import { secretMatches } from './secret'
 
 type RouteContext = {
   params: Record<string, string>
@@ -14,14 +14,6 @@ export function readBearerCredential(authorization: string) {
   return authorization.startsWith(prefix)
     ? authorization.slice(prefix.length)
     : ''
-}
-
-export function credentialsMatch(provided: string, stored: string | undefined) {
-  if (provided.length === 0 || stored === undefined) return false
-
-  const providedBytes = Buffer.from(provided)
-  const storedBytes = Buffer.from(stored)
-  return providedBytes.length === storedBytes.length && timingSafeEqual(providedBytes, storedBytes)
 }
 
 export function registerRoomSessionValidationRoute(
@@ -45,7 +37,7 @@ export function registerRoomSessionValidationRoute(
     if (
       player === undefined ||
       player.name === undefined ||
-      !credentialsMatch(credential, player.credentials)
+      !secretMatches(credential, player.credentials)
     ) {
       ctx.throw(403)
     }

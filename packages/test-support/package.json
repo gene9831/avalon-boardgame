@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@avalon/game": "workspace:*",
-    "boardgame.io": "^0.50.2"
+    "boardgame.io": "0.50.2"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

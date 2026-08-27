@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Server, State, StorageAPI } from 'boardgame.io'
-import { LobbyClient } from 'boardgame.io/client'
 
 import { AvalonSocketRegistry } from '../src/dev-admin'
 import { registerRoomParticipationRoutes } from '../src/room-participation'
 import { startAvalonServer } from '../src/server'
 import { createDeletionSafeStorage } from '../src/storage/deletion-safe'
 import { MemoryStorage } from '../src/storage/memory'
+import { AvalonTestLobbyClient as LobbyClient } from './support/lobby-client'
 
 const config = {
   gamePort: 0,

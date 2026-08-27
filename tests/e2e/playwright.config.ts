@@ -29,7 +29,7 @@ export default defineConfig({
   webServer: [
     {
       command: `NODE_ENV=test AVALON_STORAGE=memory AVALON_GAME_PORT=${gamePort} AVALON_LOBBY_PORT=${lobbyPort} AVALON_DEV_TOOLS=true AVALON_DEV_ADMIN_TOKEN=${devAdminToken} AVALON_ORIGINS=${webURL} AVALON_TEST_GAME_SEED=${gameSeed} pnpm --filter @avalon/server dev`,
-      url: `http://127.0.0.1:${lobbyPort}/games`,
+      url: `http://127.0.0.1:${lobbyPort}/rooms/avalon`,
       reuseExistingServer: false,
       timeout: 30_000,
     },
