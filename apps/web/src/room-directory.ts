@@ -1,18 +1,7 @@
-export type RoomStatus = 'lobby' | 'playing' | 'finished'
-
-export interface RoomPlayer {
-  id: number
-  name?: string
-  isConnected: boolean
-}
-
-export interface AvalonRoomSummary {
-  matchID: string
-  status: RoomStatus
-  players: RoomPlayer[]
-  createdAt: number
-  updatedAt: number
-}
+import {
+  parseAvalonRoomDirectoryResponse,
+  type AvalonRoomSummary,
+} from '@avalon/game'
 
 export interface PaginatedRooms<T> {
   items: T[]
@@ -30,6 +19,13 @@ export class RoomDirectoryHttpError extends Error {
   }
 }
 
+export class RoomDirectoryContractError extends Error {
+  constructor(options?: ErrorOptions) {
+    super('房间列表响应格式无效。', options)
+    this.name = 'RoomDirectoryContractError'
+  }
+}
+
 type Fetcher = typeof fetch
 
 export async function fetchRoomSummaries(
@@ -38,8 +34,13 @@ export async function fetchRoomSummaries(
 ): Promise<AvalonRoomSummary[]> {
   const response = await fetcher(`${baseURL}/rooms/avalon`)
   if (!response.ok) throw new RoomDirectoryHttpError(response.status)
-  const result = (await response.json()) as { rooms: AvalonRoomSummary[] }
-  return result.rooms
+
+  try {
+    const result: unknown = await response.json()
+    return parseAvalonRoomDirectoryResponse(result).rooms
+  } catch (error) {
+    throw new RoomDirectoryContractError({ cause: error })
+  }
 }
 
 export function paginateRooms<T>(rooms: readonly T[], page: number, pageSize = 20): PaginatedRooms<T> {

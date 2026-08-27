@@ -1,3 +1,5 @@
+import type { AvalonRoomSummary } from '@avalon/game'
+
 import type { PlayerAvatarID } from './player-profile'
 
 export interface RoomSession {
@@ -35,10 +37,7 @@ interface RoomSessionRoom {
   }[]
 }
 
-interface ActiveRoomSummary {
-  matchID: string
-  status: 'lobby' | 'playing' | 'finished'
-}
+type ActiveRoomSummary = Pick<AvalonRoomSummary, 'matchID' | 'status'>
 
 export interface ActiveRoomSessionValidation {
   sessions: RoomSession[]

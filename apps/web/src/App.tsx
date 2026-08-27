@@ -22,6 +22,7 @@ import {
   AvalonGame,
   type AvalonG,
   type AvalonPlayerView,
+  type AvalonRoomSummary,
   type PlayerID,
   type QuestCard,
   type TeamVote,
@@ -91,7 +92,6 @@ import {
 } from './room-session'
 import {
   fetchRoomSummaries,
-  type AvalonRoomSummary,
 } from './room-directory'
 import { ToastProvider } from './toast'
 import { useToast } from './toast-context'

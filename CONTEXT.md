@@ -7,6 +7,9 @@ This context defines the shared language for the online version of The Resistanc
 **Room**: One independently playable Avalon game for 5–10 players. A room has its own seats, role assignment, phase, history, and result.
 _Avoid_: shared game, lobby game
 
+**Room directory**: The public, non-authoritative collection of discoverable room summaries. It contains room status and public seat information, but never credentials or hidden game state.
+_Avoid_: Lobby match list, complete room state
+
 **Seat**: A stable position in a room, identified by a seat number and occupied by at most one player at a time.
 _Avoid_: slot, account
 

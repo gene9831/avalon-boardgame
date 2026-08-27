@@ -96,6 +96,9 @@ importers:
       boardgame.io:
         specifier: ^0.50.2
         version: 0.50.2
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^24.13.3
@@ -1789,6 +1792,9 @@ packages:
     resolution: {integrity: sha512-2OQsPNEmBCvXuFlIni/a+Rn+R2pHW9INm0BxXJ4hVDA8TirqMj+J/Rp9ItLatT/5pZqWwefVrTQcHpixsxnVlA==}
     engines: {node: '>= 4.0.0'}
 
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
+
 snapshots:
 
   '@babel/runtime@7.29.7': {}
@@ -3204,3 +3210,5 @@ snapshots:
   xtend@4.0.2: {}
 
   ylru@1.4.0: {}
+
+  zod@4.4.3: {}
