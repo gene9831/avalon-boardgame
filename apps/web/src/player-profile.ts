@@ -1,20 +1,17 @@
+import {
+  AVALON_PLAYER_AVATAR_IDS,
+  AvalonPlayerAvatarIDSchema,
+  type AvalonPlayerAvatarID,
+} from '@avalon/game'
+
 import { getPlayerNameValidationError, loadPlayerName, PLAYER_NAME_KEY } from './player-name'
 import type { RoomSessionStorage } from './room-session'
 
 export const PLAYER_PROFILE_KEY = 'avalon:player-profile'
 
-export const PLAYER_AVATAR_IDS = [
-  'assassin',
-  'loyal-servant',
-  'merlin',
-  'minion-of-mordred',
-  'mordred',
-  'morgana',
-  'oberon',
-  'percival',
-] as const
+export const PLAYER_AVATAR_IDS = AVALON_PLAYER_AVATAR_IDS
 
-export type PlayerAvatarID = typeof PLAYER_AVATAR_IDS[number]
+export type PlayerAvatarID = AvalonPlayerAvatarID
 
 export interface PlayerProfile {
   avatarID: PlayerAvatarID
@@ -83,7 +80,7 @@ function browserStorage(): RoomSessionStorage {
 }
 
 export function isPlayerAvatarID(value: unknown): value is PlayerAvatarID {
-  return PLAYER_AVATAR_IDS.includes(value as PlayerAvatarID)
+  return AvalonPlayerAvatarIDSchema.safeParse(value).success
 }
 
 function isPlayerProfile(value: unknown): value is PlayerProfile {

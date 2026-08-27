@@ -15,6 +15,29 @@ export type {
   AvalonRoomStatus,
   AvalonRoomSummary,
 } from './room-directory'
+export {
+  AVALON_PLAYER_AVATAR_IDS,
+  AvalonClientIDSchema,
+  AvalonCreateRoomRequestSchema,
+  AvalonJoinRoomRequestSchema,
+  AvalonMatchIDSchema,
+  AvalonPlayerAvatarIDSchema,
+  AvalonPlayerNameSchema,
+  AvalonPublicSessionIDSchema,
+  AvalonRoomDetailSchema,
+  AvalonSeatIDSchema,
+  parseAvalonCreateRoomRequest,
+  parseAvalonJoinRoomRequest,
+  parseAvalonRoomDetail,
+} from './room-api'
+export type {
+  AvalonCreateRoomRequest,
+  AvalonJoinRoomRequest,
+  AvalonMatchID,
+  AvalonPlayerAvatarID,
+  AvalonRoomDetail,
+  AvalonSeatID,
+} from './room-api'
 export { getIdentityRecognitionParticipantIDs } from './identity-recognition'
 export {
   assignRoles,
