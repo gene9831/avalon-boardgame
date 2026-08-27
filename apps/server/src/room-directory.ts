@@ -1,20 +1,9 @@
 import type { Server, State, StorageAPI } from 'boardgame.io'
 
-export type AvalonRoomStatus = 'lobby' | 'playing' | 'finished'
-
-export interface AvalonRoomPlayer {
-  id: number
-  name?: string
-  isConnected: boolean
-}
-
-export interface AvalonRoomSummary {
-  matchID: string
-  status: AvalonRoomStatus
-  players: AvalonRoomPlayer[]
-  createdAt: number
-  updatedAt: number
-}
+import type {
+  AvalonRoomStatus,
+  AvalonRoomSummary,
+} from '@avalon/game'
 
 function getStatus(metadata: Server.MatchData, state: State): AvalonRoomStatus {
   if (metadata.gameover !== undefined) return 'finished'

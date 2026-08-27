@@ -1,5 +1,10 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 
+import type {
+  AvalonRoomStatus,
+  AvalonRoomSummary,
+} from '@avalon/game'
+
 import { LobbyDevTools } from './LobbyDevTools'
 import { PlayerProfileControl } from './PlayerProfileControl'
 import type { PlayerProfile } from './player-profile'
@@ -9,8 +14,6 @@ import {
   getOccupiedRoomPlayerIDs,
   getRoomPlayerCount,
   paginateRooms,
-  type AvalonRoomSummary,
-  type RoomStatus,
 } from './room-directory'
 
 export interface LobbyViewProps {
@@ -39,7 +42,7 @@ type RoomSectionKey = 'active' | 'finished'
 
 interface RoomSection {
   key: RoomSectionKey
-  statuses: RoomStatus[]
+  statuses: AvalonRoomStatus[]
   title: string
   empty: string
 }
@@ -66,7 +69,7 @@ const enterButton = `${lobbyButtonBase} bg-emerald-300 text-slate-950 hover:bg-e
 const neutralButton = `${lobbyButtonBase} border border-white/15 bg-slate-900/40 text-slate-200 hover:border-slate-300/50 hover:bg-slate-800/70 hover:text-white focus-visible:ring-slate-300`
 const neutralIconButton = 'grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/15 bg-slate-900/40 text-slate-200 transition-colors hover:border-slate-300/50 hover:bg-slate-800/70 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950'
 
-function roomStatusLabel(status: RoomStatus) {
+function roomStatusLabel(status: AvalonRoomStatus) {
   if (status === 'lobby') return '等待中'
   if (status === 'playing') return '进行中'
   return '已结束'

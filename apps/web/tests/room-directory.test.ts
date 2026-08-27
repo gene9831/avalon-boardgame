@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import type { AvalonRoomSummary } from '@avalon/game'
+
 import {
   canJoinRoom,
+  fetchRoomSummaries,
   paginateRooms,
-  type AvalonRoomSummary,
 } from '../src/room-directory'
 import { createDevToolsClient } from '../src/dev-tools'
 import {
@@ -15,6 +17,54 @@ import {
 } from '../src/room-session'
 
 describe('room directory', () => {
+  it('rejects a successful HTTP response with an invalid directory payload', async () => {
+    const request = fetchRoomSummaries(
+      'http://localhost:8001',
+      vi.fn().mockResolvedValue(new Response('{}', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })),
+    )
+
+    await expect(request).rejects.toMatchObject({
+      name: 'RoomDirectoryContractError',
+      message: '房间列表响应格式无效。',
+    })
+  })
+
+  it('returns only validated room-directory fields', async () => {
+    const rooms = await fetchRoomSummaries(
+      'http://localhost:8001',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({
+        traceID: 'ignored',
+        rooms: [{
+          matchID: 'room-1',
+          status: 'lobby',
+          createdAt: 1,
+          updatedAt: 2,
+          internal: 'ignored',
+          players: [{
+            id: 0,
+            name: 'Alice',
+            isConnected: true,
+            credential: 'ignored',
+          }],
+        }],
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })),
+    )
+
+    expect(rooms).toEqual([{
+      matchID: 'room-1',
+      status: 'lobby',
+      createdAt: 1,
+      updatedAt: 2,
+      players: [{ id: 0, name: 'Alice', isConnected: true }],
+    }])
+  })
+
   it('paginates a room section without mutating the source list', () => {
     const rooms = Array.from({ length: 21 }, (_, index) => ({
       matchID: `room-${index}`,
