@@ -13,6 +13,7 @@ import { AvalonSocketRegistry, registerDevAdminRoutes } from './dev-admin'
 import { registerRoomParticipationRoutes } from './room-participation'
 import { registerRoomSessionValidationRoute } from './session-validation'
 import { createDeletionSafeStorage } from './storage/deletion-safe'
+import { secretMatches } from './secret'
 
 type BoardgameServer = ReturnType<typeof createBoardgameServer>
 type ServerHandles = Awaited<ReturnType<BoardgameServer['run']>>
@@ -244,6 +245,8 @@ export function createAvalonServer(options: AvalonServerOptions = {}) {
       }) as unknown as BoardgameGame,
     ],
     db,
+    authenticateCredentials: (credentials, playerMetadata) =>
+      secretMatches(credentials, playerMetadata?.credentials),
     generateCredentials: createAvalonCredentialGenerator(db),
     origins: config.origins,
     apiOrigins: config.origins,

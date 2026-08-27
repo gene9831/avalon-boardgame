@@ -8,6 +8,7 @@ import {
   toAvalonRoomSummary,
 } from './room-directory'
 import type { MatchDeletionGuard } from './storage/deletion-safe'
+import { secretMatches } from './secret'
 
 type MatchQueue = { add<T>(task: () => Promise<T>): Promise<T> }
 type SocketListener = (...args: any[]) => unknown
@@ -122,7 +123,10 @@ function authenticate(ctx: RouteContext, config: AvalonServerConfig) {
     ctx.throw(404)
   }
   const authorization = ctx.get('authorization')
-  if (authorization !== `Bearer ${config.devAdminToken}`) ctx.throw(401)
+  const providedToken = authorization.startsWith('Bearer ')
+    ? authorization.slice('Bearer '.length)
+    : ''
+  if (!secretMatches(providedToken, config.devAdminToken)) ctx.throw(401)
 }
 
 async function fetchMatch(db: StorageAPI.Sync | StorageAPI.Async, matchID: string) {
