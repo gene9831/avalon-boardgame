@@ -14,6 +14,7 @@ import { registerRoomParticipationRoutes } from './room-participation'
 import { registerRoomSessionValidationRoute } from './session-validation'
 import { createDeletionSafeStorage } from './storage/deletion-safe'
 import { secretMatches } from './secret'
+import { installAvalonHTTPBoundary } from './http-boundary'
 
 type BoardgameServer = ReturnType<typeof createBoardgameServer>
 type ServerHandles = Awaited<ReturnType<BoardgameServer['run']>>
@@ -275,6 +276,7 @@ export function createAvalonServer(options: AvalonServerOptions = {}) {
     queues: boardgame.transport,
   })
   registerRoomSessionValidationRoute(boardgame.router, db)
+  installAvalonHTTPBoundary(boardgame.router)
 
   return {
     boardgame,

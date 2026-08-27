@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { LobbyClient } from 'boardgame.io/client'
-
 import { startAvalonServer } from '../src/server'
 import { MemoryStorage } from '../src/storage/memory'
+import { AvalonTestLobbyClient as LobbyClient } from './support/lobby-client'
 
 const config = {
   gamePort: 0,
@@ -84,7 +83,10 @@ describe('room session validation', () => {
         data: publicData,
       })
       const publicMatch = await lobby.getMatch('avalon', matchID)
-      expect(publicMatch.players[0].data).toEqual(publicData)
+      expect(publicMatch.players[0].data).toEqual({
+        avatarID: 'loyal-servant',
+        sessionID: publicData.sessionID,
+      })
 
       expect((await validateSession(
         running,

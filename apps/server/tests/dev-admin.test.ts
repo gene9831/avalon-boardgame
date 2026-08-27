@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Server, State, StorageAPI } from 'boardgame.io'
-import { Client, LobbyClient } from 'boardgame.io/client'
+import { Client } from 'boardgame.io/client'
 import { SocketIO } from 'boardgame.io/multiplayer'
 
 import {
@@ -14,6 +14,7 @@ import { listAvalonRoomSummaries } from '../src/room-directory'
 import { startAvalonServer } from '../src/server'
 import { MemoryStorage } from '../src/storage/memory'
 import { createDeletionSafeStorage } from '../src/storage/deletion-safe'
+import { AvalonTestLobbyClient as LobbyClient } from './support/lobby-client'
 
 const config = {
   gamePort: 0,
@@ -397,17 +398,18 @@ describe('Avalon development APIs', () => {
       })
       expect(replacement.playerID).toBe('0')
 
-      await expect(lobby.updatePlayer('avalon', matchID, {
-        playerID: '0',
-        credentials: joined.playerCredentials,
-        newName: 'Mallory',
-      })).rejects.toThrow('HTTP status 403')
-      await expect(lobby.updatePlayer('avalon', matchID, {
-        playerID: '0',
-        credentials: replacement.playerCredentials,
-        newName: 'Robert',
-      })).resolves.toBeUndefined()
-      expect((await lobby.getMatch('avalon', matchID)).players[0].name).toBe('Robert')
+      const sessionURL = `${baseURL(running)}/rooms/avalon/${matchID}/players/0/session`
+      const oldSession = await fetch(sessionURL, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${joined.playerCredentials}` },
+      })
+      const replacementSession = await fetch(sessionURL, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${replacement.playerCredentials}` },
+      })
+      expect(oldSession.status).toBe(403)
+      expect(replacementSession.status).toBe(204)
+      expect((await lobby.getMatch('avalon', matchID)).players[0].name).toBe('Bob')
     } finally {
       await running.close()
     }

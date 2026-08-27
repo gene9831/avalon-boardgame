@@ -1,5 +1,5 @@
 import type { State } from 'boardgame.io'
-import { Client, LobbyClient } from 'boardgame.io/client'
+import { Client } from 'boardgame.io/client'
 import { SocketIO } from 'boardgame.io/multiplayer'
 
 import {
@@ -14,6 +14,7 @@ import {
 
 import { startAvalonServer } from '../../src/server'
 import { MemoryStorage } from '../../src/storage/memory'
+import { AvalonTestLobbyClient as LobbyClient } from './lobby-client'
 
 const testConfig = {
   gamePort: 0,
