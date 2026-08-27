@@ -26,6 +26,11 @@ Before changing game behavior, consult the relevant documents:
 - `docs/rules/` — game rules and role visibility.
 - `docs/adr/` — architectural decisions.
 - `docs/superpowers/specs/2026-08-14-avalon-boardgame-design.md` — accepted MVP design.
+- `docs/ENGINEERING_STANDARDS.md` — implementation, testing, and AI change standards.
+
+Before changing code, read the sections of `docs/ENGINEERING_STANDARDS.md` that
+apply to the task. Keep this file as the concise project-policy entry point and
+the engineering standards document as the detailed implementation guide.
 
 Treat `docs/PROJECT_STATUS.md` as the sole project-progress tracker.
 Do not create competing status documents.

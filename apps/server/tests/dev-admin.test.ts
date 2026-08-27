@@ -4,7 +4,10 @@ import type { Server, State, StorageAPI } from 'boardgame.io'
 import { Client, LobbyClient } from 'boardgame.io/client'
 import { SocketIO } from 'boardgame.io/multiplayer'
 
-import { AvalonGame } from '@avalon/game'
+import {
+  AvalonGame,
+  parseAvalonRoomDirectoryResponse,
+} from '@avalon/game'
 
 import { AvalonSocketRegistry, registerDevAdminRoutes } from '../src/dev-admin'
 import { listAvalonRoomSummaries } from '../src/room-directory'
@@ -243,6 +246,7 @@ describe('Avalon development APIs', () => {
       })
 
       const rooms = await listAvalonRoomSummaries(db)
+      const directory = parseAvalonRoomDirectoryResponse({ rooms })
 
       expect(rooms[0].players[0]).toEqual({
         id: 0,
@@ -252,6 +256,7 @@ describe('Avalon development APIs', () => {
       expect(rooms[0]).toMatchObject({ status: 'lobby' })
       expect(rooms[0]).not.toHaveProperty('state')
       expect(JSON.stringify(rooms[0])).not.toContain('secret-client-id')
+      expect(directory).toEqual({ rooms })
     } finally {
       await running.close()
     }
