@@ -42,7 +42,6 @@ describe('Avalon Socket.IO error boundary', () => {
       expect(log).toHaveBeenCalledWith('Socket.IO request failed', {
         event: 'sync',
         code: 'ETIMEDOUT',
-        message: 'connect ETIMEDOUT',
       })
     } finally {
       log.mockRestore()

@@ -15,6 +15,7 @@ import { registerRoomSessionValidationRoute } from './session-validation'
 import { createDeletionSafeStorage } from './storage/deletion-safe'
 import { secretMatches } from './secret'
 import { installAvalonHTTPBoundary } from './http-boundary'
+import { AvalonSocketIO } from './socket-transport'
 
 type BoardgameServer = ReturnType<typeof createBoardgameServer>
 type ServerHandles = Awaited<ReturnType<BoardgameServer['run']>>
@@ -246,6 +247,7 @@ export function createAvalonServer(options: AvalonServerOptions = {}) {
       }) as unknown as BoardgameGame,
     ],
     db,
+    transport: new AvalonSocketIO(),
     authenticateCredentials: (credentials, playerMetadata) =>
       secretMatches(credentials, playerMetadata?.credentials),
     generateCredentials: createAvalonCredentialGenerator(db),

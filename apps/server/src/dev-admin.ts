@@ -11,7 +11,7 @@ import type { MatchDeletionGuard } from './storage/deletion-safe'
 import { secretMatches } from './secret'
 
 type MatchQueue = { add<T>(task: () => Promise<T>): Promise<T> }
-type SocketListener = (...args: any[]) => unknown
+type SocketListener = (...args: never[]) => unknown
 type SocketLike = {
   id: string
   conn?: { close(): void }
@@ -22,7 +22,7 @@ type SocketLike = {
 }
 type NamespaceLike = { on(event: string, listener: (socket: SocketLike) => void): void }
 
-const BOARDGAME_SOCKET_EVENTS = ['update', 'sync', 'disconnect', 'chat'] as const
+const BOARDGAME_SOCKET_EVENTS = ['update', 'sync', 'disconnect'] as const
 
 function handleSocketRequestError(
   socket: SocketLike,
@@ -33,8 +33,7 @@ function handleSocketRequestError(
   const code = (normalizedError as NodeJS.ErrnoException).code
   console.error('Socket.IO request failed', {
     event,
-    ...(code === undefined ? {} : { code }),
-    message: normalizedError.message,
+    code: code ?? 'socket_request_failed',
   })
 
   if (socket.conn !== undefined) {
@@ -48,9 +47,10 @@ function wrapSocketRequestListeners(socket: SocketLike) {
   for (const event of BOARDGAME_SOCKET_EVENTS) {
     for (const listener of socket.listeners(event)) {
       socket.removeListener(event, listener)
-      socket.on(event, (...args: any[]) => {
+      socket.on(event, (...args: unknown[]) => {
+        const invoke = listener as (...listenerArgs: unknown[]) => unknown
         try {
-          return Promise.resolve(listener.apply(socket, args)).catch((error: unknown) => {
+          return Promise.resolve(invoke.apply(socket, args)).catch((error: unknown) => {
             handleSocketRequestError(socket, event, error)
           })
         } catch (error) {
