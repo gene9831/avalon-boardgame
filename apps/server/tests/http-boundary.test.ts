@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { LobbyClient } from 'boardgame.io/client'
 
@@ -202,6 +202,48 @@ describe('Avalon HTTP protocol boundary', () => {
         },
       })
     } finally {
+      await running.close()
+    }
+  })
+
+  it('returns a safe service error when room storage is unavailable', async () => {
+    class UnavailableStorage extends MemoryStorage {
+      override createMatch(
+        _matchID: string,
+        _options: Parameters<MemoryStorage['createMatch']>[1],
+      ): never {
+        throw Object.assign(new Error('database password must not leak'), {
+          code: 'ECONNRESET',
+        })
+      }
+    }
+
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const running = await startAvalonServer({ config, db: new UnavailableStorage() })
+
+    try {
+      const response = await fetch(
+        `${baseURL(running)}/games/avalon/create`,
+        jsonRequest({ numPlayers: 5 }),
+      )
+      const body = await response.json()
+
+      expect(response.status).toBe(503)
+      expect(body).toEqual({
+        error: {
+          code: 'service_unavailable',
+          message: 'Service temporarily unavailable',
+        },
+      })
+      expect(log).toHaveBeenCalledWith('Avalon HTTP request failed', {
+        event: 'lobby_request',
+        code: 'ECONNRESET',
+      })
+      expect(JSON.stringify({ body, calls: log.mock.calls })).not.toContain(
+        'database password',
+      )
+    } finally {
+      log.mockRestore()
       await running.close()
     }
   })

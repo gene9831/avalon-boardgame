@@ -29,10 +29,22 @@ type ErrorCode =
   | 'client_already_joined'
   | 'conflict'
   | 'forbidden'
+  | 'internal_error'
   | 'invalid_request'
   | 'not_found'
   | 'payload_too_large'
+  | 'service_unavailable'
   | 'seat_unavailable'
+
+const TEMPORARY_FAILURE_CODES = new Set([
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'EHOSTUNREACH',
+  'ENETDOWN',
+  'ENETUNREACH',
+  'EPIPE',
+  'ETIMEDOUT',
+])
 
 const parseJSONBody = koaBody({
   formLimit: HTTP_BODY_LIMIT,
@@ -52,6 +64,14 @@ function errorStatus(error: unknown) {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : ''
+}
+
+function safeErrorCode(error: unknown) {
+  if (typeof error !== 'object' || error === null) return 'unexpected_error'
+  const code = (error as { code?: unknown }).code
+  return typeof code === 'string' && /^[A-Z0-9_]{1,64}$/.test(code)
+    ? code
+    : 'unexpected_error'
 }
 
 function respondWithError(
@@ -92,8 +112,32 @@ function respondWithRequestFailure(ctx: RouteContext, error: unknown) {
     respondWithError(ctx, 403, 'forbidden', 'Request is not authorized')
     return
   }
+  if (status === 400) {
+    respondWithError(ctx, 400, 'invalid_request', 'Invalid Avalon request')
+    return
+  }
 
-  respondWithError(ctx, 400, 'invalid_request', 'Invalid Avalon request')
+  const code = safeErrorCode(error)
+  console.error('Avalon HTTP request failed', {
+    event: 'lobby_request',
+    code,
+  })
+  if (
+    TEMPORARY_FAILURE_CODES.has(code) ||
+    status === 502 ||
+    status === 503 ||
+    status === 504
+  ) {
+    respondWithError(
+      ctx,
+      503,
+      'service_unavailable',
+      'Service temporarily unavailable',
+    )
+    return
+  }
+
+  respondWithError(ctx, 500, 'internal_error', 'Internal server error')
 }
 
 function createValidatedBodyMiddleware(

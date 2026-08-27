@@ -42,14 +42,20 @@ function connectSocket(port: number) {
 describe('Avalon Socket.IO transport contract', () => {
   it('fails closed unless boardgame.io installs exactly one connection hook', () => {
     const emptyNamespace = new EventEmitter()
-    expect(() => hardenAvalonSocketNamespace(emptyNamespace as never)).toThrow(
+    expect(() => hardenAvalonSocketNamespace(
+      emptyNamespace as never,
+      async () => true,
+    )).toThrow(
       'expected exactly one boardgame.io connection listener',
     )
 
     const duplicateNamespace = new EventEmitter()
     duplicateNamespace.on('connection', () => undefined)
     duplicateNamespace.on('connection', () => undefined)
-    expect(() => hardenAvalonSocketNamespace(duplicateNamespace as never)).toThrow(
+    expect(() => hardenAvalonSocketNamespace(
+      duplicateNamespace as never,
+      async () => true,
+    )).toThrow(
       'expected exactly one boardgame.io connection listener',
     )
   })
@@ -70,7 +76,7 @@ describe('Avalon Socket.IO transport contract', () => {
     const log = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
     try {
-      hardenAvalonSocketNamespace(namespace as never)
+      hardenAvalonSocketNamespace(namespace as never, async () => true)
       namespace.emit('connection', socket)
 
       expect(socket.listenerCount('sync')).toBe(1)
@@ -153,6 +159,33 @@ describe('Avalon Socket.IO transport contract', () => {
       socket.emit('sync', 'x'.repeat(65 * 1024), '0', 'credential', 5)
       await disconnected
       expect(socket.connected).toBe(false)
+    } finally {
+      socket.close()
+      await running.close()
+    }
+  })
+
+  it.each([
+    ['a valid but unknown room ID', 'room-unknown'],
+    ['an invalid room ID', 'x'.repeat(129)],
+  ])('rejects sync for %s without creating storage', async (_case, matchID) => {
+    const storage = new MemoryStorage()
+    const running = await startAvalonServer({ config, db: storage })
+    const socket = connectSocket(running.gamePort)
+
+    try {
+      await waitForEvent(socket, 'connect')
+      const disconnected = waitForEvent(socket, 'disconnect')
+      socket.emit('sync', matchID, null, undefined, 5)
+      await disconnected
+
+      expect(storage.fetch(matchID, {
+        metadata: true,
+        state: true,
+      })).toEqual({
+        metadata: undefined,
+        state: undefined,
+      })
     } finally {
       socket.close()
       await running.close()
