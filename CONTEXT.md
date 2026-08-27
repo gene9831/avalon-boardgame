@@ -10,8 +10,14 @@ _Avoid_: shared game, lobby game
 **Room directory**: The public, non-authoritative collection of discoverable room summaries. It contains room status and public seat information, but never credentials or hidden game state.
 _Avoid_: Lobby match list, complete room state
 
+**Room detail**: The public, non-authoritative description of one room used to enter or reconnect to it. It contains only required room, seat, and public player profile data; it excludes client IDs, seat credentials, unknown metadata, and hidden game state.
+_Avoid_: match metadata, complete match data
+
 **Seat**: A stable position in a room, identified by a seat number and occupied by at most one player at a time.
 _Avoid_: slot, account
+
+**Seat credential**: A secret bound to one room and seat that proves authority to reconnect to or act for that seat. Public client IDs and session IDs are not seat credentials.
+_Avoid_: player credential, playerCredentials
 
 **Player**: The person occupying a seat in a room. A player is not an account; reconnecting uses the credentials bound to the seat.
 _Avoid_: user, member
