@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { io, type Socket } from 'socket.io-client'
+import { describe, expect, it, vi } from 'vitest'
 
 import type { Server, State, StorageAPI } from 'boardgame.io'
-import { Client, LobbyClient } from 'boardgame.io/client'
+import { Client } from 'boardgame.io/client'
 import { SocketIO } from 'boardgame.io/multiplayer'
 
 import {
@@ -14,6 +15,7 @@ import { listAvalonRoomSummaries } from '../src/room-directory'
 import { startAvalonServer } from '../src/server'
 import { MemoryStorage } from '../src/storage/memory'
 import { createDeletionSafeStorage } from '../src/storage/deletion-safe'
+import { AvalonTestLobbyClient as LobbyClient } from './support/lobby-client'
 
 const config = {
   gamePort: 0,
@@ -127,6 +129,20 @@ function waitForClientState(
 
     const currentState = client.getState()
     if (currentState !== null && predicate(currentState)) finish(currentState)
+  })
+}
+
+function waitForSocketEvent(socket: Socket, event: string, timeoutMs = 3_000) {
+  return new Promise<unknown[]>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      socket.off(event, onEvent)
+      reject(new Error(`Timed out waiting for Socket.IO ${event}`))
+    }, timeoutMs)
+    const onEvent = (...args: unknown[]) => {
+      clearTimeout(timeout)
+      resolve(args)
+    }
+    socket.once(event, onEvent)
   })
 }
 
@@ -343,7 +359,8 @@ describe('Avalon development APIs', () => {
     const db = new MemoryStorage()
     const running = await startAvalonServer({ config, db })
     const lobby = new LobbyClient({ server: `http://127.0.0.1:${running.lobbyPort}` })
-    let anonymousClient: AvalonClient | undefined
+    let anonymousSocket: Socket | undefined
+    const log = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
     try {
       const { matchID } = await lobby.createMatch('avalon', { numPlayers: 5 })
@@ -353,14 +370,15 @@ describe('Avalon development APIs', () => {
       })
       expect(deletion.status).toBe(204)
 
-      anonymousClient = Client({
-        game: AvalonGame,
-        numPlayers: 5,
-        multiplayer: SocketIO({ server: `http://127.0.0.1:${running.gamePort}` }),
-        matchID,
+      anonymousSocket = io(`http://127.0.0.1:${running.gamePort}/avalon`, {
+        forceNew: true,
+        reconnection: false,
+        transports: ['websocket'],
       })
-      anonymousClient.start()
-      await waitForClientState(anonymousClient, (state) => state.isConnected)
+      await waitForSocketEvent(anonymousSocket, 'connect')
+      const disconnected = waitForSocketEvent(anonymousSocket, 'disconnect')
+      anonymousSocket.emit('sync', matchID, '0', undefined, 5)
+      await disconnected
 
       expect(db.fetch(matchID, { metadata: true }).metadata).toBeUndefined()
       await expect(lobby.getMatch('avalon', matchID)).rejects.toThrow('HTTP status 404')
@@ -368,8 +386,13 @@ describe('Avalon development APIs', () => {
       const directoryResponse = await fetch(`${baseURL(running)}/rooms/avalon`)
       const directory = await directoryResponse.json() as { rooms: { matchID: string }[] }
       expect(directory.rooms.map((room) => room.matchID)).not.toContain(matchID)
+      expect(log).toHaveBeenCalledWith('Socket.IO protocol rejected', {
+        event: 'sync',
+        code: 'room_not_found',
+      })
     } finally {
-      anonymousClient?.stop()
+      log.mockRestore()
+      anonymousSocket?.close()
       await running.close()
     }
   }, 10000)
@@ -397,17 +420,18 @@ describe('Avalon development APIs', () => {
       })
       expect(replacement.playerID).toBe('0')
 
-      await expect(lobby.updatePlayer('avalon', matchID, {
-        playerID: '0',
-        credentials: joined.playerCredentials,
-        newName: 'Mallory',
-      })).rejects.toThrow('HTTP status 403')
-      await expect(lobby.updatePlayer('avalon', matchID, {
-        playerID: '0',
-        credentials: replacement.playerCredentials,
-        newName: 'Robert',
-      })).resolves.toBeUndefined()
-      expect((await lobby.getMatch('avalon', matchID)).players[0].name).toBe('Robert')
+      const sessionURL = `${baseURL(running)}/rooms/avalon/${matchID}/players/0/session`
+      const oldSession = await fetch(sessionURL, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${joined.playerCredentials}` },
+      })
+      const replacementSession = await fetch(sessionURL, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${replacement.playerCredentials}` },
+      })
+      expect(oldSession.status).toBe(403)
+      expect(replacementSession.status).toBe(204)
+      expect((await lobby.getMatch('avalon', matchID)).players[0].name).toBe('Bob')
     } finally {
       await running.close()
     }

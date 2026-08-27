@@ -62,6 +62,7 @@
 - [PostgreSQL 多房间持久化](adr/0002-postgresql-persistent-multi-room-storage.md)
 - [MVP 不自动超时或管理员修改](adr/0003-no-automatic-timeout-or-admin-mutation-in-mvp.md)
 - [预留可选的服务端权威身份辨认截止线](adr/0006-server-authoritative-identity-recognition-deadlines.md)
+- [收紧 boardgame.io 协议面](adr/0007-restrict-boardgame-protocol-surface.md)
 - [pnpm workspace 边界](adr/0004-pnpm-workspace-package-boundaries.md)
 
 ## 里程碑状态
@@ -144,15 +145,22 @@
 ### 工程规范渐进整改
 
 - [x] 使用共享 Zod schema 统一房间目录契约，并在 Web 接收边界拒绝无效或重复数据。
-- [ ] 盘点并逐项整改其余 HTTP、Socket、浏览器持久化和配置输入边界；客户端输入继续由服务端验证。
+- [ ] 按四阶段完成其余外部输入边界整改；客户端输入继续由服务端验证，每个接收方在自己的边界解析一次：
+  - [x] **阶段 1：服务端协议面与入口加固** — HTTP 允许列表、strict create/join、最小 Room detail、安全 5xx、仅对已存在房间开放合法 Seat sync、禁用 chat、统一秘密比较、载荷上限和固定 boardgame.io。
+  - [ ] **阶段 2：Web 网络与实时接收边界** — 解析 create/join/getMatch 响应、`AvalonPlayerView` 和 `matchData`，并提供可恢复的契约错误状态。
+  - [ ] **阶段 3：浏览器存储 v1** — 为 RoomSession/Profile 建立 v1 Schema，拒绝 legacy，并仅在检测到不兼容数据时提供临时清理入口。
+  - [ ] **阶段 4：服务端配置边界** — 统一 Zod 配置，校验 Origin、数据库 URL、开发 Token 和不受支持的 `API_SECRET`。
 - [ ] 保留 PostgreSQL 事务原始错误上下文，并为持久化数据增加损坏/版本边界处理。
-- [ ] 集中 boardgame.io、Socket 和 Storage 第三方适配层，收紧散落的 `any` 与宽泛断言。
+- [ ] 改善 Storage API 同步/异步类型表达，收紧其余第三方适配层中的 `any` 与宽泛断言。
 - [ ] 拆分 `App.tsx` 的 Lobby、Room、连接、会话和日志职责。
 - [ ] 删除无引用资源和启动断言技术债，完成最终文档与验证收口。
+- [ ] 输入边界整改期间仅在检测到不兼容浏览器存储时提供临时清理入口；所有开发设备完成清理后、真实 LAN 人工验收前删除该入口，保留永久的 v1 Schema 与损坏数据安全处理。
 
 ## 当前验证基线
 
 最近一次验证日期：2026-08-27
+
+2026-08-27 服务端协议面与入口加固验证：`@avalon/game` 提供 strict create/join 与最小 Room detail 契约；Server 仅开放 Web 当前使用的 Avalon Lobby 路由和项目自有 `/rooms/avalon/**`、`/dev/**`，关闭默认列表、leave、playAgain、rename、update 与 Socket chat；Socket sync 仅在 Room ID、Seat ID 合法且房间已经存在时才委托给 boardgame.io，未知、非法、已删除房间和匿名 Seat 均关闭连接且不触发依赖的按需建房；HTTP 已知请求失败保留 4xx，未预期依赖异常返回安全 500/503 且日志不含原始错误消息。HTTP 请求体限制 16 KiB，Socket 客户端消息限制 64 KiB，Seat credential 和开发 Token 统一使用有界、常量时间比较，四个 workspace 的 boardgame.io 精确固定为 `0.50.2`。非 PostgreSQL 自动测试通过（Game 59、test-support 22、Server 64、Web 116）；`pnpm build`、`pnpm lint`、`pnpm typecheck` exit 0；Playwright 15 passed / 9 nightly skipped。Web build 仍报告单个 518.34 kB chunk 警告，Playwright 仅出现既有的 `NO_COLOR`/`FORCE_COLOR` Node 警告。本地强制 PostgreSQL 套件在第一条 `SELECT 1` 被目标 LAN 数据库 `ECONNRESET`，结果为 1 failed / 4 skipped，因此没有声称本地 PG 通过；合入仍要求 GitHub PostgreSQL 容器门禁通过。本次未执行真实 5–10 台 LAN 设备或目标 PostgreSQL 重启人工验收。
 
 2026-08-27 房间目录契约验证：`@avalon/game` 新增共享 Zod schema 和推导类型，Web 对 `/rooms/avalon` 的成功响应执行一次接收边界解析，允许并剥离未知字段，对无效 envelope、字段、重复玩家 ID 或重复房间 ID 整批拒绝；Server 继续使用显式公开字段允许列表，并在泄密回归中证明产物通过同一 schema。PostgreSQL 强制集成套件 5 passed；完整 `pnpm test` 通过（Game 52 passed、test-support 22 passed、Server 49 passed、Web 115 passed）；`pnpm build`、`pnpm lint`、`pnpm typecheck` exit 0。Web build 仍报告既有的单个 515.39 kB chunk 警告。本次未执行 Playwright、PostgreSQL 服务重启探针或 LAN 设备验收。
 

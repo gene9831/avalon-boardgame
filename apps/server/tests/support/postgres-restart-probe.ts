@@ -1,12 +1,13 @@
 import { readFile, unlink, writeFile } from 'node:fs/promises'
 
-import { Client, LobbyClient } from 'boardgame.io/client'
+import { Client } from 'boardgame.io/client'
 import { SocketIO } from 'boardgame.io/multiplayer'
 
 import { AvalonGame, type AvalonPlayerView } from '@avalon/game'
 
 import { startAvalonServer } from '../../src/server'
 import { PostgresStorage } from '../../src/storage/postgres'
+import { AvalonTestLobbyClient as LobbyClient } from './lobby-client'
 
 interface ProbeState {
   matchID: string

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 
-import { LobbyClient } from 'boardgame.io/client'
 import { Client } from 'boardgame.io/client'
 import { SocketIO } from 'boardgame.io/multiplayer'
 
@@ -9,6 +8,7 @@ import { AvalonGame, type AvalonPlayerView } from '@avalon/game'
 import { createAvalonServer, startAvalonServer } from '../src/server'
 import { MemoryStorage } from '../src/storage/memory'
 import { PostgresStorage } from '../src/storage/postgres'
+import { AvalonTestLobbyClient as LobbyClient } from './support/lobby-client'
 
 const testConfig = { gamePort: 0, lobbyPort: 0, origins: ['*'], devToolsEnabled: false }
 
@@ -88,7 +88,7 @@ describe('Avalon server', () => {
     }
   })
 
-  it('starts the game server and Lobby API', async () => {
+  it('starts the game server with the generic game-list route disabled', async () => {
     const running = await startAvalonServer({
       config: testConfig,
       db: new MemoryStorage(),
@@ -96,8 +96,10 @@ describe('Avalon server', () => {
 
     try {
       const response = await fetch(`http://127.0.0.1:${running.lobbyPort}/games`)
-      expect(response.status).toBe(200)
-      expect(await response.json()).toEqual(['avalon'])
+      expect(response.status).toBe(404)
+      expect(await response.json()).toEqual({
+        error: { code: 'not_found', message: 'Route not found' },
+      })
     } finally {
       await running.close()
     }
@@ -149,11 +151,6 @@ describe('Avalon server', () => {
         playerID: '0',
         playerName: 'Alice',
       })
-
-      const matches = await lobby.listMatches('avalon', { isGameover: false })
-      expect(matches.matches.map(({ matchID }) => matchID)).toEqual(
-        expect.arrayContaining([first.matchID, second.matchID]),
-      )
 
       const firstMatch = await lobby.getMatch('avalon', first.matchID)
       const secondMatch = await lobby.getMatch('avalon', second.matchID)
@@ -278,7 +275,12 @@ describe('Avalon server', () => {
         expect.objectContaining({
           reason: expect.objectContaining({
             message: 'HTTP status 409',
-            details: 'Player 1 not available',
+            details: {
+              error: {
+                code: 'seat_unavailable',
+                message: 'Seat is unavailable',
+              },
+            },
           }),
         }),
       ])

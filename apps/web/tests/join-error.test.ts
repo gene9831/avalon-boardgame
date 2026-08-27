@@ -6,6 +6,12 @@ function lobbyError(status: number, details: string) {
   return Object.assign(new Error(`HTTP status ${status}`), { details })
 }
 
+function structuredLobbyError(status: number, code: string) {
+  return Object.assign(new Error(`HTTP status ${status}`), {
+    details: { error: { code, message: 'Safe server message' } },
+  })
+}
+
 describe('join error classification', () => {
   it('turns name conflicts and validation failures into retryable toast messages', () => {
     expect(classifyJoinError(lobbyError(409, 'Player name is already used in this match'))).toEqual({
@@ -26,6 +32,21 @@ describe('join error classification', () => {
     expect(classifyJoinError(lobbyError(404, 'Match room-1 not found'))).toEqual({
       message: '房间不存在或已被解散，请重新选择。',
       refreshRooms: true,
+    })
+  })
+
+  it('classifies stable server error codes without parsing dependency text', () => {
+    expect(classifyJoinError(structuredLobbyError(409, 'seat_unavailable'))).toEqual({
+      message: '所选座位已被占用，请刷新房间列表后重新选择。',
+      refreshRooms: true,
+    })
+    expect(classifyJoinError(structuredLobbyError(409, 'client_already_joined'))).toEqual({
+      message: '当前浏览器已经在本局入座，请刷新房间列表。',
+      refreshRooms: true,
+    })
+    expect(classifyJoinError(structuredLobbyError(400, 'invalid_request'))).toEqual({
+      message: '提交的数据格式无效，请检查后重试。',
+      refreshRooms: false,
     })
   })
 

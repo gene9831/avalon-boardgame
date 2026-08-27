@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto'
 import type { Server, State, StorageAPI } from 'boardgame.io'
 
 import { AvalonSocketRegistry } from './dev-admin'
-import { credentialsMatch, readBearerCredential } from './session-validation'
+import { secretMatches } from './secret'
+import { readBearerCredential } from './session-validation'
 import type { MatchDeletionGuard } from './storage/deletion-safe'
 
 type MatchQueue = { add<T>(task: () => Promise<T>): Promise<T> }
@@ -60,7 +61,7 @@ function authenticatePlayer(
   if (
     player === undefined ||
     player.name === undefined ||
-    !credentialsMatch(credential, player.credentials)
+    !secretMatches(credential, player.credentials)
   ) {
     ctx.throw(403)
   }
