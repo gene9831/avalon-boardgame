@@ -40,6 +40,20 @@ const openRoom = {
   ],
 }
 
+const finishedRoom = {
+  matchID: 'room-finished',
+  status: 'finished' as const,
+  createdAt: 3,
+  updatedAt: 4,
+  players: [
+    { id: 0, name: 'Arthur', isConnected: false },
+    { id: 1, isConnected: false },
+    { id: 2, isConnected: false },
+    { id: 3, isConnected: false },
+    { id: 4, isConnected: false },
+  ],
+}
+
 function renderLobby(overrides: Partial<LobbyViewProps> = {}) {
   const props: LobbyViewProps = {
     activeRoomSessions: [],
@@ -69,12 +83,20 @@ function renderLobby(overrides: Partial<LobbyViewProps> = {}) {
 
 describe('LobbyView room access', () => {
   it('uses the production homepage positioning and avoids implementation copy', () => {
-    const html = renderLobby({ matches: [currentRoom], activeRoomSessions: [currentSession] })
+    const html = renderLobby({
+      matches: [openRoom, currentRoom, finishedRoom],
+      activeRoomSessions: [currentSession],
+    })
 
     expect(html).toContain('>阿瓦隆<')
     expect(html).toContain('一场关于忠诚与背叛的社交推理游戏')
     expect(html).toContain('>进行中的房间<')
     expect(html).toContain('>继续游戏<')
+    expect(html).toContain('等待玩家')
+    expect(html).toContain('对局中')
+    expect(html).toContain('已结束')
+    expect(html).toContain('1/5 人已入座')
+    expect(html).toContain('5/5 人已入座')
     expect(html).not.toContain('局域网')
     expect(html).not.toContain('每 3 秒')
     expect(html).not.toContain('回放（即将支持）')
