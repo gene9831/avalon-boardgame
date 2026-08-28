@@ -272,16 +272,16 @@ test('five, seven, and ten-player round tables remain compact and operable acros
       await votePage.setViewportSize(viewports[0])
       await harness.dispatch(vote)
       if (vote.command !== 'castTeamVote') throw new Error('Expected a team vote command')
-      const submittedVoteLabel = vote.payload.vote === 'approve' ? '同意' : '拒绝'
+      const submittedVoteLabel = vote.payload.vote === 'approve' ? '赞成' : '反对'
       await expect(
-        votePage.getByText(`已投票：${submittedVoteLabel}，等待其他玩家`, { exact: true }),
+        votePage.getByText(`已表决：${submittedVoteLabel}，等待其他玩家`, { exact: true }),
       ).toBeVisible()
       await expectRoundTableFits(votePage, `${playerCount} 人游戏圆桌`)
 
       if (playerCount === 5) {
         const landscape = viewports[1]
         await votePage.setViewportSize(landscape)
-        await expect(votePage.getByText(`已投票：${submittedVoteLabel}，等待其他玩家`, { exact: true })).toBeVisible()
+        await expect(votePage.getByText(`你已表决：${submittedVoteLabel}。等待其他玩家完成表决。`, { exact: true })).toBeVisible()
         await expect(votePage.getByLabel('五次任务进度')).toBeVisible()
         await expect(votePage.getByLabel('五次任务进度').locator('li')).toHaveCount(5)
         await expect(votePage.getByLabel('连续否决轨道')).toBeVisible()

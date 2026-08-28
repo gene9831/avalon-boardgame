@@ -31,7 +31,7 @@ test('refresh restores server data and keeps pending choices private', async ({
     const leaderPage = harness.pages[Number(run.transcript[proposeIndex].actor)]
     await leaderPage.reload()
     await expect(leaderPage.getByLabel('阿瓦隆游戏圆桌')).toBeVisible()
-    await expect(leaderPage.getByRole('button', { name: /^提交 0\// })).toBeDisabled()
+    await expect(leaderPage.getByRole('button', { name: /^确认队伍 0\// })).toBeDisabled()
 
     await harness.dispatch(run.transcript[proposeIndex])
     await harness.dispatch(run.transcript[firstVoteIndex])
