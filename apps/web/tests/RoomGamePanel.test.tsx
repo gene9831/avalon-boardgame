@@ -383,7 +383,7 @@ describe('RoomGamePanel connection recovery', () => {
       />,
     )
 
-    expect(html).toContain('正在重连')
+    expect(html).toContain('正在重新连接')
     expect(html).not.toContain('>重连<')
   })
 
