@@ -95,6 +95,7 @@ describe('LobbyView room access', () => {
     expect(html).toContain('等待玩家')
     expect(html).toContain('对局中')
     expect(html).toContain('已结束')
+    expect(html).toContain('房间 room-finished')
     expect(html).toContain('1/5 人已入座')
     expect(html).toContain('5/5 人已入座')
     expect(html).not.toContain('局域网')
