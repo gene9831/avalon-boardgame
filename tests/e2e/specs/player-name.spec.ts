@@ -37,7 +37,7 @@ test('profile persistence, room locking, and credential re-entry work', async ({
     await expect(retainedSeatProfile.getByText('Saved Arthur', { exact: true })).toBeVisible()
     await expect(retainedSeatProfile.getByRole('textbox')).toHaveCount(0)
     await retainedSeatProfile.getByRole('button', { name: '关闭用户中心' }).click()
-    await roomCard(page, matchID).getByRole('button', { name: '进入' }).click()
+    await roomCard(page, matchID).getByRole('button', { name: '继续游戏' }).click()
     await expect(page).toHaveURL(new RegExp(`/rooms/${matchID}$`))
 
     await page.getByRole('button', { name: '打开开发控制' }).click()

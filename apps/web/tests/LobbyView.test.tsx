@@ -68,6 +68,18 @@ function renderLobby(overrides: Partial<LobbyViewProps> = {}) {
 }
 
 describe('LobbyView room access', () => {
+  it('uses the production homepage positioning and avoids implementation copy', () => {
+    const html = renderLobby({ matches: [currentRoom], activeRoomSessions: [currentSession] })
+
+    expect(html).toContain('>阿瓦隆<')
+    expect(html).toContain('一场关于忠诚与背叛的社交推理游戏')
+    expect(html).toContain('>进行中的房间<')
+    expect(html).toContain('>继续游戏<')
+    expect(html).not.toContain('局域网')
+    expect(html).not.toContain('每 3 秒')
+    expect(html).not.toContain('回放（即将支持）')
+  })
+
   it('shows the browser profile in the header and defers configuration to the create dialog', () => {
     const html = renderLobby()
 
@@ -86,7 +98,7 @@ describe('LobbyView room access', () => {
       roomAccessLocked: true,
     })
 
-    expect(html).toContain('>进入<')
+    expect(html).toContain('>继续游戏<')
     expect(html).toContain('data-profile-locked="true"')
     expect(html).not.toContain('>加入<')
     expect(html).not.toContain('最近的房间')

@@ -32,14 +32,15 @@ export function CreateGameDialog({
     >
       <div className="p-6 sm:p-7">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-300">
-          Create room
+          创建房间
         </p>
         <h2 className="mt-2 text-2xl font-semibold text-white" id="create-game-dialog-title">
           创建一局阿瓦隆
         </h2>
         <p className="mt-2 text-sm leading-6 text-slate-400">
-          选择本局固定人数。房间坐满后，创建者才能开始游戏。
+          选择本局人数。所有座位坐满后，房间创建者即可开始游戏。
         </p>
+        <p className="mt-2 text-sm leading-6 text-slate-400">身份与秘密选择只会显示给应该知道的玩家。</p>
 
         <fieldset className="mt-6">
           <legend className="text-sm font-semibold text-slate-200">玩家人数</legend>
@@ -64,13 +65,13 @@ export function CreateGameDialog({
 
         <section className="mt-5 rounded-2xl border border-white/10 bg-slate-950/45 p-4" aria-label={`${numPlayers} 人规则摘要`}>
           <div className="flex items-center justify-between gap-3 text-sm">
-            <span className="text-slate-400">阵营构成</span>
+            <span className="text-slate-400">阵营人数</span>
             <span className="font-semibold text-slate-100">
-              {config.good} 名正义 · {config.evil} 名邪恶
+              {config.good} 人正义阵营 · {config.evil} 人邪恶阵营
             </span>
           </div>
           <div className="mt-3 flex items-center justify-between gap-3 text-sm">
-            <span className="text-slate-400">五次任务人数</span>
+            <span className="text-slate-400">五次任务所需人数</span>
             <span className="font-semibold tracking-[0.12em] text-amber-100">
               {config.questTeamSizes.join(' · ')}
             </span>
