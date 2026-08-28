@@ -64,7 +64,7 @@ export function RoomLobbyPanel({
             <span aria-hidden="true">←</span>
           </button>
           <div className="min-w-0">
-            <p className="round-table-header-decoration text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-amber-300 sm:text-xs">Round table lobby</p>
+            <p className="round-table-header-decoration text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-amber-300 sm:text-xs">等待玩家</p>
             <h1 className="truncate text-sm font-semibold text-white sm:mt-0.5 sm:text-xl">房间 {matchID}</h1>
           </div>
         </div>
@@ -110,7 +110,12 @@ export function RoomLobbyPanel({
                   开始游戏
                 </button>
               )}
-              {isFull && !isHost && <p className="lobby-center-action mt-2 text-[clamp(0.65rem,2vw,0.85rem)] font-semibold text-amber-100"><span className="lobby-center-full-label">等待房主开始</span><span className="lobby-center-compact-label">等待房主</span></p>}
+              {isFull && !isHost && (
+                <p className="lobby-center-action mt-2 text-[clamp(0.65rem,2vw,0.85rem)] font-semibold text-amber-100">
+                  <span className="lobby-center-full-label">等待房间创建者开始游戏</span>
+                  <span className="lobby-center-compact-label">等待创建者</span>
+                </p>
+              )}
             </div>
           )}
           renderSeat={(seat) => <SeatCard dense={numPlayers >= 7} seat={seat} />}

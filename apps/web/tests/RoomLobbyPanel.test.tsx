@@ -71,11 +71,17 @@ describe('RoomLobbyPanel round table layout', () => {
       currentPlayerID: '0',
       occupiedPlayerIDs: ['0', '1', '2', '3', '4'],
     })
+    const fullGuestHtml = renderPanel({
+      occupiedPlayerIDs: ['0', '1', '2', '3', '4'],
+    })
 
+    expect(waitingHtml).toContain('>等待玩家<')
     expect(waitingHtml).toContain('还差 3 人')
     expect(waitingHtml).not.toContain('>开始游戏<')
     expect(hostHtml).toContain('>开始游戏<')
     expect(hostHtml).not.toContain('lobby-action-copy')
+    expect(fullGuestHtml).toContain('等待房间创建者开始游戏')
+    expect(fullGuestHtml).not.toContain('等待房主')
   })
 
   it('announces current, disconnected, and empty lobby seats', () => {
@@ -100,10 +106,11 @@ describe('RoomLobbyPanel connection recovery', () => {
 
     expect(connectedHtml).not.toContain('已连接')
     expect(connectedHtml).toContain('aria-label="房间操作"')
-    expect(recoveringHtml).toContain('正在重连')
+    expect(recoveringHtml).toContain('正在重新连接')
     expect(recoveringHtml).not.toContain('>重连<')
     expect(recoveringHtml).not.toContain('aria-label="房间操作"')
     expect(retryHtml).toContain('>重连<')
+    expect(retryHtml).toContain('aria-label="重新连接房间"')
     expect(retryHtml).not.toContain('aria-label="房间操作"')
   })
 })
