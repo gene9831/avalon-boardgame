@@ -76,7 +76,7 @@ describe('RoomGamePanel operation log', () => {
   it('keeps a public operation-log control in the room header without a badge', () => {
     const html = renderPanel()
 
-    expect(html).toContain('aria-label="查看操作日志"')
+    expect(html).toContain('aria-label="查看对局记录"')
     expect(html).not.toContain('data-unread')
   })
 })

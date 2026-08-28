@@ -119,7 +119,7 @@ describe('RoomLobbyPanel operation log', () => {
   it('places the log control in the room header without an unread badge', () => {
     const html = renderPanel()
 
-    expect(html).toContain('aria-label="查看操作日志"')
+    expect(html).toContain('aria-label="查看对局记录"')
     expect(html).not.toContain('data-unread')
   })
 })

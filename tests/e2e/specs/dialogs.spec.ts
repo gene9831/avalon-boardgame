@@ -70,10 +70,10 @@ test('user center and room log contain focus and restore it after closing', asyn
   await expect(profileTrigger).toBeFocused()
 
   await createRoom(page, 5, 'Keyboard Host')
-  const logTrigger = page.getByRole('button', { name: '查看操作日志' })
+  const logTrigger = page.getByRole('button', { name: '查看对局记录' })
   await logTrigger.click()
-  const roomLog = page.getByRole('dialog', { name: '操作日志' })
-  const logClose = roomLog.getByRole('button', { name: '关闭操作日志' })
+  const roomLog = page.getByRole('dialog', { name: '对局记录' })
+  const logClose = roomLog.getByRole('button', { name: '关闭对局记录' })
 
   await expect(logClose).toBeFocused()
   await page.keyboard.press('Tab')

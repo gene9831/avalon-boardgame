@@ -40,7 +40,7 @@ export function createPresenceBaselineEntry(
   return {
     id: 'presence-0',
     kind: 'presence',
-    group: '等待房间',
+    group: '等待玩家',
     title: `当前房间共有 ${occupiedPlayers(players).length} 名玩家`,
   }
 }
@@ -62,7 +62,7 @@ export function buildPresenceLogChanges(
     if (current.has(playerID)) continue
     changes.push({
       kind: 'presence',
-      group: '等待房间',
+      group: '等待玩家',
       title: `${playerLabel(previousPlayers, playerID)}退出了房间`,
     })
   }
@@ -70,7 +70,7 @@ export function buildPresenceLogChanges(
     if (previous.has(playerID)) continue
     changes.push({
       kind: 'presence',
-      group: '等待房间',
+      group: '等待玩家',
       title: `${playerLabel(currentPlayers, playerID)}加入了房间`,
     })
   }
@@ -127,7 +127,7 @@ function voteEntry(
     id,
     kind: 'vote',
     group: questGroup(vote.questIndex, attempt),
-    title: vote.approved ? '队伍投票通过' : '队伍投票未通过',
+    title: vote.approved ? '队伍表决通过' : '队伍表决未通过',
     detail,
     tone: vote.approved ? 'good' : 'danger',
   }
@@ -164,7 +164,7 @@ export function buildGameLogEntries(
   const entries: RoomLogEntry[] = [{
     id: 'game-start',
     kind: 'game-start',
-    group: '游戏开始',
+    group: '对局开始',
     title: `${playerLabel(players, '0')}开始了游戏`,
   }]
   const attemptsByQuest = new Map<number, number>()
@@ -226,7 +226,7 @@ export function buildGameLogEntries(
     entries.push({
       id: 'result',
       kind: 'result',
-      group: '游戏结束',
+      group: '对局结束',
       title: `${game.result.winner === 'good' ? '正义' : '邪恶'}阵营获胜`,
       detail: reason,
       tone: game.result.winner === 'good' ? 'good' : 'danger',
