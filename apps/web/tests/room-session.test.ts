@@ -156,12 +156,12 @@ describe('room session storage', () => {
       validateRoomSession('http://localhost:8001', session, fetcher),
     ).rejects.toEqual(new RoomSessionValidationHttpError(403))
     expect(getRoomSessionInvalidationNotice(new RoomSessionValidationHttpError(403)))
-      .toBe('你的房间座位已被释放，已返回主页。')
+      .toBe('上次的座位已失效。')
   })
 
   it('classifies a missing room separately from an unauthorized seat', () => {
     expect(getRoomSessionInvalidationNotice(new RoomSessionValidationHttpError(404)))
-      .toBe('房主已解散房间，已返回主页。')
+      .toBe('房间已解散。')
     expect(getRoomSessionInvalidationNotice(new Error('network unavailable'))).toBeNull()
   })
 

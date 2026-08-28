@@ -90,6 +90,7 @@ import {
   validateRoomSession,
   type RoomSession,
 } from './room-session'
+import { getRequestErrorMessage } from './request-error'
 import {
   fetchRoomSummaries,
 } from './room-directory'
@@ -102,18 +103,10 @@ type AvalonClientState = Omit<AvalonRawClientState, 'G'> & {
   G: AvalonPlayerView
 }
 
-function errorMessage(error: unknown) {
-  if (error instanceof Error && error.message === 'HTTP status 409') {
-    return '这个房间的座位已被占用，或当前浏览器已经在本局入座。'
-  }
-
-  return error instanceof Error ? error.message : '请求失败，请稍后重试。'
-}
-
 function roomInvalidationNotice(error: unknown) {
   return getRoomSessionInvalidationNotice(error) ?? (
     error instanceof Error && error.message === 'HTTP status 404'
-      ? '房主已解散房间，已返回主页。'
+      ? '房间已解散。'
       : null
   )
 }
@@ -223,7 +216,7 @@ function LobbyRoute({
     } catch (requestError) {
       if (generation !== refreshGenerationRef.current) return
       setRoomAccessStatus('unavailable')
-      setRoomAccessError(`无法加载房间列表：${errorMessage(requestError)}`)
+      setRoomAccessError(getRequestErrorMessage('room-directory'))
     }
   }, [])
 
@@ -410,7 +403,7 @@ function RoomRoute({
 
         const nextRoomValue = nextRoom as AvalonMatch
         if (!isRoomSessionStillValid(nextRoomValue, currentSession)) {
-          invalidateSession('你的房间座位已被释放，已返回主页。', generation)
+          invalidateSession('上次的座位已失效。', generation)
           return
         }
         setRoom(nextRoomValue)
@@ -423,7 +416,7 @@ function RoomRoute({
         }
         if (!silent) {
           pushToast({
-            message: `无法加载房间：${errorMessage(requestError)}`,
+            message: getRequestErrorMessage('room'),
             tone: 'error',
           })
         }
@@ -461,7 +454,7 @@ function RoomRoute({
       setRoomExitDialogOpen(false)
       setRoomExitBusy(false)
       navigate('/', {
-        state: { roomNotice: '本机房间会话已结束，已返回主页。' },
+        state: { roomNotice: '你已离开这个房间。' },
       })
     }
 
@@ -492,7 +485,7 @@ function RoomRoute({
         if (!active || !isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
 
         if (!isRoomSessionStillValid(initialRoom as AvalonMatch, routeSession)) {
-          invalidateSession('你的房间座位已被释放，已返回主页。', generation)
+          invalidateSession('上次的座位已失效。', generation)
           return
         }
 
@@ -515,7 +508,7 @@ function RoomRoute({
           if (client?.matchData !== undefined) {
             const players = client.matchData as unknown as LobbyPlayer[]
             if (!isRoomSessionStillValid({ players }, routeSession)) {
-              invalidateSession('你的房间座位已被释放，已返回主页。', generation)
+              invalidateSession('上次的座位已失效。', generation)
               return
             }
             setRoom((previousRoom) =>
@@ -536,7 +529,7 @@ function RoomRoute({
             invalidateSession(invalidationNotice, generation)
           } else {
             pushToast({
-              message: `无法连接房间：${errorMessage(requestError)}`,
+              message: getRequestErrorMessage('connection'),
               tone: 'error',
             })
           }
@@ -675,7 +668,7 @@ function RoomRoute({
     stopCurrentClient(clientRef)
     clearRoomSession(matchID)
     setSession(null)
-    navigate('/', { state: { roomNotice: '房间已被删除，已返回主页。' } })
+    navigate('/', { state: { roomNotice: '房间已解散。' } })
   }
 
   const handleKickPlayer = async (playerID: string, token: string) => {
@@ -686,7 +679,7 @@ function RoomRoute({
       stopCurrentClient(clientRef)
       clearRoomSession(matchID)
       setSession(null)
-      navigate('/', { state: { roomNotice: '你的房间座位已被释放，已返回主页。' } })
+      navigate('/', { state: { roomNotice: '你已被移出房间。' } })
       return
     }
     if (routeSession !== null) {

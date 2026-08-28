@@ -61,10 +61,12 @@ describe('room participation client', () => {
 
   it('explains state conflicts and retryable failures without clearing the session', () => {
     expect(getRoomExitErrorMessage(new RoomParticipationHttpError(409), false))
-      .toBe('游戏已经开始，无法退出房间。')
+      .toBe('对局已经开始，无法退出房间。')
     expect(getRoomExitErrorMessage(new RoomParticipationHttpError(409), true))
-      .toBe('游戏已经开始，无法解散房间。')
+      .toBe('对局已经开始，无法解散房间。')
     expect(getRoomExitErrorMessage(new Error('network unavailable'), false))
-      .toBe('退出失败，请重试。')
+      .toBe('退出房间失败，请重试。')
+    expect(getRoomExitErrorMessage(new Error('network unavailable'), true))
+      .toBe('解散房间失败，请重试。')
   })
 })
