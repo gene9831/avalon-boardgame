@@ -98,6 +98,8 @@ import { ToastProvider } from './toast'
 import { useToast } from './toast-context'
 
 type AvalonClient = ReturnType<typeof Client<AvalonG>>
+
+export const BOARDGAME_CLIENT_DEBUG = false as const
 type AvalonRawClientState = NonNullable<ReturnType<AvalonClient['getState']>>
 type AvalonClientState = Omit<AvalonRawClientState, 'G'> & {
   G: AvalonPlayerView
@@ -491,7 +493,7 @@ function RoomRoute({
 
         setRoom(initialRoom as AvalonMatch)
         client = Client({
-          debug: { collapseOnLoad: true },
+          debug: BOARDGAME_CLIENT_DEBUG,
           game: AvalonGame,
           numPlayers: getMatchPlayerCount(initialRoom as AvalonMatch),
           multiplayer: SocketIO({
