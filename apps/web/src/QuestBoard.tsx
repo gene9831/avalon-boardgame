@@ -19,7 +19,7 @@ export function QuestBoard({ children, game, numPlayers }: QuestBoardProps) {
       <div className="pointer-events-none absolute inset-1 rounded-[clamp(0.6rem,2.5vw,1.35rem)] border border-amber-100/10 sm:inset-2" />
       <div className="relative">
         <div className="quest-board-decoration flex items-start justify-center">
-          <h2 className="font-serif text-lg font-semibold text-amber-50 sm:text-xl">阿瓦隆 · {numPlayers}人局</h2>
+          <h2 className="hidden font-serif text-lg font-semibold text-amber-50 sm:block sm:text-xl">阿瓦隆 · {numPlayers}人局</h2>
         </div>
 
         <ol className="quest-progress mt-[clamp(0.35rem,1.5vw,0.75rem)] grid grid-cols-5 gap-[clamp(0.15rem,0.7vw,0.375rem)]" aria-label="五次任务进度">

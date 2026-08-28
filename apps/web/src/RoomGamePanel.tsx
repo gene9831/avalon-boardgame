@@ -213,7 +213,10 @@ function PhaseAction({ activeStage, canSubmitTeam, game, onAssassinate, onCastTe
           <p className="text-[clamp(0.6rem,1.8vw,0.75rem)] font-semibold text-cyan-100">选择 {requiredTeamSize} 名任务队员</p>
           <p className="phase-action-copy mt-0.5 hidden truncate text-[0.7rem] text-slate-300 sm:block">{isLeader && activeStage === 'leader' ? '选择圆桌上的玩家' : `等待 ${getPlayerName(game, game.leaderID, playerNames)} 组建任务队伍`}</p>
         </div>
-        <button className="min-h-11 shrink-0 rounded-xl bg-cyan-200 px-2 py-2 text-xs font-bold text-slate-950 transition hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-40 sm:px-3" disabled={!canSubmitTeam} onClick={onSubmitTeam} type="button">确认队伍 {selectedTeam.length}/{requiredTeamSize}</button>
+        <button aria-label={`确认队伍 ${selectedTeam.length}/${requiredTeamSize}`} className="min-h-11 shrink-0 rounded-xl bg-cyan-200 px-2 py-2 text-xs font-bold text-slate-950 transition hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-40 sm:px-3" disabled={!canSubmitTeam} onClick={onSubmitTeam} type="button">
+          <span className="min-[360px]:hidden">确认 {selectedTeam.length}/{requiredTeamSize}</span>
+          <span className="hidden min-[360px]:inline">确认队伍 {selectedTeam.length}/{requiredTeamSize}</span>
+        </button>
       </div>
     )
   }

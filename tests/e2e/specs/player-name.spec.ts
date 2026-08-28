@@ -107,7 +107,7 @@ test('a concurrent seat loser can refresh and join another seat', async ({ brows
       ? secondPage
       : firstPage
     await expect(
-      loser.getByText('所选座位已被占用，请刷新房间列表后重新选择。'),
+      loser.getByText('所选座位已被占用，请重新选择。'),
     ).toBeVisible()
     const card = roomCard(loser, matchID)
     await card.getByLabel(`选择 ${matchID} 的座位`).selectOption('2')
