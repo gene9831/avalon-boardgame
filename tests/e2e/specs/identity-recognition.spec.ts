@@ -197,7 +197,7 @@ test('players complete the curtain-based identity recognition ceremony', async (
     await harness.dispatch(roleRevealCommands[0])
     const firstConfirmedPage = harness.pages[Number(roleRevealCommands[0].actor)]
     await expect(firstConfirmedPage.getByRole('button', {
-      name: '等待中',
+      name: '等待其他玩家确认',
     })).toBeDisabled()
     await expect(firstConfirmedPage.getByText('1/5 已确认')).toBeVisible()
 

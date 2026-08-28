@@ -308,9 +308,9 @@ test('five, seven, and ten-player round tables remain compact and operable acros
         await questPage.getByRole('button', {
           name: questCard.payload.card === 'success' ? /成功/ : /失败/,
         }).click()
-        const submittedCardLabel = questCard.payload.card === 'success' ? 'Success' : 'Fail'
+        const submittedCardLabel = questCard.payload.card === 'success' ? '成功' : '失败'
         await expect(
-          questPage.getByText(`已提交 ${submittedCardLabel}，等待结算`, { exact: true }),
+          questPage.getByText(`你已提交${submittedCardLabel}，等待任务结算。`, { exact: true }),
         ).toBeVisible()
       }
     } finally {

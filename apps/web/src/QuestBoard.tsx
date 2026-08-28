@@ -5,10 +5,9 @@ interface QuestBoardProps {
   children?: ReactNode
   game: AvalonPlayerView
   numPlayers: number
-  phaseLabel: string
 }
 
-export function QuestBoard({ children, game, numPlayers, phaseLabel }: QuestBoardProps) {
+export function QuestBoard({ children, game, numPlayers }: QuestBoardProps) {
   const config = getPlayerCountConfig(numPlayers)
   const latestQuest = game.questHistory.at(-1)
 
@@ -19,12 +18,8 @@ export function QuestBoard({ children, game, numPlayers, phaseLabel }: QuestBoar
     >
       <div className="pointer-events-none absolute inset-1 rounded-[clamp(0.6rem,2.5vw,1.35rem)] border border-amber-100/10 sm:inset-2" />
       <div className="relative">
-        <div className="quest-board-decoration flex items-start justify-center gap-2 sm:justify-between sm:gap-3">
-          <div className="hidden sm:block">
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-amber-200/70">Quest tableau</p>
-            <h2 className="mt-1 font-serif text-lg font-semibold text-amber-50 sm:text-xl">阿瓦隆 · {numPlayers} 人局</h2>
-          </div>
-          <span className="hidden rounded-full border border-amber-100/15 bg-black/20 px-2.5 py-1 text-xs text-amber-50/80 sm:inline">{phaseLabel}</span>
+        <div className="quest-board-decoration flex items-start justify-center">
+          <h2 className="font-serif text-lg font-semibold text-amber-50 sm:text-xl">阿瓦隆 · {numPlayers}人局</h2>
         </div>
 
         <ol className="quest-progress mt-[clamp(0.35rem,1.5vw,0.75rem)] grid grid-cols-5 gap-[clamp(0.15rem,0.7vw,0.375rem)]" aria-label="五次任务进度">
@@ -54,7 +49,7 @@ export function QuestBoard({ children, game, numPlayers, phaseLabel }: QuestBoar
 
         {latestQuest !== undefined && (
           <p className={`quest-latest-result mt-2 hidden rounded-lg border px-2 py-1 text-center text-[0.65rem] sm:block ${latestQuest.succeeded ? 'border-sky-200/15 bg-sky-300/10 text-sky-100' : 'border-rose-200/15 bg-rose-300/10 text-rose-100'}`}>
-            第 {latestQuest.questIndex + 1} 次任务{latestQuest.succeeded ? '成功' : '失败'} · {latestQuest.successCount} Success / {latestQuest.failCount} Fail
+            第 {latestQuest.questIndex + 1} 次任务{latestQuest.succeeded ? '成功' : '失败'} · {latestQuest.successCount} 张成功 · {latestQuest.failCount} 张失败
           </p>
         )}
 

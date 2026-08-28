@@ -176,7 +176,7 @@ describe('RoomGamePanel identity recognition', () => {
       phase: 'identityRecognition',
     })
 
-    expect(html).toContain('>等待中<')
+    expect(html).toContain('>等待其他玩家确认<')
     expect(html).toContain('disabled=""')
     expect(html).not.toContain('等待其他玩家确认身份')
   })
@@ -211,7 +211,7 @@ describe('RoomGamePanel identity recognition', () => {
     expect(html).toContain('data-known-player-info="true"')
     expect(html).toContain('role="status"')
     expect(html).toContain('aria-live="polite"')
-    expect(html).toContain('>等待中<')
+    expect(html).toContain('>等待其他玩家确认<')
     expect(html).toContain('disabled=""')
     expect(html).not.toContain('等待其他邪恶阵营玩家')
   })
@@ -251,6 +251,34 @@ describe('RoomGamePanel quest hand', () => {
 })
 
 describe('RoomGamePanel team selection', () => {
+  it.each([
+    ['teamProposal', 'leader', '组建任务队伍'],
+    ['teamVote', 'vote', '队伍表决'],
+    ['quest', 'quest', '执行任务'],
+    ['assassination', 'assassin', '刺杀梅林'],
+    ['identityRecognition', 'identityRecognition', '身份辨认'],
+  ])('uses the canonical %s phase label', (phase, activeStage, expectedLabel) => {
+    const html = renderPanel({ activeStage, phase })
+
+    expect(html).toContain(expectedLabel)
+    expect(html).not.toContain('Round table')
+  })
+
+  it('uses rulebook terminology for team selection and voting actions', () => {
+    const proposalHtml = renderPanel({
+      activeStage: 'leader',
+      game: gameView({ proposedTeam: null }),
+      phase: 'teamProposal',
+    })
+    const voteHtml = renderPanel({ activeStage: 'vote', phase: 'teamVote' })
+
+    expect(proposalHtml).toContain('选择 2 名任务队员')
+    expect(proposalHtml).toContain('选择圆桌上的玩家')
+    expect(proposalHtml).toContain('确认队伍 0/2')
+    expect(voteHtml).toContain('赞成队伍')
+    expect(voteHtml).toContain('反对队伍')
+  })
+
   it('names selectable seats as task-team controls', () => {
     const html = renderPanel({
       activeStage: 'leader',
@@ -301,9 +329,12 @@ describe('RoomGamePanel public quest history', () => {
       phase: 'teamProposal',
     })
 
-    expect(html).toContain('第 1 次任务失败 · 1 Success / 1 Fail')
-    expect(html).not.toContain('Alice：Success')
-    expect(html).not.toContain('Dylan：Fail')
+    expect(html).toContain('第 1 次任务失败 · 1 张成功 · 1 张失败')
+    expect(html).not.toContain('Alice：成功')
+    expect(html).not.toContain('Dylan：失败')
+    expect(html).not.toContain('Quest tableau')
+    expect(html).not.toContain('Success')
+    expect(html).not.toContain('Fail')
   })
 })
 
@@ -350,7 +381,7 @@ describe('RoomGamePanel result', () => {
 
     expect(html).toContain('正义阵营获胜')
     expect(html).toContain('刺杀未命中梅林')
-    expect(html).toContain('游戏结束')
+    expect(html).toContain('对局结束')
     expect(html).toContain('目标 Bob')
     expect(html).not.toContain('目标 Player 2')
     expect(html).toContain('Alice · 梅林')
