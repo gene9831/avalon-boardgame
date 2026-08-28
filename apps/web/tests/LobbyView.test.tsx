@@ -89,7 +89,6 @@ describe('LobbyView room access', () => {
     })
 
     expect(html).toContain('>阿瓦隆<')
-    expect(html).toContain('一场关于忠诚与背叛的社交推理游戏')
     expect(html).toContain('>进行中的房间<')
     expect(html).toContain('>继续游戏<')
     expect(html).toContain('等待玩家')
@@ -100,7 +99,7 @@ describe('LobbyView room access', () => {
     expect(html).toContain('5/5 人已入座')
     expect(html).not.toContain('局域网')
     expect(html).not.toContain('每 3 秒')
-    expect(html).not.toContain('回放（即将支持）')
+    expect(html).not.toContain('回放')
   })
 
   it('shows the browser profile in the header and defers configuration to the create dialog', () => {

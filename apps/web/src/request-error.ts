@@ -9,3 +9,9 @@ const REQUEST_ERROR_MESSAGES: Record<RequestErrorContext, string> = {
 export function getRequestErrorMessage(context: RequestErrorContext) {
   return REQUEST_ERROR_MESSAGES[context]
 }
+
+export function getRoomAccessValidationError(validationFailed: boolean) {
+  return validationFailed
+    ? '暂时无法确认部分房间状态，请刷新房间列表后重试。'
+    : null
+}

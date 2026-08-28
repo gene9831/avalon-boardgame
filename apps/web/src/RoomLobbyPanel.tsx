@@ -111,9 +111,9 @@ export function RoomLobbyPanel({
                 </button>
               )}
               {isFull && !isHost && (
-                <p className="lobby-center-action mt-2 text-[clamp(0.65rem,2vw,0.85rem)] font-semibold text-amber-100">
-                  <span className="lobby-center-full-label">等待房间创建者开始游戏</span>
-                  <span className="lobby-center-compact-label">等待创建者</span>
+                <p aria-label="等待房间创建者开始游戏" className="lobby-center-action mt-2 text-[clamp(0.65rem,2vw,0.85rem)] font-semibold text-amber-100" role="status">
+                  <span aria-hidden="true" className="lobby-center-full-label">等待房间创建者开始游戏</span>
+                  <span aria-hidden="true" className="lobby-center-compact-label">等待创建者</span>
                 </p>
               )}
             </div>

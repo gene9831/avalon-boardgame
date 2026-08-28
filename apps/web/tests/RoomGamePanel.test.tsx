@@ -215,6 +215,23 @@ describe('RoomGamePanel identity recognition', () => {
     expect(html).toContain('disabled=""')
     expect(html).not.toContain('等待其他邪恶阵营玩家')
   })
+
+  it('leaves the phase action area empty during identity recognition', () => {
+    const html = renderPanel({
+      activeStage: 'identityRecognition',
+      game: gameView({
+        identityRecognition: {
+          step: 'evilRecognition',
+          deadlineAt: Date.now() + 10_000,
+          confirmedCount: 0,
+          participantCount: 2,
+        },
+      }),
+      phase: 'identityRecognition',
+    })
+
+    expect(html).not.toContain('正在同步游戏状态')
+  })
 })
 
 describe('RoomGamePanel quest hand', () => {

@@ -281,6 +281,10 @@ function PhaseAction({ activeStage, canSubmitTeam, game, onAssassinate, onCastTe
     )
   }
 
+  if (phase === 'identityRecognition') {
+    return null
+  }
+
   return <p className="text-center text-xs text-cyan-100">正在同步游戏状态。</p>
 }
 

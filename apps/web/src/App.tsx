@@ -90,7 +90,10 @@ import {
   validateRoomSession,
   type RoomSession,
 } from './room-session'
-import { getRequestErrorMessage } from './request-error'
+import {
+  getRequestErrorMessage,
+  getRoomAccessValidationError,
+} from './request-error'
 import {
   fetchRoomSummaries,
 } from './room-directory'
@@ -210,11 +213,7 @@ function LobbyRoute({
 
       setActiveRoomSessions(validation.sessions)
       setRoomAccessStatus(validation.validationFailed ? 'unavailable' : 'ready')
-      setRoomAccessError(
-        validation.validationFailed
-          ? '暂时无法确认部分房间状态；已保留当前房间限制。'
-          : null,
-      )
+      setRoomAccessError(getRoomAccessValidationError(validation.validationFailed))
     } catch (requestError) {
       if (generation !== refreshGenerationRef.current) return
       setRoomAccessStatus('unavailable')
