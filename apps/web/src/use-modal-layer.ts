@@ -1,7 +1,21 @@
 import { useEffect, useRef, type RefObject } from 'react'
 
 const focusableSelector =
-  'input, button, select, textarea, [href], [tabindex]:not([tabindex="-1"])'
+  'input, button, select, textarea, summary, [href], [tabindex]:not([tabindex="-1"])'
+
+function getFocusableElements(panel: HTMLElement) {
+  return Array.from(panel.querySelectorAll<HTMLElement>(focusableSelector)).filter(
+    (element) => {
+      const closedDisclosure = element.closest('details:not([open])')
+      const isDisclosureSummary = closedDisclosure?.querySelector('summary') === element
+
+      return !element.hasAttribute('disabled')
+        && !element.hidden
+        && element.getClientRects().length > 0
+        && (closedDisclosure === null || isDisclosureSummary)
+    },
+  )
+}
 
 export function useModalLayer({
   onClose,
@@ -26,7 +40,8 @@ export function useModalLayer({
     wasOpenRef.current = true
     const previousBodyOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    panelRef.current?.querySelector<HTMLElement>(focusableSelector)?.focus()
+    const panel = panelRef.current
+    if (panel !== null) getFocusableElements(panel)[0]?.focus()
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -35,9 +50,7 @@ export function useModalLayer({
       }
       if (event.key !== 'Tab' || panelRef.current === null) return
 
-      const focusable = Array.from(
-        panelRef.current.querySelectorAll<HTMLElement>(focusableSelector),
-      ).filter((element) => !element.hasAttribute('disabled'))
+      const focusable = getFocusableElements(panelRef.current)
       if (focusable.length === 0) return
 
       const first = focusable[0]!

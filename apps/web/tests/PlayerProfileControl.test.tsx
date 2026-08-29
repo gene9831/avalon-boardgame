@@ -23,6 +23,9 @@ describe('PlayerProfilePanel', () => {
     expect(html).toContain('重新随机')
     expect(html).toContain('保存资料')
     expect(html).toContain('ImperialOctopus/avalon-printable')
+    expect(html).toContain('<details')
+    expect(html).toContain('>素材与许可<')
+    expect(html).toContain('CC BY 4.0')
   })
 
   it('shows the room lock instead of edit controls after the player joins', () => {

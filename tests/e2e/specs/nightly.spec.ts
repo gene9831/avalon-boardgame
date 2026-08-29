@@ -14,11 +14,11 @@ test.describe('nightly data scenarios', () => {
   for (const { scenario, resultText } of [
     {
       scenario: 'seven-player-fourth-quest-one-fail',
-      resultText: '第 4 次任务成功 · 3 Success / 1 Fail',
+      resultText: '第 4 次任务成功 · 3 张成功 · 1 张失败',
     },
     {
       scenario: 'seven-player-fourth-quest-two-fails',
-      resultText: '第 4 次任务失败 · 2 Success / 2 Fail',
+      resultText: '第 4 次任务失败 · 2 张成功 · 2 张失败',
     },
   ] as const) {
     test(`${scenario} exposes the aggregate result to every browser`, async ({ browser }) => {

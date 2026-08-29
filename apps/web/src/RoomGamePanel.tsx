@@ -13,6 +13,7 @@ import type { LobbyPlayer } from './lobby'
 import { QuestBoard } from './QuestBoard'
 import {
   canSubmitTeam,
+  getPhaseLabel,
   getQuestTeamSize,
   ROLE_LABELS,
   toggleTeamMember,
@@ -76,7 +77,7 @@ export function RoomGamePanel({
   const canSelectTeam = phase === 'teamProposal' && activeStage === 'leader' && isLeader
   const canSelectAssassinationTarget = phase === 'assassination' && activeStage === 'assassin' && game.viewer.role === 'assassin' && game.status === 'playing'
   const canSubmit = canSubmitTeam({ activeStage, leaderID: game.leaderID, playerID, requiredTeamSize, selectedTeam })
-  const phaseLabel = game.status === 'finished' ? '游戏结束' : getPhaseLabel(phase)
+  const phaseLabel = game.status === 'finished' ? '对局结束' : getPhaseLabel(phase)
   const identityRecognitionActive =
     phase === 'identityRecognition' && game.identityRecognition !== null
   const showRecognitionKnowledge =
@@ -129,7 +130,7 @@ export function RoomGamePanel({
             <span aria-hidden="true">←</span>
           </button>
           <div className="min-w-0">
-            <p className="round-table-header-decoration text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-amber-300 sm:text-xs">Round table · {phaseLabel}</p>
+            <p className="round-table-header-decoration text-[0.65rem] font-semibold tracking-[0.24em] text-amber-300 sm:text-xs">{phaseLabel}</p>
             <h1 className="truncate text-sm font-semibold text-white sm:mt-0.5 sm:text-xl">房间 {matchID}</h1>
           </div>
         </div>
@@ -146,7 +147,7 @@ export function RoomGamePanel({
       >
         <RoundTable
           ariaLabel={`${playerIDs.length} 人游戏圆桌`}
-          center={<QuestBoard game={game} numPlayers={playerIDs.length} phaseLabel={phaseLabel}>{phaseAction}</QuestBoard>}
+          center={<QuestBoard game={game} numPlayers={playerIDs.length}>{phaseAction}</QuestBoard>}
           renderSeat={(seat) => (
             <GameSeat
               canSelect={canSelectTeam}
@@ -209,10 +210,13 @@ function PhaseAction({ activeStage, canSubmitTeam, game, onAssassinate, onCastTe
     return (
       <div className="flex items-center justify-between gap-2">
         <div className="team-proposal-summary min-w-0">
-          <p className="text-[clamp(0.6rem,1.8vw,0.75rem)] font-semibold text-cyan-100">选择 {requiredTeamSize} 名队员</p>
-          <p className="phase-action-copy mt-0.5 hidden truncate text-[0.7rem] text-slate-300 sm:block">{isLeader && activeStage === 'leader' ? '点击头像选择' : `等待 ${getPlayerName(game, game.leaderID, playerNames)} 选队`}</p>
+          <p className="text-[clamp(0.6rem,1.8vw,0.75rem)] font-semibold text-cyan-100">选择 {requiredTeamSize} 名任务队员</p>
+          <p className="phase-action-copy mt-0.5 hidden truncate text-[0.7rem] text-slate-300 sm:block">{isLeader && activeStage === 'leader' ? '选择圆桌上的玩家' : `等待 ${getPlayerName(game, game.leaderID, playerNames)} 组建任务队伍`}</p>
         </div>
-        <button className="min-h-11 shrink-0 rounded-xl bg-cyan-200 px-2 py-2 text-xs font-bold text-slate-950 transition hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-40 sm:px-3" disabled={!canSubmitTeam} onClick={onSubmitTeam} type="button">提交 {selectedTeam.length}/{requiredTeamSize}</button>
+        <button aria-label={`确认队伍 ${selectedTeam.length}/${requiredTeamSize}`} className="min-h-11 shrink-0 rounded-xl bg-cyan-200 px-2 py-2 text-xs font-bold text-slate-950 transition hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-40 sm:px-3" disabled={!canSubmitTeam} onClick={onSubmitTeam} type="button">
+          <span className="min-[360px]:hidden">确认 {selectedTeam.length}/{requiredTeamSize}</span>
+          <span className="hidden min-[360px]:inline">确认队伍 {selectedTeam.length}/{requiredTeamSize}</span>
+        </button>
       </div>
     )
   }
@@ -225,11 +229,11 @@ function PhaseAction({ activeStage, canSubmitTeam, game, onAssassinate, onCastTe
         <p className="hidden text-xs text-slate-200 sm:block">提案队伍：{(game.proposedTeam ?? []).map((id) => getPlayerName(game, id, playerNames)).join('、')}</p>
         {submittedVote === undefined ? (
           <div className="phase-action-buttons mt-2 grid grid-cols-2 gap-2">
-            <button className="min-h-11 rounded-lg bg-emerald-200 px-2 py-2 text-xs font-bold text-slate-950 disabled:opacity-40" disabled={!canVote} onClick={() => onCastTeamVote('approve')} type="button"><span className="phase-action-full-label">同意队伍</span><span className="phase-action-compact-label">同意</span></button>
-            <button className="min-h-11 rounded-lg bg-rose-200 px-2 py-2 text-xs font-bold text-slate-950 disabled:opacity-40" disabled={!canVote} onClick={() => onCastTeamVote('reject')} type="button"><span className="phase-action-full-label">拒绝队伍</span><span className="phase-action-compact-label">拒绝</span></button>
+            <button className="min-h-11 rounded-lg bg-emerald-200 px-2 py-2 text-xs font-bold text-slate-950 disabled:opacity-40" disabled={!canVote} onClick={() => onCastTeamVote('approve')} type="button"><span className="phase-action-full-label">赞成队伍</span><span className="phase-action-compact-label">赞成</span></button>
+            <button className="min-h-11 rounded-lg bg-rose-200 px-2 py-2 text-xs font-bold text-slate-950 disabled:opacity-40" disabled={!canVote} onClick={() => onCastTeamVote('reject')} type="button"><span className="phase-action-full-label">反对队伍</span><span className="phase-action-compact-label">反对</span></button>
           </div>
         ) : (
-          <p className="text-center text-[0.6rem] text-amber-100 sm:mt-2 sm:text-xs"><span className="sm:hidden">已投票：{submittedVote === 'approve' ? '同意' : '拒绝'}，等待其他玩家</span><span className="hidden sm:inline">你已投票：{submittedVote === 'approve' ? '同意' : '拒绝'}。等待其他玩家。</span></p>
+          <p className="text-center text-[0.6rem] text-amber-100 sm:mt-2 sm:text-xs"><span className="sm:hidden">已表决：{submittedVote === 'approve' ? '赞成' : '反对'}，等待其他玩家</span><span className="hidden sm:inline">你已表决：{submittedVote === 'approve' ? '赞成' : '反对'}。等待其他玩家完成表决。</span></p>
         )}
       </div>
     )
@@ -241,16 +245,16 @@ function PhaseAction({ activeStage, canSubmitTeam, game, onAssassinate, onCastTe
     const canPlay = isQuestMember && activeStage === 'quest' && submittedCard === undefined
 
     if (!isQuestMember) {
-      return <p className="text-center text-[0.6rem] text-slate-200 sm:text-xs"><span className="sm:hidden">等待任务队员出牌</span><span className="hidden sm:inline">你未进入本次任务队伍，等待队员秘密出牌。</span></p>
+      return <p className="text-center text-[0.6rem] text-slate-200 sm:text-xs">等待任务队员提交任务牌</p>
     }
 
     if (submittedCard !== undefined) {
-      return <p className="text-center text-[0.6rem] text-amber-100 sm:text-xs"><span className="sm:hidden">已提交 {submittedCard === 'success' ? 'Success' : 'Fail'}，等待结算</span><span className="hidden sm:inline">你已提交 {submittedCard === 'success' ? 'Success' : 'Fail'}，等待任务结算。</span></p>
+      return <p className="text-center text-[0.6rem] text-amber-100 sm:text-xs">你已提交{submittedCard === 'success' ? '成功' : '失败'}，等待任务结算。</p>
     }
 
     return (
       <div>
-        <p className="phase-action-copy hidden text-center text-xs text-slate-200 sm:block">从你的任务手牌中选择一张。所有牌将在提交完成后统一结算。</p>
+        <p className="phase-action-copy hidden text-center text-xs text-slate-200 sm:block">从你的任务手牌中选择一张。所有任务牌将在提交完成后统一结算。</p>
         <div className={`phase-action-buttons mt-2 grid gap-2 ${game.viewer.loyalty === 'evil' ? 'grid-cols-2' : 'grid-cols-1'}`}>
           <button className="min-h-11 rounded-lg border border-sky-100/30 bg-sky-300/90 px-2 py-2 text-xs font-bold text-slate-950 disabled:opacity-40" disabled={!canPlay} onClick={() => onPlayQuestCard('success')} type="button"><span className="phase-action-full-label">让任务成功</span><span className="phase-action-compact-label">成功</span></button>
           {game.viewer.loyalty === 'evil' && (
@@ -270,11 +274,15 @@ function PhaseAction({ activeStage, canSubmitTeam, game, onAssassinate, onCastTe
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold text-rose-100">刺杀梅林</p>
-          <p className="phase-action-copy mt-0.5 hidden truncate text-[0.7rem] text-slate-300 sm:block">{selectedTarget === null ? '点击圆桌上的正义阵营玩家选择目标' : `目标：${getPlayerName(game, selectedTarget, playerNames)}`}</p>
+          <p className="phase-action-copy mt-0.5 hidden truncate text-[0.7rem] text-slate-300 sm:block">{selectedTarget === null ? '选择一名正义阵营玩家作为刺杀目标' : `目标：${getPlayerName(game, selectedTarget, playerNames)}`}</p>
         </div>
-        <button className="min-h-11 shrink-0 rounded-xl bg-rose-300 px-3 py-2 text-xs font-bold text-slate-950 disabled:opacity-40" disabled={selectedTarget === null} onClick={onAssassinate} type="button">确认刺杀</button>
+        <button className="min-h-11 shrink-0 rounded-xl bg-rose-300 px-3 py-2 text-xs font-bold text-slate-950 disabled:opacity-40" disabled={selectedTarget === null} onClick={onAssassinate} type="button">确认目标</button>
       </div>
     )
+  }
+
+  if (phase === 'identityRecognition') {
+    return null
   }
 
   return <p className="text-center text-xs text-cyan-100">正在同步游戏状态。</p>
@@ -397,7 +405,7 @@ function GameResult({ game, playerNames }: { game: AvalonPlayerView; playerNames
       <p className="mt-1 text-xs text-amber-50/75">
         {reason}{result.targetID === undefined ? '' : ` · 目标 ${getPlayerName(game, result.targetID, playerNames)}`}
       </p>
-      {game.revealedRoles !== undefined && <p className="mt-2 text-[0.65rem] text-slate-300">所有角色已在圆桌座位上公开。</p>}
+      {game.revealedRoles !== undefined && <p className="mt-2 text-[0.65rem] text-slate-300">所有玩家的角色已公开。</p>}
     </div>
   )
 }
@@ -420,15 +428,4 @@ const SHORT_ROLE_LABELS: Record<Role, string> = {
 function getPlayerName(game: AvalonPlayerView, playerID: PlayerID | null, playerNames: Readonly<Record<PlayerID, string>>) {
   if (playerID === null) return '队长'
   return playerNames[playerID] ?? game.players[playerID]?.name ?? `玩家 ${Number(playerID) + 1}`
-}
-
-function getPhaseLabel(phase: string) {
-  switch (phase) {
-    case 'teamProposal': return '队伍提案'
-    case 'teamVote': return '队伍投票'
-    case 'assassination': return '刺杀阶段'
-    case 'quest': return '任务进行中'
-    case 'identityRecognition': return '身份辨认'
-    default: return phase
-  }
 }

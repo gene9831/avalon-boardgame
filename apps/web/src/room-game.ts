@@ -12,6 +12,18 @@ export const LOYALTY_LABELS = {
   good: '正义阵营',
 } as const
 
+export const PHASE_LABELS = {
+  assassination: '刺杀梅林',
+  identityRecognition: '身份辨认',
+  quest: '执行任务',
+  teamProposal: '组建任务队伍',
+  teamVote: '队伍表决',
+} as const
+
+export function getPhaseLabel(phase: string) {
+  return PHASE_LABELS[phase as keyof typeof PHASE_LABELS] ?? phase
+}
+
 export function getQuestTeamSize(numPlayers: number, questIndex: number) {
   return getPlayerCountConfig(numPlayers).questTeamSizes[questIndex] ?? 0
 }

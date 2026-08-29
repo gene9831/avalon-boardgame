@@ -51,7 +51,7 @@ const sections: RoomSection[] = [
   {
     key: 'active',
     statuses: ['lobby', 'playing'],
-    title: '进行中的圆桌',
+    title: '进行中的房间',
     empty: '当前没有进行中的房间。你可以先创建一局。',
   },
   {
@@ -70,8 +70,8 @@ const neutralButton = `${lobbyButtonBase} border border-white/15 bg-slate-900/40
 const neutralIconButton = 'grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/15 bg-slate-900/40 text-slate-200 transition-colors hover:border-slate-300/50 hover:bg-slate-800/70 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950'
 
 function roomStatusLabel(status: AvalonRoomStatus) {
-  if (status === 'lobby') return '等待中'
-  if (status === 'playing') return '进行中'
+  if (status === 'lobby') return '等待玩家'
+  if (status === 'playing') return '对局中'
   return '已结束'
 }
 
@@ -140,11 +140,11 @@ export function LobbyView({
                 {roomStatusLabel(room.status)}
               </span>
             </div>
-            <p className="mt-1 text-sm text-slate-400">{roomStatusLabel(room.status)} · {occupied} / {playerCount} 人已入座</p>
+            <p className="mt-1 text-sm text-slate-400">{roomStatusLabel(room.status)} · {occupied}/{playerCount} 人已入座</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {activeSession !== undefined ? (
-              <button className={enterButton} onClick={() => onEnterRoom(room.matchID)} type="button">进入</button>
+              <button className={enterButton} onClick={() => onEnterRoom(room.matchID)} type="button">继续游戏</button>
             ) : canJoinRoom(room) && roomAccessLocked ? (
               <span className="rounded-full bg-slate-700/70 px-3 py-2 text-xs text-slate-300">{roomAccessMessage}</span>
             ) : canJoinRoom(room) && (availableSeats.length === 0 ? (
@@ -162,7 +162,6 @@ export function LobbyView({
                 <button className={joinButton} disabled={busy || selectedSeat === ''} onClick={() => onJoin(room.matchID, selectedSeat)} type="button">加入</button>
               </>
             ))}
-            {room.status === 'finished' && <button className={neutralButton} disabled type="button">回放（即将支持）</button>}
             {devToolsEnabled && devToken.length > 0 && <button className="rounded-xl border border-rose-300/40 px-4 py-2.5 text-sm text-rose-200 transition hover:border-rose-300 hover:bg-rose-300/10" onClick={() => void onDeleteRoom(room.matchID)} type="button">删除</button>}
           </div>
         </div>
@@ -198,17 +197,17 @@ export function LobbyView({
       <div className="mx-auto max-w-6xl">
         <header className="mb-8 flex items-start justify-between gap-4 sm:mb-10">
           <div className="min-w-0 max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-300">局域网阿瓦隆</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-300">阿瓦隆</p>
             <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white sm:text-6xl">今晚，谁值得信任？</h1>
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">在同一个局域网内创建圆桌、选择座位并开始一局阿瓦隆。角色与秘密始终由服务器守护。</p>
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">一场关于忠诚与背叛的社交推理游戏。创建房间，与朋友开始对局。</p>
           </div>
           <PlayerProfileControl locked={roomAccessLocked} onSave={onSaveProfile} profile={profile} />
         </header>
 
         <section className="flex items-center justify-between gap-4 rounded-3xl border border-amber-300/20 bg-white/[0.06] p-5 shadow-2xl shadow-black/20 backdrop-blur sm:gap-6 sm:p-7">
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-white sm:text-xl">创建新的圆桌</h2>
-            <p className="mt-1 text-sm text-slate-400">选择人数并确认本局配置后创建房间。</p>
+            <h2 className="text-lg font-semibold text-white sm:text-xl">创建房间</h2>
+            <p className="mt-1 text-sm text-slate-400">选择人数并确认本局配置。</p>
           </div>
           <div className="text-right">
             <button className={createButton} disabled={busy || roomAccessLocked} onClick={onCreate} type="button">{busy ? '处理中…' : '创建房间'}</button>
@@ -217,7 +216,7 @@ export function LobbyView({
         </section>
 
         <section className="mt-6 rounded-3xl border border-white/10 bg-white/[0.06] p-5 shadow-2xl shadow-black/20 backdrop-blur sm:p-7">
-          <div className="flex items-center justify-between gap-4"><div><h2 className="text-2xl font-semibold text-white">进行中的圆桌</h2><p className="mt-1 text-sm text-slate-400">包含等待开局和游戏中的房间 · 每 3 秒自动更新</p></div><button aria-label="刷新房间列表" className={neutralIconButton} onClick={onRefresh} title="刷新房间列表" type="button"><svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0 2 5.5M20 4v7h-7" strokeLinecap="round" strokeLinejoin="round" /></svg></button></div>
+          <div className="flex items-center justify-between gap-4"><div><h2 className="text-2xl font-semibold text-white">进行中的房间</h2><p className="mt-1 text-sm text-slate-400">选择一个房间加入，或继续尚未结束的对局。</p></div><button aria-label="刷新房间列表" className={neutralIconButton} onClick={onRefresh} title="刷新房间列表" type="button"><svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0 2 5.5M20 4v7h-7" strokeLinecap="round" strokeLinejoin="round" /></svg></button></div>
           <div className="mt-6">{renderSection(sections[0], { showHeading: false })}</div>
           <div className="mt-8">{renderSection(sections[1], { secondary: true })}</div>
         </section>

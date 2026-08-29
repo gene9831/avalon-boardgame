@@ -15,10 +15,10 @@ export class RoomParticipationHttpError extends Error {
 export function getRoomExitErrorMessage(error: unknown, isHost: boolean) {
   if (error instanceof RoomParticipationHttpError && error.status === 409) {
     return isHost
-      ? '游戏已经开始，无法解散房间。'
-      : '游戏已经开始，无法退出房间。'
+      ? '对局已经开始，无法解散房间。'
+      : '对局已经开始，无法退出房间。'
   }
-  return isHost ? '解散失败，请重试。' : '退出失败，请重试。'
+  return isHost ? '解散房间失败，请重试。' : '退出房间失败，请重试。'
 }
 
 async function requestRoomExit(

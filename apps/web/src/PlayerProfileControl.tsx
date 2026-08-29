@@ -218,8 +218,10 @@ export function PlayerProfilePanel({
         </>
       )}
 
-      <p className="mt-5 border-t border-white/10 pt-4 text-[0.7rem] leading-5 text-slate-500">
-        头像素材：{' '}
+      <details className="mt-5 border-t border-white/10 pt-4 text-xs text-slate-500">
+        <summary className="cursor-pointer text-slate-400">素材与许可</summary>
+        <p className="mt-3 leading-5">
+          头像素材：{' '}
         <a
           className="text-slate-400 underline decoration-slate-600 underline-offset-2 hover:text-slate-200"
           href="https://github.com/ImperialOctopus/avalon-printable/tree/master/characters"
@@ -237,7 +239,8 @@ export function PlayerProfilePanel({
         >
           CC BY 4.0
         </a>
-      </p>
+        </p>
+      </details>
     </section>
   )
 }

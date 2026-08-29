@@ -37,7 +37,7 @@ test('profile persistence, room locking, and credential re-entry work', async ({
     await expect(retainedSeatProfile.getByText('Saved Arthur', { exact: true })).toBeVisible()
     await expect(retainedSeatProfile.getByRole('textbox')).toHaveCount(0)
     await retainedSeatProfile.getByRole('button', { name: '关闭用户中心' }).click()
-    await roomCard(page, matchID).getByRole('button', { name: '进入' }).click()
+    await roomCard(page, matchID).getByRole('button', { name: '继续游戏' }).click()
     await expect(page).toHaveURL(new RegExp(`/rooms/${matchID}$`))
 
     await page.getByRole('button', { name: '打开开发控制' }).click()
@@ -107,7 +107,7 @@ test('a concurrent seat loser can refresh and join another seat', async ({ brows
       ? secondPage
       : firstPage
     await expect(
-      loser.getByText('所选座位已被占用，请刷新房间列表后重新选择。'),
+      loser.getByText('所选座位已被占用，请重新选择。'),
     ).toBeVisible()
     const card = roomCard(loser, matchID)
     await card.getByLabel(`选择 ${matchID} 的座位`).selectOption('2')
