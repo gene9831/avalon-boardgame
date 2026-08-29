@@ -91,29 +91,27 @@ import {
   type RoomSession,
 } from './room-session'
 import {
+  getRequestErrorMessage,
+  getRoomAccessValidationError,
+} from './request-error'
+import {
   fetchRoomSummaries,
 } from './room-directory'
 import { ToastProvider } from './toast'
 import { useToast } from './toast-context'
 
 type AvalonClient = ReturnType<typeof Client<AvalonG>>
+
+export const BOARDGAME_CLIENT_DEBUG = false as const
 type AvalonRawClientState = NonNullable<ReturnType<AvalonClient['getState']>>
 type AvalonClientState = Omit<AvalonRawClientState, 'G'> & {
   G: AvalonPlayerView
 }
 
-function errorMessage(error: unknown) {
-  if (error instanceof Error && error.message === 'HTTP status 409') {
-    return '这个房间的座位已被占用，或当前浏览器已经在本局入座。'
-  }
-
-  return error instanceof Error ? error.message : '请求失败，请稍后重试。'
-}
-
 function roomInvalidationNotice(error: unknown) {
   return getRoomSessionInvalidationNotice(error) ?? (
     error instanceof Error && error.message === 'HTTP status 404'
-      ? '房主已解散房间，已返回主页。'
+      ? '房间已解散。'
       : null
   )
 }
@@ -215,15 +213,11 @@ function LobbyRoute({
 
       setActiveRoomSessions(validation.sessions)
       setRoomAccessStatus(validation.validationFailed ? 'unavailable' : 'ready')
-      setRoomAccessError(
-        validation.validationFailed
-          ? '暂时无法确认部分房间状态；已保留当前房间限制。'
-          : null,
-      )
+      setRoomAccessError(getRoomAccessValidationError(validation.validationFailed))
     } catch (requestError) {
       if (generation !== refreshGenerationRef.current) return
       setRoomAccessStatus('unavailable')
-      setRoomAccessError(`无法加载房间列表：${errorMessage(requestError)}`)
+      setRoomAccessError(getRequestErrorMessage('room-directory'))
     }
   }, [])
 
@@ -410,7 +404,7 @@ function RoomRoute({
 
         const nextRoomValue = nextRoom as AvalonMatch
         if (!isRoomSessionStillValid(nextRoomValue, currentSession)) {
-          invalidateSession('你的房间座位已被释放，已返回主页。', generation)
+          invalidateSession('上次的座位已失效。', generation)
           return
         }
         setRoom(nextRoomValue)
@@ -423,7 +417,7 @@ function RoomRoute({
         }
         if (!silent) {
           pushToast({
-            message: `无法加载房间：${errorMessage(requestError)}`,
+            message: getRequestErrorMessage('room'),
             tone: 'error',
           })
         }
@@ -461,7 +455,7 @@ function RoomRoute({
       setRoomExitDialogOpen(false)
       setRoomExitBusy(false)
       navigate('/', {
-        state: { roomNotice: '本机房间会话已结束，已返回主页。' },
+        state: { roomNotice: '你已离开这个房间。' },
       })
     }
 
@@ -492,13 +486,13 @@ function RoomRoute({
         if (!active || !isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
 
         if (!isRoomSessionStillValid(initialRoom as AvalonMatch, routeSession)) {
-          invalidateSession('你的房间座位已被释放，已返回主页。', generation)
+          invalidateSession('上次的座位已失效。', generation)
           return
         }
 
         setRoom(initialRoom as AvalonMatch)
         client = Client({
-          debug: { collapseOnLoad: true },
+          debug: BOARDGAME_CLIENT_DEBUG,
           game: AvalonGame,
           numPlayers: getMatchPlayerCount(initialRoom as AvalonMatch),
           multiplayer: SocketIO({
@@ -515,7 +509,7 @@ function RoomRoute({
           if (client?.matchData !== undefined) {
             const players = client.matchData as unknown as LobbyPlayer[]
             if (!isRoomSessionStillValid({ players }, routeSession)) {
-              invalidateSession('你的房间座位已被释放，已返回主页。', generation)
+              invalidateSession('上次的座位已失效。', generation)
               return
             }
             setRoom((previousRoom) =>
@@ -536,7 +530,7 @@ function RoomRoute({
             invalidateSession(invalidationNotice, generation)
           } else {
             pushToast({
-              message: `无法连接房间：${errorMessage(requestError)}`,
+              message: getRequestErrorMessage('connection'),
               tone: 'error',
             })
           }
@@ -675,7 +669,7 @@ function RoomRoute({
     stopCurrentClient(clientRef)
     clearRoomSession(matchID)
     setSession(null)
-    navigate('/', { state: { roomNotice: '房间已被删除，已返回主页。' } })
+    navigate('/', { state: { roomNotice: '房间已解散。' } })
   }
 
   const handleKickPlayer = async (playerID: string, token: string) => {
@@ -686,7 +680,7 @@ function RoomRoute({
       stopCurrentClient(clientRef)
       clearRoomSession(matchID)
       setSession(null)
-      navigate('/', { state: { roomNotice: '你的房间座位已被释放，已返回主页。' } })
+      navigate('/', { state: { roomNotice: '你已被移出房间。' } })
       return
     }
     if (routeSession !== null) {
@@ -731,7 +725,7 @@ function RoomRoute({
   )
 }
 
-function RoomAccessView({
+export function RoomAccessView({
   matchID,
   onBackHome,
 }: {
@@ -739,17 +733,17 @@ function RoomAccessView({
   onBackHome: () => void
 }) {
   return (
-    <PageShell eyebrow={`Room ${matchID}`} title="进入房间">
+    <PageShell eyebrow={`房间 ${matchID}`} title="进入房间">
       <section className="mx-auto max-w-xl rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8">
         <p className="text-sm leading-6 text-slate-300">
-          这台设备还没有该房间的座位凭据。请返回主页，从房间列表选择座位后加入。
+          你尚未加入这个房间。请返回房间列表选择座位。
         </p>
         <button
           className="mt-6 rounded-xl bg-amber-300 px-4 py-3 font-semibold text-slate-950 transition hover:bg-amber-200"
           onClick={onBackHome}
           type="button"
         >
-          返回主页
+          返回房间列表
         </button>
       </section>
     </PageShell>
@@ -767,11 +761,11 @@ function RoomLoadingContent({
     <section className="flex h-full min-h-0 items-center justify-center overflow-hidden rounded-3xl border border-white/10 bg-white/[0.06] p-4 shadow-2xl shadow-black/20 backdrop-blur sm:p-8">
       <div className="w-full max-w-xl rounded-3xl border border-white/10 bg-slate-950/35 p-6 sm:p-8">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-300">
-          Room {matchID}
+          房间 {matchID}
         </p>
-        <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">正在连接房间</h1>
+        <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">正在进入房间</h1>
         <p className="text-sm leading-6 text-slate-300">
-          正在读取房间状态并建立实时连接，请稍候。
+          正在准备游戏，请稍候。
         </p>
         <button
           className="mt-6 rounded-xl border border-white/15 px-4 py-3 font-semibold text-slate-200 transition hover:border-amber-300/60 hover:text-white"
@@ -1049,11 +1043,8 @@ function PageShell({
         <header className="mb-8 flex flex-wrap items-end justify-between gap-4 sm:mb-12">
           <div>
             <div className="flex items-center gap-3">
-              <span className="grid h-10 w-10 place-items-center rounded-2xl bg-amber-300 text-xl font-black text-slate-950 shadow-lg shadow-amber-300/20">
-                A
-              </span>
-              <span className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-400">
-                The Resistance
+              <span className="text-xl font-semibold text-white">
+                阿瓦隆
               </span>
             </div>
             <p className="mt-8 text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
@@ -1064,13 +1055,10 @@ function PageShell({
             </h1>
           </div>
           <p className="max-w-xs text-right text-sm leading-6 text-slate-400">
-            局域网在线阿瓦隆 · 5–10 人 · 服务端权威状态
+            5–10 人社交推理游戏
           </p>
         </header>
         <div className="flex-1">{children}</div>
-        <footer className="mt-10 border-t border-white/10 pt-5 text-xs text-slate-500">
-          Secrets stay on the server. This browser only receives its filtered player view.
-        </footer>
       </div>
     </main>
   )

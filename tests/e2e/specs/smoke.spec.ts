@@ -20,7 +20,7 @@ test('five isolated browser players complete a rejected-team game', async ({
   try {
     await harness.pages[4].reload()
     await expect(
-      harness.pages[4].getByText('等待房主开始', { exact: true }),
+      harness.pages[4].getByText('等待房间创建者开始游戏', { exact: true }),
     ).toBeVisible()
     await harness.pages[4].getByRole('button', { name: '房间操作' }).click()
     await expect(

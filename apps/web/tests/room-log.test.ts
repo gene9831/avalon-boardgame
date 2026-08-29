@@ -148,13 +148,13 @@ describe('local waiting-room presence log', () => {
 
     expect(buildPresenceLogChanges(previous, current, 4)).toEqual([
       {
-        group: '等待房间',
+        group: '等待玩家',
         id: 'presence-4',
         kind: 'presence',
         title: 'Arthur（2号位）退出了房间',
       },
       {
-        group: '等待房间',
+        group: '等待玩家',
         id: 'presence-5',
         kind: 'presence',
         title: 'Claire（3号位）加入了房间',

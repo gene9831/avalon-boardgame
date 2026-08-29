@@ -2,10 +2,22 @@ import { describe, expect, it, vi } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
+import { BOARDGAME_CLIENT_DEBUG } from '../src/App'
 import { createDevToolsClient, DevToolsHttpError } from '../src/dev-tools'
 import { LobbyDevTools } from '../src/LobbyDevTools'
 
+vi.mock('../src/config', () => ({
+  webConfig: {
+    gameURL: 'http://localhost:8000',
+    lobbyURL: 'http://localhost:8001',
+  },
+}))
+
 describe('development tools client', () => {
+  it('disables the built-in boardgame.io debug panel for player pages', () => {
+    expect(BOARDGAME_CLIENT_DEBUG).toBe(false)
+  })
+
   it('renders the homepage development tools as a floating debug trigger only when enabled', () => {
     const props = {
       enabled: false,

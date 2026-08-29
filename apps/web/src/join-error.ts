@@ -25,21 +25,21 @@ export function classifyJoinError(error: unknown): ClassifiedJoinError {
 
   if (code === 'seat_unavailable') {
     return {
-      message: '所选座位已被占用，请刷新房间列表后重新选择。',
+      message: '所选座位已被占用，请重新选择。',
       refreshRooms: true,
     }
   }
 
   if (code === 'client_already_joined') {
     return {
-      message: '当前浏览器已经在本局入座，请刷新房间列表。',
+      message: '你已经加入这个房间，请从房间列表继续游戏。',
       refreshRooms: true,
     }
   }
 
   if (code === 'invalid_request') {
     return {
-      message: '提交的数据格式无效，请检查后重试。',
+      message: '暂时无法加入房间，请重新选择后再试。',
       refreshRooms: false,
     }
   }
@@ -60,7 +60,7 @@ export function classifyJoinError(error: unknown): ClassifiedJoinError {
 
   if (error instanceof Error && error.message === 'HTTP status 404') {
     return {
-      message: '房间不存在或已被解散，请重新选择。',
+      message: '房间不存在或已解散，请返回房间列表。',
       refreshRooms: true,
     }
   }
@@ -68,33 +68,33 @@ export function classifyJoinError(error: unknown): ClassifiedJoinError {
   if (error instanceof Error && error.message === 'HTTP status 409') {
     if (details?.startsWith('Player ') && details.endsWith(' not available')) {
       return {
-        message: '所选座位已被占用，请刷新房间列表后重新选择。',
+        message: '所选座位已被占用，请重新选择。',
         refreshRooms: true,
       }
     }
 
     if (details === 'Client has already joined this match') {
       return {
-        message: '当前浏览器已经在本局入座，请刷新房间列表。',
+        message: '你已经加入这个房间，请从房间列表继续游戏。',
         refreshRooms: true,
       }
     }
 
     return {
-      message: '房间状态已经变化，请刷新房间列表后重新选择。',
+      message: '所选座位已被占用，请重新选择。',
       refreshRooms: true,
     }
   }
 
   if (error instanceof TypeError && error.message === 'Failed to fetch') {
     return {
-      message: '网络请求失败，请检查连接后重试。',
+      message: '网络连接异常，请稍后重试。',
       refreshRooms: false,
     }
   }
 
   return {
-    message: error instanceof Error ? error.message : '请求失败，请稍后重试。',
+    message: '暂时无法加入房间，请稍后重试。',
     refreshRooms: false,
   }
 }

@@ -16,11 +16,11 @@ export function RoomLogControl({ entries }: { entries: readonly RoomLogEntry[] }
     <>
       <button
         aria-expanded={open}
-        aria-label="查看操作日志"
+        aria-label="查看对局记录"
         className="grid min-h-11 min-w-11 place-items-center rounded-lg border border-white/15 text-slate-200 transition hover:border-amber-300/60 hover:text-white"
         onClick={() => setOpen(true)}
         ref={triggerRef}
-        title="操作日志"
+        title="对局记录"
         type="button"
       >
         <ScrollText aria-hidden="true" size={20} strokeWidth={1.8} />
@@ -28,7 +28,7 @@ export function RoomLogControl({ entries }: { entries: readonly RoomLogEntry[] }
       {open && (
         <div className="fixed inset-0 z-[150]" data-room-log-overlay>
           <button
-            aria-label="关闭操作日志"
+            aria-label="关闭对局记录"
             className="absolute inset-0 cursor-default bg-slate-950/60 backdrop-blur-sm"
             onClick={close}
             type="button"
@@ -57,7 +57,7 @@ export function RoomLogPanel({
 
   return (
     <aside
-      aria-label="操作日志"
+      aria-label="对局记录"
       aria-modal="true"
       className="absolute inset-x-0 bottom-0 flex max-h-[78dvh] min-h-[20rem] flex-col rounded-t-3xl border border-b-0 border-white/15 bg-slate-950/98 shadow-2xl shadow-black/50 sm:inset-y-0 sm:left-auto sm:right-0 sm:max-h-none sm:min-h-0 sm:w-[min(26rem,90vw)] sm:rounded-none sm:rounded-l-3xl sm:border-y-0 sm:border-r-0"
       ref={panelRef}
@@ -65,11 +65,11 @@ export function RoomLogPanel({
     >
       <header className="flex shrink-0 items-center justify-between border-b border-white/10 px-5 py-4 sm:px-6">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-300">Room history</p>
-          <h2 className="mt-1 text-xl font-semibold text-white">操作日志</h2>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-300">对局记录</p>
+          <h2 className="mt-1 text-xl font-semibold text-white">对局记录</h2>
         </div>
         <button
-          aria-label="关闭操作日志"
+          aria-label="关闭对局记录"
           className="grid min-h-11 min-w-11 place-items-center rounded-xl border border-white/15 text-slate-300 transition hover:border-white/35 hover:text-white"
           onClick={onClose}
           type="button"
@@ -81,7 +81,7 @@ export function RoomLogPanel({
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6">
         {entries.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-white/15 px-4 py-6 text-center text-sm text-slate-400">
-            还没有公开操作。
+            对局开始后，公开事件会记录在这里。
           </p>
         ) : (
           <ol className="space-y-3">

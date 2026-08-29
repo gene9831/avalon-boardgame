@@ -31,26 +31,26 @@ test('refresh restores server data and keeps pending choices private', async ({
     const leaderPage = harness.pages[Number(run.transcript[proposeIndex].actor)]
     await leaderPage.reload()
     await expect(leaderPage.getByLabel('阿瓦隆游戏圆桌')).toBeVisible()
-    await expect(leaderPage.getByRole('button', { name: /^提交 0\// })).toBeDisabled()
+    await expect(leaderPage.getByRole('button', { name: /^确认队伍 0\// })).toBeDisabled()
 
     await harness.dispatch(run.transcript[proposeIndex])
     await harness.dispatch(run.transcript[firstVoteIndex])
     const voteActor = run.transcript[firstVoteIndex].actor
     const votePage = harness.pages[Number(voteActor)]
     await expect(
-      votePage.locator('p:visible').filter({ hasText: '你已投票：同意。等待其他玩家。' }),
+      votePage.locator('p:visible').filter({ hasText: '你已表决：赞成。等待其他玩家完成表决。' }),
     ).toBeVisible()
     for (const [index, page] of harness.pages.entries()) {
       if (String(index) === voteActor) continue
-      await expect(page.getByRole('button', { name: '同意队伍' })).toBeEnabled()
-      await expect(page.getByText(/你已投票/)).toHaveCount(0)
+      await expect(page.getByRole('button', { name: '赞成队伍' })).toBeEnabled()
+      await expect(page.getByText(/你已表决/)).toHaveCount(0)
     }
 
     await votePage.reload()
     await expect(
-      votePage.locator('p:visible').filter({ hasText: '你已投票：同意。等待其他玩家。' }),
+      votePage.locator('p:visible').filter({ hasText: '你已表决：赞成。等待其他玩家完成表决。' }),
     ).toBeVisible()
-    await expect(votePage.getByRole('button', { name: '同意队伍' })).toHaveCount(0)
+    await expect(votePage.getByRole('button', { name: '赞成队伍' })).toHaveCount(0)
 
     for (let index = firstVoteIndex + 1; index < firstQuestCardIndex; index += 1) {
       await harness.dispatch(run.transcript[index])
@@ -64,19 +64,19 @@ test('refresh restores server data and keeps pending choices private', async ({
       .find(({ command }) => command === 'playQuestCard')!.actor
     const pendingTeammatePage = harness.pages[Number(nextCardActor)]
     await expect(
-      cardPage.locator('p:visible').filter({ hasText: '你已提交 Fail，等待任务结算。' }),
+      cardPage.locator('p:visible').filter({ hasText: '你已提交失败，等待任务结算。' }),
     ).toBeVisible()
     await expect(
       pendingTeammatePage.getByRole('button', { name: '让任务成功' }),
     ).toBeEnabled()
     for (const [index, page] of harness.pages.entries()) {
       if (String(index) === cardActor) continue
-      await expect(page.getByText(/你已提交 (?:Success|Fail)/)).toHaveCount(0)
+      await expect(page.getByText(/你已提交(?:成功|失败)/)).toHaveCount(0)
     }
 
     await cardPage.reload()
     await expect(
-      cardPage.locator('p:visible').filter({ hasText: '你已提交 Fail，等待任务结算。' }),
+      cardPage.locator('p:visible').filter({ hasText: '你已提交失败，等待任务结算。' }),
     ).toBeVisible()
     await expect(cardPage.getByRole('button', { name: '让任务失败' })).toHaveCount(0)
 

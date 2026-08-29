@@ -233,7 +233,7 @@ export async function validateActiveRoomSessions(
 
 export function getRoomSessionInvalidationNotice(error: unknown) {
   if (!(error instanceof RoomSessionValidationHttpError)) return null
-  if (error.status === 404) return '房主已解散房间，已返回主页。'
-  if (error.status === 403) return '你的房间座位已被释放，已返回主页。'
+  if (error.status === 404) return '房间已解散。'
+  if (error.status === 403) return '上次的座位已失效。'
   return null
 }

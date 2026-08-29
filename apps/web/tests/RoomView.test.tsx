@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
-import { RoomView, type RoomViewProps } from '../src/App'
+import { RoomAccessView, RoomView, type RoomViewProps } from '../src/App'
 
 vi.mock('../src/config', () => ({
   webConfig: {
@@ -86,13 +86,28 @@ function playingGameState(): RoomViewProps['gameState'] {
 }
 
 describe('RoomView connection state', () => {
+  it('uses player-facing access and loading copy', () => {
+    const accessHtml = renderToStaticMarkup(
+      <RoomAccessView matchID="room-123" onBackHome={vi.fn()} />,
+    )
+    const loadingHtml = renderRoomView()
+
+    expect(accessHtml).toContain('房间 room-123')
+    expect(accessHtml).toContain('你尚未加入这个房间')
+    expect(accessHtml).toContain('>返回房间列表<')
+
+    expect(loadingHtml).toContain('正在进入房间')
+    expect(loadingHtml).not.toContain('座位凭据')
+    expect(loadingHtml).not.toContain('实时连接')
+  })
+
   it.each([
     ['room metadata', { room: null }],
     ['the first authoritative game state', {}],
   ])('keeps one connecting room view until %s arrives', (_label, overrides) => {
     const html = renderRoomView(overrides)
 
-    expect(html).toContain('正在连接房间')
+    expect(html).toContain('正在进入房间')
     expect(html.match(/<main\b/g)).toHaveLength(1)
     expect(html).not.toContain('玩家座位')
   })

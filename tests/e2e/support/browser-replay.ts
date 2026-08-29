@@ -117,12 +117,12 @@ export async function createBrowserReplayHarness(options: {
               }).click()
             }
             await page.getByRole('button', {
-              name: `提交 ${command.payload.team.length}/${command.payload.team.length}`,
+              name: `确认队伍 ${command.payload.team.length}/${command.payload.team.length}`,
             }).click()
             return
           case 'castTeamVote':
             await page.getByRole('button', {
-              name: command.payload.vote === 'approve' ? '同意队伍' : '拒绝队伍',
+              name: command.payload.vote === 'approve' ? '赞成队伍' : '反对队伍',
             }).click()
             return
           case 'playQuestCard':
@@ -136,7 +136,7 @@ export async function createBrowserReplayHarness(options: {
             await page.getByRole('button', {
               name: `选择 ${playerName(command.payload.targetID)} 作为刺杀目标`,
             }).click()
-            await page.getByRole('button', { name: '确认刺杀' }).click()
+            await page.getByRole('button', { name: '确认目标' }).click()
         }
       },
       async snapshot() {

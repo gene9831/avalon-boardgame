@@ -19,11 +19,11 @@ const ROLE_AVATARS: Record<Role, string> = {
 
 const ROLE_GUIDANCE: Record<Role, { ability: string; objective: string }> = {
   assassin: {
-    ability: '你属于邪恶阵营，可在任务中选择 Success 或 Fail。正义完成三次任务后，由你刺杀梅林。',
+    ability: '你属于邪恶阵营，可在任务中选择成功或失败。正义完成三次任务后，由你刺杀梅林。',
     objective: '破坏三次任务，或在最后准确找出梅林。',
   },
   loyal_servant: {
-    ability: '你没有额外身份视野。参加任务时只能提交 Success。',
+    ability: '你没有额外身份视野。参加任务时只能提交成功。',
     objective: '帮助正义阵营完成三次任务，并保护梅林不被刺客识破。',
   },
   merlin: {
@@ -31,7 +31,7 @@ const ROLE_GUIDANCE: Record<Role, { ability: string; objective: string }> = {
     objective: '引导正义完成三次任务，同时隐藏自己，避免被刺客识破。',
   },
   minion: {
-    ability: '你属于邪恶阵营，可辨认同伴，并可在任务中选择 Success 或 Fail。',
+    ability: '你属于邪恶阵营，可辨认同伴，并可在任务中选择成功或失败。',
     objective: '协助邪恶阵营破坏三次任务，并帮助刺客找出梅林。',
   },
 }
@@ -85,7 +85,7 @@ export function IdentityRecognitionLayer({
         <CurtainDecoration />
         <div className="relative z-10 max-w-lg">
           <p className="text-xs font-semibold uppercase tracking-[0.32em] text-amber-300/80">
-            Identity recognition
+            身份辨认
           </p>
           <h2 className="mt-4 font-serif text-2xl font-semibold text-amber-50 sm:text-4xl">
             {copy.title}
@@ -186,7 +186,7 @@ function RecognitionConfirmation({
         onClick={onConfirm}
         type="button"
       >
-        {confirmed ? '等待中' : copy.confirmation}
+        {confirmed ? '等待其他玩家确认' : copy.confirmation}
       </button>
     </div>
   )
