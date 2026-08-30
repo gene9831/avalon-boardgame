@@ -1,18 +1,26 @@
+import { BadgeCheck, CircleCheck, CircleX } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type {
   AvalonPlayerView,
   PlayerID,
   QuestCard,
-  Role,
   TeamVote,
+  TeamVoteResult,
 } from '@avalon/game'
 
 import { ConnectionRecoveryControl } from './ConnectionRecoveryControl'
+import {
+  GAME_CLIENT_SETTINGS_KEY,
+  loadGameClientSettings,
+  saveGameClientSettings,
+} from './game-client-settings'
 import { IdentityRecognitionLayer } from './IdentityRecognitionLayer'
 import type { LobbyPlayer } from './lobby'
 import { QuestBoard } from './QuestBoard'
+import { RoleAvatar } from './RoleCard'
 import {
   canSubmitTeam,
+  getDisplayedTeamVoteResult,
   getPhaseLabel,
   getQuestTeamSize,
   ROLE_LABELS,
@@ -70,9 +78,12 @@ export function RoomGamePanel({
   const seats = buildRoundTableSeats(players, playerIDs.length, playerID)
   const playerNames = Object.fromEntries(seats.map((seat) => [seat.playerID, seat.name]))
   const requiredTeamSize = getQuestTeamSize(playerIDs.length, game.questIndex)
+  const displayedTeamVoteResult = getDisplayedTeamVoteResult(game, phase)
   const [selectedTeam, setSelectedTeam] = useState<PlayerID[]>([])
   const [selectedTarget, setSelectedTarget] = useState<PlayerID | null>(null)
-  const [showKnownPlayerInfo, setShowKnownPlayerInfo] = useState(false)
+  const [showRoleKnowledge, setShowRoleKnowledge] = useState(
+    () => loadGameClientSettings().roleKnowledgeOpen,
+  )
   const isLeader = game.leaderID === playerID
   const canSelectTeam = phase === 'teamProposal' && activeStage === 'leader' && isLeader
   const canSelectAssassinationTarget = phase === 'assassination' && activeStage === 'assassin' && game.viewer.role === 'assassin' && game.status === 'playing'
@@ -84,6 +95,7 @@ export function RoomGamePanel({
     identityRecognitionActive &&
     game.viewer.identityRecognition?.isParticipant === true &&
     game.identityRecognition?.step !== 'roleReveal'
+  const showPrivateRoleKnowledge = game.status === 'playing' && showRoleKnowledge
 
   useEffect(() => {
     setSelectedTeam([])
@@ -92,6 +104,22 @@ export function RoomGamePanel({
   useEffect(() => {
     setSelectedTarget(null)
   }, [phase])
+
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== GAME_CLIENT_SETTINGS_KEY) return
+      setShowRoleKnowledge(loadGameClientSettings().roleKnowledgeOpen)
+    }
+
+    window.addEventListener('storage', handleStorage)
+    return () => window.removeEventListener('storage', handleStorage)
+  }, [])
+
+  const toggleRoleKnowledge = () => {
+    const nextValue = !showRoleKnowledge
+    setShowRoleKnowledge(nextValue)
+    saveGameClientSettings({ roleKnowledgeOpen: nextValue })
+  }
 
   const toggleSeat = (currentPlayerID: PlayerID) => {
     if (canSelectTeam) {
@@ -109,6 +137,7 @@ export function RoomGamePanel({
       activeStage={activeStage}
       canSubmitTeam={canSubmit}
       game={game}
+      displayedTeamVoteResult={displayedTeamVoteResult}
       onAssassinate={() => selectedTarget !== null && onAssassinate(selectedTarget)}
       onCastTeamVote={onCastTeamVote}
       onPlayQuestCard={onPlayQuestCard}
@@ -153,12 +182,14 @@ export function RoomGamePanel({
               canSelect={canSelectTeam}
               canSelectAsTarget={canSelectAssassinationTarget && isEligibleAssassinationTarget(game, playerID, seat.playerID)}
               dense={playerIDs.length >= 7}
+              displayedTeamVoteResult={displayedTeamVoteResult}
               game={game}
               onSelect={() => toggleSeat(seat.playerID)}
               seat={seat}
               selected={selectedTeam.includes(seat.playerID)}
               selectedAsTarget={selectedTarget === seat.playerID}
-              showKnownPlayerInfo={showKnownPlayerInfo || showRecognitionKnowledge}
+              showKnownPlayerInfo={showPrivateRoleKnowledge || showRecognitionKnowledge}
+              showPrivateRoleKnowledge={showPrivateRoleKnowledge}
             />
           )}
           seats={seats}
@@ -172,23 +203,25 @@ export function RoomGamePanel({
         )}
       </div>
 
-      {!identityRecognitionActive && <button
-        aria-label={showKnownPlayerInfo ? '隐藏已知角色信息' : '显示已知角色信息'}
-        aria-pressed={showKnownPlayerInfo}
-        className={`absolute bottom-2.5 left-2.5 z-40 grid min-h-11 min-w-11 place-items-center rounded-lg border shadow-lg backdrop-blur transition sm:bottom-3 sm:left-3 ${showKnownPlayerInfo ? 'border-rose-300/60 bg-rose-950/85 text-rose-100' : 'border-white/15 bg-slate-950/80 text-slate-300 hover:border-white/35'}`}
-        onClick={() => setShowKnownPlayerInfo((visible) => !visible)}
-        title={showKnownPlayerInfo ? '隐藏已知角色信息' : '显示已知角色信息'}
+      {!identityRecognitionActive && game.status === 'playing' && <button
+        aria-controls="current-player-avatar"
+        aria-label={showRoleKnowledge ? '隐藏我的身份与已知信息' : '查看我的身份与已知信息'}
+        aria-pressed={showRoleKnowledge}
+        className={`absolute bottom-2.5 left-2.5 z-40 grid min-h-11 min-w-11 place-items-center rounded-lg border shadow-lg backdrop-blur transition sm:bottom-3 sm:left-3 ${showRoleKnowledge ? 'border-rose-300/60 bg-rose-950/85 text-rose-100' : 'border-white/15 bg-slate-950/80 text-slate-300 hover:border-white/35'}`}
+        onClick={toggleRoleKnowledge}
+        title={showRoleKnowledge ? '隐藏我的身份与已知信息' : '查看我的身份与已知信息'}
         type="button"
       >
-        <EyeIcon hidden={!showKnownPlayerInfo} />
+        <EyeIcon hidden={!showRoleKnowledge} />
       </button>}
     </section>
   )
 }
 
-function PhaseAction({ activeStage, canSubmitTeam, game, onAssassinate, onCastTeamVote, onPlayQuestCard, onSubmitTeam, phase, playerID, playerNames, requiredTeamSize, selectedTeam, selectedTarget }: {
+function PhaseAction({ activeStage, canSubmitTeam, displayedTeamVoteResult, game, onAssassinate, onCastTeamVote, onPlayQuestCard, onSubmitTeam, phase, playerID, playerNames, requiredTeamSize, selectedTeam, selectedTarget }: {
   activeStage: string | undefined
   canSubmitTeam: boolean
+  displayedTeamVoteResult: TeamVoteResult | undefined
   game: AvalonPlayerView
   onAssassinate: () => void
   onCastTeamVote: (vote: TeamVote) => void
@@ -202,21 +235,28 @@ function PhaseAction({ activeStage, canSubmitTeam, game, onAssassinate, onCastTe
   selectedTarget: PlayerID | null
 }) {
   if (game.status === 'finished' && game.result !== undefined) {
-    return <GameResult game={game} playerNames={playerNames} />
+    return <GameResult displayedTeamVoteResult={displayedTeamVoteResult} game={game} playerNames={playerNames} />
   }
+
+  const voteResultSummary = displayedTeamVoteResult === undefined
+    ? null
+    : <TeamVoteResultSummary result={displayedTeamVoteResult} />
 
   if (phase === 'teamProposal') {
     const isLeader = game.leaderID === playerID
     return (
-      <div className="flex items-center justify-between gap-2">
-        <div className="team-proposal-summary min-w-0">
-          <p className="text-[clamp(0.6rem,1.8vw,0.75rem)] font-semibold text-cyan-100">选择 {requiredTeamSize} 名任务队员</p>
-          <p className="phase-action-copy mt-0.5 hidden truncate text-[0.7rem] text-slate-300 sm:block">{isLeader && activeStage === 'leader' ? '选择圆桌上的玩家' : `等待 ${getPlayerName(game, game.leaderID, playerNames)} 组建任务队伍`}</p>
+      <div>
+        {voteResultSummary}
+        <div className="flex items-center justify-between gap-2">
+          <div className="team-proposal-summary min-w-0">
+            <p className="text-xs font-semibold text-cyan-100">选择 {requiredTeamSize} 名任务队员</p>
+            <p className="phase-action-copy mt-0.5 hidden truncate text-xs text-slate-300 sm:block">{isLeader && activeStage === 'leader' ? '选择圆桌上的玩家' : `等待 ${getPlayerName(game, game.leaderID, playerNames)} 组建任务队伍`}</p>
+          </div>
+          <button aria-label={`确认队伍 ${selectedTeam.length}/${requiredTeamSize}`} className="min-h-11 shrink-0 rounded-xl bg-cyan-200 px-2 py-2 text-xs font-bold text-slate-950 transition hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-40 sm:px-3" disabled={!canSubmitTeam} onClick={onSubmitTeam} type="button">
+            <span className="min-[360px]:hidden">确认 {selectedTeam.length}/{requiredTeamSize}</span>
+            <span className="hidden min-[360px]:inline">确认队伍 {selectedTeam.length}/{requiredTeamSize}</span>
+          </button>
         </div>
-        <button aria-label={`确认队伍 ${selectedTeam.length}/${requiredTeamSize}`} className="min-h-11 shrink-0 rounded-xl bg-cyan-200 px-2 py-2 text-xs font-bold text-slate-950 transition hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-40 sm:px-3" disabled={!canSubmitTeam} onClick={onSubmitTeam} type="button">
-          <span className="min-[360px]:hidden">确认 {selectedTeam.length}/{requiredTeamSize}</span>
-          <span className="hidden min-[360px]:inline">确认队伍 {selectedTeam.length}/{requiredTeamSize}</span>
-        </button>
       </div>
     )
   }
@@ -227,13 +267,16 @@ function PhaseAction({ activeStage, canSubmitTeam, game, onAssassinate, onCastTe
     return (
       <div>
         <p className="hidden text-xs text-slate-200 sm:block">提案队伍：{(game.proposedTeam ?? []).map((id) => getPlayerName(game, id, playerNames)).join('、')}</p>
+        <p aria-live="polite" className="text-center text-xs font-semibold text-amber-100" role="status">
+          {game.submittedTeamVotePlayerIDs.length}/{Object.keys(game.players).length} 已投票
+        </p>
         {submittedVote === undefined ? (
           <div className="phase-action-buttons mt-2 grid grid-cols-2 gap-2">
-            <button className="min-h-11 rounded-lg bg-emerald-200 px-2 py-2 text-xs font-bold text-slate-950 disabled:opacity-40" disabled={!canVote} onClick={() => onCastTeamVote('approve')} type="button"><span className="phase-action-full-label">赞成队伍</span><span className="phase-action-compact-label">赞成</span></button>
-            <button className="min-h-11 rounded-lg bg-rose-200 px-2 py-2 text-xs font-bold text-slate-950 disabled:opacity-40" disabled={!canVote} onClick={() => onCastTeamVote('reject')} type="button"><span className="phase-action-full-label">反对队伍</span><span className="phase-action-compact-label">反对</span></button>
+            <button aria-label="赞成队伍" className="min-h-11 rounded-lg bg-emerald-200 px-2 py-2 text-xs font-bold text-slate-950 disabled:opacity-40" disabled={!canVote} onClick={() => onCastTeamVote('approve')} type="button"><span className="phase-action-full-label">赞成队伍</span><span className="phase-action-compact-label">赞成</span></button>
+            <button aria-label="反对队伍" className="min-h-11 rounded-lg bg-rose-200 px-2 py-2 text-xs font-bold text-slate-950 disabled:opacity-40" disabled={!canVote} onClick={() => onCastTeamVote('reject')} type="button"><span className="phase-action-full-label">反对队伍</span><span className="phase-action-compact-label">反对</span></button>
           </div>
         ) : (
-          <p className="text-center text-[0.6rem] text-amber-100 sm:mt-2 sm:text-xs"><span className="sm:hidden">已表决：{submittedVote === 'approve' ? '赞成' : '反对'}，等待其他玩家</span><span className="hidden sm:inline">你已表决：{submittedVote === 'approve' ? '赞成' : '反对'}。等待其他玩家完成表决。</span></p>
+          <p className="mt-1 text-center text-xs text-slate-200">你已选择：{submittedVote === 'approve' ? '赞成' : '反对'}</p>
         )}
       </div>
     )
@@ -244,37 +287,35 @@ function PhaseAction({ activeStage, canSubmitTeam, game, onAssassinate, onCastTe
     const submittedCard = game.viewer.submittedQuestCard
     const canPlay = isQuestMember && activeStage === 'quest' && submittedCard === undefined
 
-    if (!isQuestMember) {
-      return <p className="text-center text-[0.6rem] text-slate-200 sm:text-xs">等待任务队员提交任务牌</p>
-    }
+    const questAction = !isQuestMember
+      ? <p className="text-center text-xs text-slate-200">等待任务队员提交任务牌</p>
+      : submittedCard !== undefined
+        ? <p className="text-center text-xs text-amber-100">你已提交{submittedCard === 'success' ? '成功' : '失败'}，等待任务结算。</p>
+        : (
+            <div>
+              <p className="phase-action-copy hidden text-center text-xs text-slate-200 sm:block">从你的任务手牌中选择一张。所有任务牌将在提交完成后统一结算。</p>
+              <div className={`phase-action-buttons mt-2 grid gap-2 ${game.viewer.loyalty === 'evil' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                <button aria-label="让任务成功" className="min-h-11 rounded-lg border border-sky-100/30 bg-sky-300/90 px-2 py-2 text-xs font-bold text-slate-950 disabled:opacity-40" disabled={!canPlay} onClick={() => onPlayQuestCard('success')} type="button"><span className="phase-action-full-label">让任务成功</span><span className="phase-action-compact-label">成功</span></button>
+                {game.viewer.loyalty === 'evil' && (
+                  <button aria-label="让任务失败" className="min-h-11 rounded-lg border border-rose-100/30 bg-rose-300/90 px-2 py-2 text-xs font-bold text-slate-950 disabled:opacity-40" disabled={!canPlay} onClick={() => onPlayQuestCard('fail')} type="button"><span className="phase-action-full-label">让任务失败</span><span className="phase-action-compact-label">失败</span></button>
+                )}
+              </div>
+            </div>
+          )
 
-    if (submittedCard !== undefined) {
-      return <p className="text-center text-[0.6rem] text-amber-100 sm:text-xs">你已提交{submittedCard === 'success' ? '成功' : '失败'}，等待任务结算。</p>
-    }
-
-    return (
-      <div>
-        <p className="phase-action-copy hidden text-center text-xs text-slate-200 sm:block">从你的任务手牌中选择一张。所有任务牌将在提交完成后统一结算。</p>
-        <div className={`phase-action-buttons mt-2 grid gap-2 ${game.viewer.loyalty === 'evil' ? 'grid-cols-2' : 'grid-cols-1'}`}>
-          <button className="min-h-11 rounded-lg border border-sky-100/30 bg-sky-300/90 px-2 py-2 text-xs font-bold text-slate-950 disabled:opacity-40" disabled={!canPlay} onClick={() => onPlayQuestCard('success')} type="button"><span className="phase-action-full-label">让任务成功</span><span className="phase-action-compact-label">成功</span></button>
-          {game.viewer.loyalty === 'evil' && (
-            <button className="min-h-11 rounded-lg border border-rose-100/30 bg-rose-300/90 px-2 py-2 text-xs font-bold text-slate-950 disabled:opacity-40" disabled={!canPlay} onClick={() => onPlayQuestCard('fail')} type="button"><span className="phase-action-full-label">让任务失败</span><span className="phase-action-compact-label">失败</span></button>
-          )}
-        </div>
-      </div>
-    )
+    return <div>{voteResultSummary}{questAction}</div>
   }
 
   if (phase === 'assassination') {
     if (game.viewer.role !== 'assassin' || activeStage !== 'assassin') {
-      return <p className="text-center text-[0.6rem] text-rose-100 sm:text-xs"><span className="sm:hidden">等待刺客行动</span><span className="hidden sm:inline">三次任务已经成功，等待刺客决定最后的命运。</span></p>
+      return <p className="text-center text-xs text-rose-100"><span className="sm:hidden">等待刺客行动</span><span className="hidden sm:inline">三次任务已经成功，等待刺客决定最后的命运。</span></p>
     }
 
     return (
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold text-rose-100">刺杀梅林</p>
-          <p className="phase-action-copy mt-0.5 hidden truncate text-[0.7rem] text-slate-300 sm:block">{selectedTarget === null ? '选择一名正义阵营玩家作为刺杀目标' : `目标：${getPlayerName(game, selectedTarget, playerNames)}`}</p>
+          <p className="phase-action-copy mt-0.5 hidden truncate text-xs text-slate-300 sm:block">{selectedTarget === null ? '选择一名正义阵营玩家作为刺杀目标' : `目标：${getPlayerName(game, selectedTarget, playerNames)}`}</p>
         </div>
         <button className="min-h-11 shrink-0 rounded-xl bg-rose-300 px-3 py-2 text-xs font-bold text-slate-950 disabled:opacity-40" disabled={selectedTarget === null} onClick={onAssassinate} type="button">确认目标</button>
       </div>
@@ -288,22 +329,39 @@ function PhaseAction({ activeStage, canSubmitTeam, game, onAssassinate, onCastTe
   return <p className="text-center text-xs text-cyan-100">正在同步游戏状态。</p>
 }
 
-function GameSeat({ canSelect, canSelectAsTarget, dense, game, onSelect, seat, selected, selectedAsTarget, showKnownPlayerInfo }: {
+function GameSeat({ canSelect, canSelectAsTarget, dense, displayedTeamVoteResult, game, onSelect, seat, selected, selectedAsTarget, showKnownPlayerInfo, showPrivateRoleKnowledge }: {
   canSelect: boolean
   canSelectAsTarget: boolean
   dense: boolean
+  displayedTeamVoteResult: TeamVoteResult | undefined
   game: AvalonPlayerView
   onSelect: () => void
   seat: RoundTableSeat
   selected: boolean
   selectedAsTarget: boolean
   showKnownPlayerInfo: boolean
+  showPrivateRoleKnowledge: boolean
 }) {
   const isLeader = game.leaderID === seat.playerID
   const onQuestTeam = game.proposedTeam?.includes(seat.playerID) === true
   const knownEvil = showKnownPlayerInfo && game.viewer.knownEvilPlayerIDs.includes(seat.playerID)
   const revealedRole = game.revealedRoles?.[seat.playerID]
-  const visibleRole = revealedRole ?? (seat.isCurrentPlayer ? game.viewer.role : null)
+  const privateRole = showPrivateRoleKnowledge && seat.isCurrentPlayer
+    ? game.viewer.role
+    : null
+  const avatarRole = game.status === 'finished'
+    ? revealedRole ?? null
+    : privateRole
+  const visibleRole = revealedRole ?? null
+  const teamVoteStatus = displayedTeamVoteResult?.votes[seat.playerID]
+    ?? (game.submittedTeamVotePlayerIDs.includes(seat.playerID) ? 'pending' : undefined)
+  const teamVoteStatusLabel = teamVoteStatus === 'approve'
+    ? '赞成'
+    : teamVoteStatus === 'reject'
+      ? '反对'
+      : teamVoteStatus === 'pending'
+        ? '已投票'
+        : null
   const avatarClasses = selectedAsTarget
     ? 'border-rose-200 bg-rose-950 text-rose-50 shadow-[0_0_26px_rgba(251,113,133,0.7)]'
     : selected || onQuestTeam
@@ -319,21 +377,24 @@ function GameSeat({ canSelect, canSelectAsTarget, dense, game, onSelect, seat, s
       ? `选择 ${seat.name} 作为刺杀目标`
       : revealedRole !== undefined
         ? `${seat.name} · ${ROLE_LABELS[revealedRole]}`
-        : visibleRole !== null
-          ? `${seat.name}，你的身份：${SHORT_ROLE_LABELS[visibleRole]}`
-          : seat.name
+        : seat.name
   const seatStatuses = [
     isLeader ? '队长' : null,
     onQuestTeam ? '任务队员' : null,
     !seat.connected ? '已断线' : null,
     knownEvil ? '已知阵营信息：邪恶' : null,
+    teamVoteStatusLabel,
   ].filter((status): status is string => status !== null)
   const seatLabel = [seatAction, ...seatStatuses].join('，')
 
   return (
     <button
       aria-label={seatLabel}
-      aria-pressed={canSelect ? selected : canSelectAsTarget ? selectedAsTarget : undefined}
+      aria-pressed={canSelect
+        ? selected
+        : canSelectAsTarget
+          ? selectedAsTarget
+          : undefined}
       className={`pointer-events-auto flex flex-col items-center border-0 bg-transparent p-0 text-center transition ${dense ? 'w-[clamp(3.1rem,14vw,6.5rem)]' : 'w-[clamp(4.2rem,17vw,8rem)]'} ${canSelect || canSelectAsTarget ? 'cursor-pointer hover:scale-105' : 'cursor-default'}`}
       data-round-table-player
       disabled={!canSelect && !canSelectAsTarget}
@@ -342,18 +403,75 @@ function GameSeat({ canSelect, canSelectAsTarget, dense, game, onSelect, seat, s
     >
       <div className="relative">
         {isLeader && <CrownIcon />}
-        <div className={`${dense ? 'size-[clamp(2.5rem,9.5vw,4.5rem)]' : 'size-[clamp(3rem,12vw,5.5rem)]'} grid shrink-0 place-items-center overflow-hidden rounded-full border-2 text-[clamp(0.9rem,4vw,1.8rem)] font-semibold transition ${avatarClasses} ${!seat.connected ? 'grayscale opacity-45' : ''}`} data-round-table-avatar>
-          <PlayerAvatar avatarID={seat.avatarID} className="size-full object-contain p-[12%]" />
+        <div
+          className={`${dense ? 'size-[clamp(2.5rem,9.5vw,4.5rem)]' : 'size-[clamp(3rem,12vw,5.5rem)]'} relative grid shrink-0 place-items-center overflow-hidden rounded-full border-2 text-[clamp(0.9rem,4vw,1.8rem)] font-semibold transition ${avatarClasses} ${!seat.connected ? 'grayscale opacity-45' : ''}`}
+          data-round-table-avatar
+          id={seat.isCurrentPlayer ? 'current-player-avatar' : undefined}
+        >
+          {avatarRole === null
+            ? <PlayerAvatar avatarID={seat.avatarID} className="size-full object-contain p-[12%]" />
+            : <RoleAvatar className="size-full object-cover" role={avatarRole} />}
         </div>
         {knownEvil && <KnownEvilEmblem />}
       </div>
-      <div className={`mt-1 w-full rounded-md border px-1.5 py-0.5 shadow-lg ${selectedAsTarget ? 'border-rose-200/70 bg-rose-950/95' : selected || onQuestTeam ? 'border-cyan-200/70 bg-cyan-950/95' : seat.isCurrentPlayer ? 'border-amber-200/70 bg-amber-950/95' : 'border-white/15 bg-slate-950/90'}`} data-label-placement={seat.labelPlacement} data-round-table-nameplate title={`${seat.seatNumber}. ${seat.name}${revealedRole === undefined ? '' : ` · ${ROLE_LABELS[revealedRole]}`}`}>
-        <p className="truncate text-[clamp(0.58rem,2.4vw,0.8rem)] font-medium leading-tight text-white">
-          {seat.seatNumber}. {seat.name}
-        </p>
-        {visibleRole !== null && <p className="truncate text-[clamp(0.5rem,2vw,0.7rem)] font-semibold leading-tight text-amber-200" data-visible-role={visibleRole}>{SHORT_ROLE_LABELS[visibleRole]}</p>}
+      <div className="round-table-label-stack mt-1 flex w-full flex-col items-stretch" data-label-placement={seat.labelPlacement}>
+        <div className="relative w-full" data-round-table-label-anchor>
+          <div className={`w-full rounded-md border px-1.5 py-0.5 shadow-lg ${selectedAsTarget ? 'border-rose-200/70 bg-rose-950/95' : selected || onQuestTeam ? 'border-cyan-200/70 bg-cyan-950/95' : seat.isCurrentPlayer ? 'border-amber-200/70 bg-amber-950/95' : 'border-white/15 bg-slate-950/90'}`} data-round-table-nameplate title={`${seat.seatNumber}. ${seat.name}${revealedRole === undefined ? '' : ` · ${ROLE_LABELS[revealedRole]}`}`}>
+            <p className="truncate text-[clamp(0.58rem,2.4vw,0.8rem)] font-medium leading-tight text-white">
+              {seat.seatNumber}. {seat.name}
+            </p>
+            {visibleRole !== null && <p className="truncate text-[clamp(0.5rem,2vw,0.7rem)] font-semibold leading-tight text-amber-200" data-visible-role={visibleRole}>{ROLE_LABELS[visibleRole]}</p>}
+          </div>
+          {teamVoteStatus !== undefined && (
+            <TeamVoteStatusIcon
+              side={seat.labelPlacement === 'right' ? 'left' : 'right'}
+              status={teamVoteStatus}
+            />
+          )}
+          {privateRole !== null && (
+            <p
+              className="absolute left-1/2 top-[calc(100%+0.125rem)] w-max max-w-[calc(100%+2rem)] -translate-x-1/2 truncate rounded bg-slate-950/90 px-1 py-px text-[clamp(0.48rem,1.8vw,0.65rem)] font-bold leading-tight text-amber-200 shadow-lg"
+              data-current-role-label={privateRole}
+            >
+              {ROLE_LABELS[privateRole]}
+            </p>
+          )}
+        </div>
       </div>
     </button>
+  )
+}
+
+function TeamVoteStatusIcon({ side, status }: {
+  side: 'left' | 'right'
+  status: TeamVote | 'pending'
+}) {
+  const label = status === 'approve'
+    ? '赞成'
+    : status === 'reject'
+      ? '反对'
+      : '已投票'
+  const colorClasses = status === 'approve'
+    ? 'text-emerald-200'
+    : status === 'reject'
+      ? 'text-rose-200'
+      : 'text-slate-200'
+
+  return (
+    <span
+      aria-hidden="true"
+      className={`team-vote-indicator absolute top-1/2 grid size-[clamp(0.9rem,3vw,1.2rem)] -translate-y-1/2 place-items-center ${side === 'left' ? 'right-[calc(100%+0.25rem)]' : 'left-[calc(100%+0.25rem)]'} ${colorClasses}`}
+      data-team-vote-status={status}
+      title={label}
+    >
+      {status === 'pending' ? (
+        <BadgeCheck className="size-full" strokeWidth={2.25} />
+      ) : status === 'approve' ? (
+        <CircleCheck className="size-full" strokeWidth={2.25} />
+      ) : (
+        <CircleX className="size-full" strokeWidth={2.25} />
+      )}
+    </span>
   )
 }
 
@@ -386,7 +504,7 @@ function EyeIcon({ hidden }: { hidden: boolean }) {
   )
 }
 
-function GameResult({ game, playerNames }: { game: AvalonPlayerView; playerNames: Readonly<Record<PlayerID, string>> }) {
+function GameResult({ displayedTeamVoteResult, game, playerNames }: { displayedTeamVoteResult: TeamVoteResult | undefined; game: AvalonPlayerView; playerNames: Readonly<Record<PlayerID, string>> }) {
   const result = game.result
   if (result === undefined) return null
 
@@ -405,8 +523,27 @@ function GameResult({ game, playerNames }: { game: AvalonPlayerView; playerNames
       <p className="mt-1 text-xs text-amber-50/75">
         {reason}{result.targetID === undefined ? '' : ` · 目标 ${getPlayerName(game, result.targetID, playerNames)}`}
       </p>
-      {game.revealedRoles !== undefined && <p className="mt-2 text-[0.65rem] text-slate-300">所有玩家的角色已公开。</p>}
+      {displayedTeamVoteResult !== undefined && <TeamVoteResultSummary result={displayedTeamVoteResult} />}
+      {game.revealedRoles !== undefined && <p className="mt-2 text-xs text-slate-300">所有玩家的角色已公开。</p>}
     </div>
+  )
+}
+
+function TeamVoteResultSummary({ result }: { result: TeamVoteResult }) {
+  const approvalCount = Object.values(result.votes).filter(
+    (vote) => vote === 'approve',
+  ).length
+  const rejectionCount = Object.keys(result.votes).length - approvalCount
+
+  return (
+    <p
+      aria-live="polite"
+      className={`team-vote-result-summary mb-1 text-center text-xs font-semibold ${result.approved ? 'text-emerald-200' : 'text-rose-200'}`}
+      role="status"
+    >
+      <span className="team-vote-result-full">队伍{result.approved ? '通过' : '否决'} · {approvalCount} 赞成 / {rejectionCount} 反对</span>
+      <span className="team-vote-result-compact">{result.approved ? '通过' : '否决'} · {approvalCount}赞成 / {rejectionCount}反对</span>
+    </p>
   )
 }
 
@@ -416,13 +553,6 @@ function isEligibleAssassinationTarget(
   targetID: PlayerID,
 ) {
   return targetID !== playerID && !game.viewer.knownEvilPlayerIDs.includes(targetID)
-}
-
-const SHORT_ROLE_LABELS: Record<Role, string> = {
-  assassin: '刺客',
-  loyal_servant: '忠臣',
-  merlin: '梅林',
-  minion: '爪牙',
 }
 
 function getPlayerName(game: AvalonPlayerView, playerID: PlayerID | null, playerNames: Readonly<Record<PlayerID, string>>) {

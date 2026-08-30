@@ -37,30 +37,30 @@ export function QuestBoard({ children, game, numPlayers }: QuestBoardProps) {
             return (
               <li className="text-center" key={index}>
                 <div aria-current={isCurrent ? 'step' : undefined} className={`mx-auto grid aspect-square w-full max-w-14 place-items-center rounded-full border ${markerClass}`}>
-                  <span className="font-serif text-[clamp(0.65rem,2.5vw,1.125rem)] font-bold">{result ? (result.succeeded ? '✓' : '✕') : index + 1}</span>
+                  <span className="font-serif text-[clamp(0.75rem,2.5vw,1.125rem)] font-bold">{result ? (result.succeeded ? '✓' : '✕') : index + 1}</span>
                 </div>
                 <p className="quest-team-size mt-1 hidden text-xs font-semibold text-amber-50/85 sm:block">{teamSize} 人</p>
-                {config.questFailThresholds[index] === 2 && <p className="quest-team-size hidden text-[0.65rem] text-rose-200 sm:block">需 2 败</p>}
-                {result !== undefined && <p className={`mt-0.5 text-[0.45rem] sm:hidden ${result.succeeded ? 'text-sky-100' : 'text-rose-100'}`}>{result.successCount}/{result.failCount}</p>}
+                {config.questFailThresholds[index] === 2 && <p className="quest-team-size hidden text-xs text-rose-200 sm:block">需 2 败</p>}
+                {result !== undefined && <p className={`mt-0.5 text-xs sm:hidden ${result.succeeded ? 'text-sky-100' : 'text-rose-100'}`}>{result.successCount}/{result.failCount}</p>}
               </li>
             )
           })}
         </ol>
 
         {latestQuest !== undefined && (
-          <p className={`quest-latest-result mt-2 hidden rounded-lg border px-2 py-1 text-center text-[0.65rem] sm:block ${latestQuest.succeeded ? 'border-sky-200/15 bg-sky-300/10 text-sky-100' : 'border-rose-200/15 bg-rose-300/10 text-rose-100'}`}>
+          <p className={`quest-latest-result mt-2 hidden rounded-lg border px-2 py-1 text-center text-xs sm:block ${latestQuest.succeeded ? 'border-sky-200/15 bg-sky-300/10 text-sky-100' : 'border-rose-200/15 bg-rose-300/10 text-rose-100'}`}>
             第 {latestQuest.questIndex + 1} 次任务{latestQuest.succeeded ? '成功' : '失败'} · {latestQuest.successCount} 张成功 · {latestQuest.failCount} 张失败
           </p>
         )}
 
         <div className="quest-rejection-track mt-[clamp(0.3rem,1.2vw,0.75rem)] flex items-center gap-1 border-t border-amber-100/10 pt-[clamp(0.3rem,1vw,0.625rem)] sm:gap-2">
-          <span className="quest-rejection-label hidden shrink-0 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-amber-100/60 sm:inline">连续否决</span>
+          <span className="quest-rejection-label hidden shrink-0 text-xs font-semibold uppercase tracking-[0.16em] text-amber-100/60 sm:inline">连续否决</span>
           <ol className="flex flex-1 items-center justify-between" aria-label="连续否决轨道">
             {Array.from({ length: 5 }, (_, index) => {
               const step = index + 1
               const reached = game.consecutiveRejectedTeams >= step
               return (
-                <li className={`grid size-[clamp(0.85rem,3vw,1.25rem)] place-items-center rounded-full border text-[clamp(0.42rem,1.4vw,0.6rem)] font-bold ${reached ? 'border-rose-200/70 bg-rose-500/30 text-rose-50' : 'border-white/15 bg-black/20 text-slate-400'}`} key={step}>
+                <li className={`grid size-[clamp(1.25rem,3vw,1.5rem)] place-items-center rounded-full border text-xs font-bold ${reached ? 'border-rose-200/70 bg-rose-500/30 text-rose-50' : 'border-white/15 bg-black/20 text-slate-400'}`} key={step}>
                   {step}
                 </li>
               )

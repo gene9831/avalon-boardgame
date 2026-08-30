@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 import { playGeneratedGame, playScriptedScenario } from '@avalon/test-support'
 
-import { createBrowserReplayHarness } from '../support/browser-replay'
+import { createBrowserReplayHarness, playerName } from '../support/browser-replay'
 
 const recognitionViewports = [
   { width: 320, height: 568 },
@@ -147,6 +147,8 @@ test('recognition controls float in portrait and replace the quest board in land
 test('players complete the curtain-based identity recognition ceremony', async ({
   browser,
 }) => {
+  test.setTimeout(120_000)
+
   const run = playScriptedScenario({
     masterSeed: process.env.E2E_MASTER_SEED ?? 'playwright-smoke',
     scenario: 'five-rejections',
@@ -182,7 +184,7 @@ test('players complete the curtain-based identity recognition ceremony', async (
       await expect(page.getByText('本局目标：')).toBeVisible()
       await expect(page.getByText(/\d+ 秒/)).toHaveCount(0)
       await expect(page.getByRole('button', {
-        name: '显示已知角色信息',
+        name: '查看我的身份与已知信息',
       })).toHaveCount(0)
 
       const headerZIndex = await page.locator('.round-table-header').evaluate(
@@ -260,9 +262,128 @@ test('players complete the curtain-based identity recognition ceremony', async (
     for (const page of harness.pages) {
       await expect(page.locator('[data-identity-step]')).toHaveCount(0)
       await expect(page.getByRole('button', {
-        name: '显示已知角色信息',
+        name: '查看我的身份与已知信息',
       })).toBeVisible()
     }
+
+    const evilPage = harness.pages[Number(evilRecognitionCommands[0].actor)]
+    const evilSeatGeometryBefore = await evilPage.locator('#current-player-avatar').evaluate((avatar) => {
+      const nameplate = avatar.closest('[data-round-table-player]')!
+        .querySelector('[data-round-table-nameplate]')!
+        .getBoundingClientRect()
+      const avatarRect = avatar.getBoundingClientRect()
+      return {
+        avatar: [avatarRect.x, avatarRect.y, avatarRect.width, avatarRect.height],
+        nameplate: [nameplate.x, nameplate.y, nameplate.width, nameplate.height],
+      }
+    })
+    await evilPage.getByRole('button', {
+      name: '查看我的身份与已知信息',
+    }).click()
+    const evilAvatar = evilPage.locator('#current-player-avatar')
+    const evilSeat = evilAvatar.locator('xpath=ancestor::*[@data-round-table-player]')
+    await expect(evilPage.getByLabel('任务计分板', { exact: true })).toBeVisible()
+    await expect(evilPage.locator('[data-role-card]')).toHaveCount(0)
+    await expect(evilAvatar.locator('[data-role-avatar]')).toBeVisible()
+    await expect(evilSeat.locator('[data-current-role-label]')).toBeVisible()
+    const evilSeatGeometryAfter = await evilSeat.evaluate((seat) => {
+      const avatar = seat.querySelector('[data-round-table-avatar]')!.getBoundingClientRect()
+      const nameplate = seat.querySelector('[data-round-table-nameplate]')!.getBoundingClientRect()
+      const roleLabel = seat.querySelector('[data-current-role-label]')!.getBoundingClientRect()
+      return {
+        avatar: [avatar.x, avatar.y, avatar.width, avatar.height],
+        labelTop: roleLabel.top,
+        nameplate: [nameplate.x, nameplate.y, nameplate.width, nameplate.height],
+        nameplateBottom: nameplate.bottom,
+      }
+    })
+    expect(evilSeatGeometryAfter.avatar).toEqual(evilSeatGeometryBefore.avatar)
+    expect(evilSeatGeometryAfter.nameplate).toEqual(evilSeatGeometryBefore.nameplate)
+    expect(evilSeatGeometryAfter.labelTop).toBeGreaterThanOrEqual(
+      evilSeatGeometryAfter.nameplateBottom + 1,
+    )
+    await expect(evilPage.locator('[data-known-player-info]')).toHaveCount(1)
+    await evilPage.keyboard.press('Escape')
+    await expect(evilAvatar.locator('[data-role-avatar]')).toBeVisible()
+
+    await evilPage.reload()
+    await expect(evilPage.getByRole('button', {
+      name: '隐藏我的身份与已知信息',
+    })).toBeVisible()
+    await expect(evilPage.locator('#current-player-avatar [data-role-avatar]')).toBeVisible()
+
+    const sameBrowserPage = await evilPage.context().newPage()
+    await sameBrowserPage.goto(evilPage.url())
+    await expect(sameBrowserPage.getByRole('button', {
+      name: '隐藏我的身份与已知信息',
+    })).toBeVisible()
+    await sameBrowserPage.getByRole('button', {
+      name: '隐藏我的身份与已知信息',
+    }).click()
+    await expect(evilPage.getByRole('button', {
+      name: '查看我的身份与已知信息',
+    })).toBeVisible()
+    await expect(evilPage.locator('#current-player-avatar [data-role-avatar]')).toHaveCount(0)
+    await sameBrowserPage.close()
+
+    const proposal = run.transcript.find(
+      ({ command }) => command === 'proposeTeam',
+    )
+    if (proposal?.command !== 'proposeTeam') {
+      throw new Error('Expected a team proposal after recognition')
+    }
+    const leaderPage = harness.pages[Number(proposal.actor)]
+    const preservedPlayerID = proposal.payload.team[0]
+    const preservedSeat = leaderPage.locator('[data-round-table-player]').filter({
+      hasText: playerName(preservedPlayerID),
+    }).first()
+    await leaderPage.getByRole('button', {
+      name: `选择 ${playerName(preservedPlayerID)} 加入任务队伍`,
+    }).click()
+    await expect(preservedSeat).toHaveAttribute('aria-pressed', 'true')
+
+    await leaderPage.getByRole('button', {
+      name: '查看我的身份与已知信息',
+    }).click()
+    await expect(leaderPage.locator('#current-player-avatar [data-role-avatar]')).toBeVisible()
+    await expect(leaderPage.getByLabel('任务计分板', { exact: true })).toBeVisible()
+    await expect(preservedSeat).toBeEnabled()
+    await expect(preservedSeat).toHaveAttribute('aria-pressed', 'true')
+
+    for (const teamMemberID of proposal.payload.team.slice(1)) {
+      await leaderPage.getByRole('button', {
+        name: `选择 ${playerName(teamMemberID)} 加入任务队伍`,
+      }).click()
+    }
+    await leaderPage.getByRole('button', {
+      name: `确认队伍 ${proposal.payload.team.length}/${proposal.payload.team.length}`,
+    }).click()
+
+    const firstVoteIndex = run.transcript.findIndex(
+      ({ command }) => command === 'castTeamVote',
+    )
+    const nextCommandIndex = run.transcript.findIndex(
+      ({ command }, index) => index > firstVoteIndex && command !== 'castTeamVote',
+    )
+    expect(firstVoteIndex).toBeGreaterThan(-1)
+    expect(nextCommandIndex).toBeGreaterThan(firstVoteIndex)
+    await harness.dispatch(run.transcript[firstVoteIndex])
+    const submittedVotePage = harness.pages[Number(run.transcript[firstVoteIndex].actor)]
+    const showSubmittedVoterRole = submittedVotePage.getByRole('button', {
+      name: '查看我的身份与已知信息',
+    })
+    if (await showSubmittedVoterRole.isVisible()) {
+      await showSubmittedVoterRole.click()
+    }
+    await expect(submittedVotePage.getByRole('button', {
+      name: '隐藏我的身份与已知信息',
+    })).toBeVisible()
+    await expect(submittedVotePage.locator('#current-player-avatar [data-role-avatar]')).toBeVisible()
+    for (let index = firstVoteIndex + 1; index < nextCommandIndex; index += 1) {
+      await harness.dispatch(run.transcript[index])
+    }
+    await expect(submittedVotePage.locator('#current-player-avatar [data-role-avatar]')).toBeVisible()
+    await expect(submittedVotePage.getByLabel('任务计分板', { exact: true })).toBeVisible()
     expect(consoleErrors).toEqual([])
   } finally {
     await harness.close()

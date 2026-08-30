@@ -20,6 +20,7 @@ function gameView(overrides: Partial<AvalonPlayerView> = {}): AvalonPlayerView {
     leaderID: '0',
     questIndex: 0,
     proposedTeam: ['0', '3'],
+    submittedTeamVotePlayerIDs: [],
     voteHistory: [],
     questHistory: [],
     consecutiveRejectedTeams: 0,
@@ -116,7 +117,7 @@ describe('RoomGamePanel identity recognition', () => {
     expect(html).toContain('正义阵营')
     expect(html).toContain('我已确认身份')
     expect(html).not.toContain('秒')
-    expect(html).not.toContain('aria-label="显示已知角色信息"')
+    expect(html).not.toContain('aria-label="查看我的身份与已知信息"')
   })
 
   it('keeps non-participants behind an opaque curtain with anonymous progress', () => {
@@ -256,10 +257,12 @@ describe('RoomGamePanel quest hand', () => {
 
     expect(html).toContain('让任务成功')
     expect(html).toContain('让任务失败')
-    expect(html).toContain('data-visible-role="assassin"')
+    expect(html).not.toContain('data-visible-role="assassin"')
     expect(html.match(/data-player-avatar=/g)).toHaveLength(6)
-    expect(html).toContain('>刺客<')
-    expect(html).toContain('aria-label="显示已知角色信息"')
+    expect(html).not.toContain('你的身份：刺客')
+    expect(html).toContain('aria-label="查看我的身份与已知信息"')
+    expect(html).toContain('aria-controls="current-player-avatar"')
+    expect(html).not.toContain('current-player-role-card')
     expect(html).not.toContain('你知道的邪恶阵营：Eve')
     expect(html).not.toContain('data-visible-role="minion"')
     expect(html).not.toContain('<aside')
@@ -315,7 +318,7 @@ describe('RoomGamePanel team selection', () => {
       phase: 'teamVote',
     })
 
-    expect(html).toContain('aria-label="Alice，你的身份：忠臣，队长，任务队员"')
+    expect(html).toContain('aria-label="Alice，队长，任务队员"')
     expect(html).toContain('aria-label="Dylan，任务队员"')
 
     const disconnectedHtml = renderPanel({
@@ -325,6 +328,93 @@ describe('RoomGamePanel team selection', () => {
       phase: 'teamVote',
     })
     expect(disconnectedHtml).toContain('aria-label="Claire，已断线"')
+  })
+})
+
+describe('RoomGamePanel team vote presentation', () => {
+  it('shows public submitters and aggregate progress without other choices', () => {
+    const html = renderPanel({
+      activeStage: 'vote',
+      game: gameView({
+        submittedTeamVotePlayerIDs: ['0', '3'],
+        viewer: {
+          role: 'loyal_servant',
+          loyalty: 'good',
+          knownEvilPlayerIDs: [],
+          submittedVote: 'approve',
+        },
+      }),
+      phase: 'teamVote',
+    })
+
+    expect(html).toContain('2/5 已投票')
+    expect(html.match(/data-team-vote-status="pending"/g)).toHaveLength(2)
+    expect(html.match(/lucide-badge-check/g)).toHaveLength(2)
+    expect(html.match(/title="已投票"/g)).toHaveLength(2)
+    expect(html).not.toContain('team-vote-seat-status')
+    expect(html).toContain('你已选择：赞成')
+    expect(html).toContain('Dylan，任务队员，已投票')
+    expect(html).not.toContain('Dylan，反对')
+  })
+
+  it('shows every settled choice at its seat and totals above quest controls', () => {
+    const html = renderPanel({
+      game: gameView({
+        voteHistory: [{
+          proposerID: '0',
+          questIndex: 0,
+          team: ['0', '3'],
+          votes: {
+            '0': 'approve',
+            '1': 'approve',
+            '2': 'approve',
+            '3': 'reject',
+            '4': 'reject',
+          },
+          approved: true,
+        }],
+      }),
+      phase: 'quest',
+    })
+
+    expect(html.match(/data-team-vote-status="approve"/g)).toHaveLength(3)
+    expect(html.match(/data-team-vote-status="reject"/g)).toHaveLength(2)
+    expect(html.match(/lucide-circle-check/g)).toHaveLength(3)
+    expect(html.match(/lucide-circle-x/g)).toHaveLength(2)
+    expect(html.match(/title="赞成"/g)).toHaveLength(3)
+    expect(html.match(/title="反对"/g)).toHaveLength(2)
+    expect(html).not.toContain('team-vote-seat-status')
+    expect(html).toContain('队伍通过 · 3 赞成 / 2 反对')
+    expect(html).toContain('Bob，赞成')
+    expect(html).toContain('Dylan，任务队员，反对')
+    expect(html).toContain('让任务成功')
+  })
+
+  it('keeps the fifth rejection totals on the result screen', () => {
+    const html = renderPanel({
+      activeStage: undefined,
+      game: gameView({
+        status: 'finished',
+        result: { winner: 'evil', reason: 'five_rejections' },
+        voteHistory: [{
+          proposerID: '0',
+          questIndex: 0,
+          team: ['0', '3'],
+          votes: {
+            '0': 'approve',
+            '1': 'approve',
+            '2': 'reject',
+            '3': 'reject',
+            '4': 'reject',
+          },
+          approved: false,
+        }],
+      }),
+      phase: 'teamVote',
+    })
+
+    expect(html).toContain('队伍否决 · 2 赞成 / 3 反对')
+    expect(html.match(/data-team-vote-status="reject"/g)).toHaveLength(3)
   })
 })
 
@@ -404,6 +494,9 @@ describe('RoomGamePanel result', () => {
     expect(html).toContain('Alice · 梅林')
     expect(html).toContain('Dylan · 刺客')
     expect(html.match(/data-visible-role=/g)).toHaveLength(5)
+    expect(html.match(/data-role-avatar=/g)).toHaveLength(5)
+    expect(html).not.toContain('aria-label="查看我的身份与已知信息"')
+    expect(html).not.toContain('aria-label="隐藏我的身份与已知信息"')
   })
 })
 
