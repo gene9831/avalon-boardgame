@@ -44,6 +44,9 @@ export function getAvalonPlayerView(
 
   const view: AvalonPlayerView = {
     ...publicGame,
+    submittedTeamVotePlayerIDs: Object.keys(secret.pendingVotes).sort(
+      (left, right) => Number(left) - Number(right),
+    ),
     viewer: {
       role: role ?? null,
       loyalty,

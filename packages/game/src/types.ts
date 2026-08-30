@@ -120,6 +120,7 @@ export interface AvalonViewer {
 }
 
 export type AvalonPlayerView = Omit<AvalonG, 'secret'> & {
+  submittedTeamVotePlayerIDs: PlayerID[]
   viewer: AvalonViewer
   revealedRoles?: Record<PlayerID, Role>
 }

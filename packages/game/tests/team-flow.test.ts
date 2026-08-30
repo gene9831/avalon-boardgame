@@ -202,6 +202,42 @@ describe('Avalon team proposal and vote flow', () => {
     expect(game.consecutiveRejectedTeams).toBe(5)
   })
 
+  it('publishes team-vote submitters without leaking pending choices', () => {
+    const client = createStartedClient()
+    proposeTeam(client, ['0', '1'])
+    client.updatePlayerID('0')
+    client.moves.castTeamVote('approve')
+
+    const submitterView = getAvalonPlayerView(getGame(client), '0')
+    const otherView = getAvalonPlayerView(getGame(client), '1')
+    const anonymousView = getAvalonPlayerView(getGame(client), null)
+
+    expect(submitterView.submittedTeamVotePlayerIDs).toEqual(['0'])
+    expect(otherView.submittedTeamVotePlayerIDs).toEqual(['0'])
+    expect(anonymousView.submittedTeamVotePlayerIDs).toEqual(['0'])
+    expect(submitterView.viewer.submittedVote).toBe('approve')
+    expect(otherView.viewer.submittedVote).toBeUndefined()
+    expect(anonymousView.viewer.submittedVote).toBeUndefined()
+
+    castVotes(client, {
+      '1': 'approve',
+      '2': 'approve',
+      '3': 'reject',
+      '4': 'reject',
+    })
+
+    expect(
+      getAvalonPlayerView(getGame(client), '1').submittedTeamVotePlayerIDs,
+    ).toEqual([])
+    expect(getGame(client).voteHistory.at(-1)?.votes).toEqual({
+      '0': 'approve',
+      '1': 'approve',
+      '2': 'approve',
+      '3': 'reject',
+      '4': 'reject',
+    })
+  })
+
   it('does not accept a second vote from the same player', () => {
     const client = createStartedClient()
     proposeTeam(client, ['0', '1'])

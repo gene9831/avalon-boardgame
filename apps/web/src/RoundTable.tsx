@@ -73,7 +73,7 @@ export function RoundTable({ ariaLabel, center, renderSeat, seats }: RoundTableP
         className="absolute inset-[13%] rounded-full border-[clamp(0.45rem,1.6vw,1.15rem)] border-amber-200/25 bg-[radial-gradient(circle_at_45%_38%,_rgba(53,79,65,0.98),_rgba(18,42,37,0.98)_55%,_rgba(8,22,27,0.98)_100%)] shadow-[0_22px_65px_rgba(0,0,0,0.5),inset_0_0_0_2px_rgba(251,191,36,0.16),inset_0_0_70px_rgba(0,0,0,0.42)]"
       />
 
-      <div className={`round-table-center-shell absolute inset-[26%] z-10 flex items-center justify-center sm:inset-[24%] lg:inset-[23%] ${seats.length <= 5 ? 'translate-y-[8%] sm:translate-y-0' : ''}`} data-round-table-center>
+      <div className="round-table-center-shell absolute inset-[26%] z-10 flex items-center justify-center sm:inset-[24%] lg:inset-[23%]" data-round-table-center>
         {center}
       </div>
 

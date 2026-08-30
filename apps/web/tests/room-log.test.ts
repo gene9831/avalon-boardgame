@@ -23,6 +23,7 @@ function gameView(overrides: Partial<AvalonPlayerView> = {}): AvalonPlayerView {
     leaderID: '0',
     questIndex: 0,
     proposedTeam: null,
+    submittedTeamVotePlayerIDs: [],
     voteHistory: [],
     questHistory: [],
     consecutiveRejectedTeams: 0,

@@ -143,7 +143,7 @@ The server-instance marker and confirmed player IDs never cross `playerView`.
 Deadline metadata remains in the state shape for the disabled optional deadline
 architecture and is not rendered by the first-release web client.
 
-The role map and pending choices are server secrets. After a vote is settled, the individual vote choices may be moved into public vote history. After a quest is settled, only the team, Success count, Fail count, and quest result are retained publicly; the mapping from a quest card to a player is discarded.
+The role map and pending choices are server secrets. Before a team vote settles, the filtered player view may expose the player IDs that have submitted as public status metadata, but not their vote choices; each player may still receive their own submitted choice. After a vote is settled, the complete player-to-vote mapping moves atomically into public vote history. After a quest is settled, only the team, Success count, Fail count, and quest result are retained publicly; the mapping from a quest card to a player is discarded.
 
 ## Phases, stages, and moves
 
@@ -195,7 +195,7 @@ Each active player has at most one strategic move in the relevant stage. Identit
 - During Merlin recognition, Merlin begins seeing the player IDs of all Evil players.
 - Known faction seats do not expose the exact Assassin or Minion role during play.
 - Identity-recognition views expose only whether the current player participates or has confirmed, plus anonymous aggregate progress; they never expose confirmed seat IDs.
-- Before a team vote is complete, a player sees only their own submitted vote and safe progress information.
+- Before a team vote is complete, every player sees which players have submitted and the aggregate submission count, while only the current player sees their own submitted vote choice.
 - Before a quest is complete, a player sees only their own submitted card and safe progress information.
 - Public team proposals, settled vote history, quest history, score, leader, phase, and result remain visible.
 - In `gameOver`, the complete role assignment is exposed.
@@ -211,6 +211,14 @@ Team votes and quest cards are accepted independently while their players are ac
 Identity recognition is non-strategic, but the first release still waits for all step participants to confirm. It shows no countdown and sends no automatic wake-up. Ordinary reconnects preserve the current confirmations. The server retains an internal, default-off deadline option with its original timeline and restart handling for future room configuration.
 
 The role-reveal step first lowers an opaque curtain over the entire round-table stage, then reveals the player's role card and confirmation controls after the curtain settles. Evil and Merlin recognition instead raise the curtain for authorized participants so they can inspect the relevant seats; nonparticipants remain behind a continuously opaque, static curtain. The room header stays above the curtain so navigation and connection recovery remain visible and operable.
+
+## In-game information presentation
+
+During an unresolved team vote, each submitted player has a neutral, borderless Lucide `BadgeCheck` outside their nameplate, and the center shows `x/n 已投票`. The current player also retains confirmation of their own approval or rejection. No player sees another vote choice before settlement.
+
+When the last vote arrives, the outside-nameplate markers change simultaneously to green Lucide `CircleCheck` or red Lucide `CircleX` results with one shared subtle transition. The center shows the approval outcome and total approval/rejection counts; individual choices remain visible at the corresponding seats instead of requiring the operation log. An approved vote remains visible while quest cards are pending and disappears when the quest settles. A rejected vote remains visible through the next team-proposal phase and disappears when the next team vote begins. The fifth rejection remains visible on the final result screen. During quest or proposal interaction, the previous result is a compact summary above the active controls and never blocks them.
+
+During active play, the current player's role is not a permanent line in their nameplate. The eye control privately replaces only the current player's decorative avatar with their role artwork, places the role name immediately below the nameplate without affecting layout, and shows any faction knowledge authorized by `playerView`. This reveal never replaces the central quest board, pauses interaction, clears selections, or handles `Escape`; clicking the eye again closes it. A versioned browser-global client setting persists the eye state across refreshes, rooms, phases, and same-browser tabs without storing role data. Identity recognition continues to show its complete role card automatically. At game over, the eye control and private faction markers disappear while every seat automatically reveals its role avatar and role name.
 
 ## Timeout configuration
 
@@ -272,6 +280,9 @@ The important permanent tests will cover:
 - Strict-majority approval and tie rejection.
 - Five consecutive rejected proposals.
 - Duplicate and non-active-player submissions.
+- Pending team-vote submission status without pending vote-choice leakage.
+- Simultaneous settled-vote disclosure, seat-level result retention, and phase-specific clearing.
+- On-demand current-player role-card presentation without changing role visibility or game state.
 - Good cannot submit Fail; Evil can submit either result.
 - The seven-or-more-player fourth-quest two-Fail rule.
 - Three Good successes, three Evil failures, and assassination outcomes.
@@ -293,3 +304,5 @@ The design is considered implemented when:
 7. The read-only Debug mode provides diagnostics without adding game authority.
 8. The database-only Docker Compose file can be deployed independently by the user.
 9. Tests, build, and lint pass against the final source tree.
+10. Team voting shows public per-seat submission status, then direct per-seat settled choices and a central result without requiring the operation log.
+11. During play, the current player can reveal their complete role card and authorized faction knowledge on demand without a permanent role label in their nameplate.
