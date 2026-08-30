@@ -30,6 +30,9 @@ _Avoid_: host admin, administrator
 **Role**: A character identity assigned to one player, such as Merlin, Assassin, Loyal Servant of Arthur, or Minion of Mordred.
 _Avoid_: class, character type
 
+**Role card**: The complete presentation of a role's artwork, name, loyalty, ability, and objective during opening identity recognition. Ordinary play may privately reveal only the current player's role avatar and role name; final role revelation remains a separate public result.
+_Avoid_: avatar, profile card, nameplate
+
 **Loyalty**: A player's faction, either Good or Evil. Loyalty is distinct from the exact role.
 _Avoid_: team, side
 
@@ -55,6 +58,15 @@ _Avoid_: assignment, roster
 
 **Team vote**: Each player's simultaneous approval or rejection of the current team proposal. A strict majority approves; a tie rejects.
 _Avoid_: room vote, team approval
+
+**Pending team vote**: The current team vote before every player has submitted. Each player's approval or rejection remains secret, even though submission status may be public.
+_Avoid_: partial vote result, live vote tally
+
+**Vote submission status**: The public fact that a player has submitted their team vote, without revealing whether they approved or rejected.
+_Avoid_: pending vote, partial vote
+
+**Resolved team vote**: A settled team vote whose complete player-to-vote mapping and approval outcome are public and immutable.
+_Avoid_: vote summary, current vote
 
 **Quest card**: A secret Success or Fail choice submitted by a member of the quest team. Good players must submit Success; Evil players may submit either result.
 _Avoid_: mission card, action card

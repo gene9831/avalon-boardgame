@@ -44,6 +44,64 @@ select {
   display: none;
 }
 
+.team-vote-result-compact {
+  display: none;
+}
+
+.quest-board button {
+  min-height: 2.5rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+@media (max-width: 639px) {
+  .quest-board {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .quest-board .quest-action {
+    margin-top: 0.25rem;
+    padding-top: 0.25rem;
+  }
+
+  .quest-board .phase-action-buttons {
+    gap: 0.375rem;
+    margin-top: 0.25rem;
+  }
+}
+
+@media (max-width: 359px) {
+  .quest-board .quest-progress,
+  .quest-board .quest-rejection-track {
+    margin-top: 0.125rem;
+  }
+
+  .quest-board .quest-progress {
+    gap: 0.125rem;
+  }
+
+  .quest-board .quest-rejection-track {
+    padding-top: 0.125rem;
+  }
+
+  .phase-action-full-label {
+    display: none;
+  }
+
+  .phase-action-compact-label {
+    display: inline;
+  }
+
+  .team-vote-result-full {
+    display: none;
+  }
+
+  .team-vote-result-compact {
+    display: inline;
+  }
+}
+
 .lobby-center-compact-label {
   display: none;
 }
@@ -57,15 +115,15 @@ select {
 }
 
 .identity-curtain--lowering {
-  animation: identity-curtain-lower 200ms ease-out both;
+  animation: identity-curtain-lower 500ms ease-out both;
 }
 
 .identity-curtain--raising {
-  animation: identity-curtain-raise 200ms ease-in both;
+  animation: identity-curtain-raise 500ms ease-in both;
 }
 
 .identity-role-reveal-content {
-  animation: identity-role-reveal-content 180ms ease-out 200ms both;
+  animation: identity-role-reveal-content 200ms ease-out 500ms both;
 }
 
 .identity-recognition-responsive-panel {
@@ -74,6 +132,40 @@ select {
 
 .identity-recognition-compact-title {
   display: none;
+}
+
+.role-card--recognition {
+  width: calc(100% - 1.5rem);
+  max-width: 28rem;
+  max-height: calc(100dvh - 11rem);
+  border-radius: 1.5rem;
+  padding: 1rem;
+}
+
+.role-card--recognition .role-card__artwork {
+  width: 6rem;
+  height: 6rem;
+}
+
+.role-card--recognition .role-card__name {
+  font-size: 1.5rem;
+  line-height: 2rem;
+}
+
+@media (min-width: 640px) {
+  .role-card--recognition {
+    padding: 1.5rem;
+  }
+
+  .role-card--recognition .role-card__artwork {
+    width: 8rem;
+    height: 8rem;
+  }
+
+  .role-card--recognition .role-card__name {
+    font-size: 1.875rem;
+    line-height: 2.25rem;
+  }
 }
 
 @media (max-width: 420px) {
@@ -114,10 +206,28 @@ select {
   }
 }
 
+@keyframes team-vote-status-reveal {
+  from {
+    opacity: 0;
+    transform: scale(0.65);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.team-vote-indicator[data-team-vote-status="approve"],
+.team-vote-indicator[data-team-vote-status="reject"] {
+  animation: team-vote-status-reveal 180ms ease-out both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .identity-curtain,
   .identity-curtain *,
-  .identity-role-reveal-content {
+  .identity-role-reveal-content,
+  .team-vote-indicator {
     animation: none !important;
     scroll-behavior: auto !important;
     transition: none !important;
@@ -222,7 +332,9 @@ select {
   }
 
   .quest-board {
+    max-height: 6.5rem;
     max-width: 6.5rem;
+    overflow-y: auto;
     padding: 0.25rem;
     border-radius: 0.5rem;
   }
@@ -285,26 +397,31 @@ select {
     width: 3rem;
   }
 
-  [data-round-table-seat-count="10"] [data-round-table-nameplate] {
+  [data-round-table-seat-count="10"] .round-table-label-stack,
+  [data-round-table-seat-count="10"] [data-round-table-player] > [data-round-table-nameplate] {
     position: absolute;
     margin: 0;
   }
 
-  [data-round-table-seat-count="10"] [data-label-placement="bottom"] {
+  [data-round-table-seat-count="10"] .round-table-label-stack[data-label-placement="bottom"],
+  [data-round-table-seat-count="10"] [data-round-table-player] > [data-round-table-nameplate][data-label-placement="bottom"] {
     top: calc(100% - 0.875rem);
   }
 
-  [data-round-table-seat-count="10"] [data-label-placement="top"] {
+  [data-round-table-seat-count="10"] .round-table-label-stack[data-label-placement="top"],
+  [data-round-table-seat-count="10"] [data-round-table-player] > [data-round-table-nameplate][data-label-placement="top"] {
     bottom: calc(100% - 0.375rem);
   }
 
-  [data-round-table-seat-count="10"] [data-label-placement="left"] {
+  [data-round-table-seat-count="10"] .round-table-label-stack[data-label-placement="left"],
+  [data-round-table-seat-count="10"] [data-round-table-player] > [data-round-table-nameplate][data-label-placement="left"] {
     top: 50%;
     right: calc(100% - 0.375rem);
     transform: translateY(-50%);
   }
 
-  [data-round-table-seat-count="10"] [data-label-placement="right"] {
+  [data-round-table-seat-count="10"] .round-table-label-stack[data-label-placement="right"],
+  [data-round-table-seat-count="10"] [data-round-table-player] > [data-round-table-nameplate][data-label-placement="right"] {
     top: 50%;
     left: calc(100% - 0.375rem);
     transform: translateY(-50%);
@@ -320,7 +437,8 @@ select {
     height: 2.625rem;
   }
 
-  [data-round-table-nameplate] {
+  .round-table-label-stack,
+  [data-round-table-player] > [data-round-table-nameplate] {
     margin-top: 0.125rem;
   }
 

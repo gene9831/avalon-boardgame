@@ -1,4 +1,9 @@
-import { getPlayerCountConfig, type PlayerID, type Role } from '@avalon/game'
+import {
+  getPlayerCountConfig,
+  type AvalonPlayerView,
+  type PlayerID,
+  type Role,
+} from '@avalon/game'
 
 export const ROLE_LABELS: Record<Role, string> = {
   assassin: '刺客',
@@ -26,6 +31,28 @@ export function getPhaseLabel(phase: string) {
 
 export function getQuestTeamSize(numPlayers: number, questIndex: number) {
   return getPlayerCountConfig(numPlayers).questTeamSizes[questIndex] ?? 0
+}
+
+export function getDisplayedTeamVoteResult(
+  game: AvalonPlayerView,
+  phase: string,
+) {
+  const latestVote = game.voteHistory.at(-1)
+  if (latestVote === undefined) return undefined
+
+  if (game.status === 'finished') {
+    return game.result?.reason === 'five_rejections' ? latestVote : undefined
+  }
+
+  if (phase === 'quest' && latestVote.approved) {
+    const questSettled = game.questHistory.some(
+      ({ questIndex }) => questIndex === latestVote.questIndex,
+    )
+    return questSettled ? undefined : latestVote
+  }
+
+  if (phase === 'teamProposal' && !latestVote.approved) return latestVote
+  return undefined
 }
 
 export function toggleTeamMember(
