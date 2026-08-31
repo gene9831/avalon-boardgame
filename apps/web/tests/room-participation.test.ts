@@ -66,6 +66,20 @@ function createLeaseDatabase(initialRecords: SeatTransitionLeaseRecord[] = []) {
   return { database, records }
 }
 
+function withFailingRelease(
+  database: SeatTransitionLeaseDatabase,
+): SeatTransitionLeaseDatabase {
+  let transactionCount = 0
+  return {
+    close: () => database.close(),
+    transaction: async (operation) => {
+      transactionCount += 1
+      if (transactionCount === 2) throw new Error('IndexedDB release failed')
+      return database.transaction(operation)
+    },
+  }
+}
+
 describe('room participation client', () => {
   it('treats a malformed committed seat response as uncertain and recovers the target', async () => {
     const storage = createStorage()
@@ -508,6 +522,53 @@ describe('room participation client', () => {
       matchID: session.matchID,
       ownerToken: 'replacement-owner',
     })
+  })
+
+  it('returns the persisted target session when release fails after a successful move', async () => {
+    const storage = createStorage()
+    const roomSession = { ...session, playerName: 'Alice' }
+    saveRoomSession(roomSession, storage)
+    const { database } = createLeaseDatabase()
+    const lock = createBrowserSeatTransitionLock({
+      generateOwnerToken: () => 'successful-owner',
+      lockManager: null,
+      now: () => 1_000,
+      openLeaseDatabase: async () => withFailingRelease(database),
+    })
+
+    await expect(changeRoomSeat({
+      changeSeat: async () => ({
+        matchID: roomSession.matchID,
+        playerID: '4',
+        playerCredentials: 'target-credential',
+      }),
+      prepareStart: async () => {},
+    }, roomSession, '4', storage, lock)).resolves.toEqual({
+      ...roomSession,
+      credentials: 'target-credential',
+      playerID: '4',
+    })
+    expect(loadRoomSession(roomSession.matchID, storage)).toEqual({
+      ...roomSession,
+      credentials: 'target-credential',
+      playerID: '4',
+    })
+    expect(loadSeatTransition(roomSession.matchID, storage)).toBeNull()
+  })
+
+  it('preserves the action error when release also fails', async () => {
+    const { database } = createLeaseDatabase()
+    const originalError = new TypeError('seat response was lost')
+    const lock = createBrowserSeatTransitionLock({
+      generateOwnerToken: () => 'failing-owner',
+      lockManager: null,
+      now: () => 1_000,
+      openLeaseDatabase: async () => withFailingRelease(database),
+    })
+
+    await expect(lock(session.matchID, async () => {
+      throw originalError
+    })).rejects.toBe(originalError)
   })
 
   it.each([

@@ -267,19 +267,18 @@ async function withIndexedDBSeatTransitionLock<T>(
     actionOutcome = { status: 'failed', error }
   }
 
-  let releaseFailed = false
   try {
     await database.transaction(async (transaction) => {
       const current = await transaction.get(matchID)
       if (current?.ownerToken === ownerToken) transaction.delete(matchID)
     })
   } catch {
-    releaseFailed = true
+    // The acquired lease is bounded and may expire naturally. Once the action
+    // has run, a best-effort release failure must not replace its outcome.
   }
   database.close()
 
   if (actionOutcome.status === 'failed') throw actionOutcome.error
-  if (releaseFailed) throw new SeatTransitionLockUnavailableError()
   return actionOutcome.value
 }
 
