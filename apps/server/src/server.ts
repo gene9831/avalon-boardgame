@@ -13,6 +13,10 @@ import { AvalonSocketRegistry, registerDevAdminRoutes } from './dev-admin'
 import { registerRoomParticipationRoutes } from './room-participation'
 import { registerRoomSessionValidationRoute } from './session-validation'
 import { createDeletionSafeStorage } from './storage/deletion-safe'
+import {
+  hasAtomicLobbyStorage,
+  type AtomicLobbyStorage,
+} from './storage/lobby-storage'
 import { secretMatches } from './secret'
 import { installAvalonHTTPBoundary } from './http-boundary'
 import { AvalonSocketIO } from './socket-transport'
@@ -190,7 +194,7 @@ function createTrackedStorage(
       ) return
     }
   }
-  const trackedStorage: StorageAPI.Async = {
+  const trackedStorage: StorageAPI.Async & Partial<AtomicLobbyStorage> = {
     type: () => 1,
     connect: () => track(() => asyncStorage.connect()),
     createMatch: (matchID, options) =>
@@ -204,6 +208,10 @@ function createTrackedStorage(
     wipe: (matchID) => track(() => asyncStorage.wipe(matchID)),
     listMatches: (options) =>
       track(() => asyncStorage.listMatches(options)),
+  }
+  if (hasAtomicLobbyStorage(asyncStorage)) {
+    trackedStorage.mutateLobbyMatch = (matchID, mutate) =>
+      track(() => asyncStorage.mutateLobbyMatch(matchID, mutate))
   }
   return { storage: trackedStorage, waitForIdle }
 }

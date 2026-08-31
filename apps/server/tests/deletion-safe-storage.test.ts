@@ -2,6 +2,10 @@ import type { LogEntry, Server, State, StorageAPI } from 'boardgame.io'
 import { describe, expect, it } from 'vitest'
 
 import { createDeletionSafeStorage } from '../src/storage/deletion-safe'
+import {
+  hasAtomicLobbyStorage,
+  type AtomicLobbyStorage,
+} from '../src/storage/lobby-storage'
 import { MemoryStorage } from '../src/storage/memory'
 
 function createState(value: string): State {
@@ -45,7 +49,7 @@ function createControlledAsyncMemoryStorage() {
   const pendingMetadataFetches: Array<() => void> = []
   let deferNextMetadataWrite = false
   let deferNextMetadataFetch = false
-  const asyncStorage: StorageAPI.Async = {
+  const asyncStorage: StorageAPI.Async & AtomicLobbyStorage = {
     type: () => 1,
     connect: async () => storage.connect(),
     createMatch: async (matchID, opts) => storage.createMatch(matchID, opts),
@@ -72,6 +76,8 @@ function createControlledAsyncMemoryStorage() {
     },
     wipe: async (matchID) => storage.wipe(matchID),
     listMatches: async (opts) => storage.listMatches(opts),
+    mutateLobbyMatch: (matchID, mutate) =>
+      storage.mutateLobbyMatch(matchID, mutate),
   }
   return {
     storage: asyncStorage,
@@ -98,6 +104,102 @@ function createControlledAsyncMemoryStorage() {
 }
 
 describe('deletion-safe storage', () => {
+  it('commits lobby state and metadata together through the sync wrapper', async () => {
+    const { storage } = createDeletionSafeStorage(new MemoryStorage())
+    storage.createMatch('room-1', {
+      initialState: createState('old'),
+      metadata: createMetadata(100, 'Alice'),
+    })
+
+    expect(hasAtomicLobbyStorage(storage)).toBe(true)
+    if (!hasAtomicLobbyStorage(storage)) throw new Error('atomic storage required')
+
+    const result = await storage.mutateLobbyMatch(
+      'room-1',
+      ({ state, metadata }) => ({
+        state: { ...state, G: { ...state.G, value: 'new' } },
+        metadata: { ...metadata, updatedAt: 200 },
+        result: 'committed',
+      }),
+    )
+
+    expect(result).toBe('committed')
+    expect(storage.fetch('room-1', { state: true, metadata: true })).toMatchObject({
+      state: { G: { value: 'new' } },
+      metadata: { updatedAt: 200 },
+    })
+  })
+
+  it('rolls back lobby state and metadata when a sync mutation throws', async () => {
+    const { storage } = createDeletionSafeStorage(new MemoryStorage())
+    const originalState = createState('old')
+    const originalMetadata = createMetadata(100, 'Alice')
+    storage.createMatch('room-1', {
+      initialState: originalState,
+      metadata: originalMetadata,
+    })
+
+    if (!hasAtomicLobbyStorage(storage)) throw new Error('atomic storage required')
+    await expect(storage.mutateLobbyMatch('room-1', ({ state, metadata }) => {
+      ;(state.G as { value: string }).value = 'leaked'
+      metadata.updatedAt = 200
+      throw new Error('stop')
+    })).rejects.toThrow('stop')
+
+    expect(storage.fetch('room-1', { state: true, metadata: true })).toMatchObject({
+      state: { G: { value: 'old' } },
+      metadata: { updatedAt: 100 },
+    })
+  })
+
+  it('blocks atomic lobby mutation after deletion', async () => {
+    const { storage, deletionGuard } = createDeletionSafeStorage(new MemoryStorage())
+    storage.createMatch('room-1', {
+      initialState: createState('old'),
+      metadata: createMetadata(100, 'Alice'),
+    })
+    deletionGuard.markMatchDeleted('room-1')
+    storage.wipe('room-1')
+
+    if (!hasAtomicLobbyStorage(storage)) throw new Error('atomic storage required')
+    await expect(storage.mutateLobbyMatch('room-1', ({ state, metadata }) => ({
+      state: { ...state, G: { ...state.G, value: 'replacement' } },
+      metadata: { ...metadata, updatedAt: 200 },
+      result: undefined,
+    }))).rejects.toThrow('Match room-1 was not found')
+
+    expect(storage.fetch('room-1', { state: true, metadata: true })).toEqual({
+      state: undefined,
+      metadata: undefined,
+    })
+  })
+
+  it('preserves atomic lobby mutation through the async wrapper', async () => {
+    const { storage } = createDeletionSafeStorage(
+      createControlledAsyncMemoryStorage().storage,
+    )
+    await storage.createMatch('room-1', {
+      initialState: createState('old'),
+      metadata: createMetadata(100, 'Alice'),
+    })
+
+    expect(hasAtomicLobbyStorage(storage)).toBe(true)
+    if (!hasAtomicLobbyStorage(storage)) throw new Error('atomic storage required')
+    await expect(storage.mutateLobbyMatch('room-1', ({ state, metadata }) => ({
+      state: { ...state, G: { ...state.G, value: 'new' } },
+      metadata: { ...metadata, updatedAt: 200 },
+      result: 42,
+    }))).resolves.toBe(42)
+
+    await expect(storage.fetch('room-1', {
+      state: true,
+      metadata: true,
+    })).resolves.toMatchObject({
+      state: { G: { value: 'new' } },
+      metadata: { updatedAt: 200 },
+    })
+  })
+
   it('rejects a stale sync metadata snapshot after an accepted replacement write', () => {
     const rawStorage = new MemoryStorage()
     const { storage } = createDeletionSafeStorage(rawStorage)

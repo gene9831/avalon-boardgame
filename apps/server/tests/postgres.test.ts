@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import { loadEnvFile } from 'node:process'
 
 import type { LogEntry, Server, State } from 'boardgame.io'
+import type { Pool } from 'pg'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import { PostgresStorage } from '../src/storage/postgres'
@@ -65,6 +66,153 @@ const logEntry = {
   turn: 0,
   phase: 'lobby',
 } as unknown as LogEntry
+
+interface FakeMatchRow {
+  state: State
+  metadata: Server.MatchData
+}
+
+class AtomicTransactionPool {
+  private row: FakeMatchRow
+  private lock = Promise.resolve()
+
+  constructor(row: FakeMatchRow) {
+    this.row = structuredClone(row)
+  }
+
+  on() {}
+
+  off() {}
+
+  async end() {}
+
+  async query(sql: string) {
+    if (/SELECT .*state.*metadata.*FROM matches/i.test(sql)) {
+      return {
+        rowCount: 1,
+        rows: [{ match_id: 'room-a', ...structuredClone(this.row) }],
+      }
+    }
+    throw new Error(`Unexpected pool query: ${sql}`)
+  }
+
+  async connect() {
+    let transactionRow: FakeMatchRow | undefined
+    let releaseLock: (() => void) | undefined
+    const release = () => {
+      releaseLock?.()
+      releaseLock = undefined
+      transactionRow = undefined
+    }
+
+    return {
+      query: async (sql: string, values?: unknown[]) => {
+        if (sql === 'BEGIN') return { rowCount: null, rows: [] }
+        if (/SELECT state, metadata FROM matches .*FOR UPDATE/i.test(sql)) {
+          const previousLock = this.lock
+          this.lock = new Promise<void>((resolve) => {
+            releaseLock = resolve
+          })
+          await previousLock
+          transactionRow = structuredClone(this.row)
+          return { rowCount: 1, rows: [structuredClone(transactionRow)] }
+        }
+        if (/UPDATE matches\s+SET state/i.test(sql)) {
+          if (transactionRow === undefined || values === undefined) {
+            throw new Error('UPDATE requires a locked transaction row')
+          }
+          transactionRow = {
+            state: JSON.parse(values[1] as string) as State,
+            metadata: JSON.parse(values[2] as string) as Server.MatchData,
+          }
+          return { rowCount: 1, rows: [] }
+        }
+        if (sql === 'COMMIT') {
+          if (transactionRow === undefined) throw new Error('no transaction row')
+          this.row = structuredClone(transactionRow)
+          release()
+          return { rowCount: null, rows: [] }
+        }
+        if (sql === 'ROLLBACK') {
+          release()
+          return { rowCount: null, rows: [] }
+        }
+        throw new Error(`Unexpected client query: ${sql}`)
+      },
+      release,
+    }
+  }
+}
+
+function createAtomicPostgresStorage() {
+  const pool = new AtomicTransactionPool({
+    state: createState(0, 0),
+    metadata: createMetadata('avalon', 100),
+  })
+  return new PostgresStorage({ pool: pool as unknown as Pool })
+}
+
+describe('PostgresStorage atomic lobby mutation', () => {
+  it('commits state and metadata together and returns the callback result', async () => {
+    const storage = createAtomicPostgresStorage()
+
+    await expect(storage.mutateLobbyMatch('room-a', ({ state, metadata }) => ({
+      state: { ...state, G: { value: 1 } },
+      metadata: { ...metadata, updatedAt: 200 },
+      result: 'committed',
+    }))).resolves.toBe('committed')
+
+    await expect(storage.fetch('room-a', {
+      state: true,
+      metadata: true,
+    })).resolves.toMatchObject({
+      state: { G: { value: 1 } },
+      metadata: { updatedAt: 200 },
+    })
+  })
+
+  it('rolls back state and metadata when the callback throws', async () => {
+    const storage = createAtomicPostgresStorage()
+
+    await expect(storage.mutateLobbyMatch('room-a', ({ state, metadata }) => {
+      ;(state.G as { value: number }).value = 99
+      metadata.updatedAt = 999
+      throw new Error('stop')
+    })).rejects.toThrow('stop')
+
+    await expect(storage.fetch('room-a', {
+      state: true,
+      metadata: true,
+    })).resolves.toMatchObject({
+      state: { G: { value: 0 } },
+      metadata: { updatedAt: 100 },
+    })
+  })
+
+  it('serializes concurrent callbacks on the committed row', async () => {
+    const storage = createAtomicPostgresStorage()
+    const observedValues: number[] = []
+    const increment = () => storage.mutateLobbyMatch('room-a', ({ state, metadata }) => {
+      const value = (state.G as { value: number }).value
+      observedValues.push(value)
+      return {
+        state: { ...state, G: { value: value + 1 } },
+        metadata: { ...metadata, updatedAt: metadata.updatedAt + 1 },
+        result: value + 1,
+      }
+    })
+
+    await expect(Promise.all([increment(), increment()])).resolves.toEqual([1, 2])
+    expect(observedValues).toEqual([0, 1])
+    await expect(storage.fetch('room-a', {
+      state: true,
+      metadata: true,
+    })).resolves.toMatchObject({
+      state: { G: { value: 2 } },
+      metadata: { updatedAt: 102 },
+    })
+  })
+})
 
 describeDatabase('PostgresStorage', () => {
   let storage: PostgresStorage

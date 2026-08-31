@@ -1,5 +1,12 @@
 import type { Server, StorageAPI } from 'boardgame.io'
 
+import {
+  hasAtomicLobbyStorage,
+  type AtomicLobbyStorage,
+  type LobbyMatchMutation,
+  type LobbyMatchSnapshot,
+} from './lobby-storage'
+
 export interface MatchDeletionGuard {
   readonly unavailableMatchIDs: Set<string>
   markMatchDeleted(matchID: string): void
@@ -12,6 +19,10 @@ interface DeletionSafeStorage<TStorage> {
     matchID: string,
     update: (metadata: Server.MatchData) => void,
   ): Server.MatchData | undefined | Promise<Server.MatchData | undefined>
+}
+
+function matchNotFound(matchID: string) {
+  return new Error(`Match ${matchID} was not found`)
 }
 
 export interface DeletionSafeStorageOptions {
@@ -104,6 +115,14 @@ function emptyFetch<O extends StorageAPI.FetchOpts>(opts: O): StorageAPI.FetchRe
 }
 
 export function createDeletionSafeStorage(
+  rawStorage: StorageAPI.Sync & AtomicLobbyStorage,
+  options?: DeletionSafeStorageOptions,
+): DeletionSafeStorage<StorageAPI.Sync & AtomicLobbyStorage>
+export function createDeletionSafeStorage(
+  rawStorage: StorageAPI.Async & AtomicLobbyStorage,
+  options?: DeletionSafeStorageOptions,
+): DeletionSafeStorage<StorageAPI.Async & AtomicLobbyStorage>
+export function createDeletionSafeStorage(
   rawStorage: StorageAPI.Sync,
   options?: DeletionSafeStorageOptions,
 ): DeletionSafeStorage<StorageAPI.Sync>
@@ -134,6 +153,7 @@ export function createDeletionSafeStorage(
 
   if (rawStorage.type() === 0) {
     const syncStorage = rawStorage as StorageAPI.Sync
+    const atomicStorage = hasAtomicLobbyStorage(rawStorage) ? rawStorage : undefined
     const forceUpdateMetadata = (
       matchID: string,
       update: (metadata: Server.MatchData) => void,
@@ -171,7 +191,7 @@ export function createDeletionSafeStorage(
         options.prepareMetadata,
       )
     }
-    const storage: StorageAPI.Sync = {
+    const storage: StorageAPI.Sync & Partial<AtomicLobbyStorage> = {
       type: () => 0,
       connect: () => syncStorage.connect(),
       createMatch: (matchID, opts) => {
@@ -235,10 +255,51 @@ export function createDeletionSafeStorage(
       listMatches: (opts) =>
         syncStorage.listMatches(opts).filter((matchID) => !unavailableMatchIDs.has(matchID)),
     }
+    if (atomicStorage !== undefined) {
+      storage.mutateLobbyMatch = <T>(
+        matchID: string,
+        mutate: (snapshot: LobbyMatchSnapshot) => LobbyMatchMutation<T>,
+      ) => {
+        if (unavailableMatchIDs.has(matchID)) {
+          return Promise.reject(matchNotFound(matchID))
+        }
+
+        const version = metadataVersions.get(matchID) ?? 0
+        const nextVersion = version + 1
+        return atomicStorage.mutateLobbyMatch(matchID, (snapshot) => {
+          if (unavailableMatchIDs.has(matchID)) throw matchNotFound(matchID)
+          const next = mutate({
+            state: snapshot.state,
+            metadata: cloneMetadata(
+              snapshot.metadata,
+              matchID,
+              version,
+              options.prepareMetadata,
+            ),
+          })
+          metadataVersions.set(matchID, nextVersion)
+          return {
+            ...next,
+            metadata: cloneMetadata(
+              next.metadata,
+              matchID,
+              nextVersion,
+              options.prepareMetadata,
+            ),
+          }
+        }).catch((error: unknown) => {
+          if (metadataVersions.get(matchID) === nextVersion) {
+            metadataVersions.set(matchID, version)
+          }
+          throw error
+        })
+      }
+    }
     return { storage, deletionGuard, forceUpdateMetadata }
   }
 
   const asyncStorage = rawStorage as StorageAPI.Async
+  const atomicStorage = hasAtomicLobbyStorage(rawStorage) ? rawStorage : undefined
   const forceUpdateMetadata = async (
     matchID: string,
     update: (metadata: Server.MatchData) => void,
@@ -281,7 +342,7 @@ export function createDeletionSafeStorage(
     })
     return updatedMetadata
   }
-  const storage: StorageAPI.Async = {
+  const storage: StorageAPI.Async & Partial<AtomicLobbyStorage> = {
     type: () => 1,
     connect: () => asyncStorage.connect(),
     createMatch: async (matchID, opts) => {
@@ -353,6 +414,40 @@ export function createDeletionSafeStorage(
       const matchIDs = await asyncStorage.listMatches(opts)
       return matchIDs.filter((matchID) => !unavailableMatchIDs.has(matchID))
     },
+  }
+  if (atomicStorage !== undefined) {
+    storage.mutateLobbyMatch = <T>(
+      matchID: string,
+      mutate: (snapshot: LobbyMatchSnapshot) => LobbyMatchMutation<T>,
+    ) => enqueueMetadataWrite(matchID, async () => {
+      if (unavailableMatchIDs.has(matchID)) throw matchNotFound(matchID)
+
+      const version = metadataVersions.get(matchID) ?? 0
+      const nextVersion = version + 1
+      const result = await atomicStorage.mutateLobbyMatch(matchID, (snapshot) => {
+        if (unavailableMatchIDs.has(matchID)) throw matchNotFound(matchID)
+        const next = mutate({
+          state: snapshot.state,
+          metadata: cloneMetadata(
+            snapshot.metadata,
+            matchID,
+            version,
+            options.prepareMetadata,
+          ),
+        })
+        return {
+          ...next,
+          metadata: cloneMetadata(
+            next.metadata,
+            matchID,
+            nextVersion,
+            options.prepareMetadata,
+          ),
+        }
+      })
+      metadataVersions.set(matchID, nextVersion)
+      return result
+    })
   }
   return { storage, deletionGuard, forceUpdateMetadata }
 }
