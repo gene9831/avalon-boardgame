@@ -154,6 +154,33 @@ export async function recoverRoomRouteSession(
 }
 
 // oxlint-disable-next-line react/only-export-components
+export async function resolveRoomRouteSnapshotSession(
+  session: RoomSession,
+  validate: (matchID: string, playerID: string, credentials: string) => Promise<boolean>,
+  storage?: RoomSessionStorage,
+) {
+  const hadPendingTransition = loadSeatTransition(session.matchID, storage) !== null
+  const recoveredSession = await recoverRoomRouteSession(session, validate, storage)
+  if (recoveredSession === null) return { status: 'invalid' as const }
+  if (!isSameRoomSession(recoveredSession, session)) {
+    return { status: 'rebind' as const, session: recoveredSession }
+  }
+
+  if (hadPendingTransition) {
+    return { status: 'refresh' as const, session: recoveredSession }
+  }
+
+  const sourceValid = await validate(
+    recoveredSession.matchID,
+    recoveredSession.playerID,
+    recoveredSession.credentials,
+  )
+  return sourceValid
+    ? { status: 'refresh' as const, session: recoveredSession }
+    : { status: 'invalid' as const }
+}
+
+// oxlint-disable-next-line react/only-export-components
 export async function resolveRecoverySeatValidation(
   validate: () => Promise<void>,
 ) {
@@ -164,6 +191,15 @@ export async function resolveRecoverySeatValidation(
     if (getRoomSessionInvalidationNotice(error) !== null) return false
     throw error
   }
+}
+
+// oxlint-disable-next-line react/only-export-components
+export function canRequestRoomExit(
+  phase: string | null | undefined,
+  roomExitBusy: boolean,
+  seatChangePending: boolean,
+) {
+  return phase === 'lobby' && !roomExitBusy && !seatChangePending
 }
 
 function App() {
@@ -484,10 +520,6 @@ function RoomRoute({
         if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
 
         const nextRoomValue = nextRoom as unknown as AvalonMatch
-        if (!isRoomSessionStillValid(nextRoomValue, currentSession)) {
-          invalidateSession('上次的座位已失效。', generation, currentSession)
-          return
-        }
         setRoom(nextRoomValue)
       } catch (requestError) {
         if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
@@ -598,11 +630,6 @@ function RoomRoute({
         ])
         if (!active || !isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
 
-        if (!isRoomSessionStillValid(initialRoom as unknown as AvalonMatch, routeSession)) {
-          invalidateSession('上次的座位已失效。', generation, routeSession)
-          return
-        }
-
         setRoom(initialRoom as unknown as AvalonMatch)
         client = Client({
           debug: BOARDGAME_CLIENT_DEBUG,
@@ -622,7 +649,7 @@ function RoomRoute({
           if (client?.matchData !== undefined) {
             const players = client.matchData as unknown as LobbyPlayer[]
             if (!isRoomSessionStillValid({ players }, routeSession)) {
-              void recoverRoomRouteSession(
+              void resolveRoomRouteSnapshotSession(
                 routeSession,
                 async (recoveryMatchID, playerID, credentials) => resolveRecoverySeatValidation(async () => {
                   await validateRoomSession(webConfig.lobbyURL, {
@@ -631,17 +658,17 @@ function RoomRoute({
                     credentials,
                   })
                 }),
-              ).then((recoveredSession) => {
+              ).then((resolution) => {
                 if (!active || !isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
-                if (recoveredSession === null) {
+                if (resolution.status === 'invalid') {
                   invalidateSession('上次的座位已失效。', generation, routeSession)
                   return
                 }
-                if (!isSameRoomSession(recoveredSession, routeSession)) {
-                  setSession(recoveredSession)
+                if (resolution.status === 'rebind') {
+                  setSession(resolution.session)
                   return
                 }
-                invalidateSession('上次的座位已失效。', generation, routeSession)
+                void refreshRoom(matchID, resolution.session, generation, true)
               }).catch(() => {
                 if (!active || !isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
                 pushToast({ message: getRequestErrorMessage('connection'), tone: 'error' })
@@ -764,7 +791,7 @@ function RoomRoute({
   }
 
   const handleRequestRoomExit = () => {
-    if (routeSession === null || gameState?.ctx.phase !== 'lobby' || roomExitBusy) return
+    if (routeSession === null || !canRequestRoomExit(gameState?.ctx.phase, roomExitBusy, seatChangePending)) return
 
     setRoomExitDialogOpen(true)
   }
@@ -776,7 +803,7 @@ function RoomRoute({
   }
 
   const handleConfirmRoomExit = async () => {
-    if (routeSession === null || gameState?.ctx.phase !== 'lobby' || roomExitBusy) return
+    if (routeSession === null || gameState === null || !canRequestRoomExit(gameState.ctx.phase, roomExitBusy, seatChangePending)) return
 
     const currentSession = routeSession
     const generation = routeGenerationRef.current

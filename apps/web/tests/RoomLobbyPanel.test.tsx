@@ -55,6 +55,15 @@ describe('RoomLobbyPanel room exit action', () => {
     expect(html).toContain('>正在退出…<')
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>正在退出…<\/button>/)
   })
+
+  it.each([
+    ['guest exit', {}],
+    ['owner dissolution', { currentPlayerID: '3', ownerPlayerID: '3' }],
+  ])('disables %s while a seat change is pending', (_label, overrides) => {
+    const html = renderPanel({ ...overrides, seatChangePending: true })
+
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>(?:退出房间|解散房间)<\/button>/)
+  })
 })
 
 describe('RoomLobbyPanel round table layout', () => {

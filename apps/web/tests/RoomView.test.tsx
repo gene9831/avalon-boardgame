@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
-import { getUpdatedRoomRouteSession, recoverRoomRouteSession, resolveRecoverySeatValidation, RoomAccessView, RoomView, type RoomViewProps } from '../src/App'
+import { canRequestRoomExit, getUpdatedRoomRouteSession, recoverRoomRouteSession, resolveRecoverySeatValidation, resolveRoomRouteSnapshotSession, RoomAccessView, RoomView, type RoomViewProps } from '../src/App'
 import { beginSeatTransition, loadRoomSession, loadSeatTransition, saveRoomSession, type RoomSessionStorage } from '../src/room-session'
 
 vi.mock('../src/config', () => ({
@@ -223,6 +223,36 @@ describe('RoomView connection state', () => {
     expect(loadSeatTransition(source.matchID, storage)).toBeNull()
   })
 
+  it('refreshes an unchanged source session after a stale subscription snapshot omits its seat', async () => {
+    const values = new Map<string, string>()
+    const storage: RoomSessionStorage = {
+      getItem: (key) => values.get(key) ?? null,
+      removeItem: (key) => values.delete(key),
+      setItem: (key, value) => values.set(key, value),
+    }
+    const source = {
+      credentials: 'credential',
+      matchID: 'room-123',
+      playerID: '0',
+      playerName: 'Alice',
+      sessionID: 'session-123',
+    }
+    saveRoomSession(source, storage)
+    beginSeatTransition(source, '3', storage, 42)
+
+    const resolution = await resolveRoomRouteSnapshotSession(
+      source,
+      async (_matchID, playerID, credentials) => (
+        playerID === source.playerID && credentials === source.credentials
+      ),
+      storage,
+    )
+
+    expect(resolution).toEqual({ status: 'refresh', session: source })
+    expect(loadRoomSession(source.matchID, storage)).toEqual(source)
+    expect(loadSeatTransition(source.matchID, storage)).toBeNull()
+  })
+
   it('treats only definitive session errors as an invalid recovery seat', async () => {
     await expect(resolveRecoverySeatValidation(async () => {
       throw new TypeError('Failed to fetch')
@@ -236,6 +266,11 @@ describe('RoomView connection state', () => {
     expect(getUpdatedRoomRouteSession(source, target)).toEqual(target)
     expect(getUpdatedRoomRouteSession(target, target)).toBeNull()
     expect(getUpdatedRoomRouteSession(source, { ...target, matchID: 'other-room' })).toBeNull()
+  })
+
+  it('rejects an attempted room exit while seat migration is pending', () => {
+    expect(canRequestRoomExit('lobby', false, true)).toBe(false)
+    expect(canRequestRoomExit('lobby', false, false)).toBe(true)
   })
 })
 
