@@ -262,6 +262,28 @@ describe('room session storage', () => {
     expect(loadRoomSession(session.matchID, storage)).toBeNull()
   })
 
+  it('does not let a stale validation clear a completed seat migration', async () => {
+    const storage = createStorage()
+    const targetSession = { ...session, playerID: '4', credentials: 'credential-456' }
+    let finishValidation: (response: Response) => void = () => {}
+    const fetcher = vi.fn(() => new Promise<Response>((resolve) => {
+      finishValidation = resolve
+    }))
+    saveRoomSession(session, storage)
+
+    const validation = validateActiveRoomSessions(
+      [{ matchID: session.matchID, status: 'lobby' }],
+      'http://localhost:8001',
+      storage,
+      fetcher,
+    )
+    saveRoomSession(targetSession, storage)
+    finishValidation(new Response(null, { status: 403 }))
+
+    await expect(validation).resolves.toEqual({ sessions: [], validationFailed: false })
+    expect(loadRoomSession(session.matchID, storage)).toEqual(targetSession)
+  })
+
   it('keeps an active session locked when credential validation is unavailable', async () => {
     const storage = createStorage()
     saveRoomSession(session, storage)

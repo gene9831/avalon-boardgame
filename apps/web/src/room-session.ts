@@ -367,7 +367,7 @@ export async function validateActiveRoomSessions(
       return session
     } catch (error) {
       if (getRoomSessionInvalidationNotice(error) !== null) {
-        clearRoomSession(session.matchID, storage)
+        clearRoomSessionIfCurrent(session, storage)
         return null
       }
       validationFailed = true
