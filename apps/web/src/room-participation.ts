@@ -9,6 +9,7 @@ import {
   clearRoomSessionIfCurrent,
   clearSeatTransitionIfCurrent,
   completeSeatTransition,
+  isExactRoomSessionCurrent,
   loadRoomSession,
   loadSeatTransition,
   markSeatTransitionUncertain,
@@ -33,6 +34,40 @@ export class RoomParticipationHttpError extends Error {
     this.code = code
     this.status = status
   }
+}
+
+export class SeatTransitionPendingError extends Error {
+  constructor() {
+    super('A seat transition is already pending')
+    this.name = 'SeatTransitionPendingError'
+  }
+}
+
+export class SeatTransitionLockUnavailableError extends Error {
+  constructor() {
+    super('Browser seat-transition locking is unavailable')
+    this.name = 'SeatTransitionLockUnavailableError'
+  }
+}
+
+export type SeatTransitionLock = <T>(
+  matchID: string,
+  action: () => Promise<T>,
+) => Promise<T | null>
+
+export const withBrowserSeatTransitionLock: SeatTransitionLock = async (
+  matchID,
+  action,
+) => {
+  if (typeof navigator === 'undefined' || navigator.locks === undefined) {
+    throw new SeatTransitionLockUnavailableError()
+  }
+
+  return navigator.locks.request(
+    `avalon:seat-transition:${encodeURIComponent(matchID)}`,
+    { ifAvailable: true, mode: 'exclusive' },
+    (lock) => lock === null ? null : action(),
+  )
 }
 
 export interface RoomParticipationClient {
@@ -106,6 +141,12 @@ export function createRoomParticipationClient(
 }
 
 export function getSeatChangeErrorMessage(error: unknown) {
+  if (error instanceof SeatTransitionPendingError) {
+    return '座位正在变更，请稍后再试。'
+  }
+  if (error instanceof SeatTransitionLockUnavailableError) {
+    return '当前浏览器无法安全换座，请刷新或更换浏览器后重试。'
+  }
   if (error instanceof RoomParticipationHttpError && error.code === 'seat_unavailable') {
     return getLobbyErrorMessage(error.code)
   }
@@ -133,30 +174,45 @@ export async function changeRoomSeat(
   source: RoomSession,
   targetPlayerID: string,
   storage?: RoomSessionStorage,
+  lock: SeatTransitionLock = withBrowserSeatTransitionLock,
 ) {
-  const transition = beginSeatTransition(source, targetPlayerID, storage)
-  const heartbeat = globalThis.setInterval(
-    () => renewSeatTransitionLease(transition, storage),
-    SEAT_TRANSITION_LEASE_MS / 4,
-  )
-  try {
-    const response = await client.changeSeat(
-      source.matchID,
-      source.playerID,
-      source.credentials,
-      targetPlayerID,
-    )
-    return completeSeatTransition(source, transition, response, storage)
-  } catch (error) {
-    if (isDefinitiveSeatChangeRejection(error)) {
-      clearSeatTransitionIfCurrent(transition, storage)
-    } else {
-      markSeatTransitionUncertain(transition, storage)
+  const result = await lock(source.matchID, async () => {
+    if (loadSeatTransition(source.matchID, storage) !== null) {
+      throw new SeatTransitionPendingError()
     }
-    throw error
-  } finally {
-    globalThis.clearInterval(heartbeat)
-  }
+    if (!isExactRoomSessionCurrent(source, storage)) {
+      throw new SeatTransitionPendingError()
+    }
+
+    const transition = beginSeatTransition(source, targetPlayerID, storage)
+    const heartbeat = globalThis.setInterval(
+      () => renewSeatTransitionLease(transition, storage),
+      SEAT_TRANSITION_LEASE_MS / 4,
+    )
+    try {
+      const response = await client.changeSeat(
+        source.matchID,
+        source.playerID,
+        source.credentials,
+        targetPlayerID,
+      )
+      return completeSeatTransition(source, transition, response, storage)
+    } catch (error) {
+      if (isExactRoomSessionCurrent(source, storage)) {
+        if (isDefinitiveSeatChangeRejection(error)) {
+          clearSeatTransitionIfCurrent(transition, storage)
+        } else {
+          markSeatTransitionUncertain(transition, storage)
+        }
+      }
+      throw error
+    } finally {
+      globalThis.clearInterval(heartbeat)
+    }
+  })
+
+  if (result === null) throw new SeatTransitionPendingError()
+  return result
 }
 
 function isDefinitiveSeatChangeRejection(error: unknown) {

@@ -372,6 +372,19 @@ describe('Avalon setup and player views', () => {
     expect(view.viewer.knownEvilPlayerIDs).toEqual([])
   })
 
+  it('keeps Merlin evil-seat knowledge during paired Percival recognition', () => {
+    const G = createRecognitionStateAt('percivalRecognition')
+    const merlinID = Object.entries(G.secret.roleByPlayer)
+      .find(([, role]) => role === 'merlin')?.[0]
+    const evilIDs = Object.entries(G.secret.roleByPlayer)
+      .filter(([, role]) => loyaltyForRole(role) === 'evil')
+      .map(([playerID]) => playerID)
+
+    expect(merlinID).toBeDefined()
+    expect(getAvalonPlayerView(G, merlinID ?? null).viewer.knownEvilPlayerIDs)
+      .toEqual(evilIDs)
+  })
+
   it('does not send Percival candidates to any other role', () => {
     const G = createRecognitionStateAt('percivalRecognition')
     const loyalServantID = Object.entries(G.secret.roleByPlayer)

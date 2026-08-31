@@ -148,7 +148,7 @@ describe('RoomGamePanel identity recognition', () => {
     expect(html).toContain('我已辨认梅林候选')
   })
 
-  it('keeps candidate badges after recognition and exposes none to other viewers', () => {
+  it('keeps candidate badges private until Percival opens the knowledge control', () => {
     const percivalHtml = renderPanel({
       game: gameView({
         viewer: {
@@ -174,8 +174,66 @@ describe('RoomGamePanel identity recognition', () => {
       playerID: '1',
     })
 
-    expect(percivalHtml.match(/aria-label="Merlin 候选"/g)).toHaveLength(2)
+    expect(percivalHtml).not.toContain('aria-label="Merlin 候选"')
     expect(loyalServantHtml).not.toContain('aria-label="Merlin 候选"')
+  })
+
+  it('includes candidate knowledge in the marked parent seat accessible names', () => {
+    const html = renderPanel({
+      activeStage: 'identityRecognition',
+      game: gameView({
+        identityRecognition: {
+          step: 'percivalRecognition',
+          deadlineAt: Date.now() + 10_000,
+          confirmedCount: 0,
+          participantCount: 1,
+        },
+        viewer: {
+          role: 'percival',
+          loyalty: 'good',
+          knownEvilPlayerIDs: [],
+          knownMerlinCandidatePlayerIDs: ['0', '4'],
+          identityRecognition: {
+            isParticipant: true,
+            confirmed: false,
+            deadlineRefreshRequired: false,
+            serverNow: 1_000,
+          },
+        },
+      }),
+      phase: 'identityRecognition',
+      playerID: '1',
+    })
+
+    expect(html).toContain('aria-label="Alice，队长，任务队员，Merlin 候选"')
+    expect(html).toContain('aria-label="Eve，Merlin 候选"')
+  })
+
+  it('removes private candidate badges at game over', () => {
+    const html = renderPanel({
+      activeStage: undefined,
+      game: gameView({
+        status: 'finished',
+        result: { winner: 'good', reason: 'assassination', targetID: '1' },
+        revealedRoles: {
+          '0': 'merlin',
+          '1': 'percival',
+          '2': 'loyal_servant',
+          '3': 'assassin',
+          '4': 'morgana',
+        },
+        viewer: {
+          role: 'percival',
+          loyalty: 'good',
+          knownEvilPlayerIDs: [],
+          knownMerlinCandidatePlayerIDs: ['0', '4'],
+        },
+      }),
+      phase: 'assassination',
+      playerID: '1',
+    })
+
+    expect(html).not.toContain('aria-label="Merlin 候选"')
   })
 
   it('lowers an opaque curtain before showing the first role card', () => {

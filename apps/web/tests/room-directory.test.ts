@@ -100,6 +100,15 @@ describe('room directory', () => {
     expect(canJoinRoom({ status: 'lobby' } as AvalonRoomSummary)).toBe(true)
   })
 
+  it('does not offer joining an ownerless legacy lobby room', () => {
+    expect(canJoinRoom({
+      status: 'lobby',
+      ownerPlayerID: null,
+      occupiedPlayerIDs: ['0'],
+      players: [{ id: 0, name: 'Alice' }, { id: 1 }],
+    } as AvalonRoomSummary)).toBe(false)
+  })
+
   it('clears the saved last-room session after successful deletion', async () => {
     const values = new Map<string, string>()
     const storage: RoomSessionStorage = {

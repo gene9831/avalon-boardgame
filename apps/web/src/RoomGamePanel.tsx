@@ -347,9 +347,9 @@ function GameSeat({ canSelect, canSelectAsTarget, dense, displayedTeamVoteResult
   const isLeader = game.leaderID === seat.playerID
   const onQuestTeam = game.proposedTeam?.includes(seat.playerID) === true
   const knownEvil = showKnownPlayerInfo && game.viewer.knownEvilPlayerIDs.includes(seat.playerID)
-  const knownMerlinCandidate = (
-    game.viewer.knownMerlinCandidatePlayerIDs ?? []
-  ).includes(seat.playerID)
+  const knownMerlinCandidate = showKnownPlayerInfo &&
+    game.status !== 'finished' &&
+    (game.viewer.knownMerlinCandidatePlayerIDs ?? []).includes(seat.playerID)
   const revealedRole = game.revealedRoles?.[seat.playerID]
   const privateRole = showPrivateRoleKnowledge && seat.isCurrentPlayer
     ? game.viewer.role
@@ -388,6 +388,7 @@ function GameSeat({ canSelect, canSelectAsTarget, dense, displayedTeamVoteResult
     onQuestTeam ? '任务队员' : null,
     !seat.connected ? '已断线' : null,
     knownEvil ? '已知阵营信息：邪恶' : null,
+    knownMerlinCandidate ? 'Merlin 候选' : null,
     teamVoteStatusLabel,
   ].filter((status): status is string => status !== null)
   const seatLabel = [seatAction, ...seatStatuses].join('，')

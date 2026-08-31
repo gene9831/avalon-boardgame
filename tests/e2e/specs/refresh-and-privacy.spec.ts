@@ -30,6 +30,7 @@ test('a transient committed seat change recovers both same-browser room routes a
   let reportServerCommit: () => void = () => undefined
   let reportExitRequest: () => void = () => undefined
   let reportExitResponse: (status: number) => void = () => undefined
+  let seatChangeRequestCount = 0
   const transientResponseReleased = new Promise<void>((resolve) => {
     releaseTransientResponse = resolve
   })
@@ -69,6 +70,7 @@ test('a transient committed seat change recovers both same-browser room routes a
     }
 
     await context.route('**/rooms/avalon/*/players/*/seat', async (route) => {
+      seatChangeRequestCount += 1
       const committed = await route.fetch()
       expect(committed.ok()).toBe(true)
       reportServerCommit()
@@ -101,6 +103,8 @@ test('a transient committed seat change recovers both same-browser room routes a
       if (raw === null) return null
       return (JSON.parse(raw) as { status?: unknown }).status ?? null
     }, seatTransitionKey(matchID))).toBe('requesting')
+    await expect(stalePage.locator('button.seat--empty').first()).toBeDisabled()
+    expect(seatChangeRequestCount).toBe(1)
 
     await expect(movingPage).toHaveURL(new RegExp(`/rooms/${matchID}$`))
     await expect(stalePage).toHaveURL(new RegExp(`/rooms/${matchID}$`))

@@ -55,6 +55,12 @@ const fullRoom = {
   players: currentRoom.players,
 }
 
+const ownerlessLegacyRoom = {
+  ...openRoom,
+  matchID: 'room-ownerless',
+  ownerPlayerID: null,
+}
+
 const finishedRoom = {
   matchID: 'room-finished',
   status: 'finished' as const,
@@ -194,6 +200,13 @@ describe('LobbyView room access', () => {
     const html = renderLobby({ matches: [fullRoom] })
 
     expect(html).toContain('>已满<')
+    expect(html).not.toContain('>加入游戏<')
+  })
+
+  it('does not offer joining an ownerless legacy room', () => {
+    const html = renderLobby({ matches: [ownerlessLegacyRoom] })
+
+    expect(html).toContain('房间 room-ownerless')
     expect(html).not.toContain('>加入游戏<')
   })
 })

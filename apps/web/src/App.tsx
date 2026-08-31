@@ -784,7 +784,13 @@ function RoomRoute({
   }
 
   const handleChangeSeat = async (targetPlayerID: string) => {
-    if (routeSession === null || gameState?.ctx.phase !== 'lobby' || seatChangePending || targetPlayerID === routeSession.playerID) return
+    if (
+      routeSession === null ||
+      gameState?.ctx.phase !== 'lobby' ||
+      seatChangePending ||
+      loadSeatTransition(routeSession.matchID) !== null ||
+      targetPlayerID === routeSession.playerID
+    ) return
     setSeatChangePending(true)
     try {
       const nextSession = await changeRoomSeat(createRoomParticipationClient(webConfig.lobbyURL), routeSession, targetPlayerID)
@@ -990,7 +996,7 @@ function RoomRoute({
         room={room}
         roomExitBlocked={roomExitBlocked}
         roomExitBusy={roomExitBusy}
-        seatChangePending={seatChangePending}
+        seatChangePending={seatChangePending || persistedSeatTransitionPending}
         session={routeSession}
       />
       <RoomExitDialog

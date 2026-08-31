@@ -163,7 +163,9 @@
 
 最近一次验证日期：2026-08-31
 
-2026-08-31 自动入座、座位无关拥有者和成对角色验证：创建房间会原子进入拥有者，普通玩家由服务端分配提交时最低空座位，并发加入不会重复；拥有者移离 0 号座位后权限随玩家保持，新玩家可复用 0 号座位，刷新仍以原凭据重连。满房公共文案、320×568 下至少 44px 且可用键盘操作的换座按钮、Percival 仅看到不可区分的 Merlin/Morgana 候选，以及 10 人桌在 1024×768/1077×722 不与 Header 重叠均有浏览器回归。真实路由生命周期在服务端已提交换座但浏览器收到瞬态 503 时验证：实时 `requesting` 标记暂停旧座位失效，转为 `uncertain` 后重新校验并绑定唯一有效目标，同一浏览器的旧标签页不会删除新会话或丢失凭据。Automatic seating / seat-independent ownership / paired roles: complete。完整 `pnpm test` 为 Game 87、test-support 23、Server 83、Web 195，共 388 passed；`pnpm build`、`pnpm lint`、`pnpm typecheck` 均 exit 0；聚焦 Playwright 9 passed，完整 `pnpm test:e2e` 为 18 passed / 9 nightly skipped。Web build 报告单个 534.85 kB minified JavaScript chunk 超过 500 kB 的 Vite 建议性警告；Playwright 仅出现既有 `NO_COLOR`/`FORCE_COLOR` Node 警告。`pnpm --filter @avalon/server test:postgres` 已强制使用真实 PostgreSQL，但当前配置的 `192.168.100.13:5432` 在沙箱内以 `EPERM` 拒绝连接（2 failed / 3 passed / 4 skipped），而外部执行因套件会初始化 schema 和清理数据、目标又不是已确认的一次性数据库而未获授权；因此 PostgreSQL restart acceptance: blocked，未用内存存储替代，也未声称通过。Manual LAN 5-browser acceptance: pending；本次未执行真实 5–10 台设备、实际 LAN/CORS/Socket.IO 或部署环境 PostgreSQL 重启演练。
+2026-08-31 最终分支审查收口：同一房间换座现在使用 Web Locks `exclusive` + `ifAvailable` 浏览器全局互斥，并在锁内重新检查持久化标记和精确源会话；`requesting`、`uncertain` 及 legacy 标记都会拒绝第二次换座，不会排队到不确定迁移之后。迟到的成功、失败和恢复结果必须同时通过 opaque transition ID 与源会话 fence，不能覆盖或清除较新的标记/会话；退出/解散继续读取同一全局标记。两个同源标签页的真实浏览器回归证明首个请求持锁时空座按钮立即禁用、只发出一次换座请求，并在瞬态 503 后共同恢复唯一有效目标。Lobby 客户端保留服务端稳定错误 envelope，ownerless legacy lobby 不再展示加入操作；Percival 候选只在身份辨认或主动打开私密信息时显示、结算时移除，候选父座位可访问名称包含 `Merlin 候选`；成对房间中 Merlin 的邪恶座位知识从 Merlin 辨认持续到 Percival 辨认及之后，legacy 三步流程不变。完整 `pnpm test` 为 Game 88、test-support 23、Server 83、Web 216，共 410 passed；`pnpm build`、`pnpm lint`、`pnpm typecheck` 均 exit 0；聚焦 `refresh-and-privacy` 与 `identity-recognition` Playwright 为 4 passed，完整 `pnpm test:e2e` 为 18 passed / 9 nightly skipped。Web build 报告单个 538.03 kB minified JavaScript chunk 超过 500 kB 的 Vite 建议性警告；Playwright 仅出现既有 `NO_COLOR`/`FORCE_COLOR` Node 警告。本轮没有运行或声称通过 CI，也没有重新执行 PostgreSQL 套件；基于此前真实 PostgreSQL 目标不可用且未获一次性清理授权的结果，PostgreSQL restart acceptance 继续为 blocked，未用内存存储替代。Manual LAN 5-browser acceptance: pending；本次未执行真实 5–10 台设备、实际 LAN/CORS/Socket.IO 或部署环境 PostgreSQL 重启演练。
+
+2026-08-31 同日此前的自动入座、座位无关拥有者和成对角色验证：创建房间会原子进入拥有者，普通玩家由服务端分配提交时最低空座位，并发加入不会重复；拥有者移离 0 号座位后权限随玩家保持，新玩家可复用 0 号座位，刷新仍以原凭据重连。满房公共文案、320×568 下至少 44px 且可用键盘操作的换座按钮、Percival 仅看到不可区分的 Merlin/Morgana 候选，以及 10 人桌在 1024×768/1077×722 不与 Header 重叠均有浏览器回归。真实路由生命周期在服务端已提交换座但浏览器收到瞬态 503 时验证：实时 `requesting` 标记暂停旧座位失效，转为 `uncertain` 后重新校验并绑定唯一有效目标，同一浏览器的旧标签页不会删除新会话或丢失凭据。Automatic seating / seat-independent ownership / paired roles: complete。完整 `pnpm test` 为 Game 87、test-support 23、Server 83、Web 195，共 388 passed；`pnpm build`、`pnpm lint`、`pnpm typecheck` 均 exit 0；聚焦 Playwright 9 passed，完整 `pnpm test:e2e` 为 18 passed / 9 nightly skipped。Web build 报告单个 534.85 kB minified JavaScript chunk 超过 500 kB 的 Vite 建议性警告；Playwright 仅出现既有 `NO_COLOR`/`FORCE_COLOR` Node 警告。`pnpm --filter @avalon/server test:postgres` 已强制使用真实 PostgreSQL，但当前配置的 `192.168.100.13:5432` 在沙箱内以 `EPERM` 拒绝连接（2 failed / 3 passed / 4 skipped），而外部执行因套件会初始化 schema 和清理数据、目标又不是已确认的一次性数据库而未获授权；因此 PostgreSQL restart acceptance: blocked，未用内存存储替代，也未声称通过。Manual LAN 5-browser acceptance: pending；本次未执行真实 5–10 台设备、实际 LAN/CORS/Socket.IO 或部署环境 PostgreSQL 重启演练。
 
 - Automatic seating / seat-independent ownership / paired roles: complete
 - Validation: `pnpm test` — passed; `pnpm build` — passed; `pnpm lint` — passed; `pnpm typecheck` — passed; `pnpm test:e2e` — passed
@@ -197,14 +199,14 @@
 2026-08-23 PostgreSQL 网络中断崩溃修复验证：确认 `a90095d` 的范围仅是空闲客户端触发的 `pg.Pool` `error` 事件，不包含活动 `query()` 返回的 rejected Promise。新增 boardgame.io Socket.IO `update`、`sync`、`disconnect`、`chat` 请求错误边界；聚焦回归测试完成 RED（`sync` rejection 逸出）→ GREEN（安全日志并关闭底层连接）；Server tests 48 passed；Server typecheck exit 0。
 
 ```text
-pnpm test ✅ Game 87；test-support 23；Server 83；Web 195（共 388 passed）
-pnpm build ✅ Game、Server TypeScript 与 Web TypeScript + Vite build；单个 534.85 kB chunk 建议性警告
+pnpm test ✅ Game 88；test-support 23；Server 83；Web 216（共 410 passed）
+pnpm build ✅ Game、Server TypeScript 与 Web TypeScript + Vite build；单个 538.03 kB chunk 建议性警告
 pnpm lint ✅ exit 0，无 diagnostics
 pnpm typecheck ✅ Game、test-support、Server、Web、E2E exit 0
-pnpm --filter @avalon/e2e test:e2e smoke.spec.ts responsive.spec.ts refresh-and-privacy.spec.ts identity-recognition.spec.ts ✅ 9 passed
+pnpm --filter @avalon/e2e test:e2e refresh-and-privacy.spec.ts identity-recognition.spec.ts ✅ 4 passed
 pnpm test:e2e ✅ 18 passed / 9 nightly skipped
 Playwright 本地日志 ⚠️ Node 子进程提示 `NO_COLOR` 被 `FORCE_COLOR` 覆盖；无业务 warning/error
-pnpm --filter @avalon/server test:postgres ⚠️ 真实 PostgreSQL 连接被环境阻塞；2 failed / 3 passed / 4 skipped，未以 memory storage 替代
+pnpm --filter @avalon/server test:postgres ⚠️ 本轮未重跑；既有真实 PostgreSQL 环境/授权阻塞未解除，未以 memory storage 替代
 真实 5–10 浏览器 LAN 验收 ⬜ 未执行
 部署环境 PostgreSQL 重启与原凭据重连 ⬜ 未执行
 ```

@@ -129,6 +129,25 @@ describe('room session storage', () => {
     expect(loadSeatTransition(session.matchID, storage)).toBeNull()
   })
 
+  it('does not let an older recovery overwrite a newer transition created during validation', async () => {
+    const storage = createStorage()
+    saveRoomSession(session, storage)
+    const older = beginSeatTransition(session, '4', storage, 42, () => 'older')
+    markSeatTransitionUncertain(older, storage)
+    let newer: ReturnType<typeof beginSeatTransition> | null = null
+
+    await expect(recoverSeatTransition(older, async (_matchID, playerID) => {
+      if (playerID === older.targetPlayerID) {
+        newer = beginSeatTransition(session, '3', storage, 43, () => 'newer')
+        return true
+      }
+      return false
+    }, storage)).resolves.toEqual({ status: 'requesting', playerID: session.playerID })
+
+    expect(loadRoomSession(session.matchID, storage)).toEqual(session)
+    expect(loadSeatTransition(session.matchID, storage)).toEqual(newer)
+  })
+
   it('clears only the source session when neither seat credential is valid', async () => {
     const storage = createStorage()
     saveRoomSession(session, storage)
@@ -220,19 +239,47 @@ describe('room session storage', () => {
     })
   })
 
-  it('does not let an older identical move consume a newer transition marker', () => {
+  it('gives different same-millisecond seat targets different opaque transition IDs', () => {
+    const firstStorage = createStorage()
+    const secondStorage = createStorage()
+
+    const first = beginSeatTransition(session, '3', firstStorage, 42)
+    const second = beginSeatTransition(session, '4', secondStorage, 42)
+
+    expect(first.transitionID).not.toBe(second.transitionID)
+  })
+
+  it('does not let an older move overwrite its source or consume a newer transition marker', () => {
     const storage = createStorage()
     saveRoomSession(session, storage)
     const older = beginSeatTransition(session, '4', storage, 42, () => 'older')
-    const newer = beginSeatTransition(session, '4', storage, 42, () => 'newer')
+    const newer = beginSeatTransition(session, '3', storage, 42, () => 'newer')
 
     completeSeatTransition(session, older, {
       matchID: session.matchID,
       playerID: '4',
-      playerCredentials: session.credentials,
+      playerCredentials: 'late-credential',
     }, storage)
 
+    expect(loadRoomSession(session.matchID, storage)).toEqual(session)
     expect(loadSeatTransition(session.matchID, storage)).toEqual(newer)
+  })
+
+  it('preserves and adopts a newer valid session when an old success arrives late', () => {
+    const storage = createStorage()
+    saveRoomSession(session, storage)
+    const older = beginSeatTransition(session, '4', storage, 42, () => 'older')
+    const newerSession = { ...session, playerID: '3', credentials: 'newer-credential' }
+    saveRoomSession(newerSession, storage)
+
+    expect(completeSeatTransition(session, older, {
+      matchID: session.matchID,
+      playerID: '4',
+      playerCredentials: 'late-credential',
+    }, storage)).toEqual(newerSession)
+
+    expect(loadRoomSession(session.matchID, storage)).toEqual(newerSession)
+    expect(loadSeatTransition(session.matchID, storage)).toEqual(older)
   })
 
   it('can read the previous single-session format for the matching room', () => {

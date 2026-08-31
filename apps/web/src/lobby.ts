@@ -49,7 +49,13 @@ export function createAvalonLobbyClient() {
       body: JSON.stringify(body),
     })
     const result: unknown = await response.json()
-    if (!response.ok) throw new LobbyRequestError({ error: result })
+    if (!response.ok) {
+      throw new LobbyRequestError(
+        typeof result === 'object' && result !== null
+          ? result as { error?: unknown }
+          : { error: result },
+      )
+    }
     return result as AvalonRoomSessionResponse
   }
 

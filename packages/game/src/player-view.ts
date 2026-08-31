@@ -35,7 +35,9 @@ export function getAvalonPlayerView(
   const evilKnowledgeReleased =
     recognitionStep === undefined || recognitionStep !== 'roleReveal'
   const merlinKnowledgeReleased =
-    recognitionStep === undefined || recognitionStep === 'merlinRecognition'
+    recognitionStep === undefined ||
+    recognitionStep === 'merlinRecognition' ||
+    recognitionStep === 'percivalRecognition'
   const knownEvilPlayerIDs =
     role === 'merlin' && merlinKnowledgeReleased
       ? evilPlayerIDs

@@ -173,6 +173,19 @@ export function clearRoomSessionIfCurrent(
   clearRoomSession(expected.matchID, storage)
 }
 
+export function isExactRoomSessionCurrent(
+  expected: RoomSession,
+  storage: RoomSessionStorage = browserStorage(),
+) {
+  const current = loadRoomSession(expected.matchID, storage)
+  return current?.matchID === expected.matchID &&
+    current.playerID === expected.playerID &&
+    current.credentials === expected.credentials &&
+    current.playerName === expected.playerName &&
+    current.sessionID === expected.sessionID &&
+    current.avatarID === expected.avatarID
+}
+
 export function beginSeatTransition(
   source: Pick<RoomSession, 'matchID' | 'playerID' | 'credentials'>,
   targetPlayerID: string,
@@ -222,6 +235,12 @@ export function completeSeatTransition(
   response: AvalonRoomSessionResponse,
   storage: RoomSessionStorage = browserStorage(),
 ) {
+  const currentSession = loadRoomSession(source.matchID, storage)
+  if (
+    !isSameSeatTransition(loadSeatTransition(transition.matchID, storage), transition) ||
+    !isExactRoomSessionCurrent(source, storage)
+  ) return currentSession
+
   const target = {
     ...source,
     matchID: response.matchID,
@@ -235,6 +254,14 @@ export function completeSeatTransition(
 
 function isSameSeatTransition(current: SeatTransition | null, expected: SeatTransition) {
   return current?.transitionID === expected.transitionID
+}
+
+function isTransitionSourceSession(
+  current: RoomSession,
+  transition: SeatTransition,
+): boolean {
+  return current.playerID === transition.sourcePlayerID &&
+    current.credentials === transition.credentials
 }
 
 export function clearSeatTransitionIfCurrent(
@@ -307,7 +334,21 @@ export async function recoverSeatTransition(
     transition.sourcePlayerID,
     transition.credentials,
   )
+  if (!isSameSeatTransition(
+    loadSeatTransition(transition.matchID, resolvedStorage),
+    transition,
+  )) {
+    return { status: 'requesting', playerID: transition.sourcePlayerID }
+  }
   if (sourceValid) {
+    const currentSession = loadRoomSession(transition.matchID, resolvedStorage)
+    if (currentSession === null) {
+      clearSeatTransitionIfCurrent(transition, resolvedStorage)
+      return { status: 'invalid' }
+    }
+    if (!isTransitionSourceSession(currentSession, transition)) {
+      return { status: 'target', playerID: currentSession.playerID }
+    }
     clearSeatTransitionIfCurrent(transition, resolvedStorage)
     return { status: 'source', playerID: transition.sourcePlayerID }
   }
@@ -317,20 +358,35 @@ export async function recoverSeatTransition(
     transition.targetPlayerID,
     transition.credentials,
   )
+  if (!isSameSeatTransition(
+    loadSeatTransition(transition.matchID, resolvedStorage),
+    transition,
+  )) {
+    return { status: 'requesting', playerID: transition.sourcePlayerID }
+  }
   if (targetValid) {
     const source = loadRoomSession(transition.matchID, resolvedStorage)
-    if (
-      source?.playerID === transition.sourcePlayerID &&
-      source.credentials === transition.credentials
-    ) {
-      saveRoomSession({ ...source, playerID: transition.targetPlayerID }, resolvedStorage)
+    if (source === null) {
+      clearSeatTransitionIfCurrent(transition, resolvedStorage)
+      return { status: 'invalid' }
     }
+    if (!isTransitionSourceSession(source, transition)) {
+      return { status: 'target', playerID: source.playerID }
+    }
+    saveRoomSession({ ...source, playerID: transition.targetPlayerID }, resolvedStorage)
     clearSeatTransitionIfCurrent(transition, resolvedStorage)
     return { status: 'target', playerID: transition.targetPlayerID }
   }
 
   const current = loadRoomSession(transition.matchID, resolvedStorage)
-  if (current !== null) clearRoomSessionIfCurrent({
+  if (current === null) {
+    clearSeatTransitionIfCurrent(transition, resolvedStorage)
+    return { status: 'invalid' }
+  }
+  if (!isTransitionSourceSession(current, transition)) {
+    return { status: 'target', playerID: current.playerID }
+  }
+  clearRoomSessionIfCurrent({
     ...current,
     playerID: transition.sourcePlayerID,
     credentials: transition.credentials,

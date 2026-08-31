@@ -300,11 +300,19 @@ test('players complete the curtain-based identity recognition ceremony', async (
         name: '查看我的身份与已知信息',
       })).toBeVisible()
     }
-    for (const [index, page] of harness.pages.entries()) {
-      await expect(page.getByLabel('Merlin 候选', { exact: true })).toHaveCount(
-        String(index) === percivalID ? 2 : 0,
-      )
+    const percivalPage = harness.pages[Number(percivalID)]
+    for (const page of harness.pages) {
+      await expect(page.getByLabel('Merlin 候选', { exact: true })).toHaveCount(0)
     }
+    await percivalPage.getByRole('button', {
+      name: '查看我的身份与已知信息',
+    }).click()
+    await expect(percivalPage.getByLabel('Merlin 候选', { exact: true })).toHaveCount(2)
+    await expect(percivalPage.getByRole('button', { name: /Merlin 候选/ })).toHaveCount(2)
+    await percivalPage.getByRole('button', {
+      name: '隐藏我的身份与已知信息',
+    }).click()
+    await expect(percivalPage.getByLabel('Merlin 候选', { exact: true })).toHaveCount(0)
 
     const evilID = Array.from(roleByPlayer.entries()).find(([, role]) => (
       role === 'assassin' || role === 'morgana' || role === 'minion'

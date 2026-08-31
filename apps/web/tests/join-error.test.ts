@@ -1,6 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { classifyJoinError } from '../src/join-error'
+import { createAvalonLobbyClient } from '../src/lobby'
+
+vi.mock('../src/config', () => ({
+  webConfig: {
+    gameURL: 'http://localhost:8000',
+    lobbyURL: 'http://localhost:8001',
+  },
+}))
 
 function structuredLobbyError(status: number, code: string) {
   return Object.assign(new Error(`HTTP status ${status}`), {
@@ -9,6 +17,8 @@ function structuredLobbyError(status: number, code: string) {
 }
 
 describe('join error classification', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
   it.each([
     ['room_full', '房间已满。', true],
     ['room_not_joinable', '游戏已经开始。', true],
@@ -39,5 +49,26 @@ describe('join error classification', () => {
       message: '暂时无法加入房间，请稍后重试。',
       refreshRooms: false,
     })
+  })
+
+  it.each([
+    ['room_full', '房间已满。'],
+    ['client_already_joined', '本浏览器已经加入该房间。'],
+    ['room_not_found', '房间不存在或已解散。'],
+  ] as const)('preserves the real Lobby response code %s for copy and directory refresh', async (code, message) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: { code, message: 'Safe server message' },
+    }), {
+      status: code === 'room_not_found' ? 404 : 409,
+      headers: { 'Content-Type': 'application/json' },
+    })))
+    const client = createAvalonLobbyClient()
+
+    const error = await client.joinMatch('avalon', 'room-1', {
+      data: { avatarID: 'merlin', clientID: 'client-1', sessionID: 'session-1' },
+      playerName: 'Alice',
+    }).catch((requestError: unknown) => requestError)
+
+    expect(classifyJoinError(error)).toEqual({ message, refreshRooms: true })
   })
 })

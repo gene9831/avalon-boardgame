@@ -36,6 +36,11 @@ const session = {
   credentials: 'secret-credential',
 }
 
+const immediateSeatTransitionLock = async <T>(
+  _matchID: string,
+  action: () => Promise<T>,
+) => action()
+
 describe('room participation client', () => {
   it('keeps an in-flight marker until a lost response becomes recoverable', async () => {
     const storage = createStorage()
@@ -46,7 +51,7 @@ describe('room participation client', () => {
     const request = changeRoomSeat({
       changeSeat: async () => pendingResponse,
       prepareStart: async () => {},
-    }, roomSession, '4', storage)
+    }, roomSession, '4', storage, immediateSeatTransitionLock)
 
     const requesting = loadSeatTransition(roomSession.matchID, storage)!
     const validateWhilePending = vi.fn(async () => true)
@@ -81,7 +86,7 @@ describe('room participation client', () => {
     await expect(changeRoomSeat({
       changeSeat: async () => { throw new TypeError('Failed to fetch') },
       prepareStart: async () => {},
-    }, roomSession, '4', storage)).rejects.toThrow('Failed to fetch')
+    }, roomSession, '4', storage, immediateSeatTransitionLock)).rejects.toThrow('Failed to fetch')
 
     expect(loadSeatTransition(roomSession.matchID, storage)).toMatchObject({
       sourcePlayerID: '2',
@@ -99,7 +104,7 @@ describe('room participation client', () => {
     await expect(changeRoomSeat({
       changeSeat: async () => { throw new RoomParticipationHttpError(409, 'seat_unavailable') },
       prepareStart: async () => {},
-    }, roomSession, '4', storage)).rejects.toEqual(
+    }, roomSession, '4', storage, immediateSeatTransitionLock)).rejects.toEqual(
       new RoomParticipationHttpError(409, 'seat_unavailable'),
     )
     expect(loadRoomSession(roomSession.matchID, storage)).toEqual(roomSession)
@@ -114,7 +119,7 @@ describe('room participation client', () => {
     await expect(changeRoomSeat({
       changeSeat: async () => { throw new RoomParticipationHttpError(503) },
       prepareStart: async () => {},
-    }, roomSession, '4', storage)).rejects.toEqual(new RoomParticipationHttpError(503))
+    }, roomSession, '4', storage, immediateSeatTransitionLock)).rejects.toEqual(new RoomParticipationHttpError(503))
 
     const uncertain = loadSeatTransition(roomSession.matchID, storage)!
     expect(uncertain.status).toBe('uncertain')
@@ -139,7 +144,7 @@ describe('room participation client', () => {
     await expect(changeRoomSeat({
       changeSeat: async () => { throw new RoomParticipationHttpError(status, code) },
       prepareStart: async () => {},
-    }, roomSession, '4', storage)).rejects.toBeInstanceOf(RoomParticipationHttpError)
+    }, roomSession, '4', storage, immediateSeatTransitionLock)).rejects.toBeInstanceOf(RoomParticipationHttpError)
     expect(loadSeatTransition(roomSession.matchID, storage)).toBeNull()
     expect(loadRoomSession(roomSession.matchID, storage)).toEqual(roomSession)
   })
@@ -161,10 +166,131 @@ describe('room participation client', () => {
         playerCredentials: 'rebound-credential',
       }),
       prepareStart: async () => {},
-    }, roomSession, '4', storage)
+    }, roomSession, '4', storage, immediateSeatTransitionLock)
 
     expect(result).toEqual({ ...roomSession, playerID: '4', credentials: 'rebound-credential' })
     expect(loadSeatTransition(roomSession.matchID, storage)).toBeNull()
+  })
+
+  it('rejects a second-tab seat move while the first tab owns the room lock', async () => {
+    const storage = createStorage()
+    const roomSession = { ...session, playerName: 'Alice' }
+    saveRoomSession(roomSession, storage)
+    let releaseFirstRequest!: () => void
+    const firstResponse = new Promise<void>((resolve) => { releaseFirstRequest = resolve })
+    let lockHeld = false
+    const exclusiveIfAvailableLock = async <T>(
+      _matchID: string,
+      action: () => Promise<T>,
+    ): Promise<T | null> => {
+      if (lockHeld) return null
+      lockHeld = true
+      try {
+        return await action()
+      } finally {
+        lockHeld = false
+      }
+    }
+    const firstClient = {
+      changeSeat: vi.fn(async () => {
+        await firstResponse
+        return {
+          matchID: roomSession.matchID,
+          playerID: '3',
+          playerCredentials: roomSession.credentials,
+        }
+      }),
+      prepareStart: async () => {},
+    }
+    const secondClient = {
+      changeSeat: vi.fn(async () => ({
+        matchID: roomSession.matchID,
+        playerID: '4',
+        playerCredentials: roomSession.credentials,
+      })),
+      prepareStart: async () => {},
+    }
+
+    const firstMove = changeRoomSeat(
+      firstClient,
+      roomSession,
+      '3',
+      storage,
+      exclusiveIfAvailableLock,
+    )
+    await vi.waitFor(() => expect(firstClient.changeSeat).toHaveBeenCalledTimes(1))
+
+    await expect(changeRoomSeat(
+      secondClient,
+      roomSession,
+      '4',
+      storage,
+      exclusiveIfAvailableLock,
+    )).rejects.toMatchObject({ name: 'SeatTransitionPendingError' })
+    expect(secondClient.changeSeat).not.toHaveBeenCalled()
+    expect(loadSeatTransition(roomSession.matchID, storage)).toMatchObject({
+      sourcePlayerID: '2',
+      targetPlayerID: '3',
+    })
+
+    releaseFirstRequest()
+    await expect(firstMove).resolves.toMatchObject({ playerID: '3' })
+  })
+
+  it('rejects a new move without a request when a legacy transition marker exists', async () => {
+    const storage = createStorage()
+    const roomSession = { ...session, playerName: 'Alice' }
+    saveRoomSession(roomSession, storage)
+    beginSeatTransition(roomSession, '3', storage, 42, () => 'existing')
+    const client = {
+      changeSeat: vi.fn(async () => ({
+        matchID: roomSession.matchID,
+        playerID: '4',
+        playerCredentials: roomSession.credentials,
+      })),
+      prepareStart: async () => {},
+    }
+
+    await expect(changeRoomSeat(
+      client,
+      roomSession,
+      '4',
+      storage,
+      immediateSeatTransitionLock,
+    )).rejects.toMatchObject({ name: 'SeatTransitionPendingError' })
+    expect(client.changeSeat).not.toHaveBeenCalled()
+    expect(loadSeatTransition(roomSession.matchID, storage)).toMatchObject({
+      transitionID: 'existing',
+      targetPlayerID: '3',
+    })
+  })
+
+  it('uses a same-room exclusive browser lock without queueing behind its owner', async () => {
+    const storage = createStorage()
+    const roomSession = { ...session, playerName: 'Alice' }
+    saveRoomSession(roomSession, storage)
+    const request = vi.fn(async (
+      name: string,
+      options: LockOptions,
+      callback: (lock: Lock | null) => Promise<unknown>,
+    ) => callback(null))
+    vi.stubGlobal('navigator', { locks: { request } })
+
+    try {
+      await expect(changeRoomSeat({
+        changeSeat: vi.fn(),
+        prepareStart: async () => {},
+      }, roomSession, '4', storage)).rejects.toMatchObject({
+        name: 'SeatTransitionPendingError',
+      })
+      expect(request).toHaveBeenCalledWith(
+        'avalon:seat-transition:room%20123',
+        { ifAvailable: true, mode: 'exclusive' },
+        expect.any(Function),
+      )
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('releases the current seat without exposing its credential in the URL', async () => {
