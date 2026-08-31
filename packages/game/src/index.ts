@@ -52,6 +52,7 @@ export {
 export type {
   AvalonRoleConfiguration,
   AvalonG,
+  AvalonLobbyState,
   IdentityRecognitionState,
   IdentityRecognitionStep,
   AvalonPlayerView,
