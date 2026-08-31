@@ -1,4 +1,8 @@
-import type { AvalonRoomSessionResponse } from '@avalon/game'
+import {
+  AVALON_LOBBY_ERROR_CODES,
+  type AvalonLobbyErrorCode,
+  type AvalonRoomSessionResponse,
+} from '@avalon/game'
 
 import {
   beginSeatTransition,
@@ -6,15 +10,18 @@ import {
   type RoomSession,
   type RoomSessionStorage,
 } from './room-session'
+import { getLobbyErrorMessage } from './join-error'
 
 type Fetcher = typeof fetch
 
 export class RoomParticipationHttpError extends Error {
+  readonly code: AvalonLobbyErrorCode | null
   readonly status: number
 
-  constructor(status: number) {
+  constructor(status: number, code: AvalonLobbyErrorCode | null = null) {
     super(`HTTP status ${status}`)
     this.name = 'RoomParticipationHttpError'
+    this.code = code
     this.status = status
   }
 }
@@ -46,7 +53,18 @@ export function createRoomParticipationClient(
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     })
-    if (!response.ok) throw new RoomParticipationHttpError(response.status)
+    if (!response.ok) {
+      const body: unknown = await response.json().catch(() => undefined)
+      const code = typeof body === 'object' && body !== null && 'error' in body
+        ? (body as { error?: { code?: unknown } }).error?.code
+        : undefined
+      throw new RoomParticipationHttpError(
+        response.status,
+        typeof code === 'string' && AVALON_LOBBY_ERROR_CODES.includes(code as AvalonLobbyErrorCode)
+          ? code as AvalonLobbyErrorCode
+          : null,
+      )
+    }
     return response
   }
 
@@ -66,6 +84,13 @@ export function createRoomParticipationClient(
       )
     },
   }
+}
+
+export function getSeatChangeErrorMessage(error: unknown) {
+  if (error instanceof RoomParticipationHttpError && error.code === 'seat_unavailable') {
+    return getLobbyErrorMessage(error.code)
+  }
+  return '换座失败，请重试。'
 }
 
 export function getRoomExitErrorMessage(error: unknown, isHost: boolean) {

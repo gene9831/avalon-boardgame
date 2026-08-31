@@ -41,12 +41,16 @@ function isAvalonLobbyErrorCode(code: string): code is AvalonLobbyErrorCode {
   return AVALON_LOBBY_ERROR_CODES.includes(code as AvalonLobbyErrorCode)
 }
 
+export function getLobbyErrorMessage(code: AvalonLobbyErrorCode) {
+  return LOBBY_ERROR_COPY[code]
+}
+
 export function classifyJoinError(error: unknown): ClassifiedJoinError {
   const code = errorCode(error)
 
   if (code !== null && isAvalonLobbyErrorCode(code)) {
     return {
-      message: LOBBY_ERROR_COPY[code],
+      message: getLobbyErrorMessage(code),
       refreshRooms: ROOM_REFRESH_ERROR_CODES.has(code),
     }
   }

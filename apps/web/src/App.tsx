@@ -53,6 +53,7 @@ import {
   changeRoomSeat,
   createRoomParticipationClient,
   getRoomExitErrorMessage,
+  getSeatChangeErrorMessage,
   leaveRoom,
 } from './room-participation'
 import {
@@ -86,14 +87,18 @@ import {
   LAST_ROOM_SESSION_KEY,
   ROOM_SESSION_KEY,
   clearRoomSession,
+  clearRoomSessionIfCurrent,
   getRoomSessionKey,
   getRoomSessionInvalidationNotice,
   isRoomSessionStillValid,
   loadRoomSession,
+  loadSeatTransition,
+  recoverSeatTransition,
   saveRoomSession,
   validateActiveRoomSessions,
   validateRoomSession,
   type RoomSession,
+  type RoomSessionStorage,
 } from './room-session'
 import {
   getRequestErrorMessage,
@@ -119,6 +124,22 @@ function roomInvalidationNotice(error: unknown) {
       ? '房间已解散。'
       : null
   )
+}
+
+function isSameRoomSession(current: RoomSession | null, expected: RoomSession) {
+  return current?.playerID === expected.playerID && current.credentials === expected.credentials
+}
+
+// oxlint-disable-next-line react/only-export-components
+export async function recoverRoomRouteSession(
+  session: RoomSession,
+  validate: (matchID: string, playerID: string, credentials: string) => Promise<boolean>,
+  storage?: RoomSessionStorage,
+) {
+  const transition = loadSeatTransition(session.matchID, storage)
+  if (transition === null) return session
+  await recoverSeatTransition(transition, validate, storage)
+  return loadRoomSession(session.matchID, storage)
 }
 
 function App() {
@@ -382,11 +403,20 @@ function RoomRoute({
   const [seatChangePending, setSeatChangePending] = useState(false)
 
   const invalidateSession = useCallback(
-    (reason: string, generation: number) => {
+    (reason: string, generation: number, expectedSession?: RoomSession) => {
       if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
 
+      if (
+        expectedSession !== undefined &&
+        !isSameRoomSession(loadRoomSession(matchID), expectedSession)
+      ) return
+
       stopCurrentClient(clientRef)
-      clearRoomSession(matchID)
+      if (expectedSession !== undefined) {
+        clearRoomSessionIfCurrent(expectedSession)
+      } else {
+        clearRoomSession(matchID)
+      }
       setSession(null)
       navigate('/', { state: { roomNotice: reason } })
     },
@@ -411,7 +441,7 @@ function RoomRoute({
 
         const nextRoomValue = nextRoom as unknown as AvalonMatch
         if (!isRoomSessionStillValid(nextRoomValue, currentSession)) {
-          invalidateSession('上次的座位已失效。', generation)
+          invalidateSession('上次的座位已失效。', generation, currentSession)
           return
         }
         setRoom(nextRoomValue)
@@ -419,7 +449,7 @@ function RoomRoute({
         if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
         const invalidationNotice = roomInvalidationNotice(requestError)
         if (invalidationNotice !== null) {
-          invalidateSession(invalidationNotice, generation)
+          invalidateSession(invalidationNotice, generation, currentSession)
           return
         }
         if (!silent) {
@@ -486,6 +516,31 @@ function RoomRoute({
 
     const connect = async () => {
       try {
+        const recoveredSession = await recoverRoomRouteSession(
+          routeSession,
+          async (recoveryMatchID, playerID, credentials) => {
+            try {
+              await validateRoomSession(webConfig.lobbyURL, {
+                matchID: recoveryMatchID,
+                playerID,
+                credentials,
+              })
+              return true
+            } catch {
+              return false
+            }
+          },
+        )
+        if (!active || !isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
+        if (recoveredSession === null) {
+          invalidateSession('上次的座位已失效。', generation, routeSession)
+          return
+        }
+        if (!isSameRoomSession(recoveredSession, routeSession)) {
+          setSession(recoveredSession)
+          return
+        }
+
         const [initialRoom] = await Promise.all([
           lobby.getMatch(AVALON_GAME_NAME, matchID),
           validateRoomSession(webConfig.lobbyURL, routeSession),
@@ -493,7 +548,7 @@ function RoomRoute({
         if (!active || !isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
 
         if (!isRoomSessionStillValid(initialRoom as unknown as AvalonMatch, routeSession)) {
-          invalidateSession('上次的座位已失效。', generation)
+          invalidateSession('上次的座位已失效。', generation, routeSession)
           return
         }
 
@@ -516,7 +571,7 @@ function RoomRoute({
           if (client?.matchData !== undefined) {
             const players = client.matchData as unknown as LobbyPlayer[]
             if (!isRoomSessionStillValid({ players }, routeSession)) {
-              invalidateSession('上次的座位已失效。', generation)
+              invalidateSession('上次的座位已失效。', generation, routeSession)
               return
             }
             setRoom((previousRoom) =>
@@ -534,7 +589,7 @@ function RoomRoute({
         if (active && isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) {
           const invalidationNotice = roomInvalidationNotice(requestError)
           if (invalidationNotice !== null) {
-            invalidateSession(invalidationNotice, generation)
+            invalidateSession(invalidationNotice, generation, routeSession)
           } else {
             pushToast({
               message: getRequestErrorMessage('connection'),
@@ -579,7 +634,7 @@ function RoomRoute({
       const nextSession = await changeRoomSeat(createRoomParticipationClient(webConfig.lobbyURL), routeSession, targetPlayerID)
       setSession(nextSession)
     } catch (error) {
-      pushToast({ message: getRoomExitErrorMessage(error, false), tone: 'error' })
+      pushToast({ message: getSeatChangeErrorMessage(error), tone: 'error' })
     } finally {
       setSeatChangePending(false)
     }
@@ -762,7 +817,7 @@ export function RoomAccessView({
     <PageShell eyebrow={`房间 ${matchID}`} title="进入房间">
       <section className="mx-auto max-w-xl rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8">
         <p className="text-sm leading-6 text-slate-300">
-          你尚未加入这个房间。请返回房间列表选择座位。
+          你尚未加入这个房间。请返回房间列表，选择一个房间后加入。
         </p>
         <button
           className="mt-6 rounded-xl bg-amber-300 px-4 py-3 font-semibold text-slate-950 transition hover:bg-amber-200"

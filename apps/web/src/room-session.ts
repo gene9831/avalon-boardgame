@@ -220,13 +220,14 @@ export async function recoverSeatTransition(
   validate: ValidateSeat,
   storage?: RoomSessionStorage,
 ): Promise<SeatTransitionRecovery> {
+  const resolvedStorage = storage ?? browserStorage()
   const sourceValid = await validate(
     transition.matchID,
     transition.sourcePlayerID,
     transition.credentials,
   )
   if (sourceValid) {
-    storage?.removeItem(getSeatTransitionKey(transition.matchID))
+    resolvedStorage.removeItem(getSeatTransitionKey(transition.matchID))
     return { status: 'source', playerID: transition.sourcePlayerID }
   }
 
@@ -236,28 +237,24 @@ export async function recoverSeatTransition(
     transition.credentials,
   )
   if (targetValid) {
-    const source = storage === undefined
-      ? null
-      : loadRoomSession(transition.matchID, storage)
+    const source = loadRoomSession(transition.matchID, resolvedStorage)
     if (
       source?.playerID === transition.sourcePlayerID &&
       source.credentials === transition.credentials
     ) {
-      saveRoomSession({ ...source, playerID: transition.targetPlayerID }, storage)
+      saveRoomSession({ ...source, playerID: transition.targetPlayerID }, resolvedStorage)
     }
-    storage?.removeItem(getSeatTransitionKey(transition.matchID))
+    resolvedStorage.removeItem(getSeatTransitionKey(transition.matchID))
     return { status: 'target', playerID: transition.targetPlayerID }
   }
 
-  if (storage !== undefined) {
-    const current = loadRoomSession(transition.matchID, storage)
-    if (current !== null) clearRoomSessionIfCurrent({
-      ...current,
-      playerID: transition.sourcePlayerID,
-      credentials: transition.credentials,
-    }, storage)
-    storage.removeItem(getSeatTransitionKey(transition.matchID))
-  }
+  const current = loadRoomSession(transition.matchID, resolvedStorage)
+  if (current !== null) clearRoomSessionIfCurrent({
+    ...current,
+    playerID: transition.sourcePlayerID,
+    credentials: transition.credentials,
+  }, resolvedStorage)
+  resolvedStorage.removeItem(getSeatTransitionKey(transition.matchID))
   return { status: 'invalid' }
 }
 

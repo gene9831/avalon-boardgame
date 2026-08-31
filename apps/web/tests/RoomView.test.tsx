@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
-import { RoomAccessView, RoomView, type RoomViewProps } from '../src/App'
+import { recoverRoomRouteSession, RoomAccessView, RoomView, type RoomViewProps } from '../src/App'
+import { beginSeatTransition, loadRoomSession, saveRoomSession, type RoomSessionStorage } from '../src/room-session'
 
 vi.mock('../src/config', () => ({
   webConfig: {
@@ -96,6 +97,7 @@ describe('RoomView connection state', () => {
     expect(accessHtml).toContain('房间 room-123')
     expect(accessHtml).toContain('你尚未加入这个房间')
     expect(accessHtml).toContain('>返回房间列表<')
+    expect(accessHtml).toContain('选择一个房间后加入')
 
     expect(loadingHtml).toContain('正在进入房间')
     expect(loadingHtml).not.toContain('座位凭据')
@@ -111,6 +113,60 @@ describe('RoomView connection state', () => {
     expect(html).toContain('正在进入房间')
     expect(html.match(/<main\b/g)).toHaveLength(1)
     expect(html).not.toContain('玩家座位')
+  })
+
+  it('recovers a committed target seat after a dropped change response and reload', async () => {
+    const values = new Map<string, string>()
+    const storage: RoomSessionStorage = {
+      getItem: (key) => values.get(key) ?? null,
+      removeItem: (key) => values.delete(key),
+      setItem: (key, value) => values.set(key, value),
+    }
+    const source = {
+      credentials: 'credential',
+      matchID: 'room-123',
+      playerID: '0',
+      playerName: 'Alice',
+      sessionID: 'session-123',
+    }
+    saveRoomSession(source, storage)
+    beginSeatTransition(source, '3', storage, 42)
+
+    await expect(recoverRoomRouteSession(
+      source,
+      async (_matchID, playerID, credentials) => playerID === '3' && credentials === 'credential',
+      storage,
+    )).resolves.toEqual({ ...source, playerID: '3' })
+    expect(loadRoomSession(source.matchID, storage)).toEqual({ ...source, playerID: '3' })
+  })
+
+  it('retains the source session or clears an invalid source during route recovery', async () => {
+    const createStorage = (): RoomSessionStorage => {
+      const values = new Map<string, string>()
+      return {
+        getItem: (key) => values.get(key) ?? null,
+        removeItem: (key) => values.delete(key),
+        setItem: (key, value) => values.set(key, value),
+      }
+    }
+    const source = {
+      credentials: 'credential',
+      matchID: 'room-123',
+      playerID: '0',
+      playerName: 'Alice',
+      sessionID: 'session-123',
+    }
+    const sourceStorage = createStorage()
+    saveRoomSession(source, sourceStorage)
+    beginSeatTransition(source, '3', sourceStorage, 42)
+    await expect(recoverRoomRouteSession(source, async (_matchID, playerID) => playerID === '0', sourceStorage))
+      .resolves.toEqual(source)
+
+    const invalidStorage = createStorage()
+    saveRoomSession(source, invalidStorage)
+    beginSeatTransition(source, '3', invalidStorage, 42)
+    await expect(recoverRoomRouteSession(source, async () => false, invalidStorage)).resolves.toBeNull()
+    expect(loadRoomSession(source.matchID, invalidStorage)).toBeNull()
   })
 })
 
