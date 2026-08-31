@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   getRequestErrorMessage,
   getRoomAccessValidationError,
+  getSeatTransitionRecoveryError,
 } from '../src/request-error'
 
 describe('request error copy', () => {
@@ -23,5 +24,11 @@ describe('request error copy', () => {
       '暂时无法确认部分房间状态，请刷新房间列表后重试。',
     )
     expect(getRoomAccessValidationError(false)).toBeNull()
+  })
+
+  it('explains an unrecoverable seat transition without exposing server details', () => {
+    expect(getSeatTransitionRecoveryError('invalid')).toBe('当前座位会话已失效。')
+    expect(getSeatTransitionRecoveryError('source')).toBeNull()
+    expect(getSeatTransitionRecoveryError('target')).toBeNull()
   })
 })

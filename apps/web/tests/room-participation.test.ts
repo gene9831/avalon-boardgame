@@ -1,11 +1,27 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  changeRoomSeat,
   dissolveRoom,
   getRoomExitErrorMessage,
   leaveRoom,
   RoomParticipationHttpError,
 } from '../src/room-participation'
+import {
+  loadSeatTransition,
+  loadRoomSession,
+  saveRoomSession,
+  type RoomSessionStorage,
+} from '../src/room-session'
+
+function createStorage(): RoomSessionStorage {
+  const values = new Map<string, string>()
+  return {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+    removeItem: (key) => values.delete(key),
+  }
+}
 
 const session = {
   matchID: 'room 123',
@@ -14,6 +30,51 @@ const session = {
 }
 
 describe('room participation client', () => {
+  it('preserves a transition marker when a seat-change response is uncertain', async () => {
+    const storage = createStorage()
+    const roomSession = {
+      ...session,
+      avatarID: 'merlin' as const,
+      playerName: 'Alice',
+      sessionID: 'join-session-1',
+    }
+    saveRoomSession(roomSession, storage)
+
+    await expect(changeRoomSeat({
+      changeSeat: async () => { throw new TypeError('Failed to fetch') },
+      prepareStart: async () => {},
+    }, roomSession, '4', storage)).rejects.toThrow('Failed to fetch')
+
+    expect(loadSeatTransition(roomSession.matchID, storage)).toMatchObject({
+      sourcePlayerID: '2',
+      targetPlayerID: '4',
+    })
+    expect(loadRoomSession(roomSession.matchID, storage)).toEqual(roomSession)
+  })
+
+  it('stores the server-authoritative target seat after changing rooms', async () => {
+    const storage = createStorage()
+    const roomSession = {
+      ...session,
+      avatarID: 'merlin' as const,
+      playerName: 'Alice',
+      sessionID: 'join-session-1',
+    }
+    saveRoomSession(roomSession, storage)
+
+    const result = await changeRoomSeat({
+      changeSeat: async () => ({
+        matchID: roomSession.matchID,
+        playerID: '4',
+        playerCredentials: 'rebound-credential',
+      }),
+      prepareStart: async () => {},
+    }, roomSession, '4', storage)
+
+    expect(result).toEqual({ ...roomSession, playerID: '4', credentials: 'rebound-credential' })
+    expect(loadSeatTransition(roomSession.matchID, storage)).toBeNull()
+  })
+
   it('releases the current seat without exposing its credential in the URL', async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
 

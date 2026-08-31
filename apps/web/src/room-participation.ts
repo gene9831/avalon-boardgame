@@ -1,4 +1,11 @@
-import type { RoomSession } from './room-session'
+import type { AvalonRoomSessionResponse } from '@avalon/game'
+
+import {
+  beginSeatTransition,
+  completeSeatTransition,
+  type RoomSession,
+  type RoomSessionStorage,
+} from './room-session'
 
 type Fetcher = typeof fetch
 
@@ -12,6 +19,20 @@ export class RoomParticipationHttpError extends Error {
   }
 }
 
+export interface RoomParticipationClient {
+  changeSeat: (
+    matchID: string,
+    sourcePlayerID: string,
+    credentials: string,
+    targetPlayerID: string,
+  ) => Promise<AvalonRoomSessionResponse>
+  prepareStart: (
+    matchID: string,
+    playerID: string,
+    credentials: string,
+  ) => Promise<void>
+}
+
 export function getRoomExitErrorMessage(error: unknown, isHost: boolean) {
   if (error instanceof RoomParticipationHttpError && error.status === 409) {
     return isHost
@@ -19,6 +40,22 @@ export function getRoomExitErrorMessage(error: unknown, isHost: boolean) {
       : '对局已经开始，无法退出房间。'
   }
   return isHost ? '解散房间失败，请重试。' : '退出房间失败，请重试。'
+}
+
+export async function changeRoomSeat(
+  client: RoomParticipationClient,
+  source: RoomSession,
+  targetPlayerID: string,
+  storage?: RoomSessionStorage,
+) {
+  beginSeatTransition(source, targetPlayerID, storage)
+  const response = await client.changeSeat(
+    source.matchID,
+    source.playerID,
+    source.credentials,
+    targetPlayerID,
+  )
+  return completeSeatTransition(source, response, storage)
 }
 
 async function requestRoomExit(

@@ -1,4 +1,4 @@
-import type { AvalonRoomSummary } from '@avalon/game'
+import type { AvalonRoomSessionResponse, AvalonRoomSummary } from '@avalon/game'
 
 import type { PlayerAvatarID } from './player-profile'
 
@@ -44,11 +44,35 @@ export interface ActiveRoomSessionValidation {
   validationFailed: boolean
 }
 
+export interface SeatTransition {
+  matchID: string
+  sourcePlayerID: string
+  targetPlayerID: string
+  credentials: string
+  startedAt: number
+}
+
+export type ValidateSeat = (
+  matchID: string,
+  playerID: string,
+  credentials: string,
+) => Promise<boolean>
+
+export type SeatTransitionRecovery =
+  | { status: 'source'; playerID: string }
+  | { status: 'target'; playerID: string }
+  | { status: 'invalid' }
+
 export const ROOM_SESSION_KEY = 'avalon:room-session'
 export const LAST_ROOM_SESSION_KEY = 'avalon:last-room'
+export const SEAT_TRANSITION_KEY = 'avalon:seat-transition'
 
 export function getRoomSessionKey(matchID: string) {
   return `${ROOM_SESSION_KEY}:${encodeURIComponent(matchID)}`
+}
+
+export function getSeatTransitionKey(matchID: string) {
+  return `${SEAT_TRANSITION_KEY}:${encodeURIComponent(matchID)}`
 }
 
 function browserStorage(): RoomSessionStorage {
@@ -129,6 +153,114 @@ export function clearRoomSession(
   }
 }
 
+export function clearRoomSessionIfCurrent(
+  expected: RoomSession,
+  storage: RoomSessionStorage = browserStorage(),
+) {
+  const current = loadRoomSession(expected.matchID, storage)
+  if (
+    current?.playerID !== expected.playerID ||
+    current.credentials !== expected.credentials
+  ) return
+
+  clearRoomSession(expected.matchID, storage)
+}
+
+export function beginSeatTransition(
+  source: Pick<RoomSession, 'matchID' | 'playerID' | 'credentials'>,
+  targetPlayerID: string,
+  storage: RoomSessionStorage = browserStorage(),
+  startedAt = Date.now(),
+): SeatTransition {
+  const transition: SeatTransition = {
+    matchID: source.matchID,
+    sourcePlayerID: source.playerID,
+    targetPlayerID,
+    credentials: source.credentials,
+    startedAt,
+  }
+  storage.setItem(getSeatTransitionKey(transition.matchID), JSON.stringify(transition))
+  return transition
+}
+
+export function loadSeatTransition(
+  matchID: string,
+  storage: RoomSessionStorage = browserStorage(),
+): SeatTransition | null {
+  const raw = storage.getItem(getSeatTransitionKey(matchID))
+  if (raw === null) return null
+
+  try {
+    const transition: unknown = JSON.parse(raw)
+    if (!isSeatTransition(transition) || transition.matchID !== matchID) return null
+    return transition
+  } catch {
+    return null
+  }
+}
+
+export function completeSeatTransition(
+  source: RoomSession,
+  response: AvalonRoomSessionResponse,
+  storage: RoomSessionStorage = browserStorage(),
+) {
+  const target = {
+    ...source,
+    matchID: response.matchID,
+    playerID: response.playerID,
+    credentials: response.playerCredentials,
+  }
+  saveRoomSession(target, storage)
+  storage.removeItem(getSeatTransitionKey(source.matchID))
+  return target
+}
+
+export async function recoverSeatTransition(
+  transition: SeatTransition,
+  validate: ValidateSeat,
+  storage?: RoomSessionStorage,
+): Promise<SeatTransitionRecovery> {
+  const sourceValid = await validate(
+    transition.matchID,
+    transition.sourcePlayerID,
+    transition.credentials,
+  )
+  if (sourceValid) {
+    storage?.removeItem(getSeatTransitionKey(transition.matchID))
+    return { status: 'source', playerID: transition.sourcePlayerID }
+  }
+
+  const targetValid = await validate(
+    transition.matchID,
+    transition.targetPlayerID,
+    transition.credentials,
+  )
+  if (targetValid) {
+    const source = storage === undefined
+      ? null
+      : loadRoomSession(transition.matchID, storage)
+    if (
+      source?.playerID === transition.sourcePlayerID &&
+      source.credentials === transition.credentials
+    ) {
+      saveRoomSession({ ...source, playerID: transition.targetPlayerID }, storage)
+    }
+    storage?.removeItem(getSeatTransitionKey(transition.matchID))
+    return { status: 'target', playerID: transition.targetPlayerID }
+  }
+
+  if (storage !== undefined) {
+    const current = loadRoomSession(transition.matchID, storage)
+    if (current !== null) clearRoomSessionIfCurrent({
+      ...current,
+      playerID: transition.sourcePlayerID,
+      credentials: transition.credentials,
+    }, storage)
+    storage.removeItem(getSeatTransitionKey(transition.matchID))
+  }
+  return { status: 'invalid' }
+}
+
 export function clearDeletedLastRoomSession(
   matchID: string,
   lastRoomSession: RoomSession | null,
@@ -149,6 +281,18 @@ function readRoomSession(raw: string | null): RoomSession | null {
   } catch {
     return null
   }
+}
+
+function isSeatTransition(value: unknown): value is SeatTransition {
+  if (typeof value !== 'object' || value === null) return false
+  const transition = value as Partial<SeatTransition>
+  return [
+    transition.matchID,
+    transition.sourcePlayerID,
+    transition.targetPlayerID,
+    transition.credentials,
+  ].every((field) => typeof field === 'string' && field.length > 0) &&
+    typeof transition.startedAt === 'number' && Number.isFinite(transition.startedAt)
 }
 
 export function getAvailableSeatIDs(
@@ -212,6 +356,12 @@ export async function validateActiveRoomSessions(
     return session === null ? [] : [session]
   })
   const sessions = await Promise.all(candidates.map(async (session) => {
+    const transition = loadSeatTransition(session.matchID, storage)
+    if (
+      transition?.sourcePlayerID === session.playerID &&
+      transition.credentials === session.credentials
+    ) return session
+
     try {
       await validateRoomSession(baseURL, session, fetcher)
       return session

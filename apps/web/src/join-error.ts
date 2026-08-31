@@ -1,13 +1,31 @@
+import {
+  AVALON_LOBBY_ERROR_CODES,
+  type AvalonLobbyErrorCode,
+} from '@avalon/game'
+
 export interface ClassifiedJoinError {
   message: string
   refreshRooms: boolean
 }
 
-function errorDetails(error: unknown) {
-  if (typeof error !== 'object' || error === null || !('details' in error)) return null
-  const details = (error as { details?: unknown }).details
-  return typeof details === 'string' ? details : null
+const LOBBY_ERROR_COPY: Record<AvalonLobbyErrorCode, string> = {
+  room_full: '房间已满。',
+  room_not_joinable: '游戏已经开始。',
+  room_not_found: '房间不存在或已解散。',
+  client_already_joined: '本浏览器已经加入该房间。',
+  seat_unavailable: '该空座刚刚被其他玩家占用。',
+  invalid_seat_session: '当前座位会话已失效。',
+  not_room_owner: '只有房间拥有者可以执行此操作。',
+  owner_must_dissolve: '房间拥有者退出时需要解散房间。',
 }
+
+const ROOM_REFRESH_ERROR_CODES = new Set<AvalonLobbyErrorCode>([
+  'room_full',
+  'room_not_joinable',
+  'room_not_found',
+  'client_already_joined',
+  'seat_unavailable',
+])
 
 function errorCode(error: unknown) {
   if (typeof error !== 'object' || error === null || !('details' in error)) return null
@@ -19,70 +37,17 @@ function errorCode(error: unknown) {
   return typeof code === 'string' ? code : null
 }
 
+function isAvalonLobbyErrorCode(code: string): code is AvalonLobbyErrorCode {
+  return AVALON_LOBBY_ERROR_CODES.includes(code as AvalonLobbyErrorCode)
+}
+
 export function classifyJoinError(error: unknown): ClassifiedJoinError {
-  const details = errorDetails(error)
   const code = errorCode(error)
 
-  if (code === 'seat_unavailable') {
+  if (code !== null && isAvalonLobbyErrorCode(code)) {
     return {
-      message: '所选座位已被占用，请重新选择。',
-      refreshRooms: true,
-    }
-  }
-
-  if (code === 'client_already_joined') {
-    return {
-      message: '你已经加入这个房间，请从房间列表继续游戏。',
-      refreshRooms: true,
-    }
-  }
-
-  if (code === 'invalid_request') {
-    return {
-      message: '暂时无法加入房间，请重新选择后再试。',
-      refreshRooms: false,
-    }
-  }
-
-  if (details === 'Player name is already used in this match') {
-    return {
-      message: '这个名字已被本房间的其他玩家使用。',
-      refreshRooms: false,
-    }
-  }
-
-  if (details === 'Player name must contain 1 to 24 characters') {
-    return {
-      message: '玩家名称需要包含 1–24 个字符。',
-      refreshRooms: false,
-    }
-  }
-
-  if (error instanceof Error && error.message === 'HTTP status 404') {
-    return {
-      message: '房间不存在或已解散，请返回房间列表。',
-      refreshRooms: true,
-    }
-  }
-
-  if (error instanceof Error && error.message === 'HTTP status 409') {
-    if (details?.startsWith('Player ') && details.endsWith(' not available')) {
-      return {
-        message: '所选座位已被占用，请重新选择。',
-        refreshRooms: true,
-      }
-    }
-
-    if (details === 'Client has already joined this match') {
-      return {
-        message: '你已经加入这个房间，请从房间列表继续游戏。',
-        refreshRooms: true,
-      }
-    }
-
-    return {
-      message: '所选座位已被占用，请重新选择。',
-      refreshRooms: true,
+      message: LOBBY_ERROR_COPY[code],
+      refreshRooms: ROOM_REFRESH_ERROR_CODES.has(code),
     }
   }
 

@@ -2,11 +2,16 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   clearRoomSession,
+  clearRoomSessionIfCurrent,
+  beginSeatTransition,
+  completeSeatTransition,
   getAvailableSeatIDs,
   getRoomSessionInvalidationNotice,
   isRoomSessionStillValid,
   loadLastRoomSession,
   loadRoomSession,
+  loadSeatTransition,
+  recoverSeatTransition,
   saveRoomSession,
   validateActiveRoomSessions,
   validateRoomSession,
@@ -73,6 +78,62 @@ describe('room session storage', () => {
 
     expect(loadRoomSession(session.matchID, storage)).toBeNull()
     expect(loadRoomSession(otherSession.matchID, storage)).toEqual(otherSession)
+  })
+
+  it('does not let a stale tab clear a migrated session', () => {
+    const storage = createStorage()
+    const targetSession = { ...session, playerID: '4' }
+
+    saveRoomSession(targetSession, storage)
+    clearRoomSessionIfCurrent(session, storage)
+
+    expect(loadRoomSession(session.matchID, storage)).toEqual(targetSession)
+  })
+
+  it('saves the target session before completing a seat transition', () => {
+    const storage = createStorage()
+    saveRoomSession(session, storage)
+    beginSeatTransition(session, '4', storage, 42)
+
+    completeSeatTransition(session, {
+      matchID: session.matchID,
+      playerID: '4',
+      playerCredentials: 'credential-456',
+    }, storage)
+
+    expect(loadRoomSession(session.matchID, storage)).toEqual({
+      ...session,
+      playerID: '4',
+      credentials: 'credential-456',
+    })
+    expect(loadSeatTransition(session.matchID, storage)).toBeNull()
+  })
+
+  it('recovers a lost seat-change response by validating the target session', async () => {
+    const storage = createStorage()
+    saveRoomSession(session, storage)
+    const transition = beginSeatTransition(session, '4', storage, 42)
+    const validate = vi.fn(async (_matchID: string, playerID: string) => playerID === '4')
+
+    await expect(recoverSeatTransition(transition, validate, storage)).resolves.toEqual({
+      status: 'target',
+      playerID: '4',
+    })
+    expect(validate).toHaveBeenCalledTimes(2)
+    expect(loadRoomSession(session.matchID, storage)).toEqual({ ...session, playerID: '4' })
+    expect(loadSeatTransition(session.matchID, storage)).toBeNull()
+  })
+
+  it('clears only the source session when neither seat credential is valid', async () => {
+    const storage = createStorage()
+    saveRoomSession(session, storage)
+    const transition = beginSeatTransition(session, '4', storage, 42)
+
+    await expect(recoverSeatTransition(transition, async () => false, storage)).resolves.toEqual({
+      status: 'invalid',
+    })
+    expect(loadRoomSession(session.matchID, storage)).toBeNull()
+    expect(loadSeatTransition(session.matchID, storage)).toBeNull()
   })
 
   it('can read the previous single-session format for the matching room', () => {
@@ -215,6 +276,22 @@ describe('room session storage', () => {
       sessions: [session],
       validationFailed: true,
     })
+    expect(loadRoomSession(session.matchID, storage)).toEqual(session)
+  })
+
+  it('does not clear a source session while another tab changes its seat', async () => {
+    const storage = createStorage()
+    saveRoomSession(session, storage)
+    beginSeatTransition(session, '4', storage, 42)
+
+    const result = await validateActiveRoomSessions(
+      [{ matchID: session.matchID, status: 'lobby' }],
+      'http://localhost:8001',
+      storage,
+      vi.fn().mockResolvedValue(new Response(null, { status: 403 })),
+    )
+
+    expect(result).toEqual({ sessions: [session], validationFailed: false })
     expect(loadRoomSession(session.matchID, storage)).toEqual(session)
   })
 })
