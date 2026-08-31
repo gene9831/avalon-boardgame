@@ -6,7 +6,7 @@ import { RoomExitDialog, type RoomExitDialogProps } from '../src/RoomExitDialog'
 function renderDialog(overrides: Partial<RoomExitDialogProps> = {}) {
   const props: RoomExitDialogProps = {
     busy: false,
-    isHost: false,
+    isOwner: false,
     onCancel: vi.fn(),
     onConfirm: vi.fn(),
     open: true,
@@ -21,12 +21,12 @@ describe('RoomExitDialog', () => {
     const html = renderDialog()
 
     expect(html).toContain('确认退出房间')
-    expect(html).toContain('退出后将释放你的座位。再次加入时需要重新选择座位。')
+    expect(html).toContain('退出后将释放你的座位。再次加入时会自动分配空座位。')
     expect(html).toContain('>退出房间<')
   })
 
   it('warns the host that dissolution removes the room for everyone', () => {
-    const html = renderDialog({ isHost: true })
+    const html = renderDialog({ isOwner: true })
 
     expect(html).toContain('确认解散房间')
     expect(html).toContain('解散后，所有玩家都会返回房间列表，这个房间无法恢复。')

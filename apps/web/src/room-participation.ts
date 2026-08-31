@@ -33,6 +33,41 @@ export interface RoomParticipationClient {
   ) => Promise<void>
 }
 
+export function createRoomParticipationClient(
+  baseURL: string,
+  fetcher: Fetcher = fetch,
+): RoomParticipationClient {
+  const request = async (url: string, credentials: string, body?: unknown) => {
+    const response = await fetcher(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${credentials}`,
+        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+    if (!response.ok) throw new RoomParticipationHttpError(response.status)
+    return response
+  }
+
+  return {
+    async changeSeat(matchID, sourcePlayerID, credentials, targetPlayerID) {
+      const response = await request(
+        `${baseURL}/rooms/avalon/${encodeURIComponent(matchID)}/players/${encodeURIComponent(sourcePlayerID)}/seat`,
+        credentials,
+        { targetPlayerID },
+      )
+      return response.json() as Promise<AvalonRoomSessionResponse>
+    },
+    async prepareStart(matchID, playerID, credentials) {
+      await request(
+        `${baseURL}/rooms/avalon/${encodeURIComponent(matchID)}/players/${encodeURIComponent(playerID)}/prepare-start`,
+        credentials,
+      )
+    },
+  }
+}
+
 export function getRoomExitErrorMessage(error: unknown, isHost: boolean) {
   if (error instanceof RoomParticipationHttpError && error.status === 409) {
     return isHost

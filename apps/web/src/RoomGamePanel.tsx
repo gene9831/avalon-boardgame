@@ -1,4 +1,4 @@
-import { BadgeCheck, CircleCheck, CircleX } from 'lucide-react'
+import { BadgeCheck, CircleCheck, CircleX, House } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type {
   AvalonPlayerView,
@@ -52,6 +52,7 @@ interface RoomGamePanelProps {
   playerID: PlayerID
   players: readonly LobbyPlayer[]
   profile: PlayerProfile
+  ownerPlayerID: string | null
 }
 
 export function RoomGamePanel({
@@ -73,9 +74,10 @@ export function RoomGamePanel({
   playerID,
   players,
   profile,
+  ownerPlayerID,
 }: RoomGamePanelProps) {
   const playerIDs = Object.keys(game.players).sort((left, right) => Number(left) - Number(right))
-  const seats = buildRoundTableSeats(players, playerIDs.length, playerID)
+  const seats = buildRoundTableSeats(players, playerIDs.length, playerID, ownerPlayerID)
   const playerNames = Object.fromEntries(seats.map((seat) => [seat.playerID, seat.name]))
   const requiredTeamSize = getQuestTeamSize(playerIDs.length, game.questIndex)
   const displayedTeamVoteResult = getDisplayedTeamVoteResult(game, phase)
@@ -397,12 +399,14 @@ function GameSeat({ canSelect, canSelectAsTarget, dense, displayedTeamVoteResult
           : undefined}
       className={`pointer-events-auto flex flex-col items-center border-0 bg-transparent p-0 text-center transition ${dense ? 'w-[clamp(3.1rem,14vw,6.5rem)]' : 'w-[clamp(4.2rem,17vw,8rem)]'} ${canSelect || canSelectAsTarget ? 'cursor-pointer hover:scale-105' : 'cursor-default'}`}
       data-round-table-player
+      data-player-id={seat.playerID}
       disabled={!canSelect && !canSelectAsTarget}
       onClick={onSelect}
       type="button"
     >
       <div className="relative">
         {isLeader && <CrownIcon />}
+        {seat.isOwner && <span aria-label="房间拥有者" className="seat-owner-badge absolute -left-1 -top-1 z-20 grid size-5 place-items-center rounded-full bg-amber-300 text-slate-950 shadow-lg"><House aria-hidden="true" className="size-3" /></span>}
         <div
           className={`${dense ? 'size-[clamp(2.5rem,9.5vw,4.5rem)]' : 'size-[clamp(3rem,12vw,5.5rem)]'} relative grid shrink-0 place-items-center overflow-hidden rounded-full border-2 text-[clamp(0.9rem,4vw,1.8rem)] font-semibold transition ${avatarClasses} ${!seat.connected ? 'grayscale opacity-45' : ''}`}
           data-round-table-avatar

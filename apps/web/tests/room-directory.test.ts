@@ -40,6 +40,10 @@ describe('room directory', () => {
         rooms: [{
           matchID: 'room-1',
           status: 'lobby',
+          authorityVersion: 1,
+          ownerPlayerID: '0',
+          occupiedPlayerIDs: ['0'],
+          roleConfiguration: { percivalMorgana: true },
           createdAt: 1,
           updatedAt: 2,
           internal: 'ignored',
@@ -59,6 +63,10 @@ describe('room directory', () => {
     expect(rooms).toEqual([{
       matchID: 'room-1',
       status: 'lobby',
+      authorityVersion: 1,
+      ownerPlayerID: '0',
+      occupiedPlayerIDs: ['0'],
+      roleConfiguration: { percivalMorgana: true },
       createdAt: 1,
       updatedAt: 2,
       players: [{ id: 0, name: 'Alice', isConnected: true }],

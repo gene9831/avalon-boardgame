@@ -13,7 +13,9 @@ function renderPanel(overrides: Partial<RoomLobbyPanelProps> = {}) {
     matchID: 'room-123',
     numPlayers: 5,
     occupiedPlayerIDs: ['0', '1'],
+    ownerPlayerID: '0',
     onBackHome: vi.fn(),
+    onChangeSeat: vi.fn(),
     onReconnect: vi.fn(),
     onRequestRoomExit: vi.fn(),
     onStart: vi.fn(),
@@ -24,6 +26,7 @@ function renderPanel(overrides: Partial<RoomLobbyPanelProps> = {}) {
     ],
     profile: { avatarID: 'merlin', name: 'Bob' },
     roomExitBusy: false,
+    seatChangePending: false,
     ...overrides,
   }
 
@@ -39,8 +42,8 @@ describe('RoomLobbyPanel room exit action', () => {
     expect(html).not.toContain('>解散房间<')
   })
 
-  it('offers the host room dissolution instead of releasing seat zero', () => {
-    const html = renderPanel({ currentPlayerID: '0' })
+  it('offers the owner room dissolution instead of releasing a seat', () => {
+    const html = renderPanel({ currentPlayerID: '3', ownerPlayerID: '3' })
 
     expect(html).toContain('>解散房间<')
     expect(html).not.toContain('>退出房间<')
@@ -68,7 +71,8 @@ describe('RoomLobbyPanel round table layout', () => {
     const waitingHtml = renderPanel()
     const hostHtml = renderPanel({
       canStart: true,
-      currentPlayerID: '0',
+      currentPlayerID: '3',
+      ownerPlayerID: '3',
       occupiedPlayerIDs: ['0', '1', '2', '3', '4'],
     })
     const fullGuestHtml = renderPanel({
@@ -98,7 +102,25 @@ describe('RoomLobbyPanel round table layout', () => {
 
     expect(html).toContain('aria-label="1. Alice，已断线"')
     expect(html).toContain('aria-label="2. Bob，这是你"')
-    expect(html).toContain('aria-label="3. 空座位"')
+    expect(html).toContain('aria-label="移至 3 号空座位"')
+  })
+
+  it('marks the owner at their current seat and exposes immediate empty-seat actions', () => {
+    const html = renderPanel({
+      currentPlayerID: '3',
+      ownerPlayerID: '3',
+      occupiedPlayerIDs: ['0', '1', '3'],
+      players: [
+        { id: 0, name: 'Alice', isConnected: true },
+        { id: 1, name: 'Bob', isConnected: true },
+        { id: 3, name: 'Dylan', isConnected: true },
+      ],
+    })
+
+    expect(html).toContain('data-player-id="3"')
+    expect(html).toMatch(/data-player-id="3"[^>]*[\s\S]*aria-label="房间拥有者"|aria-label="房间拥有者"[\s\S]*data-player-id="3"/)
+    expect(html).toContain('aria-label="移至 3 号空座位"')
+    expect(html).not.toContain('确认换座')
   })
 })
 

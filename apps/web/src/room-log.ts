@@ -26,6 +26,13 @@ export interface RoomLogEntry {
 interface PublicLogPlayer {
   id: string | number
   name?: string | null
+  data?: unknown
+}
+
+function publicSessionID(player: PublicLogPlayer) {
+  if (typeof player.data !== 'object' || player.data === null) return undefined
+  const value = (player.data as Record<string, unknown>).sessionID
+  return typeof value === 'string' ? value : undefined
 }
 
 function occupiedPlayers(players: readonly PublicLogPlayer[]) {
@@ -57,9 +64,26 @@ export function buildPresenceLogChanges(
     occupiedPlayers(currentPlayers).map((player) => [String(player.id), player]),
   )
   const changes: Omit<RoomLogEntry, 'id'>[] = []
+  const movedPlayerIDs = new Set<string>()
+
+  for (const previousPlayer of occupiedPlayers(previousPlayers)) {
+    const sessionID = publicSessionID(previousPlayer)
+    if (sessionID === undefined) continue
+    const currentPlayer = occupiedPlayers(currentPlayers).find(
+      (candidate) => publicSessionID(candidate) === sessionID && String(candidate.id) !== String(previousPlayer.id),
+    )
+    if (currentPlayer === undefined) continue
+    movedPlayerIDs.add(String(previousPlayer.id))
+    movedPlayerIDs.add(String(currentPlayer.id))
+    changes.push({
+      kind: 'presence',
+      group: '等待玩家',
+      title: `${currentPlayer.name} 从 ${Number(previousPlayer.id) + 1} 号座位移动到 ${Number(currentPlayer.id) + 1} 号座位`,
+    })
+  }
 
   for (const [playerID] of [...previous].sort(([left], [right]) => Number(left) - Number(right))) {
-    if (current.has(playerID)) continue
+    if (current.has(playerID) || movedPlayerIDs.has(playerID)) continue
     changes.push({
       kind: 'presence',
       group: '等待玩家',
@@ -67,7 +91,7 @@ export function buildPresenceLogChanges(
     })
   }
   for (const [playerID] of [...current].sort(([left], [right]) => Number(left) - Number(right))) {
-    if (previous.has(playerID)) continue
+    if (previous.has(playerID) || movedPlayerIDs.has(playerID)) continue
     changes.push({
       kind: 'presence',
       group: '等待玩家',
@@ -155,6 +179,7 @@ export function buildGameLogEntries(
     | 'revealedRoles'
     | 'status'
     | 'voteHistory'
+    | 'lobby'
   >,
   players: readonly PublicLogPlayer[],
   phase: string,
@@ -165,7 +190,7 @@ export function buildGameLogEntries(
     id: 'game-start',
     kind: 'game-start',
     group: '对局开始',
-    title: `${playerLabel(players, '0')}开始了游戏`,
+    title: `${playerLabel(players, game.lobby?.ownerPlayerID ?? '0')}开始了游戏`,
   }]
   const attemptsByQuest = new Map<number, number>()
   const questResults = new Map(

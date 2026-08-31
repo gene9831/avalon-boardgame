@@ -1,4 +1,4 @@
-import { getPlayerCountConfig } from '@avalon/game'
+import { getPlayerCountConfig, type AvalonRoleConfiguration } from '@avalon/game'
 
 import { ModalDialog } from './ModalDialog'
 
@@ -8,7 +8,9 @@ export interface CreateGameDialogProps {
   onCancel: () => void
   onConfirm: () => void
   onPlayerCountChange: (value: number) => void
+  onRoleConfigurationChange: (value: AvalonRoleConfiguration) => void
   open: boolean
+  roleConfiguration: AvalonRoleConfiguration
 }
 
 const PLAYER_COUNTS = [5, 6, 7, 8, 9, 10] as const
@@ -19,7 +21,9 @@ export function CreateGameDialog({
   onCancel,
   onConfirm,
   onPlayerCountChange,
+  onRoleConfigurationChange,
   open,
+  roleConfiguration,
 }: CreateGameDialogProps) {
   const config = getPlayerCountConfig(numPlayers)
 
@@ -62,6 +66,21 @@ export function CreateGameDialog({
             })}
           </div>
         </fieldset>
+
+        <label className="role-configuration-toggle mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 bg-slate-950/45 p-4 text-sm">
+          <input
+            checked={roleConfiguration.percivalMorgana}
+            className="mt-0.5 size-5 accent-amber-300"
+            disabled={busy}
+            onChange={(event) => onRoleConfigurationChange({ percivalMorgana: event.target.checked })}
+            role="switch"
+            type="checkbox"
+          />
+          <span>
+            <span className="block font-semibold text-slate-100">帕西维尔与莫甘娜</span>
+            <small className="mt-1 block leading-5 text-slate-400">帕西维尔会看到梅林与莫甘娜两名候选人。</small>
+          </span>
+        </label>
 
         <section className="mt-5 rounded-2xl border border-white/10 bg-slate-950/45 p-4" aria-label={`${numPlayers} 人规则摘要`}>
           <div className="flex items-center justify-between gap-3 text-sm">

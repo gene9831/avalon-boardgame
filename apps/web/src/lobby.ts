@@ -1,4 +1,5 @@
 import { LobbyClient } from 'boardgame.io/client'
+import type { AvalonCreateRoomRequest, AvalonJoinRoomRequest, AvalonRoomSessionResponse } from '@avalon/game'
 
 import { webConfig } from './config'
 import type { PlayerAvatarID } from './player-profile'
@@ -24,11 +25,40 @@ export interface AvalonMatch {
   setupData?: {
     numPlayers?: number
   }
+  ownerPlayerID: string | null
+  occupiedPlayerIDs: string[]
+  roleConfiguration: { percivalMorgana: boolean }
   gameover?: unknown
 }
 
+class LobbyRequestError extends Error {
+  details: { error?: unknown }
+
+  constructor(details: { error?: unknown }) {
+    super('Lobby request failed')
+    this.details = details
+  }
+}
+
 export function createAvalonLobbyClient() {
-  return new LobbyClient({ server: webConfig.lobbyURL })
+  const client = new LobbyClient({ server: webConfig.lobbyURL })
+  const request = async (path: string, body: unknown) => {
+    const response = await fetch(`${webConfig.lobbyURL}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const result: unknown = await response.json()
+    if (!response.ok) throw new LobbyRequestError({ error: result })
+    return result as AvalonRoomSessionResponse
+  }
+
+  return {
+    createRoomAndJoin: (requestBody: AvalonCreateRoomRequest) => request('/games/avalon/create', requestBody),
+    getMatch: client.getMatch.bind(client),
+    joinMatch: (_gameName: 'avalon', matchID: string, requestBody: AvalonJoinRoomRequest) =>
+      request(`/games/avalon/${encodeURIComponent(matchID)}/join`, requestBody),
+  }
 }
 
 export function getMatchPlayerCount(match: AvalonMatch) {

@@ -12,7 +12,9 @@ describe('CreateGameDialog', () => {
         onCancel={vi.fn()}
         onConfirm={vi.fn()}
         onPlayerCountChange={vi.fn()}
+        onRoleConfigurationChange={vi.fn()}
         open
+        roleConfiguration={{ percivalMorgana: true }}
       />,
     )
 
@@ -36,11 +38,23 @@ describe('CreateGameDialog', () => {
         onCancel={vi.fn()}
         onConfirm={vi.fn()}
         onPlayerCountChange={vi.fn()}
+        onRoleConfigurationChange={vi.fn()}
         open
+        roleConfiguration={{ percivalMorgana: true }}
       />,
     )
 
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>取消<\/button>/)
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>正在创建…<\/button>/)
+  })
+
+  it('enables the Percival and Morgana pair for a new room', () => {
+    const html = renderToStaticMarkup(
+      <CreateGameDialog busy={false} numPlayers={5} onCancel={vi.fn()} onConfirm={vi.fn()} onPlayerCountChange={vi.fn()} onRoleConfigurationChange={vi.fn()} open roleConfiguration={{ percivalMorgana: true }} />,
+    )
+
+    expect(html).toContain('role="switch"')
+    expect(html).toContain('checked=""')
+    expect(html).toContain('帕西维尔与莫甘娜')
   })
 })

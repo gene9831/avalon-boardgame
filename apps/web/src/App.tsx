@@ -22,6 +22,7 @@ import {
   AvalonGame,
   type AvalonG,
   type AvalonPlayerView,
+  type AvalonRoleConfiguration,
   type AvalonRoomSummary,
   type PlayerID,
   type QuestCard,
@@ -33,7 +34,9 @@ import { ConnectionRecoveryTimer } from './connection-recovery'
 import { CreateGameDialog } from './CreateGameDialog'
 import {
   loadPreferredPlayerCount,
+  loadPreferredRoleConfiguration,
   savePreferredPlayerCount,
+  savePreferredRoleConfiguration,
 } from './create-game-preference'
 import { getClientID } from './client-identity'
 import { createDevToolsClient } from './dev-tools'
@@ -47,6 +50,8 @@ import { RoomGamePanel } from './RoomGamePanel'
 import { RoomLobbyPanel } from './RoomLobbyPanel'
 import {
   dissolveRoom,
+  changeRoomSeat,
+  createRoomParticipationClient,
   getRoomExitErrorMessage,
   leaveRoom,
 } from './room-participation'
@@ -172,8 +177,8 @@ function LobbyRoute({
   const { pushToast } = useToast()
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [numPlayers, setNumPlayers] = useState(loadPreferredPlayerCount)
+  const [roleConfiguration, setRoleConfiguration] = useState<AvalonRoleConfiguration>(loadPreferredRoleConfiguration)
   const [matches, setMatches] = useState<AvalonRoomSummary[]>([])
-  const [selectedSeats, setSelectedSeats] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const roomNotice = getRoomNavigationNotice(location.state)
   useEffect(() => {
@@ -214,7 +219,7 @@ function LobbyRoute({
       setActiveRoomSessions(validation.sessions)
       setRoomAccessStatus(validation.validationFailed ? 'unavailable' : 'ready')
       setRoomAccessError(getRoomAccessValidationError(validation.validationFailed))
-    } catch (requestError) {
+    } catch {
       if (generation !== refreshGenerationRef.current) return
       setRoomAccessStatus('unavailable')
       setRoomAccessError(getRequestErrorMessage('room-directory'))
@@ -282,8 +287,8 @@ function LobbyRoute({
     [clientID, lobby, navigate, profile, pushToast, refreshMatches, roomAccessLocked],
   )
 
-  const handleJoin = (matchID: string, playerID: string) => {
-    void executePendingJoinRequest({ type: 'join', matchID, playerID })
+  const handleJoin = (intent: { type: 'join'; matchID: string }) => {
+    void executePendingJoinRequest(intent)
   }
 
   const handleCreate = () => {
@@ -298,7 +303,8 @@ function LobbyRoute({
   const handleCreateDialogConfirm = () => {
     if (requestInFlightRef.current || roomAccessLocked) return
     savePreferredPlayerCount(numPlayers)
-    void executePendingJoinRequest({ type: 'create', numPlayers })
+    savePreferredRoleConfiguration(roleConfiguration)
+    void executePendingJoinRequest({ type: 'create', numPlayers, roleConfiguration })
   }
 
   const handleEnterRoom = (matchID: string) => {
@@ -337,8 +343,6 @@ function LobbyRoute({
         roomAccessPending={roomAccessPending}
         roomAccessUnavailable={roomAccessUnavailable}
         profile={profile}
-        selectedSeats={selectedSeats}
-        setSelectedSeats={setSelectedSeats}
       />
       <CreateGameDialog
         busy={busy}
@@ -346,7 +350,9 @@ function LobbyRoute({
         onCancel={handleCreateDialogCancel}
         onConfirm={handleCreateDialogConfirm}
         onPlayerCountChange={setNumPlayers}
+        onRoleConfigurationChange={setRoleConfiguration}
         open={createDialogOpen}
+        roleConfiguration={roleConfiguration}
       />
     </>
   )
@@ -373,6 +379,7 @@ function RoomRoute({
   const [gameState, setGameState] = useState<AvalonClientState | null>(null)
   const [roomExitDialogOpen, setRoomExitDialogOpen] = useState(false)
   const [roomExitBusy, setRoomExitBusy] = useState(false)
+  const [seatChangePending, setSeatChangePending] = useState(false)
 
   const invalidateSession = useCallback(
     (reason: string, generation: number) => {
@@ -402,7 +409,7 @@ function RoomRoute({
         ])
         if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
 
-        const nextRoomValue = nextRoom as AvalonMatch
+        const nextRoomValue = nextRoom as unknown as AvalonMatch
         if (!isRoomSessionStillValid(nextRoomValue, currentSession)) {
           invalidateSession('上次的座位已失效。', generation)
           return
@@ -485,16 +492,16 @@ function RoomRoute({
         ])
         if (!active || !isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
 
-        if (!isRoomSessionStillValid(initialRoom as AvalonMatch, routeSession)) {
+        if (!isRoomSessionStillValid(initialRoom as unknown as AvalonMatch, routeSession)) {
           invalidateSession('上次的座位已失效。', generation)
           return
         }
 
-        setRoom(initialRoom as AvalonMatch)
+        setRoom(initialRoom as unknown as AvalonMatch)
         client = Client({
           debug: BOARDGAME_CLIENT_DEBUG,
           game: AvalonGame,
-          numPlayers: getMatchPlayerCount(initialRoom as AvalonMatch),
+          numPlayers: getMatchPlayerCount(initialRoom as unknown as AvalonMatch),
           multiplayer: SocketIO({
             server: webConfig.gameURL,
           }),
@@ -555,9 +562,26 @@ function RoomRoute({
     }
   }, [invalidateSession, lobby, matchID, pushToast, refreshRoom, routeSession])
 
-  const handleStart = () => {
-    if (gameState?.isActive && routeSession?.playerID === '0') {
+  const handleStart = async () => {
+    if (gameState?.isActive !== true || routeSession === null || gameState.G.lobby.ownerPlayerID !== routeSession.playerID) return
+    try {
+      await createRoomParticipationClient(webConfig.lobbyURL).prepareStart(matchID, routeSession.playerID, routeSession.credentials)
       clientRef.current?.moves.startGame()
+    } catch (error) {
+      pushToast({ message: getRoomExitErrorMessage(error, true), tone: 'error' })
+    }
+  }
+
+  const handleChangeSeat = async (targetPlayerID: string) => {
+    if (routeSession === null || gameState?.ctx.phase !== 'lobby' || seatChangePending || targetPlayerID === routeSession.playerID) return
+    setSeatChangePending(true)
+    try {
+      const nextSession = await changeRoomSeat(createRoomParticipationClient(webConfig.lobbyURL), routeSession, targetPlayerID)
+      setSession(nextSession)
+    } catch (error) {
+      pushToast({ message: getRoomExitErrorMessage(error, false), tone: 'error' })
+    } finally {
+      setSeatChangePending(false)
     }
   }
 
@@ -627,11 +651,11 @@ function RoomRoute({
 
     const currentSession = routeSession
     const generation = routeGenerationRef.current
-    const isHost = currentSession.playerID === '0'
+    const isOwner = gameState.G.lobby.ownerPlayerID === currentSession.playerID
     setRoomExitBusy(true)
 
     try {
-      if (isHost) {
+      if (isOwner) {
         await dissolveRoom(webConfig.lobbyURL, currentSession)
       } else {
         await leaveRoom(webConfig.lobbyURL, currentSession)
@@ -644,7 +668,7 @@ function RoomRoute({
       setRoomExitDialogOpen(false)
       navigate('/', {
         state: {
-          roomNotice: isHost
+          roomNotice: isOwner
             ? '房间已解散。'
             : '已退出房间并释放座位。',
         },
@@ -652,7 +676,7 @@ function RoomRoute({
     } catch (actionError) {
       if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
       pushToast({
-        message: getRoomExitErrorMessage(actionError, isHost),
+        message: getRoomExitErrorMessage(actionError, isOwner),
         tone: 'error',
       })
     } finally {
@@ -706,17 +730,19 @@ function RoomRoute({
         onReconnect={handleReconnect}
         onRequestRoomExit={handleRequestRoomExit}
         onStart={handleStart}
+        onChangeSeat={handleChangeSeat}
         onDeleteRoom={handleDeleteRoom}
         onKickPlayer={handleKickPlayer}
         onSaveProfile={onSaveProfile}
         profile={profile}
         room={room}
         roomExitBusy={roomExitBusy}
+        seatChangePending={seatChangePending}
         session={routeSession}
       />
       <RoomExitDialog
         busy={roomExitBusy}
-        isHost={routeSession.playerID === '0'}
+        isOwner={gameState?.G.lobby.ownerPlayerID === routeSession.playerID}
         onCancel={handleCancelRoomExit}
         onConfirm={() => void handleConfirmRoomExit()}
         open={roomExitDialogOpen}
@@ -785,6 +811,7 @@ export interface RoomViewProps {
   onBackHome: () => void
   onCastTeamVote: (vote: TeamVote) => void
   onConfirmIdentityRecognition: () => void
+  onChangeSeat: (targetPlayerID: string) => void
   onClearLocalSession: () => void
   onProposeTeam: (team: PlayerID[]) => void
   onPlayQuestCard: (card: QuestCard) => void
@@ -797,6 +824,7 @@ export interface RoomViewProps {
   profile: PlayerProfile
   room: AvalonMatch | null
   roomExitBusy: boolean
+  seatChangePending: boolean
   session: RoomSession
 }
 
@@ -806,6 +834,7 @@ export function RoomView({
   onBackHome,
   onCastTeamVote,
   onConfirmIdentityRecognition,
+  onChangeSeat,
   onClearLocalSession,
   onProposeTeam,
   onPlayQuestCard,
@@ -818,6 +847,7 @@ export function RoomView({
   profile,
   room,
   roomExitBusy,
+  seatChangePending,
   session,
 }: RoomViewProps) {
   const connected = gameState?.isConnected === true
@@ -850,7 +880,7 @@ export function RoomView({
   const canStart =
     connected &&
     gameState?.isActive === true &&
-    session.playerID === '0' &&
+    room.ownerPlayerID === session.playerID &&
     phase === 'lobby' &&
     isFull
   const currentRoomPlayer = room.players.find(
@@ -887,7 +917,9 @@ export function RoomView({
           matchID={room.matchID}
           numPlayers={numPlayers}
           occupiedPlayerIDs={occupiedPlayerIDs}
+          ownerPlayerID={room.ownerPlayerID}
           onBackHome={onBackHome}
+          onChangeSeat={onChangeSeat}
           onReconnect={handleManualReconnect}
           onRequestRoomExit={onRequestRoomExit}
           onStart={onStart}
@@ -895,6 +927,7 @@ export function RoomView({
           players={room.players}
           profile={roomProfile}
           roomExitBusy={roomExitBusy}
+          seatChangePending={seatChangePending}
         />
       </ImmersiveLobbyShell>
     )
@@ -932,6 +965,7 @@ export function RoomView({
         playerID={session.playerID}
         players={room.players}
         profile={roomProfile}
+        ownerPlayerID={room.ownerPlayerID}
       />
     </ImmersiveLobbyShell>
   )

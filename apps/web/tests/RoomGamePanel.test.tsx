@@ -69,6 +69,7 @@ function renderPanel({
       playerID={playerID}
       players={lobbyPlayers}
       profile={{ avatarID: 'merlin', name: 'Alice' }}
+      ownerPlayerID="3"
     />,
   )
 }
@@ -79,6 +80,15 @@ describe('RoomGamePanel operation log', () => {
 
     expect(html).toContain('aria-label="查看对局记录"')
     expect(html).not.toContain('data-unread')
+  })
+})
+
+describe('RoomGamePanel owner marker', () => {
+  it('keeps the neutral owner marker visible after play starts', () => {
+    const html = renderPanel()
+
+    expect(html).toMatch(/data-player-id="3"[^>]*[\s\S]*aria-label="房间拥有者"|aria-label="房间拥有者"[\s\S]*data-player-id="3"/)
+    expect(html).not.toContain('>解散房间<')
   })
 })
 
