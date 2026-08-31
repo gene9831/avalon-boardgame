@@ -23,6 +23,7 @@ function createRecognitionClient(
       setup: (context) => game.setup?.(context, {
         ownerPlayerID: '0',
         occupiedPlayerIDs: ['0', '1', '2', '3', '4'],
+        roleConfiguration: { percivalMorgana: false },
       }) as AvalonG,
     },
     numPlayers: 5,

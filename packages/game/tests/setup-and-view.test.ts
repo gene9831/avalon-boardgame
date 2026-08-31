@@ -1,7 +1,7 @@
 import { Client } from 'boardgame.io/client'
 import { describe, expect, it } from 'vitest'
 
-import { createAvalonGame } from '../src/game'
+import { AvalonGame, createAvalonGame } from '../src/game'
 import { getAvalonPlayerView } from '../src/player-view'
 import type {
   AvalonG,
@@ -20,6 +20,7 @@ function createLocalClient(
       { length: numPlayers },
       (_, index) => String(index),
     ),
+    roleConfiguration: { percivalMorgana: false },
   }
   const game = createAvalonGame()
 
@@ -103,14 +104,42 @@ function createRecognitionStateAt(step: IdentityRecognitionStep) {
 }
 
 describe('Avalon setup and player views', () => {
+  it('does not start an unprepared match without authoritative occupancy', () => {
+    const client = Client({
+      game: AvalonGame,
+      numPlayers: 5,
+      playerID: '0',
+    })
+    const beforeMove = client.store.getState()._stateID
+
+    client.moves.startGame()
+
+    expect(client.store.getState()._stateID).toBe(beforeMove)
+    expect(getAuthoritativeGame(client).status).toBe('lobby')
+    expect(getAuthoritativeGame(client).lobby.occupiedPlayerIDs).toEqual([])
+  })
+
   it('replays role assignment and initial leader from the same RNG seed', () => {
+    const setupData: AvalonSetupData = {
+      ownerPlayerID: '0',
+      occupiedPlayerIDs: ['0', '1', '2', '3', '4', '5', '6'],
+      roleConfiguration: { percivalMorgana: false },
+    }
+    const firstGame = createAvalonGame({ seed: 'replay-seed' })
+    const secondGame = createAvalonGame({ seed: 'replay-seed' })
     const first = Client({
-      game: createAvalonGame({ seed: 'replay-seed' }),
+      game: {
+        ...firstGame,
+        setup: (context) => firstGame.setup?.(context, setupData) as AvalonG,
+      },
       numPlayers: 7,
       playerID: '0',
     })
     const second = Client({
-      game: createAvalonGame({ seed: 'replay-seed' }),
+      game: {
+        ...secondGame,
+        setup: (context) => secondGame.setup?.(context, setupData) as AvalonG,
+      },
       numPlayers: 7,
       playerID: '0',
     })

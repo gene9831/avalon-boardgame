@@ -39,9 +39,7 @@ function createInitialGame(
   )
   const occupiedPlayerIDs = [
     ...(setupData?.occupiedPlayerIDs ?? (
-      setupData?.players === undefined
-        ? playerIDs
-        : Object.keys(setupData.players)
+      Object.keys(setupData?.players ?? {})
     )),
   ].sort((a, b) => Number(a) - Number(b))
 
