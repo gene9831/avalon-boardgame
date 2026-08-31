@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
 import { canRequestRoomExit, getUpdatedRoomRouteSession, recoverRoomRouteSession, resolveRecoverySeatValidation, resolveRoomRouteSnapshotSession, shouldWakeRoomRouteForSeatTransitionChange, RoomAccessView, RoomView, type RoomViewProps } from '../src/App'
+import { RoomParticipationHttpError, type SeatTransitionReplayClient } from '../src/room-participation'
 import { beginSeatTransition, loadRoomSession, loadSeatTransition, markSeatTransitionUncertain, saveRoomSession, type RoomSessionStorage } from '../src/room-session'
 
 vi.mock('../src/config', () => ({
@@ -44,6 +45,20 @@ function renderRoomView(overrides: Partial<RoomViewProps> = {}) {
   }
 
   return renderToStaticMarkup(<RoomView {...props} />)
+}
+
+const replayTarget: SeatTransitionReplayClient = {
+  changeSeat: async (matchID, _sourcePlayerID, credentials, targetPlayerID) => ({
+    matchID,
+    playerID: targetPlayerID,
+    playerCredentials: credentials,
+  }),
+}
+
+const rejectOccupiedTarget: SeatTransitionReplayClient = {
+  changeSeat: async () => {
+    throw new RoomParticipationHttpError(409, 'seat_unavailable')
+  },
 }
 
 function playingGameState(): RoomViewProps['gameState'] {
@@ -135,7 +150,8 @@ describe('RoomView connection state', () => {
 
     await expect(recoverRoomRouteSession(
       source,
-      async (_matchID, playerID, credentials) => playerID === '3' && credentials === 'credential',
+      replayTarget,
+      async () => true,
       storage,
     )).resolves.toEqual({ ...source, playerID: '3' })
     expect(loadRoomSession(source.matchID, storage)).toEqual({ ...source, playerID: '3' })
@@ -160,13 +176,27 @@ describe('RoomView connection state', () => {
     const sourceStorage = createStorage()
     saveRoomSession(source, sourceStorage)
     markSeatTransitionUncertain(beginSeatTransition(source, '3', sourceStorage, 42), sourceStorage)
-    await expect(recoverRoomRouteSession(source, async (_matchID, playerID) => playerID === '0', sourceStorage))
+    await expect(recoverRoomRouteSession(
+      source,
+      rejectOccupiedTarget,
+      async (_matchID, playerID) => playerID === '0',
+      sourceStorage,
+    ))
       .resolves.toEqual(source)
 
     const invalidStorage = createStorage()
     saveRoomSession(source, invalidStorage)
     markSeatTransitionUncertain(beginSeatTransition(source, '3', invalidStorage, 42), invalidStorage)
-    await expect(recoverRoomRouteSession(source, async () => false, invalidStorage)).resolves.toBeNull()
+    await expect(recoverRoomRouteSession(
+      source,
+      {
+        changeSeat: async () => {
+          throw new RoomParticipationHttpError(403, 'invalid_seat_session')
+        },
+      },
+      async () => false,
+      invalidStorage,
+    )).resolves.toBeNull()
     expect(loadRoomSession(source.matchID, invalidStorage)).toBeNull()
   })
 
@@ -187,9 +217,9 @@ describe('RoomView connection state', () => {
     saveRoomSession(source, storage)
     markSeatTransitionUncertain(beginSeatTransition(source, '3', storage, 42), storage)
 
-    await expect(recoverRoomRouteSession(source, async () => {
-      throw new TypeError('Failed to fetch')
-    }, storage)).rejects.toThrow('Failed to fetch')
+    await expect(recoverRoomRouteSession(source, {
+      changeSeat: async () => { throw new TypeError('Failed to fetch') },
+    }, async () => true, storage)).rejects.toThrow('Failed to fetch')
     expect(loadRoomSession(source.matchID, storage)).toEqual(source)
     expect(loadSeatTransition(source.matchID, storage)).toMatchObject({
       sourcePlayerID: '0',
@@ -214,11 +244,11 @@ describe('RoomView connection state', () => {
     saveRoomSession(source, storage)
     markSeatTransitionUncertain(beginSeatTransition(source, '3', storage, 42), storage)
 
-    await expect(recoverRoomRouteSession(source, async () => {
-      throw new TypeError('temporary outage')
-    }, storage)).rejects.toThrow('temporary outage')
+    await expect(recoverRoomRouteSession(source, {
+      changeSeat: async () => { throw new TypeError('temporary outage') },
+    }, async () => true, storage)).rejects.toThrow('temporary outage')
 
-    await expect(recoverRoomRouteSession(source, async (_matchID, playerID) => playerID === '3', storage))
+    await expect(recoverRoomRouteSession(source, replayTarget, async () => true, storage))
       .resolves.toEqual({ ...source, playerID: '3' })
     expect(loadRoomSession(source.matchID, storage)).toEqual({ ...source, playerID: '3' })
     expect(loadSeatTransition(source.matchID, storage)).toBeNull()
@@ -243,6 +273,7 @@ describe('RoomView connection state', () => {
 
     const resolution = await resolveRoomRouteSnapshotSession(
       source,
+      rejectOccupiedTarget,
       async (_matchID, playerID, credentials) => (
         playerID === source.playerID && credentials === source.credentials
       ),
@@ -271,7 +302,12 @@ describe('RoomView connection state', () => {
     const transition = beginSeatTransition(source, '3', storage)
     const validate = vi.fn(async () => true)
 
-    await expect(resolveRoomRouteSnapshotSession(source, validate, storage)).resolves.toEqual({
+    await expect(resolveRoomRouteSnapshotSession(
+      source,
+      { changeSeat: vi.fn() },
+      validate,
+      storage,
+    )).resolves.toEqual({
       status: 'requesting',
       session: source,
     })
@@ -297,7 +333,8 @@ describe('RoomView connection state', () => {
     expect(shouldWakeRoomRouteForSeatTransitionChange(markerKey, source, storage, 43)).toBe(true)
     await expect(recoverRoomRouteSession(
       source,
-      async (_matchID, playerID) => playerID === '3',
+      replayTarget,
+      async () => true,
       storage,
     )).resolves.toEqual({ ...source, playerID: '3' })
 

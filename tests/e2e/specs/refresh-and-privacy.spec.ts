@@ -81,6 +81,14 @@ test('the IndexedDB lock fallback serializes two tabs and recovers a transient c
 
     await context.route('**/rooms/avalon/*/players/*/seat', async (route) => {
       seatChangeRequestCount += 1
+      if (seatChangeRequestCount > 1) {
+        await recoveryRequestsReleased
+        const replayed = await route.fetch()
+        expect(replayed.ok()).toBe(true)
+        await route.fulfill({ response: replayed })
+        return
+      }
+
       const committed = await route.fetch()
       expect(committed.ok()).toBe(true)
       reportServerCommit()
@@ -154,11 +162,6 @@ test('the IndexedDB lock fallback serializes two tabs and recovers a transient c
       return (JSON.parse(raw) as { playerID?: unknown }).playerID ?? null
     }, roomSessionKey(matchID))).toBe('1')
 
-    await context.route('**/rooms/avalon/*/players/*/session', async (route) => {
-      await recoveryRequestsReleased
-      await route.continue()
-    })
-
     releaseTransientResponse()
     await expect(movingPage.getByText('换座失败，请重试。', { exact: true })).toBeVisible()
     await expect.poll(() => movingPage.evaluate((key) => {
@@ -188,6 +191,7 @@ test('the IndexedDB lock fallback serializes two tabs and recovers a transient c
     }, roomSessionKey(matchID))).toBe('4')
     await expect.poll(() => movingPage.evaluate((key) => localStorage.getItem(key), seatTransitionKey(matchID)))
       .toBeNull()
+    expect(seatChangeRequestCount).toBeGreaterThanOrEqual(2)
 
     for (const page of [movingPage, stalePage]) {
       await expect(page).toHaveURL(new RegExp(`/rooms/${matchID}$`))

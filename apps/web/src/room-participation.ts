@@ -19,6 +19,7 @@ import {
   SEAT_TRANSITION_LEASE_MS,
   type RoomSession,
   type RoomSessionStorage,
+  type SeatTransition,
   type ValidateSeat,
 } from './room-session'
 import { getLobbyErrorMessage } from './join-error'
@@ -338,6 +339,8 @@ export interface RoomParticipationClient {
   ) => Promise<void>
 }
 
+export type SeatTransitionReplayClient = Pick<RoomParticipationClient, 'changeSeat'>
+
 export interface RoomExitResult {
   status: 204 | 403 | 404
 }
@@ -479,6 +482,21 @@ function isDefinitiveSeatChangeRejection(error: unknown) {
   return error.status === 409 && error.code === 'seat_unavailable'
 }
 
+export function recoverRoomSeatTransition(
+  client: SeatTransitionReplayClient,
+  transition: SeatTransition,
+  validate: ValidateSeat,
+  storage?: RoomSessionStorage,
+  now = Date.now(),
+) {
+  return recoverSeatTransition(transition, {
+    isDefinitiveRejection: isDefinitiveSeatChangeRejection,
+    replay: (matchID, sourcePlayerID, credentials, targetPlayerID) =>
+      client.changeSeat(matchID, sourcePlayerID, credentials, targetPlayerID),
+    validate,
+  }, storage, now)
+}
+
 async function requestRoomExit(
   url: string,
   credentials: string,
@@ -504,6 +522,7 @@ export async function reconcileRoomExit(
   expected: RoomSession,
   result: RoomExitResult,
   transitionChanged: boolean,
+  client: SeatTransitionReplayClient,
   validate: ValidateSeat,
   storage?: RoomSessionStorage,
 ): Promise<RoomExitResolution> {
@@ -514,7 +533,12 @@ export async function reconcileRoomExit(
 
   const transition = loadSeatTransition(expected.matchID, storage)
   if (transition !== null) {
-    const recovery = await recoverSeatTransition(transition, validate, storage)
+    const recovery = await recoverRoomSeatTransition(
+      client,
+      transition,
+      validate,
+      storage,
+    )
     currentSession = loadRoomSession(expected.matchID, storage)
     if (currentSession !== null && !sameRoomSession(currentSession, expected)) {
       return { status: 'rebind', session: currentSession }

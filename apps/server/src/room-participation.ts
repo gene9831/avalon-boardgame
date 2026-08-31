@@ -22,6 +22,8 @@ type RouteContext = {
 }
 
 type RouteHandler = (ctx: RouteContext) => Promise<void>
+type Next = () => Promise<unknown>
+type RouteMiddleware = (ctx: RouteContext, next: Next) => Promise<void>
 
 interface RoomParticipationContext {
   lobby: RoomLobbyService
@@ -34,7 +36,7 @@ const parseJSONBody = koaBody({
   text: false,
   textLimit: '16kb',
   urlencoded: false,
-}) as unknown as RouteHandler
+}) as unknown as RouteMiddleware
 
 function invalidRequest() {
   return new AvalonLobbyError(400, 'invalid_request', 'Invalid Avalon request')
@@ -71,8 +73,8 @@ export function registerRoomParticipationRoutes(
 ) {
   router.post?.(
     '/rooms/avalon/:matchID/players/:playerID/seat',
-    parseJSONBody,
     async (ctx) => handle(ctx, async () => {
+      await parseJSONBody(ctx, async () => undefined)
       const { matchID, playerID } = validatedPath(ctx)
       const parsed = AvalonSeatChangeRequestSchema.safeParse(ctx.request.body)
       if (!parsed.success) throw invalidRequest()

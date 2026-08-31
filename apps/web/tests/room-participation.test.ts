@@ -10,6 +10,7 @@ import {
   getStartErrorMessage,
   leaveRoom,
   reconcileRoomExit,
+  recoverRoomSeatTransition,
   RoomParticipationHttpError,
   RoomParticipationResponseContractError,
   SeatTransitionPendingError,
@@ -22,7 +23,6 @@ import {
   loadSeatTransition,
   loadRoomSession,
   markSeatTransitionUncertain,
-  recoverSeatTransition,
   saveRoomSession,
   type RoomSession,
   type RoomSessionStorage,
@@ -89,16 +89,24 @@ describe('room participation client', () => {
       playerName: 'Alice',
     }
     saveRoomSession(roomSession, storage)
-    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+    const fetcher = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({
       matchID: roomSession.matchID,
       playerID: '4',
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
+    })).mockResolvedValueOnce(new Response(JSON.stringify({
+      matchID: roomSession.matchID,
+      playerID: '4',
+      playerCredentials: roomSession.credentials,
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
     }))
+    const client = createRoomParticipationClient('http://localhost:8001', fetcher)
 
     await expect(changeRoomSeat(
-      createRoomParticipationClient('http://localhost:8001', fetcher),
+      client,
       roomSession,
       '4',
       storage,
@@ -107,12 +115,13 @@ describe('room participation client', () => {
 
     const uncertain = loadSeatTransition(roomSession.matchID, storage)!
     expect(uncertain).toMatchObject({ status: 'uncertain', targetPlayerID: '4' })
-    const validate = vi.fn(async (_matchID: string, playerID: string) => playerID === '4')
-    await expect(recoverSeatTransition(uncertain, validate, storage)).resolves.toEqual({
+    const validate = vi.fn(async () => true)
+    await expect(recoverRoomSeatTransition(client, uncertain, validate, storage)).resolves.toEqual({
       status: 'target',
       playerID: '4',
     })
-    expect(validate.mock.calls.map(([, playerID]) => playerID)).toEqual(['2', '4'])
+    expect(validate).not.toHaveBeenCalled()
+    expect(fetcher).toHaveBeenCalledTimes(2)
     expect(loadRoomSession(roomSession.matchID, storage)).toEqual({ ...roomSession, playerID: '4' })
   })
 
@@ -124,17 +133,23 @@ describe('room participation client', () => {
       playerName: 'Alice',
     }
     saveRoomSession(roomSession, storage)
-    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+    const fetcher = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({
       matchID: roomSession.matchID,
       playerID: '4',
       playerCredentials: '',
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
+    })).mockResolvedValueOnce(new Response(JSON.stringify({
+      error: { code: 'invalid_seat_session', message: 'Seat session is invalid' },
+    }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
     }))
+    const client = createRoomParticipationClient('http://localhost:8001', fetcher)
 
     await expect(changeRoomSeat(
-      createRoomParticipationClient('http://localhost:8001', fetcher),
+      client,
       roomSession,
       '4',
       storage,
@@ -143,10 +158,70 @@ describe('room participation client', () => {
 
     const uncertain = loadSeatTransition(roomSession.matchID, storage)!
     expect(uncertain.status).toBe('uncertain')
-    await expect(recoverSeatTransition(uncertain, async () => false, storage)).resolves.toEqual({
+    await expect(recoverRoomSeatTransition(
+      client,
+      uncertain,
+      async () => false,
+      storage,
+    )).resolves.toEqual({
       status: 'invalid',
     })
     expect(loadRoomSession(roomSession.matchID, storage)).toBeNull()
+    expect(loadSeatTransition(roomSession.matchID, storage)).toBeNull()
+  })
+
+  it('keeps source and marker when an exact recovery replay has a malformed response', async () => {
+    const storage = createStorage()
+    const roomSession = { ...session, matchID: 'room-123', playerName: 'Alice' }
+    saveRoomSession(roomSession, storage)
+    const transition = beginSeatTransition(roomSession, '4', storage, 42)
+    markSeatTransitionUncertain(transition, storage)
+    const client = createRoomParticipationClient(
+      'http://localhost:8001',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({
+        matchID: roomSession.matchID,
+        playerID: '4',
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })),
+    )
+
+    await expect(recoverRoomSeatTransition(
+      client,
+      transition,
+      async () => true,
+      storage,
+    )).rejects.toBeInstanceOf(RoomParticipationResponseContractError)
+
+    expect(loadRoomSession(roomSession.matchID, storage)).toEqual(roomSession)
+    expect(loadSeatTransition(roomSession.matchID, storage)).toMatchObject({
+      transitionID: transition.transitionID,
+      status: 'uncertain',
+    })
+  })
+
+  it('retains the source after an exact recovery replay reports an occupied target', async () => {
+    const storage = createStorage()
+    const roomSession = { ...session, matchID: 'room-123', playerName: 'Alice' }
+    saveRoomSession(roomSession, storage)
+    const transition = beginSeatTransition(roomSession, '4', storage, 42)
+    markSeatTransitionUncertain(transition, storage)
+    const validate = vi.fn(async (_matchID: string, playerID: string) => (
+      playerID === roomSession.playerID
+    ))
+
+    await expect(recoverRoomSeatTransition({
+      changeSeat: async () => {
+        throw new RoomParticipationHttpError(409, 'seat_unavailable')
+      },
+    }, transition, validate, storage)).resolves.toEqual({
+      status: 'source',
+      playerID: roomSession.playerID,
+    })
+
+    expect(validate).toHaveBeenCalledTimes(1)
+    expect(loadRoomSession(roomSession.matchID, storage)).toEqual(roomSession)
     expect(loadSeatTransition(roomSession.matchID, storage)).toBeNull()
   })
 
@@ -163,7 +238,7 @@ describe('room participation client', () => {
 
     const requesting = loadSeatTransition(roomSession.matchID, storage)!
     const validateWhilePending = vi.fn(async () => true)
-    await expect(recoverSeatTransition(requesting, validateWhilePending, storage)).resolves.toEqual({
+    await expect(recoverRoomSeatTransition({ changeSeat: vi.fn() }, requesting, validateWhilePending, storage)).resolves.toEqual({
       status: 'requesting', playerID: '2',
     })
     expect(validateWhilePending).not.toHaveBeenCalled()
@@ -173,9 +248,16 @@ describe('room participation client', () => {
     await expect(request).rejects.toThrow('response lost after commit')
     const uncertain = loadSeatTransition(roomSession.matchID, storage)!
     expect(uncertain).toMatchObject({ status: 'uncertain' })
-    await expect(recoverSeatTransition(
+    await expect(recoverRoomSeatTransition(
+      {
+        changeSeat: async (matchID, _sourcePlayerID, credentials, targetPlayerID) => ({
+          matchID,
+          playerID: targetPlayerID,
+          playerCredentials: credentials,
+        }),
+      },
       uncertain,
-      async (_matchID, playerID) => playerID === '4',
+      async () => true,
       storage,
     )).resolves.toEqual({ status: 'target', playerID: '4' })
     expect(loadRoomSession(roomSession.matchID, storage)).toEqual({ ...roomSession, playerID: '4' })
@@ -231,9 +313,16 @@ describe('room participation client', () => {
 
     const uncertain = loadSeatTransition(roomSession.matchID, storage)!
     expect(uncertain.status).toBe('uncertain')
-    await recoverSeatTransition(
+    await recoverRoomSeatTransition(
+      {
+        changeSeat: async (matchID, _sourcePlayerID, credentials, targetPlayerID) => ({
+          matchID,
+          playerID: targetPlayerID,
+          playerCredentials: credentials,
+        }),
+      },
       uncertain,
-      async (_matchID, playerID) => playerID === '4',
+      async () => true,
       storage,
     )
     expect(loadRoomSession(roomSession.matchID, storage)).toEqual({ ...roomSession, playerID: '4' })
@@ -728,6 +817,14 @@ describe('room exit reconciliation', () => {
     ...session,
     playerName: 'Alice',
   }
+  const replayTarget = {
+    changeSeat: async (
+      matchID: string,
+      _sourcePlayerID: string,
+      credentials: string,
+      targetPlayerID: string,
+    ) => ({ matchID, playerID: targetPlayerID, playerCredentials: credentials }),
+  }
 
   it('does not count a stale-source 403 as exit while a cross-tab move is requesting', async () => {
     const storage = createStorage()
@@ -739,6 +836,7 @@ describe('room exit reconciliation', () => {
       roomSession,
       { status: 403 },
       true,
+      { changeSeat: vi.fn() },
       validate,
       storage,
     )).resolves.toEqual({ status: 'transition-pending' })
@@ -757,7 +855,8 @@ describe('room exit reconciliation', () => {
       roomSession,
       { status: 403 },
       true,
-      async (_matchID, playerID) => playerID === '4',
+      replayTarget,
+      async () => true,
       storage,
     )).resolves.toEqual({
       status: 'rebind',
@@ -777,6 +876,7 @@ describe('room exit reconciliation', () => {
       roomSession,
       { status: 403 },
       true,
+      { changeSeat: vi.fn() },
       async () => false,
       storage,
     )).resolves.toEqual({
@@ -797,6 +897,7 @@ describe('room exit reconciliation', () => {
       roomSession,
       { status: 403 },
       true,
+      { changeSeat: vi.fn() },
       async (_matchID, playerID) => playerID === roomSession.playerID,
       storage,
     )).resolves.toEqual({ status: 'session-retained' })
@@ -811,6 +912,7 @@ describe('room exit reconciliation', () => {
       roomSession,
       { status: 204 },
       false,
+      { changeSeat: vi.fn() },
       async () => false,
       storage,
     )).resolves.toEqual({ status: 'completed' })
@@ -826,6 +928,7 @@ describe('room exit reconciliation', () => {
       roomSession,
       { status: 204 },
       false,
+      { changeSeat: vi.fn() },
       async () => false,
       storage,
     )).resolves.toEqual({ status: 'rebind', session: target })

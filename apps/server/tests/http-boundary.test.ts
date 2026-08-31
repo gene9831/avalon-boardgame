@@ -344,6 +344,51 @@ describe('Avalon HTTP protocol boundary', () => {
     }
   })
 
+  it('returns structured errors for malformed and oversized seat-change JSON', async () => {
+    const running = await startAvalonServer({ config, db: new MemoryStorage() })
+
+    try {
+      const created = await requestCreate(running)
+      const owner = await created.json() as {
+        matchID: string
+        playerID: string
+        playerCredentials: string
+      }
+      const url = `${baseURL(running)}/rooms/avalon/${owner.matchID}/players/${owner.playerID}/seat`
+      const headers = {
+        Authorization: `Bearer ${owner.playerCredentials}`,
+        'Content-Type': 'application/json',
+      }
+
+      const malformed = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: '{"targetPlayerID":',
+      })
+      expect(malformed.status).toBe(400)
+      expect(malformed.headers.get('content-type')).toContain('application/json')
+      expect(await malformed.json()).toEqual({
+        error: { code: 'invalid_request', message: 'Invalid Avalon request' },
+      })
+
+      const oversized = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ targetPlayerID: '3', padding: 'x'.repeat(17 * 1024) }),
+      })
+      expect(oversized.status).toBe(413)
+      expect(oversized.headers.get('content-type')).toContain('application/json')
+      expect(await oversized.json()).toEqual({
+        error: {
+          code: 'payload_too_large',
+          message: 'Request body exceeds 16 KiB',
+        },
+      })
+    } finally {
+      await running.close()
+    }
+  })
+
   it('returns a safe service error when room storage is unavailable', async () => {
     class UnavailableStorage extends MemoryStorage {
       override createMatch(
@@ -578,7 +623,16 @@ describe('Avalon HTTP protocol boundary', () => {
         bob.playerCredentials,
       )
       expect(guest.status).toBe(403)
-      expect((await guest.json()).error.code).toBe('invalid_seat_session')
+      expect((await guest.json()).error.code).toBe('not_room_owner')
+
+      const wrongCredential = await requestPrepareStart(
+        running,
+        owner.matchID,
+        bob.playerID,
+        owner.playerCredentials,
+      )
+      expect(wrongCredential.status).toBe(403)
+      expect((await wrongCredential.json()).error.code).toBe('invalid_seat_session')
 
       const incomplete = await requestPrepareStart(
         running,

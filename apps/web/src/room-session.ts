@@ -63,6 +63,26 @@ export type ValidateSeat = (
   credentials: string,
 ) => Promise<boolean>
 
+export type ReplaySeatTransition = (
+  matchID: string,
+  sourcePlayerID: string,
+  credentials: string,
+  targetPlayerID: string,
+) => Promise<AvalonRoomSessionResponse>
+
+export interface SeatTransitionRecoveryActions {
+  replay: ReplaySeatTransition
+  validate: ValidateSeat
+  isDefinitiveRejection: (error: unknown) => boolean
+}
+
+export class SeatTransitionReplayResponseError extends Error {
+  constructor() {
+    super('Seat transition replay response does not match the persisted transition')
+    this.name = 'SeatTransitionReplayResponseError'
+  }
+}
+
 export type SeatTransitionRecovery =
   | { status: 'requesting'; playerID: string }
   | { status: 'source'; playerID: string }
@@ -312,7 +332,7 @@ export function isSeatTransitionRequestActive(
 
 export async function recoverSeatTransition(
   transition: SeatTransition,
-  validate: ValidateSeat,
+  actions: SeatTransitionRecoveryActions,
   storage?: RoomSessionStorage,
   now = Date.now(),
 ): Promise<SeatTransitionRecovery> {
@@ -329,69 +349,131 @@ export async function recoverSeatTransition(
     markSeatTransitionUncertain(recoverableTransition, resolvedStorage)
     recoverableTransition = { ...recoverableTransition, status: 'uncertain' }
   }
-  const sourceValid = await validate(
-    transition.matchID,
-    transition.sourcePlayerID,
-    transition.credentials,
-  )
-  if (!isSameSeatTransition(
-    loadSeatTransition(transition.matchID, resolvedStorage),
-    transition,
-  )) {
-    return { status: 'requesting', playerID: transition.sourcePlayerID }
-  }
-  if (sourceValid) {
-    const currentSession = loadRoomSession(transition.matchID, resolvedStorage)
-    if (currentSession === null) {
-      clearSeatTransitionIfCurrent(transition, resolvedStorage)
-      return { status: 'invalid' }
+
+  try {
+    const response = await actions.replay(
+      recoverableTransition.matchID,
+      recoverableTransition.sourcePlayerID,
+      recoverableTransition.credentials,
+      recoverableTransition.targetPlayerID,
+    )
+    if (
+      response.matchID !== recoverableTransition.matchID ||
+      response.playerID !== recoverableTransition.targetPlayerID ||
+      response.playerCredentials !== recoverableTransition.credentials
+    ) {
+      throw new SeatTransitionReplayResponseError()
     }
-    if (!isTransitionSourceSession(currentSession, transition)) {
+    if (!isSameSeatTransition(
+      loadSeatTransition(recoverableTransition.matchID, resolvedStorage),
+      recoverableTransition,
+    )) {
+      return {
+        status: 'requesting',
+        playerID: recoverableTransition.sourcePlayerID,
+      }
+    }
+
+    const currentSession = loadRoomSession(recoverableTransition.matchID, resolvedStorage)
+    if (currentSession === null) return { status: 'invalid' }
+    if (!isTransitionSourceSession(currentSession, recoverableTransition)) {
+      if (
+        currentSession.playerID === recoverableTransition.targetPlayerID &&
+        currentSession.credentials === recoverableTransition.credentials
+      ) {
+        clearSeatTransitionIfCurrent(recoverableTransition, resolvedStorage)
+      }
       return { status: 'target', playerID: currentSession.playerID }
     }
-    clearSeatTransitionIfCurrent(transition, resolvedStorage)
-    return { status: 'source', playerID: transition.sourcePlayerID }
+
+    const target = completeSeatTransition(
+      currentSession,
+      recoverableTransition,
+      response,
+      resolvedStorage,
+    )
+    return target === null
+      ? { status: 'invalid' }
+      : { status: 'target', playerID: target.playerID }
+  } catch (error) {
+    if (!isSameSeatTransition(
+      loadSeatTransition(recoverableTransition.matchID, resolvedStorage),
+      recoverableTransition,
+    )) {
+      return {
+        status: 'requesting',
+        playerID: recoverableTransition.sourcePlayerID,
+      }
+    }
+    if (!actions.isDefinitiveRejection(error)) {
+      markSeatTransitionUncertain(recoverableTransition, resolvedStorage)
+      throw error
+    }
   }
 
-  const targetValid = await validate(
-    transition.matchID,
-    transition.targetPlayerID,
-    transition.credentials,
+  const sourceValid = await actions.validate(
+    recoverableTransition.matchID,
+    recoverableTransition.sourcePlayerID,
+    recoverableTransition.credentials,
   )
   if (!isSameSeatTransition(
-    loadSeatTransition(transition.matchID, resolvedStorage),
-    transition,
+    loadSeatTransition(recoverableTransition.matchID, resolvedStorage),
+    recoverableTransition,
   )) {
-    return { status: 'requesting', playerID: transition.sourcePlayerID }
+    return { status: 'requesting', playerID: recoverableTransition.sourcePlayerID }
   }
-  if (targetValid) {
-    const source = loadRoomSession(transition.matchID, resolvedStorage)
-    if (source === null) {
-      clearSeatTransitionIfCurrent(transition, resolvedStorage)
+  if (sourceValid) {
+    const currentSession = loadRoomSession(recoverableTransition.matchID, resolvedStorage)
+    if (currentSession === null) {
+      clearSeatTransitionIfCurrent(recoverableTransition, resolvedStorage)
       return { status: 'invalid' }
     }
-    if (!isTransitionSourceSession(source, transition)) {
-      return { status: 'target', playerID: source.playerID }
+    if (!isTransitionSourceSession(currentSession, recoverableTransition)) {
+      return { status: 'target', playerID: currentSession.playerID }
     }
-    saveRoomSession({ ...source, playerID: transition.targetPlayerID }, resolvedStorage)
-    clearSeatTransitionIfCurrent(transition, resolvedStorage)
-    return { status: 'target', playerID: transition.targetPlayerID }
+    clearSeatTransitionIfCurrent(recoverableTransition, resolvedStorage)
+    return { status: 'source', playerID: recoverableTransition.sourcePlayerID }
   }
 
-  const current = loadRoomSession(transition.matchID, resolvedStorage)
+  const targetValid = await actions.validate(
+    recoverableTransition.matchID,
+    recoverableTransition.targetPlayerID,
+    recoverableTransition.credentials,
+  )
+  if (!isSameSeatTransition(
+    loadSeatTransition(recoverableTransition.matchID, resolvedStorage),
+    recoverableTransition,
+  )) {
+    return { status: 'requesting', playerID: recoverableTransition.sourcePlayerID }
+  }
+  if (targetValid) {
+    const source = loadRoomSession(recoverableTransition.matchID, resolvedStorage)
+    if (source === null) {
+      clearSeatTransitionIfCurrent(recoverableTransition, resolvedStorage)
+      return { status: 'invalid' }
+    }
+    if (!isTransitionSourceSession(source, recoverableTransition)) {
+      return { status: 'target', playerID: source.playerID }
+    }
+    saveRoomSession({ ...source, playerID: recoverableTransition.targetPlayerID }, resolvedStorage)
+    clearSeatTransitionIfCurrent(recoverableTransition, resolvedStorage)
+    return { status: 'target', playerID: recoverableTransition.targetPlayerID }
+  }
+
+  const current = loadRoomSession(recoverableTransition.matchID, resolvedStorage)
   if (current === null) {
-    clearSeatTransitionIfCurrent(transition, resolvedStorage)
+    clearSeatTransitionIfCurrent(recoverableTransition, resolvedStorage)
     return { status: 'invalid' }
   }
-  if (!isTransitionSourceSession(current, transition)) {
+  if (!isTransitionSourceSession(current, recoverableTransition)) {
     return { status: 'target', playerID: current.playerID }
   }
   clearRoomSessionIfCurrent({
     ...current,
-    playerID: transition.sourcePlayerID,
-    credentials: transition.credentials,
+    playerID: recoverableTransition.sourcePlayerID,
+    credentials: recoverableTransition.credentials,
   }, resolvedStorage)
-  clearSeatTransitionIfCurrent(transition, resolvedStorage)
+  clearSeatTransitionIfCurrent(recoverableTransition, resolvedStorage)
   return { status: 'invalid' }
 }
 

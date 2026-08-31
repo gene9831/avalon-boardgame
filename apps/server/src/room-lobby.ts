@@ -439,7 +439,7 @@ export function createRoomLobbyService(
         mutate<void>(matchID, ({ state, metadata }) => {
           const G = state.G as PersistedAvalonG
           const lobby = normalizeLobbyAuthority(G, metadata)
-          authenticatePlayer(metadata, lobby.ownerPlayerID, credential)
+          authenticatePlayer(metadata, playerID, credential)
           if (playerID !== lobby.ownerPlayerID) throw notRoomOwner()
           if (lobby.occupiedPlayerIDs.length !== Object.keys(metadata.players).length) {
             throw roomNotJoinable()

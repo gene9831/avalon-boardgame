@@ -2,7 +2,7 @@
 
 > 这是项目进度的唯一维护入口。更新代码或完成一个独立模块后，同时更新本文件的状态、验收条件和提交记录。
 >
-> 最后更新：2026-08-31
+> 最后更新：2026-09-01
 
 ## 当前结论
 
@@ -84,7 +84,7 @@
 | 主页与等待大厅体验 | ✅ | 主页、创建配置、房间列表和等待提示已使用面向普通玩家的中文产品文案；公共按钮统一使用至少 44px 的触控尺寸和一致交互态。创建配置与退出/解散房间的业务弹窗共用原生 `ModalDialog`，统一管理打开、关闭、Escape、遮罩、危险色、视口内滚动及水平垂直居中；默认配置不显示开发控制入口。创建配置当前提供 5–10 人按钮、阵营构成、五次任务人数摘要和 Percival/Morgana 成对开关。等待大厅在 PC、平板和移动端使用同一套圆桌座位 DOM，当前玩家固定在底部，空位显示虚线头像与座位号；不再使用底部操作栏，房间拥有者开局位于桌面中央，退出/解散位于顶部房间菜单。窄屏使用“等待创建者”等紧凑等待文案，并保留完整的可访问名称；断线状态在窄屏收为 44px 图标，等待大厅暂时以重连控件替代不可用的房间操作入口。房间壳层仅使用 `100dvh` 并关闭 overscroll，避免 iOS Chrome 的 `100vh` 包含动态工具栏而产生页面滚动；主页仍可按内容滚动。高度至少 421px 的横屏会回收 Header 中部空白供圆桌舞台使用，同时保持 Header 左右内容位于更高层级；5–6 人桌底部座位与裁剪边界至少保留 24px，7–10 人桌会向下补偿以保护顶部密集座位。Playwright 使用 5、7、10 人房间在 320×568、568×320、390×844、768×1024、1024×768、1077×722、1280×685、1440×900 验证页面无滚动、座位不被面板裁切、Header 左右内容不与座位重叠、座位与中央区无实质重叠，以及开局、选队和投票可操作。 |
 | 玩家名称与入座入口 | ✅ | 浏览器首次使用从 24 个中世纪奇幻意象与 24 个身份词中组合随机中文名称（576 种组合），并随机选择八款装饰头像，一并保存在 `localStorage`；主页 Header 用户中心支持名称校验、头像选择和重新随机，跨标签页同步。只要本机仍保存并验证出活动房间座位，即使返回主页也只展示锁定资料，真正退出/解散后才恢复编辑。创建和加入直接使用当前资料，不再询问名称；客户端和服务端共同限制 trim 后 1–24 字符。同一房间允许同名，所有公开日志使用名称加座位号区分；client ID 仍防止同一浏览器重复占座。头像采用 ImperialOctopus/avalon-printable 的八款角色图标并按 CC BY 4.0 署名，但仅作为装饰，不表达隐藏角色；用户中心的“素材与许可”可用键盘展开与折叠，折叠时不暴露许可链接。 |
 | 通知与房间操作日志 | ✅ | 系统通知统一显示为顶部 Toast：桌面右上、移动端顶部居中，普通/成功 4 秒、错误 8 秒，最多保留三条且可手动关闭；主页不显示铃铛或通知历史。房间 Header 使用日志图标且不显示未读圆点/数量，桌面为右侧抽屉、移动端为底部抽屉；日志按旧到新记录公开玩家操作，不含时间戳、清空或分页。等待房间只记录当前客户端实际观察到的加入/退出；开局后可从公开状态重建开局、提案、已结算的逐人投票、匿名成功/失败牌总数、刺杀目标和胜负，不读取 viewer 私密信息。 |
-| 座位绑定与重连 | ✅ | 房间路由、按房间保存凭据、client ID 防重复占座和自动重新连接已实现。等待房间可使用当前 seat credential 换到空座位，credential 和房间拥有者身份一起重绑到目标；请求期间使用可续租的浏览器全局 transition marker 暂停其他标签页的过期源座位失效处理，丢失/瞬态响应转为 uncertain 后同时校验源与目标并恢复唯一有效座位，旧标签页只能清理仍与自己完全匹配的会话。健康连接不占用界面；断线时顶部先显示自动恢复状态，连续失败 8 秒后才出现手动重连。房间首次加载与轮询通过只返回 204/403/404 的服务端端点校验私有 seat credential；公开 session ID 仅作提前失效优化，不能授权会话。 |
+| 座位绑定与重连 | ✅ | 房间路由、按房间保存凭据、client ID 防重复占座和自动重新连接已实现。等待房间可使用当前 seat credential 换到空座位，credential 和房间拥有者身份一起重绑到目标；请求期间使用可续租的浏览器全局 transition marker 暂停其他标签页的过期源座位失效处理。丢失、超时或瞬态响应转为 uncertain 后，浏览器先通过真实换座客户端精确重放原 match/source/credential/target，让服务端 match queue 与目标凭据幂等检查确定结算顺序；只有稳定拒绝才继续校验源与目标，网络、5xx 或无效成功响应会保留 marker 和会话等待重试。旧标签页只能更新或清理仍与相同 opaque transition ID 及精确源会话匹配的状态。健康连接不占用界面；断线时顶部先显示自动恢复状态，连续失败 8 秒后才出现手动重连。房间首次加载与轮询通过只返回 204/403/404 的服务端端点校验私有 seat credential；公开 session ID 仅作提前失效优化，不能授权会话。 |
 | Debug Panel 默认关闭 | ✅ | boardgame.io 内置 Debug Panel 显式设为 `false`；生产默认配置下不显示内置调试入口，也不显示自定义开发控制入口。 |
 | 角色与阶段展示 | ✅ | 游戏开始后保持统一圆桌布局；中央面板始终显示五次任务、当前任务、连续否决轨道和阶段操作。进行中的姓名牌不常驻显示本人角色；左下角“眼睛”按钮默认关闭，打开后只把本人的装饰头像替换为角色头像，并在姓名牌正下方显示角色名称，同时显示 `playerView` 授权的邪恶阵营座位或 Percival 的两个不可区分 Merlin 候选，不遮挡中央面板或暂停选队、投票、任务牌和刺杀操作。角色名称使用不参与座位布局的定位层，出现时不会移动头像或姓名牌。开关值以只含版本号和布尔值的浏览器全局客户端设置保存在 `localStorage`，跨刷新、房间、阶段和同浏览器标签页同步；开局身份辨认结束后按该偏好显示。对局结束时隐藏眼睛和私密知识标记，自动把所有座位头像替换为公开角色头像，并在姓名牌第二行显示角色名，但不覆盖下局偏好。暗红徽记只表示已知邪恶阵营，统一候选徽记只表示 Merlin/Morgana 候选，均不泄露精确角色。断线、队长和任务队员分别通过头像灰度、头冠和高亮表达。 |
 | 开局身份辨认 | ✅ | `startGame` 后先进入按角色配置确定的身份辨认：全员查看自己的完整身份牌，邪恶阵营辨认其他邪恶座位，Merlin 辨认全部邪恶座位，启用成对角色时由 Percival 辨认 Merlin 与 Morgana 两个不可区分候选。第一幕先让深蓝实体幕布落下并完全遮住圆桌，落定后才淡入身份牌、进度和确认按钮；后续各幕仅参与者升幕查看获授权的圆桌座位。竖屏继续使用顶部提示与底部确认浮层，横屏则由同一份控件替换中央任务面板，极矮横屏使用紧凑文案并保持 44px 热区；方向切换不会重新挂载确认按钮，提示、按钮和面板边界不得遮挡头像或姓名牌。参与者确认后保留信息并显示“等待其他玩家确认”，匿名 `x/n` 进度会以礼貌级状态更新提供给辅助技术；非参与者始终处于静态不透明幕布后。顶部返回与连接恢复控件在仪式期间保持可见可操作。当前版本不显示倒计时、不发送自动唤醒，必须等待当前步骤全部参与者确认，仪式结束才进入首次组队。服务端保留默认关闭的截止线、原时间线追赶与重启保护架构；实时及持久化日志和公开框架 `ctx` 均不记录或编码确认者、唤醒者座位。仪式期间隐藏眼睛按钮，结束后恢复原功能。 |
@@ -200,20 +200,24 @@
 
 2026-08-23 PostgreSQL 网络中断崩溃修复验证：确认 `a90095d` 的范围仅是空闲客户端触发的 `pg.Pool` `error` 事件，不包含活动 `query()` 返回的 rejected Promise。新增 boardgame.io Socket.IO `update`、`sync`、`disconnect`、`chat` 请求错误边界；聚焦回归测试完成 RED（`sync` rejection 逸出）→ GREEN（安全日志并关闭底层连接）；Server tests 48 passed；Server typecheck exit 0。
 
+2026-09-01 换座迟到提交与服务端错误边界修正验证：uncertain 或租约过期的换座恢复不再用一次源座位探测直接结算，而是先通过真实 participation client 精确重放原 match/source/credential/target；服务端 match queue 和“目标已持有相同 credential”幂等分支会在返回前序列化原请求与重放请求。重放成功保存目标后只清除匹配的 opaque marker；稳定 409 等拒绝才探测并保留有效源或恢复有效目标；网络、5xx、无效成功响应继续保留 uncertain marker、源会话和后续重试能力。路由刷新、陈旧 Socket snapshot 与退出/解散对账共用该路径；Playwright 的双标签页丢响应场景已实际发送重放请求并恢复目标。`prepare-start` 先认证请求中的 player ID 与 credential，再判断房间拥有者，因此有效访客稳定得到 `not_room_owner`，错误 credential 仍为 `invalid_seat_session`。换座 JSON parser 的异常进入统一 HTTP 错误边界：无效 JSON 返回结构化 400 `invalid_request`，超过 16 KiB 返回结构化 413 `payload_too_large`，限制未放宽。
+
 ```text
-pnpm test ✅ Game 88；test-support 23；Server 83；Web 220（共 414 passed）
-pnpm build ✅ Game、Server TypeScript 与 Web TypeScript + Vite build；单个 538.44 kB minified / 162.41 kB gzip chunk 建议性警告
+pnpm test ✅ Game 88；test-support 23；Server 84；Web 234（共 429 passed）
+pnpm build ✅ Game、Server TypeScript 与 Web TypeScript + Vite build；单个 542.05 kB minified / 163.62 kB gzip chunk 建议性警告
 pnpm lint ✅ exit 0，无 diagnostics
 pnpm typecheck ✅ Game、test-support、Server、Web、E2E exit 0
-pnpm --filter @avalon/e2e test:e2e smoke.spec.ts refresh-and-privacy.spec.ts ✅ 4 passed
-pnpm test:e2e ℹ️ 此窄幅补丁后未重跑；此前同一最终审查轮次为 18 passed / 9 nightly skipped
+pnpm exec vitest run tests/http-boundary.test.ts（apps/server）✅ 13 passed
+pnpm exec vitest run tests/room-session.test.ts tests/room-participation.test.ts tests/RoomView.test.tsx（apps/web）✅ 90 passed
+pnpm --filter @avalon/e2e test:e2e refresh-and-privacy.spec.ts ✅ 2 passed
+pnpm test:e2e ✅ 18 passed / 9 nightly skipped
 Playwright 本地日志 ⚠️ Node 子进程提示 `NO_COLOR` 被 `FORCE_COLOR` 覆盖；无业务 warning/error
 pnpm --filter @avalon/server test:postgres ⚠️ 本轮未重跑；既有真实 PostgreSQL 环境/授权阻塞未解除，未以 memory storage 替代
 真实 5–10 浏览器 LAN 验收 ⬜ 未执行
 部署环境 PostgreSQL 重启与原凭据重连 ⬜ 未执行
 ```
 
-以上本地结果只证明本功能提交的 `pnpm test`、构建和隔离浏览器自动化通过；上文 2026-08-30 及更早条目中的 GitHub Actions/PostgreSQL 容器结果仅记录当时已运行的历史基线，并未执行本功能提交。本轮没有单独运行强制 PostgreSQL 命令或重启探针，部署环境重启演练仍未运行，**也尚未完成真实 5–10 台设备的局域网验收或部署环境的 PostgreSQL 重启演练**。
+以上本地结果只证明本功能提交的 `pnpm test`、构建和隔离浏览器自动化通过；上文 2026-08-30 及更早条目中的 GitHub Actions/PostgreSQL 容器结果仅记录当时已运行的历史基线，并未执行本功能提交。本轮没有单独运行强制 PostgreSQL 命令或重启探针，部署环境重启演练仍未运行，**也尚未完成真实 5–10 台设备的局域网验收或部署环境的 PostgreSQL 重启演练**。未声称当前提交已有 CI 结果。
 
 ## 当前架构与运行方式
 

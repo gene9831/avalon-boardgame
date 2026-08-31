@@ -57,6 +57,8 @@ import {
   getStartErrorMessage,
   leaveRoom,
   reconcileRoomExit,
+  recoverRoomSeatTransition,
+  type SeatTransitionReplayClient,
 } from './room-participation'
 import {
   consumeRoomNavigationNotice,
@@ -97,7 +99,6 @@ import {
   isSeatTransitionRequestActive,
   loadRoomSession,
   loadSeatTransition,
-  recoverSeatTransition,
   saveRoomSession,
   validateActiveRoomSessions,
   validateRoomSession,
@@ -146,12 +147,13 @@ export function getUpdatedRoomRouteSession(
 // oxlint-disable-next-line react/only-export-components
 export async function recoverRoomRouteSession(
   session: RoomSession,
+  client: SeatTransitionReplayClient,
   validate: (matchID: string, playerID: string, credentials: string) => Promise<boolean>,
   storage?: RoomSessionStorage,
 ) {
   const transition = loadSeatTransition(session.matchID, storage)
   if (transition === null) return session
-  await recoverSeatTransition(transition, validate, storage)
+  await recoverRoomSeatTransition(client, transition, validate, storage)
   return loadRoomSession(session.matchID, storage)
 }
 
@@ -176,6 +178,7 @@ export function shouldWakeRoomRouteForSeatTransitionChange(
 // oxlint-disable-next-line react/only-export-components
 export async function resolveRoomRouteSnapshotSession(
   session: RoomSession,
+  client: SeatTransitionReplayClient,
   validate: (matchID: string, playerID: string, credentials: string) => Promise<boolean>,
   storage?: RoomSessionStorage,
 ) {
@@ -183,7 +186,7 @@ export async function resolveRoomRouteSnapshotSession(
     return { status: 'requesting' as const, session }
   }
   const hadPendingTransition = loadSeatTransition(session.matchID, storage) !== null
-  const recoveredSession = await recoverRoomRouteSession(session, validate, storage)
+  const recoveredSession = await recoverRoomRouteSession(session, client, validate, storage)
   if (recoveredSession === null) return { status: 'invalid' as const }
   if (!isSameRoomSession(recoveredSession, session)) {
     return { status: 'rebind' as const, session: recoveredSession }
@@ -476,6 +479,10 @@ function RoomRoute({
   const { matchID = '' } = useParams()
   const navigate = useNavigate()
   const lobby = useMemo(() => createAvalonLobbyClient(), [])
+  const roomParticipation = useMemo(
+    () => createRoomParticipationClient(webConfig.lobbyURL),
+    [],
+  )
   const devTools = useMemo(() => createDevToolsClient(webConfig.lobbyURL), [])
   const { pushToast } = useToast()
   const clientRef = useRef<AvalonClient | null>(null)
@@ -532,6 +539,7 @@ function RoomRoute({
         const hadSeatTransition = loadSeatTransition(currentSession.matchID) !== null
         const recoveredSession = await recoverRoomRouteSession(
           currentSession,
+          roomParticipation,
           async (recoveryMatchID, playerID, credentials) => resolveRecoverySeatValidation(async () => {
             await validateRoomSession(webConfig.lobbyURL, {
               matchID: recoveryMatchID,
@@ -577,7 +585,7 @@ function RoomRoute({
         }
       }
     },
-    [invalidateSession, lobby, pushToast],
+    [invalidateSession, lobby, pushToast, roomParticipation],
   )
 
   useEffect(() => {
@@ -658,6 +666,7 @@ function RoomRoute({
         if (isSeatTransitionRequestingForSession(routeSession)) return
         const recoveredSession = await recoverRoomRouteSession(
           routeSession,
+          roomParticipation,
           async (recoveryMatchID, playerID, credentials) => {
             return resolveRecoverySeatValidation(async () => {
               await validateRoomSession(webConfig.lobbyURL, {
@@ -705,6 +714,7 @@ function RoomRoute({
             if (!isRoomSessionStillValid({ players }, routeSession)) {
               void resolveRoomRouteSnapshotSession(
                 routeSession,
+                roomParticipation,
                 async (recoveryMatchID, playerID, credentials) => resolveRecoverySeatValidation(async () => {
                   await validateRoomSession(webConfig.lobbyURL, {
                     matchID: recoveryMatchID,
@@ -771,12 +781,12 @@ function RoomRoute({
       unsubscribe()
       if (client !== null) stopCurrentClient(clientRef, client)
     }
-  }, [invalidateSession, lobby, matchID, pushToast, refreshRoom, routeSession, seatTransitionRevision])
+  }, [invalidateSession, lobby, matchID, pushToast, refreshRoom, roomParticipation, routeSession, seatTransitionRevision])
 
   const handleStart = async () => {
     if (gameState?.isActive !== true || routeSession === null || gameState.G.lobby.ownerPlayerID !== routeSession.playerID) return
     try {
-      await createRoomParticipationClient(webConfig.lobbyURL).prepareStart(matchID, routeSession.playerID, routeSession.credentials)
+      await roomParticipation.prepareStart(matchID, routeSession.playerID, routeSession.credentials)
       clientRef.current?.moves.startGame()
     } catch (error) {
       pushToast({ message: getStartErrorMessage(error), tone: 'error' })
@@ -793,7 +803,7 @@ function RoomRoute({
     ) return
     setSeatChangePending(true)
     try {
-      const nextSession = await changeRoomSeat(createRoomParticipationClient(webConfig.lobbyURL), routeSession, targetPlayerID)
+      const nextSession = await changeRoomSeat(roomParticipation, routeSession, targetPlayerID)
       setSession(nextSession)
     } catch (error) {
       pushToast({ message: getSeatChangeErrorMessage(error), tone: 'error' })
@@ -899,6 +909,7 @@ function RoomRoute({
         currentSession,
         result,
         transitionRevision !== seatTransitionChangeRevisionRef.current,
+        roomParticipation,
         async (recoveryMatchID, playerID, credentials) => resolveRecoverySeatValidation(async () => {
           await validateRoomSession(webConfig.lobbyURL, {
             matchID: recoveryMatchID,
