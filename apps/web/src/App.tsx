@@ -142,6 +142,19 @@ export async function recoverRoomRouteSession(
   return loadRoomSession(session.matchID, storage)
 }
 
+// oxlint-disable-next-line react/only-export-components
+export async function resolveRecoverySeatValidation(
+  validate: () => Promise<void>,
+) {
+  try {
+    await validate()
+    return true
+  } catch (error) {
+    if (getRoomSessionInvalidationNotice(error) !== null) return false
+    throw error
+  }
+}
+
 function App() {
   return (
     <ToastProvider>
@@ -519,16 +532,13 @@ function RoomRoute({
         const recoveredSession = await recoverRoomRouteSession(
           routeSession,
           async (recoveryMatchID, playerID, credentials) => {
-            try {
+            return resolveRecoverySeatValidation(async () => {
               await validateRoomSession(webConfig.lobbyURL, {
                 matchID: recoveryMatchID,
                 playerID,
                 credentials,
               })
-              return true
-            } catch {
-              return false
-            }
+            })
           },
         )
         if (!active || !isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return

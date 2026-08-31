@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
-import { recoverRoomRouteSession, RoomAccessView, RoomView, type RoomViewProps } from '../src/App'
-import { beginSeatTransition, loadRoomSession, saveRoomSession, type RoomSessionStorage } from '../src/room-session'
+import { recoverRoomRouteSession, resolveRecoverySeatValidation, RoomAccessView, RoomView, type RoomViewProps } from '../src/App'
+import { beginSeatTransition, loadRoomSession, loadSeatTransition, saveRoomSession, type RoomSessionStorage } from '../src/room-session'
 
 vi.mock('../src/config', () => ({
   webConfig: {
@@ -167,6 +167,39 @@ describe('RoomView connection state', () => {
     beginSeatTransition(source, '3', invalidStorage, 42)
     await expect(recoverRoomRouteSession(source, async () => false, invalidStorage)).resolves.toBeNull()
     expect(loadRoomSession(source.matchID, invalidStorage)).toBeNull()
+  })
+
+  it('preserves a pending transition when recovery validation is transiently unavailable', async () => {
+    const values = new Map<string, string>()
+    const storage: RoomSessionStorage = {
+      getItem: (key) => values.get(key) ?? null,
+      removeItem: (key) => values.delete(key),
+      setItem: (key, value) => values.set(key, value),
+    }
+    const source = {
+      credentials: 'credential',
+      matchID: 'room-123',
+      playerID: '0',
+      playerName: 'Alice',
+      sessionID: 'session-123',
+    }
+    saveRoomSession(source, storage)
+    beginSeatTransition(source, '3', storage, 42)
+
+    await expect(recoverRoomRouteSession(source, async () => {
+      throw new TypeError('Failed to fetch')
+    }, storage)).rejects.toThrow('Failed to fetch')
+    expect(loadRoomSession(source.matchID, storage)).toEqual(source)
+    expect(loadSeatTransition(source.matchID, storage)).toMatchObject({
+      sourcePlayerID: '0',
+      targetPlayerID: '3',
+    })
+  })
+
+  it('treats only definitive session errors as an invalid recovery seat', async () => {
+    await expect(resolveRecoverySeatValidation(async () => {
+      throw new TypeError('Failed to fetch')
+    })).rejects.toThrow('Failed to fetch')
   })
 })
 
