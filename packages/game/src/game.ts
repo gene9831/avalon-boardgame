@@ -7,6 +7,7 @@ import { getPlayerCountConfig } from './config'
 import { buildRoleDeck, assignRoles, loyaltyForRole } from './roles'
 import { getAvalonPlayerView } from './player-view'
 import { getIdentityRecognitionParticipantIDs } from './identity-recognition'
+import { normalizeRoleConfiguration } from './types'
 import type {
   AvalonG,
   AvalonResult,
@@ -33,8 +34,24 @@ function createInitialGame(
   playerIDs: readonly string[],
   setupData?: AvalonSetupData,
 ): AvalonG {
+  const roleConfiguration = normalizeRoleConfiguration(
+    setupData?.roleConfiguration,
+  )
+  const occupiedPlayerIDs = [
+    ...(setupData?.occupiedPlayerIDs ?? (
+      setupData?.players === undefined
+        ? playerIDs
+        : Object.keys(setupData.players)
+    )),
+  ].sort((a, b) => Number(a) - Number(b))
+
   return {
     status: 'lobby',
+    lobby: {
+      authorityVersion: 1,
+      ownerPlayerID: setupData?.ownerPlayerID ?? '0',
+      occupiedPlayerIDs,
+    },
     players: createPlayers(playerIDs, setupData?.players),
     secret: {
       roleByPlayer: {},
@@ -53,6 +70,7 @@ function createInitialGame(
     goodSuccesses: 0,
     evilFailures: 0,
     rules: {
+      roleConfiguration,
       timeouts: setupData?.timeouts ?? { enabled: false },
     },
   }
@@ -104,11 +122,23 @@ function finishGame(
   endGame(result)
 }
 
-const IDENTITY_RECOGNITION_STEPS: readonly IdentityRecognitionStep[] = [
+const BASE_IDENTITY_RECOGNITION_STEPS: readonly IdentityRecognitionStep[] = [
   'roleReveal',
   'evilRecognition',
   'merlinRecognition',
 ]
+
+const PERCIVAL_IDENTITY_RECOGNITION_STEPS: readonly IdentityRecognitionStep[] = [
+  ...BASE_IDENTITY_RECOGNITION_STEPS,
+  'percivalRecognition',
+]
+
+function canStartGame(G: AvalonG, playerID: PlayerID, numPlayers: number) {
+  return G.status === 'lobby' &&
+    G.lobby !== undefined &&
+    playerID === G.lobby.ownerPlayerID &&
+    G.lobby.occupiedPlayerIDs.length === numPlayers
+}
 
 const identityRecognitionLogPrivacyPlugin: Plugin = {
   name: 'identityRecognitionLogPrivacy',
@@ -156,11 +186,17 @@ function createAvalonGameDefinition(
     setPhase: (phase: string) => void,
     nextDeadlineAt?: number,
   ) => {
+    const roleConfiguration = normalizeRoleConfiguration(
+      G.rules.roleConfiguration,
+    )
+    const recognitionSteps = roleConfiguration.percivalMorgana
+      ? PERCIVAL_IDENTITY_RECOGNITION_STEPS
+      : BASE_IDENTITY_RECOGNITION_STEPS
     const currentStep = G.identityRecognition?.step
     const currentIndex = currentStep === undefined
       ? -1
-      : IDENTITY_RECOGNITION_STEPS.indexOf(currentStep)
-    const nextStep = IDENTITY_RECOGNITION_STEPS[currentIndex + 1]
+      : recognitionSteps.indexOf(currentStep)
+    const nextStep = recognitionSteps[currentIndex + 1]
 
     if (nextStep !== undefined) {
       enterIdentityRecognitionStep(G, nextStep, nextDeadlineAt)
@@ -217,7 +253,7 @@ function createAvalonGameDefinition(
           next: () => undefined,
         },
         activePlayers: {
-          currentPlayer: { stage: 'start', minMoves: 1, maxMoves: 1 },
+          all: { stage: 'start', minMoves: 1, maxMoves: 1 },
         },
         stages: {
           start: {
@@ -225,11 +261,17 @@ function createAvalonGameDefinition(
               startGame: {
                 client: false,
                 move: ({ G, ctx, events, random, playerID }) => {
-                  if (playerID !== '0' || G.status !== 'lobby') {
+                  if (!canStartGame(G, playerID, ctx.numPlayers)) {
                     return INVALID_MOVE
                   }
 
-                  const roles = random.Shuffle(buildRoleDeck(ctx.numPlayers))
+                  const roleConfiguration = normalizeRoleConfiguration(
+                    G.rules.roleConfiguration,
+                  )
+                  G.rules.roleConfiguration = roleConfiguration
+                  const roles = random.Shuffle(
+                    buildRoleDeck(ctx.numPlayers, roleConfiguration),
+                  )
                   G.secret.roleByPlayer = assignRoles(ctx.playOrder, roles)
                   G.secret.identityRecognitionConfirmedPlayerIDs = []
                   G.secret.identityRecognitionServerInstanceID =

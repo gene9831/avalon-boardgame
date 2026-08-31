@@ -18,5 +18,9 @@ export function getIdentityRecognitionParticipantIDs(
       return roleEntries
         .filter(([, role]) => role === 'merlin')
         .map(([playerID]) => playerID)
+    case 'percivalRecognition':
+      return roleEntries
+        .filter(([, role]) => role === 'percival')
+        .map(([playerID]) => playerID)
   }
 }
