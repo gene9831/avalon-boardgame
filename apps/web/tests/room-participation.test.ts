@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   changeRoomSeat,
+  createRoomParticipationClient,
   dissolveRoom,
   getRoomExitErrorMessage,
   getSeatChangeErrorMessage,
@@ -9,6 +10,7 @@ import {
   leaveRoom,
   reconcileRoomExit,
   RoomParticipationHttpError,
+  RoomParticipationResponseContractError,
 } from '../src/room-participation'
 import {
   beginSeatTransition,
@@ -42,6 +44,75 @@ const immediateSeatTransitionLock = async <T>(
 ) => action()
 
 describe('room participation client', () => {
+  it('treats a malformed committed seat response as uncertain and recovers the target', async () => {
+    const storage = createStorage()
+    const roomSession = {
+      ...session,
+      matchID: 'room-123',
+      playerName: 'Alice',
+    }
+    saveRoomSession(roomSession, storage)
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      matchID: roomSession.matchID,
+      playerID: '4',
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+
+    await expect(changeRoomSeat(
+      createRoomParticipationClient('http://localhost:8001', fetcher),
+      roomSession,
+      '4',
+      storage,
+      immediateSeatTransitionLock,
+    )).rejects.toBeInstanceOf(RoomParticipationResponseContractError)
+
+    const uncertain = loadSeatTransition(roomSession.matchID, storage)!
+    expect(uncertain).toMatchObject({ status: 'uncertain', targetPlayerID: '4' })
+    const validate = vi.fn(async (_matchID: string, playerID: string) => playerID === '4')
+    await expect(recoverSeatTransition(uncertain, validate, storage)).resolves.toEqual({
+      status: 'target',
+      playerID: '4',
+    })
+    expect(validate.mock.calls.map(([, playerID]) => playerID)).toEqual(['2', '4'])
+    expect(loadRoomSession(roomSession.matchID, storage)).toEqual({ ...roomSession, playerID: '4' })
+  })
+
+  it('keeps a malformed seat response recoverable until both seats prove invalid', async () => {
+    const storage = createStorage()
+    const roomSession = {
+      ...session,
+      matchID: 'room-123',
+      playerName: 'Alice',
+    }
+    saveRoomSession(roomSession, storage)
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      matchID: roomSession.matchID,
+      playerID: '4',
+      playerCredentials: '',
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+
+    await expect(changeRoomSeat(
+      createRoomParticipationClient('http://localhost:8001', fetcher),
+      roomSession,
+      '4',
+      storage,
+      immediateSeatTransitionLock,
+    )).rejects.toBeInstanceOf(RoomParticipationResponseContractError)
+
+    const uncertain = loadSeatTransition(roomSession.matchID, storage)!
+    expect(uncertain.status).toBe('uncertain')
+    await expect(recoverSeatTransition(uncertain, async () => false, storage)).resolves.toEqual({
+      status: 'invalid',
+    })
+    expect(loadRoomSession(roomSession.matchID, storage)).toBeNull()
+    expect(loadSeatTransition(roomSession.matchID, storage)).toBeNull()
+  })
+
   it('keeps an in-flight marker until a lost response becomes recoverable', async () => {
     const storage = createStorage()
     const roomSession = { ...session, playerName: 'Alice' }

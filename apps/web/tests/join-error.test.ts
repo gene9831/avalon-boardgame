@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { classifyJoinError } from '../src/join-error'
-import { createAvalonLobbyClient } from '../src/lobby'
+import { createAvalonLobbyClient, LobbyResponseContractError } from '../src/lobby'
 
 vi.mock('../src/config', () => ({
   webConfig: {
@@ -70,5 +70,34 @@ describe('join error classification', () => {
     }).catch((requestError: unknown) => requestError)
 
     expect(classifyJoinError(error)).toEqual({ message, refreshRooms: true })
+  })
+
+  it.each([
+    ['create', (client: ReturnType<typeof createAvalonLobbyClient>) => client.createRoomAndJoin({
+      data: { avatarID: 'merlin', clientID: 'client-1', sessionID: 'session-1' },
+      numPlayers: 5,
+      playerName: 'Alice',
+      roleConfiguration: { percivalMorgana: false },
+    })],
+    ['join', (client: ReturnType<typeof createAvalonLobbyClient>) => client.joinMatch('avalon', 'room-1', {
+      data: { avatarID: 'merlin', clientID: 'client-1', sessionID: 'session-1' },
+      playerName: 'Alice',
+    })],
+  ] as const)('rejects a malformed successful %s response at the client boundary', async (_operation, request) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      matchID: 'room-1',
+      playerID: '0',
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })))
+
+    const error = await request(createAvalonLobbyClient()).catch((requestError: unknown) => requestError)
+
+    expect(error).toBeInstanceOf(LobbyResponseContractError)
+    expect(classifyJoinError(error)).toEqual({
+      message: '暂时无法加入房间，请稍后重试。',
+      refreshRooms: false,
+    })
   })
 })

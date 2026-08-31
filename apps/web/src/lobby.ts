@@ -1,5 +1,9 @@
 import { LobbyClient } from 'boardgame.io/client'
-import type { AvalonCreateRoomRequest, AvalonJoinRoomRequest, AvalonRoomSessionResponse } from '@avalon/game'
+import {
+  parseAvalonRoomSessionResponse,
+  type AvalonCreateRoomRequest,
+  type AvalonJoinRoomRequest,
+} from '@avalon/game'
 
 import { webConfig } from './config'
 import type { PlayerAvatarID } from './player-profile'
@@ -40,6 +44,13 @@ class LobbyRequestError extends Error {
   }
 }
 
+export class LobbyResponseContractError extends Error {
+  constructor() {
+    super('Lobby room-session response is invalid')
+    this.name = 'LobbyResponseContractError'
+  }
+}
+
 export function createAvalonLobbyClient() {
   const client = new LobbyClient({ server: webConfig.lobbyURL })
   const request = async (path: string, body: unknown) => {
@@ -48,7 +59,13 @@ export function createAvalonLobbyClient() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    const result: unknown = await response.json()
+    let result: unknown
+    try {
+      result = await response.json()
+    } catch {
+      if (response.ok) throw new LobbyResponseContractError()
+      throw new LobbyRequestError({})
+    }
     if (!response.ok) {
       throw new LobbyRequestError(
         typeof result === 'object' && result !== null
@@ -56,7 +73,11 @@ export function createAvalonLobbyClient() {
           : { error: result },
       )
     }
-    return result as AvalonRoomSessionResponse
+    try {
+      return parseAvalonRoomSessionResponse(result)
+    } catch {
+      throw new LobbyResponseContractError()
+    }
   }
 
   return {

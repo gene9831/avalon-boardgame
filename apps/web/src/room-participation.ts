@@ -1,5 +1,6 @@
 import {
   AVALON_LOBBY_ERROR_CODES,
+  parseAvalonRoomSessionResponse,
   type AvalonLobbyErrorCode,
   type AvalonRoomSessionResponse,
 } from '@avalon/game'
@@ -33,6 +34,13 @@ export class RoomParticipationHttpError extends Error {
     this.name = 'RoomParticipationHttpError'
     this.code = code
     this.status = status
+  }
+}
+
+export class RoomParticipationResponseContractError extends Error {
+  constructor() {
+    super('Room participation response is invalid')
+    this.name = 'RoomParticipationResponseContractError'
   }
 }
 
@@ -129,7 +137,11 @@ export function createRoomParticipationClient(
         credentials,
         { targetPlayerID },
       )
-      return response.json() as Promise<AvalonRoomSessionResponse>
+      try {
+        return parseAvalonRoomSessionResponse(await response.json())
+      } catch {
+        throw new RoomParticipationResponseContractError()
+      }
     },
     async prepareStart(matchID, playerID, credentials) {
       await request(
