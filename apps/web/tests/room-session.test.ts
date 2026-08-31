@@ -11,6 +11,7 @@ import {
   loadLastRoomSession,
   loadRoomSession,
   loadSeatTransition,
+  markSeatTransitionUncertain,
   recoverSeatTransition,
   saveRoomSession,
   validateActiveRoomSessions,
@@ -95,7 +96,8 @@ describe('room session storage', () => {
     saveRoomSession(session, storage)
     beginSeatTransition(session, '4', storage, 42)
 
-    completeSeatTransition(session, {
+    const transition = loadSeatTransition(session.matchID, storage)!
+    completeSeatTransition(session, transition, {
       matchID: session.matchID,
       playerID: '4',
       playerCredentials: 'credential-456',
@@ -113,6 +115,7 @@ describe('room session storage', () => {
     const storage = createStorage()
     saveRoomSession(session, storage)
     const transition = beginSeatTransition(session, '4', storage, 42)
+    markSeatTransitionUncertain(transition, storage)
     const validate = vi.fn(async (_matchID: string, playerID: string) => playerID === '4')
 
     await expect(recoverSeatTransition(transition, validate, storage)).resolves.toEqual({
@@ -128,12 +131,41 @@ describe('room session storage', () => {
     const storage = createStorage()
     saveRoomSession(session, storage)
     const transition = beginSeatTransition(session, '4', storage, 42)
+    markSeatTransitionUncertain(transition, storage)
 
     await expect(recoverSeatTransition(transition, async () => false, storage)).resolves.toEqual({
       status: 'invalid',
     })
     expect(loadRoomSession(session.matchID, storage)).toBeNull()
     expect(loadSeatTransition(session.matchID, storage)).toBeNull()
+  })
+
+  it('does not recover or clear a transition while its request is in flight', async () => {
+    const storage = createStorage()
+    saveRoomSession(session, storage)
+    const transition = beginSeatTransition(session, '4', storage, 42)
+    const validate = vi.fn(async () => true)
+
+    await expect(recoverSeatTransition(transition, validate, storage)).resolves.toEqual({
+      status: 'requesting',
+      playerID: session.playerID,
+    })
+    expect(validate).not.toHaveBeenCalled()
+    expect(loadSeatTransition(session.matchID, storage)).toEqual(transition)
+  })
+
+  it('loads legacy transition markers as uncertain recovery work', () => {
+    const storage = createStorage({
+      'avalon:seat-transition:room-123': JSON.stringify({
+        matchID: session.matchID,
+        sourcePlayerID: session.playerID,
+        targetPlayerID: '4',
+        credentials: session.credentials,
+        startedAt: 42,
+      }),
+    })
+
+    expect(loadSeatTransition(session.matchID, storage)).toMatchObject({ status: 'uncertain' })
   })
 
   it('can read the previous single-session format for the matching room', () => {

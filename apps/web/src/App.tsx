@@ -153,12 +153,25 @@ export async function recoverRoomRouteSession(
   return loadRoomSession(session.matchID, storage)
 }
 
+function isSeatTransitionRequestingForSession(
+  session: RoomSession,
+  storage?: RoomSessionStorage,
+) {
+  const transition = loadSeatTransition(session.matchID, storage)
+  return transition?.status === 'requesting' &&
+    transition.sourcePlayerID === session.playerID &&
+    transition.credentials === session.credentials
+}
+
 // oxlint-disable-next-line react/only-export-components
 export async function resolveRoomRouteSnapshotSession(
   session: RoomSession,
   validate: (matchID: string, playerID: string, credentials: string) => Promise<boolean>,
   storage?: RoomSessionStorage,
 ) {
+  if (isSeatTransitionRequestingForSession(session, storage)) {
+    return { status: 'requesting' as const, session }
+  }
   const hadPendingTransition = loadSeatTransition(session.matchID, storage) !== null
   const recoveredSession = await recoverRoomRouteSession(session, validate, storage)
   if (recoveredSession === null) return { status: 'invalid' as const }
@@ -468,6 +481,11 @@ function RoomRoute({
 
       if (
         expectedSession !== undefined &&
+        isSeatTransitionRequestingForSession(expectedSession)
+      ) return
+
+      if (
+        expectedSession !== undefined &&
         !isSameRoomSession(loadRoomSession(matchID), expectedSession)
       ) return
 
@@ -491,6 +509,7 @@ function RoomRoute({
       silent = false,
     ) => {
       if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
+      if (isSeatTransitionRequestingForSession(currentSession)) return
 
       try {
         const recoveredSession = await recoverRoomRouteSession(
@@ -602,6 +621,7 @@ function RoomRoute({
 
     const connect = async () => {
       try {
+        if (isSeatTransitionRequestingForSession(routeSession)) return
         const recoveredSession = await recoverRoomRouteSession(
           routeSession,
           async (recoveryMatchID, playerID, credentials) => {
@@ -668,6 +688,7 @@ function RoomRoute({
                   setSession(resolution.session)
                   return
                 }
+                if (resolution.status === 'requesting') return
                 void refreshRoom(matchID, resolution.session, generation, true)
               }).catch(() => {
                 if (!active || !isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return

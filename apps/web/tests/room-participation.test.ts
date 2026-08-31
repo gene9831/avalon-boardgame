@@ -12,6 +12,7 @@ import {
 import {
   loadSeatTransition,
   loadRoomSession,
+  recoverSeatTransition,
   saveRoomSession,
   type RoomSessionStorage,
 } from '../src/room-session'
@@ -32,6 +33,37 @@ const session = {
 }
 
 describe('room participation client', () => {
+  it('keeps an in-flight marker until a lost response becomes recoverable', async () => {
+    const storage = createStorage()
+    const roomSession = { ...session, playerName: 'Alice' }
+    saveRoomSession(roomSession, storage)
+    let rejectRequest!: (error: unknown) => void
+    const pendingResponse = new Promise<never>((_resolve, reject) => { rejectRequest = reject })
+    const request = changeRoomSeat({
+      changeSeat: async () => pendingResponse,
+      prepareStart: async () => {},
+    }, roomSession, '4', storage)
+
+    const requesting = loadSeatTransition(roomSession.matchID, storage)!
+    const validateWhilePending = vi.fn(async () => true)
+    await expect(recoverSeatTransition(requesting, validateWhilePending, storage)).resolves.toEqual({
+      status: 'requesting', playerID: '2',
+    })
+    expect(validateWhilePending).not.toHaveBeenCalled()
+    expect(loadSeatTransition(roomSession.matchID, storage)).toMatchObject({ status: 'requesting' })
+
+    rejectRequest(new TypeError('response lost after commit'))
+    await expect(request).rejects.toThrow('response lost after commit')
+    const uncertain = loadSeatTransition(roomSession.matchID, storage)!
+    expect(uncertain).toMatchObject({ status: 'uncertain' })
+    await expect(recoverSeatTransition(
+      uncertain,
+      async (_matchID, playerID) => playerID === '4',
+      storage,
+    )).resolves.toEqual({ status: 'target', playerID: '4' })
+    expect(loadRoomSession(roomSession.matchID, storage)).toEqual({ ...roomSession, playerID: '4' })
+  })
+
   it('preserves a transition marker when a seat-change response is uncertain', async () => {
     const storage = createStorage()
     const roomSession = {
@@ -50,8 +82,24 @@ describe('room participation client', () => {
     expect(loadSeatTransition(roomSession.matchID, storage)).toMatchObject({
       sourcePlayerID: '2',
       targetPlayerID: '4',
+      status: 'uncertain',
     })
     expect(loadRoomSession(roomSession.matchID, storage)).toEqual(roomSession)
+  })
+
+  it('clears a definitively failed request while preserving the source session', async () => {
+    const storage = createStorage()
+    const roomSession = { ...session, playerName: 'Alice' }
+    saveRoomSession(roomSession, storage)
+
+    await expect(changeRoomSeat({
+      changeSeat: async () => { throw new RoomParticipationHttpError(409, 'seat_unavailable') },
+      prepareStart: async () => {},
+    }, roomSession, '4', storage)).rejects.toEqual(
+      new RoomParticipationHttpError(409, 'seat_unavailable'),
+    )
+    expect(loadRoomSession(roomSession.matchID, storage)).toEqual(roomSession)
+    expect(loadSeatTransition(roomSession.matchID, storage)).toBeNull()
   })
 
   it('stores the server-authoritative target seat after changing rooms', async () => {

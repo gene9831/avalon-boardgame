@@ -6,7 +6,9 @@ import {
 
 import {
   beginSeatTransition,
+  clearSeatTransitionIfCurrent,
   completeSeatTransition,
+  markSeatTransitionUncertain,
   type RoomSession,
   type RoomSessionStorage,
 } from './room-session'
@@ -115,14 +117,23 @@ export async function changeRoomSeat(
   targetPlayerID: string,
   storage?: RoomSessionStorage,
 ) {
-  beginSeatTransition(source, targetPlayerID, storage)
-  const response = await client.changeSeat(
-    source.matchID,
-    source.playerID,
-    source.credentials,
-    targetPlayerID,
-  )
-  return completeSeatTransition(source, response, storage)
+  const transition = beginSeatTransition(source, targetPlayerID, storage)
+  try {
+    const response = await client.changeSeat(
+      source.matchID,
+      source.playerID,
+      source.credentials,
+      targetPlayerID,
+    )
+    return completeSeatTransition(source, transition, response, storage)
+  } catch (error) {
+    if (error instanceof RoomParticipationHttpError) {
+      clearSeatTransitionIfCurrent(transition, storage)
+    } else {
+      markSeatTransitionUncertain(transition, storage)
+    }
+    throw error
+  }
 }
 
 async function requestRoomExit(

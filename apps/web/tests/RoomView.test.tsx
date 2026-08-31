@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
 import { canRequestRoomExit, getUpdatedRoomRouteSession, recoverRoomRouteSession, resolveRecoverySeatValidation, resolveRoomRouteSnapshotSession, RoomAccessView, RoomView, type RoomViewProps } from '../src/App'
-import { beginSeatTransition, loadRoomSession, loadSeatTransition, saveRoomSession, type RoomSessionStorage } from '../src/room-session'
+import { beginSeatTransition, loadRoomSession, loadSeatTransition, markSeatTransitionUncertain, saveRoomSession, type RoomSessionStorage } from '../src/room-session'
 
 vi.mock('../src/config', () => ({
   webConfig: {
@@ -130,7 +130,7 @@ describe('RoomView connection state', () => {
       sessionID: 'session-123',
     }
     saveRoomSession(source, storage)
-    beginSeatTransition(source, '3', storage, 42)
+    markSeatTransitionUncertain(beginSeatTransition(source, '3', storage, 42), storage)
 
     await expect(recoverRoomRouteSession(
       source,
@@ -158,13 +158,13 @@ describe('RoomView connection state', () => {
     }
     const sourceStorage = createStorage()
     saveRoomSession(source, sourceStorage)
-    beginSeatTransition(source, '3', sourceStorage, 42)
+    markSeatTransitionUncertain(beginSeatTransition(source, '3', sourceStorage, 42), sourceStorage)
     await expect(recoverRoomRouteSession(source, async (_matchID, playerID) => playerID === '0', sourceStorage))
       .resolves.toEqual(source)
 
     const invalidStorage = createStorage()
     saveRoomSession(source, invalidStorage)
-    beginSeatTransition(source, '3', invalidStorage, 42)
+    markSeatTransitionUncertain(beginSeatTransition(source, '3', invalidStorage, 42), invalidStorage)
     await expect(recoverRoomRouteSession(source, async () => false, invalidStorage)).resolves.toBeNull()
     expect(loadRoomSession(source.matchID, invalidStorage)).toBeNull()
   })
@@ -184,7 +184,7 @@ describe('RoomView connection state', () => {
       sessionID: 'session-123',
     }
     saveRoomSession(source, storage)
-    beginSeatTransition(source, '3', storage, 42)
+    markSeatTransitionUncertain(beginSeatTransition(source, '3', storage, 42), storage)
 
     await expect(recoverRoomRouteSession(source, async () => {
       throw new TypeError('Failed to fetch')
@@ -211,7 +211,7 @@ describe('RoomView connection state', () => {
       sessionID: 'session-123',
     }
     saveRoomSession(source, storage)
-    beginSeatTransition(source, '3', storage, 42)
+    markSeatTransitionUncertain(beginSeatTransition(source, '3', storage, 42), storage)
 
     await expect(recoverRoomRouteSession(source, async () => {
       throw new TypeError('temporary outage')
@@ -238,7 +238,7 @@ describe('RoomView connection state', () => {
       sessionID: 'session-123',
     }
     saveRoomSession(source, storage)
-    beginSeatTransition(source, '3', storage, 42)
+    markSeatTransitionUncertain(beginSeatTransition(source, '3', storage, 42), storage)
 
     const resolution = await resolveRoomRouteSnapshotSession(
       source,
@@ -251,6 +251,32 @@ describe('RoomView connection state', () => {
     expect(resolution).toEqual({ status: 'refresh', session: source })
     expect(loadRoomSession(source.matchID, storage)).toEqual(source)
     expect(loadSeatTransition(source.matchID, storage)).toBeNull()
+  })
+
+  it('pauses stale subscription recovery while another tab is requesting a seat change', async () => {
+    const values = new Map<string, string>()
+    const storage: RoomSessionStorage = {
+      getItem: (key) => values.get(key) ?? null,
+      removeItem: (key) => values.delete(key),
+      setItem: (key, value) => values.set(key, value),
+    }
+    const source = {
+      credentials: 'credential',
+      matchID: 'room-123',
+      playerID: '0',
+      playerName: 'Alice',
+    }
+    saveRoomSession(source, storage)
+    const transition = beginSeatTransition(source, '3', storage, 42)
+    const validate = vi.fn(async () => true)
+
+    await expect(resolveRoomRouteSnapshotSession(source, validate, storage)).resolves.toEqual({
+      status: 'requesting',
+      session: source,
+    })
+    expect(validate).not.toHaveBeenCalled()
+    expect(loadSeatTransition(source.matchID, storage)).toEqual(transition)
+    expect(loadRoomSession(source.matchID, storage)).toEqual(source)
   })
 
   it('treats only definitive session errors as an invalid recovery seat', async () => {
