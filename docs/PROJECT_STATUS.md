@@ -209,7 +209,7 @@ pnpm --filter @avalon/server test:postgres ⚠️ 真实 PostgreSQL 连接被环
 部署环境 PostgreSQL 重启与原凭据重连 ⬜ 未执行
 ```
 
-以上结果证明当前代码、构建、隔离浏览器自动化和 GitHub Actions/PostgreSQL 容器检查范围通过，**不等价于已经完成真实 5–10 台设备的局域网验收或部署环境的 PostgreSQL 重启演练**。
+以上本地结果只证明本功能提交的非 PostgreSQL 测试、构建和隔离浏览器自动化通过；上文 2026-08-30 及更早条目中的 GitHub Actions/PostgreSQL 容器结果仅记录当时已运行的历史基线，并未执行本功能提交。本功能提交新增的 PostgreSQL 重启场景仍因环境/授权阻塞且未运行，**也尚未完成真实 5–10 台设备的局域网验收或部署环境的 PostgreSQL 重启演练**。
 
 ## 当前架构与运行方式
 
