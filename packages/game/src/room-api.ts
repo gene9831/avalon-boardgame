@@ -124,6 +124,16 @@ export const AvalonRoomDetailSchema = z.object({
   gameover: z.boolean().optional(),
   createdAt: z.number().finite().nonnegative(),
   updatedAt: z.number().finite().nonnegative(),
+}).superRefine((room, context) => {
+  const issue = getAvalonRoomAuthorityIssue(room)
+
+  if (issue !== null) {
+    context.addIssue({
+      code: 'custom',
+      message: issue,
+      path: ['ownerPlayerID'],
+    })
+  }
 })
 
 export type AvalonMatchID = z.infer<typeof AvalonMatchIDSchema>
@@ -137,6 +147,25 @@ export type AvalonRoomSessionResponse = z.infer<
 >
 export type AvalonLobbyErrorCode = typeof AVALON_LOBBY_ERROR_CODES[number]
 export type AvalonRoomDetail = z.infer<typeof AvalonRoomDetailSchema>
+
+export function getAvalonRoomAuthorityIssue(
+  room: Pick<AvalonRoomDetail, 'ownerPlayerID' | 'occupiedPlayerIDs'>,
+  ownerlessAllowed = true,
+): string | null {
+  if (room.ownerPlayerID === null) {
+    if (!ownerlessAllowed) {
+      return 'Ownerless rooms must be in the lobby'
+    }
+
+    return room.occupiedPlayerIDs.includes('0')
+      ? 'Ownerless legacy rooms must leave seat 0 empty'
+      : null
+  }
+
+  return room.occupiedPlayerIDs.includes(room.ownerPlayerID)
+    ? null
+    : 'Room owner must occupy the owner seat'
+}
 
 export function parseAvalonCreateRoomRequest(value: unknown) {
   return AvalonCreateRoomRequestSchema.parse(value)

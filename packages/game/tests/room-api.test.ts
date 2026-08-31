@@ -145,4 +145,36 @@ describe('Avalon room API contracts', () => {
       updatedAt: 2,
     })
   })
+
+  it('accepts an ownerless legacy detail only when seat zero is empty', () => {
+    expect(parseAvalonRoomDetail({
+      matchID: 'legacy-room',
+      gameName: 'avalon',
+      players: [{ id: 0 }, { id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }],
+      setupData: { numPlayers: 5 },
+      authorityVersion: 1,
+      ownerPlayerID: null,
+      occupiedPlayerIDs: ['1'],
+      roleConfiguration: { percivalMorgana: false },
+      createdAt: 1,
+      updatedAt: 2,
+    })).toMatchObject({ ownerPlayerID: null, occupiedPlayerIDs: ['1'] })
+  })
+
+  it.each([
+    { ownerPlayerID: null, occupiedPlayerIDs: ['0'] },
+    { ownerPlayerID: '1', occupiedPlayerIDs: ['0'] },
+  ])('rejects an invalid room-detail ownership invariant %#', (authority) => {
+    expect(() => parseAvalonRoomDetail({
+      matchID: 'room-1',
+      gameName: 'avalon',
+      players: [{ id: 0 }, { id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }],
+      setupData: { numPlayers: 5 },
+      authorityVersion: 1,
+      ...authority,
+      roleConfiguration: { percivalMorgana: true },
+      createdAt: 1,
+      updatedAt: 2,
+    })).toThrow()
+  })
 })

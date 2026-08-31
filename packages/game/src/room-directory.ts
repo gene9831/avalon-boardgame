@@ -4,6 +4,7 @@ import {
   AvalonMatchIDSchema,
   AvalonRoleConfigurationSchema,
   AvalonSeatIDSchema,
+  getAvalonRoomAuthorityIssue,
 } from './room-api'
 
 export const AvalonRoomStatusSchema = z.enum([
@@ -29,6 +30,19 @@ export const AvalonRoomSummarySchema = z.object({
   createdAt: z.number().finite().nonnegative(),
   updatedAt: z.number().finite().nonnegative(),
 }).superRefine((room, context) => {
+  const authorityIssue = getAvalonRoomAuthorityIssue(
+    room,
+    room.status === 'lobby',
+  )
+
+  if (authorityIssue !== null) {
+    context.addIssue({
+      code: 'custom',
+      message: authorityIssue,
+      path: ['ownerPlayerID'],
+    })
+  }
+
   const playerIDs = new Set<number>()
 
   room.players.forEach((player, index) => {
