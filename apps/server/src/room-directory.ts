@@ -5,7 +5,10 @@ import type {
   AvalonRoomSummary,
 } from '@avalon/game'
 
-import { getPublicLobbyAuthority } from './room-lobby'
+import {
+  AvalonLobbyError,
+  getPublicLobbyAuthority,
+} from './room-lobby'
 
 function getStatus(metadata: Server.MatchData, state: State): AvalonRoomStatus {
   if (metadata.gameover !== undefined) return 'finished'
@@ -48,7 +51,17 @@ export async function listAvalonRoomSummaries(
       state: true,
     })
     if (metadata === undefined || state === undefined || metadata.unlisted) continue
-    rooms.push(toAvalonRoomSummary(matchID, metadata, state))
+    try {
+      rooms.push(toAvalonRoomSummary(matchID, metadata, state))
+    } catch (error) {
+      if (
+        error instanceof AvalonLobbyError &&
+        error.code === 'room_not_joinable'
+      ) {
+        continue
+      }
+      throw error
+    }
   }
 
   return rooms.sort((first, second) => second.updatedAt - first.updatedAt)

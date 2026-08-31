@@ -134,6 +134,7 @@ const PERCIVAL_IDENTITY_RECOGNITION_STEPS: readonly IdentityRecognitionStep[] = 
 function canStartGame(G: AvalonG, playerID: PlayerID, numPlayers: number) {
   return G.status === 'lobby' &&
     G.lobby !== undefined &&
+    G.lobby.authorityVersion === 1 &&
     playerID === G.lobby.ownerPlayerID &&
     G.lobby.occupiedPlayerIDs.length === numPlayers
 }

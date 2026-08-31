@@ -228,6 +228,38 @@ describe('Avalon setup and player views', () => {
     expect((client.store.getState().G as AvalonG).status).toBe('lobby')
   })
 
+  it('rejects a full lobby with a newer authority version without mutating it', () => {
+    const game = createAvalonGame()
+    const client = Client({
+      game: {
+        ...game,
+        setup: (context) => {
+          const initialGame = game.setup?.(context, {
+            ownerPlayerID: '0',
+            occupiedPlayerIDs: ['0', '1', '2', '3', '4'],
+          }) as AvalonG
+          return {
+            ...initialGame,
+            lobby: {
+              authorityVersion: 2,
+              ownerPlayerID: '0',
+              occupiedPlayerIDs: ['0', '1', '2', '3', '4'],
+            },
+          } as unknown as AvalonG
+        },
+      },
+      numPlayers: 5,
+      playerID: '0',
+    })
+    const beforeMove = client.store.getState()._stateID
+    const beforeGame = structuredClone(client.store.getState().G)
+
+    client.moves.startGame()
+
+    expect(client.store.getState()._stateID).toBe(beforeMove)
+    expect(client.store.getState().G).toEqual(beforeGame)
+  })
+
   it('keeps rooms without an explicit role configuration on the base roles', () => {
     const client = createLocalClient()
     client.moves.startGame()

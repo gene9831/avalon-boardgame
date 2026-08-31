@@ -649,7 +649,7 @@ describe('Avalon HTTP protocol boundary', () => {
     }
   })
 
-  it('refuses to mutate a room with a newer authority version', async () => {
+  it('quarantines a full room with a newer authority version without mutation', async () => {
     const db = new MemoryStorage()
     const game = createAvalonGame()
     const match = createMatch({
@@ -663,18 +663,47 @@ describe('Avalon HTTP protocol boundary', () => {
     ;(match.initialState.G as AvalonG).lobby = {
       authorityVersion: 2,
       ownerPlayerID: '0',
-      occupiedPlayerIDs: ['0'],
+      occupiedPlayerIDs: ['0', '1', '2', '3', '4'],
     } as never
-    match.metadata.players[0] = {
-      id: 0,
-      name: 'Future Owner',
-      credentials: 'future-owner-credential',
+    for (const playerID of ['0', '1', '2', '3', '4']) {
+      const numericPlayerID = Number(playerID)
+      match.metadata.players[numericPlayerID] = {
+        id: numericPlayerID,
+        name: playerID === '0' ? 'Future Owner' : `Future Player ${numericPlayerID + 1}`,
+        credentials: `future-credential-${playerID}`,
+      }
+      ;(match.initialState.G as AvalonG).players[playerID] = {
+        name: match.metadata.players[numericPlayerID].name!,
+      }
     }
     db.createMatch('future-authority', match)
     const before = db.fetch('future-authority', { state: true, metadata: true })
     const running = await startAvalonServer({ config, db })
 
     try {
+      const created = await requestCreate(running)
+      const supported = await created.json() as { matchID: string }
+
+      const detail = await fetch(
+        `${baseURL(running)}/games/avalon/future-authority`,
+      )
+      expect(detail.status).toBe(409)
+      expect(await detail.json()).toEqual({
+        error: {
+          code: 'room_not_joinable',
+          message: 'Room is not joinable',
+        },
+      })
+
+      const directory = await fetch(`${baseURL(running)}/rooms/avalon`)
+      expect(directory.status).toBe(200)
+      const directoryBody = await directory.json() as {
+        rooms: Array<{ matchID: string }>
+      }
+      expect(directoryBody.rooms.map(({ matchID }) => matchID)).toEqual([
+        supported.matchID,
+      ])
+
       const joined = await requestJoin(running, 'future-authority', 'Bob')
       expect(joined.status).toBe(409)
       expect((await joined.json()).error.code).toBe('room_not_joinable')

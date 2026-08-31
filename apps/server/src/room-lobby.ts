@@ -209,6 +209,8 @@ export function getPublicLobbyAuthority(
     }
   }
 
+  if (G.lobby?.authorityVersion !== undefined) throw roomNotJoinable()
+
   const occupied = occupiedPlayerIDs(metadata)
   return {
     authorityVersion: 1,
