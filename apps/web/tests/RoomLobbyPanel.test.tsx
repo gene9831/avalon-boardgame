@@ -25,6 +25,7 @@ function renderPanel(overrides: Partial<RoomLobbyPanelProps> = {}) {
       { id: 1, name: 'Bob', isConnected: true },
     ],
     profile: { avatarID: 'merlin', name: 'Bob' },
+    roomExitBlocked: false,
     roomExitBusy: false,
     seatChangePending: false,
     ...overrides,
@@ -61,6 +62,18 @@ describe('RoomLobbyPanel room exit action', () => {
     ['owner dissolution', { currentPlayerID: '3', ownerPlayerID: '3' }],
   ])('disables %s while a seat change is pending', (_label, overrides) => {
     const html = renderPanel({ ...overrides, seatChangePending: true })
+
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>(?:退出房间|解散房间)<\/button>/)
+  })
+
+  it.each([
+    ['guest exit', {}],
+    ['owner dissolution', { currentPlayerID: '3', ownerPlayerID: '3' }],
+  ])('disables %s while another tab has a persisted seat transition', (_label, overrides) => {
+    const html = renderPanel({
+      ...overrides,
+      roomExitBlocked: true,
+    })
 
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>(?:退出房间|解散房间)<\/button>/)
   })

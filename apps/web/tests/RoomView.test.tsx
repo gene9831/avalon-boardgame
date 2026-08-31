@@ -32,6 +32,7 @@ function renderRoomView(overrides: Partial<RoomViewProps> = {}) {
       players: [{ id: 0, name: 'Alice', isConnected: true }],
       setupData: { numPlayers: 5 },
     },
+    roomExitBlocked: false,
     roomExitBusy: false,
     session: {
       credentials: 'credential',
@@ -340,8 +341,9 @@ describe('RoomView connection state', () => {
   })
 
   it('rejects an attempted room exit while seat migration is pending', () => {
-    expect(canRequestRoomExit('lobby', false, true)).toBe(false)
-    expect(canRequestRoomExit('lobby', false, false)).toBe(true)
+    expect(canRequestRoomExit('lobby', false, true, false)).toBe(false)
+    expect(canRequestRoomExit('lobby', false, false, true)).toBe(false)
+    expect(canRequestRoomExit('lobby', false, false, false)).toBe(true)
   })
 })
 

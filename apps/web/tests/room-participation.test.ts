@@ -7,13 +7,17 @@ import {
   getSeatChangeErrorMessage,
   getStartErrorMessage,
   leaveRoom,
+  reconcileRoomExit,
   RoomParticipationHttpError,
 } from '../src/room-participation'
 import {
+  beginSeatTransition,
   loadSeatTransition,
   loadRoomSession,
+  markSeatTransitionUncertain,
   recoverSeatTransition,
   saveRoomSession,
+  type RoomSession,
   type RoomSessionStorage,
 } from '../src/room-session'
 
@@ -166,7 +170,9 @@ describe('room participation client', () => {
   it('releases the current seat without exposing its credential in the URL', async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
 
-    await leaveRoom('http://localhost:8001', session, fetcher)
+    await expect(leaveRoom('http://localhost:8001', session, fetcher)).resolves.toEqual({
+      status: 204,
+    })
 
     expect(fetcher).toHaveBeenCalledWith(
       'http://localhost:8001/rooms/avalon/room%20123/players/2',
@@ -183,13 +189,15 @@ describe('room participation client', () => {
 
     await expect(
       leaveRoom('http://localhost:8001', session, fetcher),
-    ).resolves.toBeUndefined()
+    ).resolves.toEqual({ status })
   })
 
   it('uses the host credential to dissolve the whole room', async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
 
-    await dissolveRoom('http://localhost:8001', session, fetcher)
+    await expect(dissolveRoom('http://localhost:8001', session, fetcher)).resolves.toEqual({
+      status: 204,
+    })
 
     expect(fetcher).toHaveBeenCalledWith(
       'http://localhost:8001/rooms/avalon/room%20123',
@@ -229,5 +237,115 @@ describe('room participation client', () => {
       .toBe('只有房间拥有者可以执行此操作。')
     expect(getStartErrorMessage(new Error('network unavailable')))
       .toBe('开始游戏失败，请重试。')
+  })
+})
+
+describe('room exit reconciliation', () => {
+  const roomSession: RoomSession = {
+    ...session,
+    playerName: 'Alice',
+  }
+
+  it('does not count a stale-source 403 as exit while a cross-tab move is requesting', async () => {
+    const storage = createStorage()
+    saveRoomSession(roomSession, storage)
+    const transition = beginSeatTransition(roomSession, '4', storage, Date.now(), () => 'move-1')
+    const validate = vi.fn(async () => true)
+
+    await expect(reconcileRoomExit(
+      roomSession,
+      { status: 403 },
+      true,
+      validate,
+      storage,
+    )).resolves.toEqual({ status: 'transition-pending' })
+    expect(validate).not.toHaveBeenCalled()
+    expect(loadRoomSession(roomSession.matchID, storage)).toEqual(roomSession)
+    expect(loadSeatTransition(roomSession.matchID, storage)).toEqual(transition)
+  })
+
+  it('recovers and adopts a committed target before handling a stale-source 403', async () => {
+    const storage = createStorage()
+    saveRoomSession(roomSession, storage)
+    const transition = beginSeatTransition(roomSession, '4', storage, 42, () => 'move-2')
+    markSeatTransitionUncertain(transition, storage)
+
+    await expect(reconcileRoomExit(
+      roomSession,
+      { status: 403 },
+      true,
+      async (_matchID, playerID) => playerID === '4',
+      storage,
+    )).resolves.toEqual({
+      status: 'rebind',
+      session: { ...roomSession, playerID: '4' },
+    })
+    expect(loadRoomSession(roomSession.matchID, storage)).toEqual({
+      ...roomSession,
+      playerID: '4',
+    })
+  })
+
+  it('adopts a target already saved by another tab instead of clearing it', async () => {
+    const storage = createStorage()
+    saveRoomSession({ ...roomSession, playerID: '4' }, storage)
+
+    await expect(reconcileRoomExit(
+      roomSession,
+      { status: 403 },
+      true,
+      async () => false,
+      storage,
+    )).resolves.toEqual({
+      status: 'rebind',
+      session: { ...roomSession, playerID: '4' },
+    })
+    expect(loadRoomSession(roomSession.matchID, storage)).toEqual({
+      ...roomSession,
+      playerID: '4',
+    })
+  })
+
+  it('retains a valid source when a transition changed during a 403 request', async () => {
+    const storage = createStorage()
+    saveRoomSession(roomSession, storage)
+
+    await expect(reconcileRoomExit(
+      roomSession,
+      { status: 403 },
+      true,
+      async (_matchID, playerID) => playerID === roomSession.playerID,
+      storage,
+    )).resolves.toEqual({ status: 'session-retained' })
+    expect(loadRoomSession(roomSession.matchID, storage)).toEqual(roomSession)
+  })
+
+  it('clears only the exact intended session after an ordinary completed exit', async () => {
+    const storage = createStorage()
+    saveRoomSession(roomSession, storage)
+
+    await expect(reconcileRoomExit(
+      roomSession,
+      { status: 204 },
+      false,
+      async () => false,
+      storage,
+    )).resolves.toEqual({ status: 'completed' })
+    expect(loadRoomSession(roomSession.matchID, storage)).toBeNull()
+  })
+
+  it('preserves a target saved between the exit request and exact cleanup', async () => {
+    const storage = createStorage()
+    const target = { ...roomSession, playerID: '4' }
+    saveRoomSession(target, storage)
+
+    await expect(reconcileRoomExit(
+      roomSession,
+      { status: 204 },
+      false,
+      async () => false,
+      storage,
+    )).resolves.toEqual({ status: 'rebind', session: target })
+    expect(loadRoomSession(roomSession.matchID, storage)).toEqual(target)
   })
 })

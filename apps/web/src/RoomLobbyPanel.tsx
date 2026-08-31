@@ -28,6 +28,7 @@ export interface RoomLobbyPanelProps {
   players: readonly LobbyPlayer[]
   profile: PlayerProfile
   roomExitBusy: boolean
+  roomExitBlocked: boolean
   seatChangePending: boolean
 }
 
@@ -50,6 +51,7 @@ export function RoomLobbyPanel({
   players,
   profile,
   roomExitBusy,
+  roomExitBlocked,
   seatChangePending,
 }: RoomLobbyPanelProps) {
   const seats = buildRoundTableSeats(players, numPlayers, currentPlayerID, ownerPlayerID)
@@ -89,7 +91,7 @@ export function RoomLobbyPanel({
               <span aria-hidden="true">⋯</span>
             </button>
             <div className={`${roomMenuOpen ? 'block' : 'hidden'} absolute right-0 top-[calc(100%+0.5rem)] z-50 min-w-32 rounded-xl border border-white/15 bg-slate-950/95 p-1.5 shadow-2xl`}>
-              <button className="min-h-11 w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-rose-200 transition hover:bg-rose-300/10 disabled:cursor-not-allowed disabled:opacity-40" disabled={roomExitBusy || seatChangePending} onClick={onRequestRoomExit} type="button">
+              <button className="min-h-11 w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-rose-200 transition hover:bg-rose-300/10 disabled:cursor-not-allowed disabled:opacity-40" disabled={roomExitBusy || seatChangePending || roomExitBlocked} onClick={onRequestRoomExit} type="button">
                 {roomExitBusy ? (isOwner ? '正在解散…' : '正在退出…') : isOwner ? '解散房间' : '退出房间'}
               </button>
             </div>

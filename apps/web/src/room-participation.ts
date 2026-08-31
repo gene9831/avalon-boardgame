@@ -6,13 +6,18 @@ import {
 
 import {
   beginSeatTransition,
+  clearRoomSessionIfCurrent,
   clearSeatTransitionIfCurrent,
   completeSeatTransition,
+  loadRoomSession,
+  loadSeatTransition,
   markSeatTransitionUncertain,
+  recoverSeatTransition,
   renewSeatTransitionLease,
   SEAT_TRANSITION_LEASE_MS,
   type RoomSession,
   type RoomSessionStorage,
+  type ValidateSeat,
 } from './room-session'
 import { getLobbyErrorMessage } from './join-error'
 
@@ -43,6 +48,16 @@ export interface RoomParticipationClient {
     credentials: string,
   ) => Promise<void>
 }
+
+export interface RoomExitResult {
+  status: 204 | 403 | 404
+}
+
+export type RoomExitResolution =
+  | { status: 'completed' }
+  | { status: 'rebind', session: RoomSession }
+  | { status: 'session-retained' }
+  | { status: 'transition-pending' }
 
 export function createRoomParticipationClient(
   baseURL: string,
@@ -154,14 +169,69 @@ async function requestRoomExit(
   url: string,
   credentials: string,
   fetcher: Fetcher,
-) {
+): Promise<RoomExitResult> {
   const response = await fetcher(url, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${credentials}` },
   })
-  if ([204, 403, 404].includes(response.status)) return
+  if (response.status === 204 || response.status === 403 || response.status === 404) {
+    return { status: response.status as RoomExitResult['status'] }
+  }
 
   throw new RoomParticipationHttpError(response.status)
+}
+
+function sameRoomSession(current: RoomSession | null, expected: RoomSession) {
+  return current?.playerID === expected.playerID &&
+    current.credentials === expected.credentials
+}
+
+export async function reconcileRoomExit(
+  expected: RoomSession,
+  result: RoomExitResult,
+  transitionChanged: boolean,
+  validate: ValidateSeat,
+  storage?: RoomSessionStorage,
+): Promise<RoomExitResolution> {
+  let currentSession = loadRoomSession(expected.matchID, storage)
+  if (currentSession !== null && !sameRoomSession(currentSession, expected)) {
+    return { status: 'rebind', session: currentSession }
+  }
+
+  const transition = loadSeatTransition(expected.matchID, storage)
+  if (transition !== null) {
+    const recovery = await recoverSeatTransition(transition, validate, storage)
+    currentSession = loadRoomSession(expected.matchID, storage)
+    if (currentSession !== null && !sameRoomSession(currentSession, expected)) {
+      return { status: 'rebind', session: currentSession }
+    }
+    if (recovery.status === 'requesting') return { status: 'transition-pending' }
+    if (recovery.status === 'source') return { status: 'session-retained' }
+    if (recovery.status === 'target' && currentSession !== null) {
+      return { status: 'rebind', session: currentSession }
+    }
+    if (recovery.status === 'invalid') return { status: 'completed' }
+  }
+
+  if (transitionChanged && result.status === 403) {
+    const sourceValid = await validate(
+      expected.matchID,
+      expected.playerID,
+      expected.credentials,
+    )
+    currentSession = loadRoomSession(expected.matchID, storage)
+    if (currentSession !== null && !sameRoomSession(currentSession, expected)) {
+      return { status: 'rebind', session: currentSession }
+    }
+    if (sourceValid || currentSession !== null) return { status: 'session-retained' }
+  }
+
+  clearRoomSessionIfCurrent(expected, storage)
+  currentSession = loadRoomSession(expected.matchID, storage)
+  if (currentSession === null) return { status: 'completed' }
+  return sameRoomSession(currentSession, expected)
+    ? { status: 'session-retained' }
+    : { status: 'rebind', session: currentSession }
 }
 
 export async function leaveRoom(
@@ -169,7 +239,7 @@ export async function leaveRoom(
   session: Pick<RoomSession, 'matchID' | 'playerID' | 'credentials'>,
   fetcher: Fetcher = fetch,
 ) {
-  await requestRoomExit(
+  return requestRoomExit(
     `${baseURL}/rooms/avalon/${encodeURIComponent(session.matchID)}/players/${encodeURIComponent(session.playerID)}`,
     session.credentials,
     fetcher,
@@ -181,7 +251,7 @@ export async function dissolveRoom(
   session: Pick<RoomSession, 'matchID' | 'credentials'>,
   fetcher: Fetcher = fetch,
 ) {
-  await requestRoomExit(
+  return requestRoomExit(
     `${baseURL}/rooms/avalon/${encodeURIComponent(session.matchID)}`,
     session.credentials,
     fetcher,

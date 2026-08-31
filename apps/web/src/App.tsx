@@ -56,6 +56,7 @@ import {
   getSeatChangeErrorMessage,
   getStartErrorMessage,
   leaveRoom,
+  reconcileRoomExit,
 } from './room-participation'
 import {
   consumeRoomNavigationNotice,
@@ -220,8 +221,12 @@ export function canRequestRoomExit(
   phase: string | null | undefined,
   roomExitBusy: boolean,
   seatChangePending: boolean,
+  persistedSeatTransitionPending: boolean,
 ) {
-  return phase === 'lobby' && !roomExitBusy && !seatChangePending
+  return phase === 'lobby' &&
+    !roomExitBusy &&
+    !seatChangePending &&
+    !persistedSeatTransitionPending
 }
 
 function App() {
@@ -484,6 +489,8 @@ function RoomRoute({
   const [roomExitBusy, setRoomExitBusy] = useState(false)
   const [seatChangePending, setSeatChangePending] = useState(false)
   const [seatTransitionRevision, setSeatTransitionRevision] = useState(0)
+  const [, setSeatTransitionGuardRevision] = useState(0)
+  const seatTransitionChangeRevisionRef = useRef(0)
 
   const invalidateSession = useCallback(
     (reason: string, generation: number, expectedSession?: RoomSession) => {
@@ -585,6 +592,8 @@ function RoomRoute({
   }, [matchID])
 
   const routeSession = session?.matchID === matchID ? session : null
+  const persistedSeatTransitionPending = routeSession !== null &&
+    loadSeatTransition(matchID) !== null
 
   useEffect(() => {
     const handleRoomSessionStorage = (event: StorageEvent) => {
@@ -596,6 +605,13 @@ function RoomRoute({
         event.key !== ROOM_SESSION_KEY &&
         event.key !== LAST_ROOM_SESSION_KEY
       ) return
+      if (event.key === getSeatTransitionKey(matchID)) {
+        seatTransitionChangeRevisionRef.current += 1
+        setSeatTransitionGuardRevision((revision) => revision + 1)
+        if (loadSeatTransition(matchID) !== null) {
+          setRoomExitDialogOpen(false)
+        }
+      }
       if (shouldWakeRoomRouteForSeatTransitionChange(event.key, routeSession)) {
         setSeatTransitionRevision((revision) => revision + 1)
       }
@@ -830,7 +846,15 @@ function RoomRoute({
   }
 
   const handleRequestRoomExit = () => {
-    if (routeSession === null || !canRequestRoomExit(gameState?.ctx.phase, roomExitBusy, seatChangePending)) return
+    if (
+      routeSession === null ||
+      !canRequestRoomExit(
+        gameState?.ctx.phase,
+        roomExitBusy,
+        seatChangePending,
+        loadSeatTransition(routeSession.matchID) !== null,
+      )
+    ) return
 
     setRoomExitDialogOpen(true)
   }
@@ -842,23 +866,54 @@ function RoomRoute({
   }
 
   const handleConfirmRoomExit = async () => {
-    if (routeSession === null || gameState === null || !canRequestRoomExit(gameState.ctx.phase, roomExitBusy, seatChangePending)) return
+    if (
+      routeSession === null ||
+      gameState === null ||
+      !canRequestRoomExit(
+        gameState.ctx.phase,
+        roomExitBusy,
+        seatChangePending,
+        loadSeatTransition(routeSession.matchID) !== null,
+      )
+    ) return
 
     const currentSession = routeSession
     const generation = routeGenerationRef.current
+    const transitionRevision = seatTransitionChangeRevisionRef.current
     const isOwner = gameState.G.lobby.ownerPlayerID === currentSession.playerID
     setRoomExitBusy(true)
 
     try {
-      if (isOwner) {
-        await dissolveRoom(webConfig.lobbyURL, currentSession)
-      } else {
-        await leaveRoom(webConfig.lobbyURL, currentSession)
-      }
+      const result = isOwner
+        ? await dissolveRoom(webConfig.lobbyURL, currentSession)
+        : await leaveRoom(webConfig.lobbyURL, currentSession)
       if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
 
+      const resolution = await reconcileRoomExit(
+        currentSession,
+        result,
+        transitionRevision !== seatTransitionChangeRevisionRef.current,
+        async (recoveryMatchID, playerID, credentials) => resolveRecoverySeatValidation(async () => {
+          await validateRoomSession(webConfig.lobbyURL, {
+            matchID: recoveryMatchID,
+            playerID,
+            credentials,
+          })
+        }),
+      )
+      if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
+      if (resolution.status === 'rebind') {
+        setSession(resolution.session)
+        setRoomExitDialogOpen(false)
+        return
+      }
+      if (resolution.status !== 'completed') {
+        setRoomExitDialogOpen(false)
+        pushToast({ message: '座位正在恢复，请稍后重试退出。', tone: 'error' })
+        return
+      }
+
       stopCurrentClient(clientRef)
-      clearRoomSession(matchID)
       setSession(null)
       setRoomExitDialogOpen(false)
       navigate('/', {
@@ -911,6 +966,8 @@ function RoomRoute({
     return <RoomAccessView matchID={matchID} onBackHome={() => navigate('/')} />
   }
 
+  const roomExitBlocked = seatChangePending || persistedSeatTransitionPending
+
   return (
     <>
       <RoomView
@@ -931,6 +988,7 @@ function RoomRoute({
         onSaveProfile={onSaveProfile}
         profile={profile}
         room={room}
+        roomExitBlocked={roomExitBlocked}
         roomExitBusy={roomExitBusy}
         seatChangePending={seatChangePending}
         session={routeSession}
@@ -1018,6 +1076,7 @@ export interface RoomViewProps {
   onSaveProfile: (profile: PlayerProfile) => void
   profile: PlayerProfile
   room: AvalonMatch | null
+  roomExitBlocked: boolean
   roomExitBusy: boolean
   seatChangePending: boolean
   session: RoomSession
@@ -1042,6 +1101,7 @@ export function RoomView({
   profile,
   room,
   roomExitBusy,
+  roomExitBlocked,
   seatChangePending,
   session,
 }: RoomViewProps) {
@@ -1122,6 +1182,7 @@ export function RoomView({
           players={room.players}
           profile={roomProfile}
           roomExitBusy={roomExitBusy}
+          roomExitBlocked={roomExitBlocked}
           seatChangePending={seatChangePending}
         />
       </ImmersiveLobbyShell>

@@ -5,6 +5,7 @@ import { playScriptedScenario } from '@avalon/test-support'
 import {
   createBrowserReplayHarness,
   createRoom,
+  joinRoom,
   playerName,
 } from '../support/browser-replay'
 
@@ -18,21 +19,40 @@ test('a transient committed seat change recovers both same-browser room routes a
 }) => {
   test.setTimeout(90_000)
 
+  const hostContext = await browser.newContext()
   const context = await browser.newContext()
+  const hostPage = await hostContext.newPage()
   const movingPage = await context.newPage()
   const stalePage = await context.newPage()
   let releaseTransientResponse: () => void = () => undefined
+  let releaseExitRequest: () => void = () => undefined
+  let releaseRecoveryRequests: () => void = () => undefined
   let reportServerCommit: () => void = () => undefined
+  let reportExitRequest: () => void = () => undefined
+  let reportExitResponse: (status: number) => void = () => undefined
   const transientResponseReleased = new Promise<void>((resolve) => {
     releaseTransientResponse = resolve
+  })
+  const exitRequestReleased = new Promise<void>((resolve) => {
+    releaseExitRequest = resolve
+  })
+  const recoveryRequestsReleased = new Promise<void>((resolve) => {
+    releaseRecoveryRequests = resolve
   })
   const serverCommitted = new Promise<void>((resolve) => {
     reportServerCommit = resolve
   })
+  const exitRequestStarted = new Promise<void>((resolve) => {
+    reportExitRequest = resolve
+  })
+  const exitResponse = new Promise<number>((resolve) => {
+    reportExitResponse = resolve
+  })
 
   try {
-    const matchID = await createRoom(movingPage, 5, 'Recovering Owner')
+    const matchID = await createRoom(hostPage, 5, 'Room Owner')
     const roomURL = `/rooms/${matchID}`
+    await joinRoom(movingPage, matchID, '1', 'Recovering Guest')
     await stalePage.goto(roomURL)
     await expect(stalePage.getByLabel('5 人玩家圆桌')).toBeVisible()
 
@@ -60,6 +80,20 @@ test('a transient committed seat change recovers both same-browser room routes a
       })
     })
 
+    await context.route(`**/rooms/avalon/${matchID}/players/1`, async (route) => {
+      reportExitRequest()
+      await exitRequestReleased
+      const response = await route.fetch()
+      reportExitResponse(response.status())
+      await route.fulfill({ response })
+    })
+
+    await stalePage.getByRole('button', { name: '房间操作' }).click()
+    await stalePage.getByRole('button', { name: '退出房间' }).click()
+    const exitDialog = stalePage.getByRole('dialog', { name: '确认退出房间' })
+    await exitDialog.getByRole('button', { name: '退出房间' }).click()
+    await exitRequestStarted
+
     await movingPage.getByRole('button', { name: '移至 5 号空座位' }).click()
     await serverCommitted
     await expect.poll(() => movingPage.evaluate((key) => {
@@ -68,17 +102,51 @@ test('a transient committed seat change recovers both same-browser room routes a
       return (JSON.parse(raw) as { status?: unknown }).status ?? null
     }, seatTransitionKey(matchID))).toBe('requesting')
 
-    await movingPage.waitForTimeout(3_000)
     await expect(movingPage).toHaveURL(new RegExp(`/rooms/${matchID}$`))
     await expect(stalePage).toHaveURL(new RegExp(`/rooms/${matchID}$`))
     await expect.poll(() => movingPage.evaluate((key) => {
       const raw = localStorage.getItem(key)
       if (raw === null) return null
       return (JSON.parse(raw) as { playerID?: unknown }).playerID ?? null
-    }, roomSessionKey(matchID))).toBe('0')
+    }, roomSessionKey(matchID))).toBe('1')
+
+    releaseExitRequest()
+    await expect(exitResponse).resolves.toBe(403)
+    await expect(movingPage).toHaveURL(new RegExp(`/rooms/${matchID}$`))
+    await expect(stalePage).toHaveURL(new RegExp(`/rooms/${matchID}$`))
+    await expect.poll(() => stalePage.evaluate((key) => {
+      const raw = localStorage.getItem(key)
+      if (raw === null) return null
+      return (JSON.parse(raw) as { playerID?: unknown }).playerID ?? null
+    }, roomSessionKey(matchID))).toBe('1')
+
+    await context.route('**/rooms/avalon/*/players/*/session', async (route) => {
+      await recoveryRequestsReleased
+      await route.continue()
+    })
 
     releaseTransientResponse()
     await expect(movingPage.getByText('换座失败，请重试。', { exact: true })).toBeVisible()
+    await expect.poll(() => movingPage.evaluate((key) => {
+      const raw = localStorage.getItem(key)
+      if (raw === null) return null
+      return (JSON.parse(raw) as { status?: unknown }).status ?? null
+    }, seatTransitionKey(matchID))).toBe('uncertain')
+
+    for (const page of [movingPage, stalePage]) {
+      const exitButton = page.getByRole('button', { name: '退出房间' })
+      const roomMenu = page.getByRole('button', { name: '房间操作' })
+      if (await roomMenu.count() === 0) {
+        await expect(exitButton).toHaveCount(0)
+        continue
+      }
+      if (!await exitButton.isVisible()) {
+        await roomMenu.click()
+      }
+      await expect(exitButton).toBeDisabled()
+    }
+
+    releaseRecoveryRequests()
     await expect.poll(() => movingPage.evaluate((key) => {
       const raw = localStorage.getItem(key)
       if (raw === null) return null
@@ -90,7 +158,7 @@ test('a transient committed seat change recovers both same-browser room routes a
     for (const page of [movingPage, stalePage]) {
       await expect(page).toHaveURL(new RegExp(`/rooms/${matchID}$`))
       await expect(page.locator('[data-round-table-player][data-player-id="4"]'))
-        .toContainText('Recovering Owner')
+        .toContainText('Recovering Guest')
       await expect.poll(() => page.evaluate((key) => {
         const raw = localStorage.getItem(key)
         if (raw === null) return false
@@ -107,8 +175,10 @@ test('a transient committed seat change recovers both same-browser room routes a
       return (JSON.parse(raw) as { playerID?: unknown }).playerID ?? null
     }, roomSessionKey(matchID))).toBe('4')
   } finally {
+    releaseExitRequest()
     releaseTransientResponse()
-    await context.close()
+    releaseRecoveryRequests()
+    await Promise.allSettled([context.close(), hostContext.close()])
   }
 })
 
