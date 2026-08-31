@@ -347,6 +347,9 @@ function GameSeat({ canSelect, canSelectAsTarget, dense, displayedTeamVoteResult
   const isLeader = game.leaderID === seat.playerID
   const onQuestTeam = game.proposedTeam?.includes(seat.playerID) === true
   const knownEvil = showKnownPlayerInfo && game.viewer.knownEvilPlayerIDs.includes(seat.playerID)
+  const knownMerlinCandidate = (
+    game.viewer.knownMerlinCandidatePlayerIDs ?? []
+  ).includes(seat.playerID)
   const revealedRole = game.revealedRoles?.[seat.playerID]
   const privateRole = showPrivateRoleKnowledge && seat.isCurrentPlayer
     ? game.viewer.role
@@ -417,6 +420,7 @@ function GameSeat({ canSelect, canSelectAsTarget, dense, displayedTeamVoteResult
             : <RoleAvatar className="size-full object-cover" role={avatarRole} />}
         </div>
         {knownEvil && <KnownEvilEmblem />}
+        {knownMerlinCandidate && <MerlinCandidateBadge />}
       </div>
       <div className="round-table-label-stack mt-1 flex w-full flex-col items-stretch" data-label-placement={seat.labelPlacement}>
         <div className="relative w-full" data-round-table-label-anchor>
@@ -494,6 +498,14 @@ function KnownEvilEmblem() {
         <path d="M12 3l8 4v5c0 4.8-3.3 8-8 9-4.7-1-8-4.2-8-9V7l8-4z" fill="currentColor" />
         <path d="M8 10l2.2 1.4L8.8 14M16 10l-2.2 1.4 1.4 2.6" fill="none" stroke="#4c0519" strokeLinecap="round" strokeWidth="1.5" />
       </svg>
+    </span>
+  )
+}
+
+function MerlinCandidateBadge() {
+  return (
+    <span aria-label="Merlin 候选" className="knowledge-badge knowledge-badge--merlin-candidate">
+      <span aria-hidden="true">?</span>
     </span>
   )
 }

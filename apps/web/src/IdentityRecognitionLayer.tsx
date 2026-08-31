@@ -24,6 +24,11 @@ const STEP_COPY: Record<
     compactTitle: '辨认邪恶阵营',
     confirmation: '我已辨认邪恶阵营',
   },
+  percivalRecognition: {
+    title: '帕西维尔，请睁眼并辨认梅林候选',
+    compactTitle: '辨认梅林候选',
+    confirmation: '我已辨认梅林候选',
+  },
 }
 
 interface IdentityRecognitionLayerProps {

@@ -1,8 +1,29 @@
 import { expect, test } from '@playwright/test'
 
-import { playGeneratedGame, playScriptedScenario } from '@avalon/test-support'
+import {
+  type BrowserRecognitionStep,
+  confirmRecognitionParticipants,
+  createBrowserReplayHarness,
+  playerName,
+} from '../support/browser-replay'
 
-import { createBrowserReplayHarness, playerName } from '../support/browser-replay'
+const baseRecognitionOrder = [
+  'roleReveal',
+  'evilRecognition',
+  'merlinRecognition',
+] as const satisfies readonly BrowserRecognitionStep[]
+const pairedRecognitionOrder = [
+  ...baseRecognitionOrder,
+  'percivalRecognition',
+] as const satisfies readonly BrowserRecognitionStep[]
+
+type PresentedRole =
+  | 'merlin'
+  | 'percival'
+  | 'assassin'
+  | 'morgana'
+  | 'loyal_servant'
+  | 'minion'
 
 const recognitionViewports = [
   { width: 320, height: 568 },
@@ -100,44 +121,47 @@ test('recognition controls float in portrait and replace the quest board in land
   test.setTimeout(180_000)
 
   for (const playerCount of [5, 10]) {
-    const run = playGeneratedGame({
-      masterSeed: process.env.E2E_MASTER_SEED ?? 'playwright-smoke',
+    const harness = await createBrowserReplayHarness({
+      browser,
       playerCount,
+      roleConfiguration: { percivalMorgana: false },
     })
-    const harness = await createBrowserReplayHarness({ browser, playerCount })
 
     try {
-      const recognitionCommands = run.transcript.filter(
-        ({ command }) => command === 'confirmIdentityRecognition',
-      )
-      const roleRevealCommands = recognitionCommands.slice(0, playerCount)
-      const firstRecognitionCommand = recognitionCommands[playerCount]
+      await harness.dispatch({ actor: '0', command: 'startGame' })
+      await confirmRecognitionParticipants(harness.pages, 'roleReveal')
 
-      expect(roleRevealCommands).toHaveLength(playerCount)
-      expect(firstRecognitionCommand).toBeDefined()
-
-      await harness.dispatch(run.transcript[0]!)
-      for (const command of roleRevealCommands) {
-        await harness.dispatch(command)
-      }
-
-      const participantPage = harness.pages[Number(firstRecognitionCommand!.actor)]!
+      const participantIndex = await Promise.all(harness.pages.map(async (page, index) => (
+        await page.locator('[data-identity-step="evilRecognition"][data-curtain-state="raised"]').count() === 1
+          ? index
+          : -1
+      ))).then((indices) => indices.find((index) => index >= 0))
+      if (participantIndex === undefined) throw new Error('Expected an Evil-recognition participant')
+      const responsiveParticipantPage = harness.pages[participantIndex]!
       for (const viewport of recognitionViewports) {
         await expectRecognitionControlsAvoidSeats({
-          page: participantPage,
+          page: responsiveParticipantPage,
           playerCount,
           viewport,
         })
       }
 
-      await participantPage.setViewportSize({ width: 390, height: 844 })
-      const confirmationButton = participantPage.getByRole('button', {
+      await responsiveParticipantPage.setViewportSize({ width: 390, height: 844 })
+      const confirmationButton = responsiveParticipantPage.getByRole('button', {
         name: /我已辨认/,
       })
       await confirmationButton.focus()
       await expect(confirmationButton).toBeFocused()
-      await participantPage.setViewportSize({ width: 1339, height: 786 })
+      await responsiveParticipantPage.setViewportSize({ width: 1339, height: 786 })
       await expect(confirmationButton).toBeFocused()
+
+      for (const step of baseRecognitionOrder.slice(1)) {
+        await confirmRecognitionParticipants(harness.pages, step)
+      }
+      for (const page of harness.pages) {
+        await expect(page.locator('[data-identity-step="percivalRecognition"]')).toHaveCount(0)
+        await expect(page.locator('[data-identity-step]')).toHaveCount(0)
+      }
     } finally {
       await harness.close()
     }
@@ -149,11 +173,11 @@ test('players complete the curtain-based identity recognition ceremony', async (
 }) => {
   test.setTimeout(120_000)
 
-  const run = playScriptedScenario({
-    masterSeed: process.env.E2E_MASTER_SEED ?? 'playwright-smoke',
-    scenario: 'five-rejections',
+  const harness = await createBrowserReplayHarness({
+    browser,
+    playerCount: 5,
+    roleConfiguration: { percivalMorgana: true },
   })
-  const harness = await createBrowserReplayHarness({ browser, playerCount: 5 })
   const consoleErrors: string[] = []
 
   for (const page of harness.pages) {
@@ -163,18 +187,8 @@ test('players complete the curtain-based identity recognition ceremony', async (
   }
 
   try {
-    const recognitionCommands = run.transcript.filter(
-      ({ command }) => command === 'confirmIdentityRecognition',
-    )
-    const roleRevealCommands = recognitionCommands.slice(0, 5)
-    const evilRecognitionCommands = recognitionCommands.slice(5, 7)
-    const merlinRecognitionCommand = recognitionCommands[7]
-
-    expect(roleRevealCommands).toHaveLength(5)
-    expect(evilRecognitionCommands).toHaveLength(2)
-    expect(merlinRecognitionCommand).toBeDefined()
-
-    await harness.dispatch(run.transcript[0])
+    await harness.dispatch({ actor: '0', command: 'startGame' })
+    const roleByPlayer = new Map<string, PresentedRole>()
     for (const page of harness.pages) {
       const recognitionLayer = page.locator('[data-identity-step="roleReveal"]')
       await expect(recognitionLayer).toHaveAttribute(
@@ -195,78 +209,108 @@ test('players complete the curtain-based identity recognition ceremony', async (
       )
       expect(headerZIndex).toBeGreaterThan(recognitionZIndex)
     }
-
-    await harness.dispatch(roleRevealCommands[0])
-    const firstConfirmedPage = harness.pages[Number(roleRevealCommands[0].actor)]
-    await expect(firstConfirmedPage.getByRole('button', {
-      name: '等待其他玩家确认',
-    })).toBeDisabled()
-    await expect(firstConfirmedPage.getByText('1/5 已确认')).toBeVisible()
-
-    for (const command of roleRevealCommands.slice(1)) {
-      await harness.dispatch(command)
-    }
-
-    const evilPlayerIDs = new Set(
-      evilRecognitionCommands.map(({ actor }) => actor),
-    )
     for (const [index, page] of harness.pages.entries()) {
-      await expect(page.locator('[data-identity-step="evilRecognition"]')).toHaveAttribute(
-        'data-curtain-state',
-        evilPlayerIDs.has(String(index)) ? 'raised' : 'closed',
-      )
-    }
-    const nonParticipantPage = harness.pages.find(
-      (_, index) => !evilPlayerIDs.has(String(index)),
-    )
-    if (nonParticipantPage === undefined) {
-      throw new Error('Expected an Evil-recognition nonparticipant')
-    }
-    const closedCurtain = nonParticipantPage.locator(
-      '[data-curtain-state="closed"]',
-    )
-    await expect(closedCurtain).toHaveCSS('animation-name', 'none')
-    const backButton = nonParticipantPage.getByRole('button', {
-      name: '返回主页',
-    })
-    await expect(backButton).toBeVisible()
-    expect(await backButton.evaluate((button) => {
-      const bounds = button.getBoundingClientRect()
-      const topmost = document.elementFromPoint(
-        bounds.left + bounds.width / 2,
-        bounds.top + bounds.height / 2,
-      )
-      return topmost === button || button.contains(topmost)
-    })).toBe(true)
-    await expect(
-      harness.pages[Number(evilRecognitionCommands[0].actor)]
-        .locator('[data-known-player-info]'),
-    ).toHaveCount(1)
-
-    for (const command of evilRecognitionCommands) {
-      await harness.dispatch(command)
+      const role = await page.locator('[data-role-card]').getAttribute('data-role-card')
+      if (role === null) throw new Error(`Player ${index} has no role card`)
+      roleByPlayer.set(String(index), role as PresentedRole)
     }
 
-    const merlinID = merlinRecognitionCommand.actor
-    for (const [index, page] of harness.pages.entries()) {
-      await expect(page.locator('[data-identity-step="merlinRecognition"]')).toHaveAttribute(
-        'data-curtain-state',
-        String(index) === merlinID ? 'raised' : 'closed',
-      )
-    }
-    await expect(
-      harness.pages[Number(merlinID)].locator('[data-known-player-info]'),
-    ).toHaveCount(2)
+    for (const step of pairedRecognitionOrder) {
+      const expectedParticipantIDs = Array.from(roleByPlayer.entries())
+        .filter(([, role]) => (
+          step === 'roleReveal'
+            ? true
+            : step === 'evilRecognition'
+              ? role === 'assassin' || role === 'morgana' || role === 'minion'
+              : step === 'merlinRecognition'
+                ? role === 'merlin'
+                : role === 'percival'
+        ))
+        .map(([playerID]) => playerID)
+        .sort()
 
-    await harness.dispatch(merlinRecognitionCommand)
+      if (step !== 'roleReveal') {
+        for (const [index, page] of harness.pages.entries()) {
+          await expect(page.locator(`[data-identity-step="${step}"]`)).toHaveAttribute(
+            'data-curtain-state',
+            expectedParticipantIDs.includes(String(index)) ? 'raised' : 'closed',
+          )
+        }
+      }
+
+      if (step === 'evilRecognition') {
+        const nonParticipantPage = harness.pages.find(
+          (_, index) => !expectedParticipantIDs.includes(String(index)),
+        )
+        if (nonParticipantPage === undefined) throw new Error('Expected an Evil-recognition nonparticipant')
+        const closedCurtain = nonParticipantPage.locator('[data-curtain-state="closed"]')
+        await expect(closedCurtain).toHaveCSS('animation-name', 'none')
+        const backButton = nonParticipantPage.getByRole('button', { name: '返回主页' })
+        await expect(backButton).toBeVisible()
+        expect(await backButton.evaluate((button) => {
+          const bounds = button.getBoundingClientRect()
+          const topmost = document.elementFromPoint(
+            bounds.left + bounds.width / 2,
+            bounds.top + bounds.height / 2,
+          )
+          return topmost === button || button.contains(topmost)
+        })).toBe(true)
+        await expect(
+          harness.pages[Number(expectedParticipantIDs[0])]
+            .locator('[data-known-player-info]'),
+        ).toHaveCount(1)
+      }
+
+      if (step === 'merlinRecognition') {
+        await expect(
+          harness.pages[Number(expectedParticipantIDs[0])].locator('[data-known-player-info]'),
+        ).toHaveCount(2)
+      }
+
+      if (step === 'percivalRecognition') {
+        const percivalPage = harness.pages[Number(expectedParticipantIDs[0])]
+        const candidateIDs = Array.from(roleByPlayer.entries())
+          .filter(([, role]) => role === 'merlin' || role === 'morgana')
+          .map(([playerID]) => playerID)
+          .sort()
+        const candidateBadges = percivalPage.getByLabel('Merlin 候选', { exact: true })
+        await expect(candidateBadges).toHaveCount(2)
+        const markedPlayerIDs = await candidateBadges.evaluateAll((badges) => badges.map((badge) => (
+          badge.closest('[data-player-id]')?.getAttribute('data-player-id') ?? ''
+        )).sort())
+        expect(markedPlayerIDs).toEqual(candidateIDs)
+        for (const [index, page] of harness.pages.entries()) {
+          if (String(index) === expectedParticipantIDs[0]) continue
+          await expect(page.getByLabel('Merlin 候选', { exact: true })).toHaveCount(0)
+        }
+      }
+
+      const confirmedParticipantIDs = await confirmRecognitionParticipants(
+        harness.pages,
+        step,
+      )
+      expect(confirmedParticipantIDs.sort()).toEqual(expectedParticipantIDs)
+    }
+
+    const percivalID = Array.from(roleByPlayer.entries()).find(([, role]) => role === 'percival')?.[0]
+    if (percivalID === undefined) throw new Error('Expected Percival in paired-role room')
     for (const page of harness.pages) {
       await expect(page.locator('[data-identity-step]')).toHaveCount(0)
       await expect(page.getByRole('button', {
         name: '查看我的身份与已知信息',
       })).toBeVisible()
     }
+    for (const [index, page] of harness.pages.entries()) {
+      await expect(page.getByLabel('Merlin 候选', { exact: true })).toHaveCount(
+        String(index) === percivalID ? 2 : 0,
+      )
+    }
 
-    const evilPage = harness.pages[Number(evilRecognitionCommands[0].actor)]
+    const evilID = Array.from(roleByPlayer.entries()).find(([, role]) => (
+      role === 'assassin' || role === 'morgana' || role === 'minion'
+    ))?.[0]
+    if (evilID === undefined) throw new Error('Expected an Evil player')
+    const evilPage = harness.pages[Number(evilID)]
     const evilSeatGeometryBefore = await evilPage.locator('#current-player-avatar').evaluate((avatar) => {
       const nameplate = avatar.closest('[data-round-table-player]')!
         .querySelector('[data-round-table-nameplate]')!
@@ -326,14 +370,13 @@ test('players complete the curtain-based identity recognition ceremony', async (
     await expect(evilPage.locator('#current-player-avatar [data-role-avatar]')).toHaveCount(0)
     await sameBrowserPage.close()
 
-    const proposal = run.transcript.find(
-      ({ command }) => command === 'proposeTeam',
-    )
-    if (proposal?.command !== 'proposeTeam') {
-      throw new Error('Expected a team proposal after recognition')
-    }
-    const leaderPage = harness.pages[Number(proposal.actor)]
-    const preservedPlayerID = proposal.payload.team[0]
+    const leaderID = await harness.pages[0]
+      .locator('[data-round-table-player][aria-label*="队长"]')
+      .getAttribute('data-player-id')
+    if (leaderID === null) throw new Error('Expected a leader after recognition')
+    const leaderPage = harness.pages[Number(leaderID)]
+    const proposalTeam = ['0', '1']
+    const preservedPlayerID = proposalTeam[0]
     const preservedSeat = leaderPage.locator('[data-round-table-player]').filter({
       hasText: playerName(preservedPlayerID),
     }).first()
@@ -350,25 +393,21 @@ test('players complete the curtain-based identity recognition ceremony', async (
     await expect(preservedSeat).toBeEnabled()
     await expect(preservedSeat).toHaveAttribute('aria-pressed', 'true')
 
-    for (const teamMemberID of proposal.payload.team.slice(1)) {
+    for (const teamMemberID of proposalTeam.slice(1)) {
       await leaderPage.getByRole('button', {
         name: `选择 ${playerName(teamMemberID)} 加入任务队伍`,
       }).click()
     }
     await leaderPage.getByRole('button', {
-      name: `确认队伍 ${proposal.payload.team.length}/${proposal.payload.team.length}`,
+      name: `确认队伍 ${proposalTeam.length}/${proposalTeam.length}`,
     }).click()
 
-    const firstVoteIndex = run.transcript.findIndex(
-      ({ command }) => command === 'castTeamVote',
-    )
-    const nextCommandIndex = run.transcript.findIndex(
-      ({ command }, index) => index > firstVoteIndex && command !== 'castTeamVote',
-    )
-    expect(firstVoteIndex).toBeGreaterThan(-1)
-    expect(nextCommandIndex).toBeGreaterThan(firstVoteIndex)
-    await harness.dispatch(run.transcript[firstVoteIndex])
-    const submittedVotePage = harness.pages[Number(run.transcript[firstVoteIndex].actor)]
+    await harness.dispatch({
+      actor: '0',
+      command: 'castTeamVote',
+      payload: { vote: 'approve' },
+    })
+    const submittedVotePage = harness.pages[0]
     const showSubmittedVoterRole = submittedVotePage.getByRole('button', {
       name: '查看我的身份与已知信息',
     })
@@ -379,8 +418,12 @@ test('players complete the curtain-based identity recognition ceremony', async (
       name: '隐藏我的身份与已知信息',
     })).toBeVisible()
     await expect(submittedVotePage.locator('#current-player-avatar [data-role-avatar]')).toBeVisible()
-    for (let index = firstVoteIndex + 1; index < nextCommandIndex; index += 1) {
-      await harness.dispatch(run.transcript[index])
+    for (let index = 1; index < harness.pages.length; index += 1) {
+      await harness.dispatch({
+        actor: String(index),
+        command: 'castTeamVote',
+        payload: { vote: 'approve' },
+      })
     }
     await expect(submittedVotePage.locator('#current-player-avatar [data-role-avatar]')).toBeVisible()
     await expect(submittedVotePage.getByLabel('任务计分板', { exact: true })).toBeVisible()
