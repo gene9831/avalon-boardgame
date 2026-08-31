@@ -48,6 +48,13 @@ const openRoom = {
   ],
 }
 
+const fullRoom = {
+  ...openRoom,
+  matchID: 'room-full',
+  occupiedPlayerIDs: ['0', '1', '2', '3', '4'],
+  players: currentRoom.players,
+}
+
 const finishedRoom = {
   matchID: 'room-finished',
   status: 'finished' as const,
@@ -181,5 +188,12 @@ describe('LobbyView room access', () => {
     expect(html).toContain('>加入游戏<')
     expect(html).not.toContain('选择 room-open 的座位')
     expect(html).not.toContain('<select')
+  })
+
+  it('shows the approved full-room copy without offering a join action', () => {
+    const html = renderLobby({ matches: [fullRoom] })
+
+    expect(html).toContain('>已满<')
+    expect(html).not.toContain('>加入游戏<')
   })
 })

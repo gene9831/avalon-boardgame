@@ -2,7 +2,115 @@ import { expect, test } from '@playwright/test'
 
 import { playScriptedScenario } from '@avalon/test-support'
 
-import { createBrowserReplayHarness, playerName } from '../support/browser-replay'
+import {
+  createBrowserReplayHarness,
+  createRoom,
+  playerName,
+} from '../support/browser-replay'
+
+const roomSessionKey = (matchID: string) =>
+  `avalon:room-session:${encodeURIComponent(matchID)}`
+const seatTransitionKey = (matchID: string) =>
+  `avalon:seat-transition:${encodeURIComponent(matchID)}`
+
+test('a transient committed seat change recovers both same-browser room routes at the target seat', async ({
+  browser,
+}) => {
+  test.setTimeout(90_000)
+
+  const context = await browser.newContext()
+  const movingPage = await context.newPage()
+  const stalePage = await context.newPage()
+  let releaseTransientResponse: () => void = () => undefined
+  let reportServerCommit: () => void = () => undefined
+  const transientResponseReleased = new Promise<void>((resolve) => {
+    releaseTransientResponse = resolve
+  })
+  const serverCommitted = new Promise<void>((resolve) => {
+    reportServerCommit = resolve
+  })
+
+  try {
+    const matchID = await createRoom(movingPage, 5, 'Recovering Owner')
+    const roomURL = `/rooms/${matchID}`
+    await stalePage.goto(roomURL)
+    await expect(stalePage.getByLabel('5 人玩家圆桌')).toBeVisible()
+
+    for (const page of [movingPage, stalePage]) {
+      await page.evaluate((key) => {
+        const raw = localStorage.getItem(key)
+        if (raw === null) throw new Error('Expected a saved room session')
+        const session = JSON.parse(raw) as { credentials?: unknown }
+        if (typeof session.credentials !== 'string') {
+          throw new Error('Expected saved room credentials')
+        }
+        sessionStorage.setItem('e2e:original-room-credentials', session.credentials)
+      }, roomSessionKey(matchID))
+    }
+
+    await context.route('**/rooms/avalon/*/players/*/seat', async (route) => {
+      const committed = await route.fetch()
+      expect(committed.ok()).toBe(true)
+      reportServerCommit()
+      await transientResponseReleased
+      await route.fulfill({
+        body: JSON.stringify({ error: { code: 'transient_failure' } }),
+        contentType: 'application/json',
+        status: 503,
+      })
+    })
+
+    await movingPage.getByRole('button', { name: '移至 5 号空座位' }).click()
+    await serverCommitted
+    await expect.poll(() => movingPage.evaluate((key) => {
+      const raw = localStorage.getItem(key)
+      if (raw === null) return null
+      return (JSON.parse(raw) as { status?: unknown }).status ?? null
+    }, seatTransitionKey(matchID))).toBe('requesting')
+
+    await movingPage.waitForTimeout(3_000)
+    await expect(movingPage).toHaveURL(new RegExp(`/rooms/${matchID}$`))
+    await expect(stalePage).toHaveURL(new RegExp(`/rooms/${matchID}$`))
+    await expect.poll(() => movingPage.evaluate((key) => {
+      const raw = localStorage.getItem(key)
+      if (raw === null) return null
+      return (JSON.parse(raw) as { playerID?: unknown }).playerID ?? null
+    }, roomSessionKey(matchID))).toBe('0')
+
+    releaseTransientResponse()
+    await expect(movingPage.getByText('换座失败，请重试。', { exact: true })).toBeVisible()
+    await expect.poll(() => movingPage.evaluate((key) => {
+      const raw = localStorage.getItem(key)
+      if (raw === null) return null
+      return (JSON.parse(raw) as { playerID?: unknown }).playerID ?? null
+    }, roomSessionKey(matchID))).toBe('4')
+    await expect.poll(() => movingPage.evaluate((key) => localStorage.getItem(key), seatTransitionKey(matchID)))
+      .toBeNull()
+
+    for (const page of [movingPage, stalePage]) {
+      await expect(page).toHaveURL(new RegExp(`/rooms/${matchID}$`))
+      await expect(page.locator('[data-round-table-player][data-player-id="4"]'))
+        .toContainText('Recovering Owner')
+      await expect.poll(() => page.evaluate((key) => {
+        const raw = localStorage.getItem(key)
+        if (raw === null) return false
+        const current = JSON.parse(raw) as { credentials?: unknown, playerID?: unknown }
+        return current.playerID === '4' &&
+          current.credentials === sessionStorage.getItem('e2e:original-room-credentials')
+      }, roomSessionKey(matchID))).toBe(true)
+    }
+
+    await stalePage.waitForTimeout(3_000)
+    await expect.poll(() => stalePage.evaluate((key) => {
+      const raw = localStorage.getItem(key)
+      if (raw === null) return null
+      return (JSON.parse(raw) as { playerID?: unknown }).playerID ?? null
+    }, roomSessionKey(matchID))).toBe('4')
+  } finally {
+    releaseTransientResponse()
+    await context.close()
+  }
+})
 
 test('refresh restores server data and keeps pending choices private', async ({
   browser,

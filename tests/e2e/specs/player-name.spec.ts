@@ -62,7 +62,6 @@ test('duplicate names can occupy distinct seats', async ({ browser }) => {
     await joinPage.goto('/')
     await setPlayerProfileName(joinPage, 'Duplicate Arthur')
     const card = roomCard(joinPage, matchID)
-    await card.getByLabel(`选择 ${matchID} 的座位`).selectOption('1')
     await card.getByRole('button', { name: '加入' }).click()
     await expect(joinPage).toHaveURL(new RegExp(`/rooms/${matchID}$`))
     await expect(
@@ -73,7 +72,7 @@ test('duplicate names can occupy distinct seats', async ({ browser }) => {
   }
 })
 
-test('a concurrent seat loser can refresh and join another seat', async ({ browser }) => {
+test('concurrent joins receive distinct server-assigned seats', async ({ browser }) => {
   const contexts = await Promise.all(
     Array.from({ length: 3 }, () => browser.newContext()),
   )
@@ -89,30 +88,22 @@ test('a concurrent seat loser can refresh and join another seat', async ({ brows
     ] as const) {
       await page.goto('/')
       await setPlayerProfileName(page, name)
-      const card = roomCard(page, matchID)
-      await card.getByLabel(`选择 ${matchID} 的座位`).selectOption('1')
     }
 
     await Promise.all([
       roomCard(firstPage, matchID).getByRole('button', { name: '加入' }).click(),
       roomCard(secondPage, matchID).getByRole('button', { name: '加入' }).click(),
     ])
-    await expect.poll(() =>
-      [firstPage, secondPage].filter((page) =>
-        new URL(page.url()).pathname === `/rooms/${matchID}`,
-      ).length,
-    ).toBe(1)
-
-    const loser = new URL(firstPage.url()).pathname === `/rooms/${matchID}`
-      ? secondPage
-      : firstPage
-    await expect(
-      loser.getByText('所选座位已被占用，请重新选择。'),
-    ).toBeVisible()
-    const card = roomCard(loser, matchID)
-    await card.getByLabel(`选择 ${matchID} 的座位`).selectOption('2')
-    await card.getByRole('button', { name: '加入' }).click()
-    await expect(loser).toHaveURL(new RegExp(`/rooms/${matchID}$`))
+    await expect(firstPage).toHaveURL(new RegExp(`/rooms/${matchID}$`))
+    await expect(secondPage).toHaveURL(new RegExp(`/rooms/${matchID}$`))
+    const assignedPlayerIDs = await Promise.all(
+      [firstPage, secondPage].map((page) => page.evaluate((roomID) => {
+        const raw = localStorage.getItem(`avalon:room-session:${encodeURIComponent(roomID)}`)
+        if (raw === null) return null
+        return (JSON.parse(raw) as { playerID?: unknown }).playerID ?? null
+      }, matchID)),
+    )
+    expect(assignedPlayerIDs.sort()).toEqual(['1', '2'])
   } finally {
     await Promise.all(contexts.map((context) => context.close()))
   }

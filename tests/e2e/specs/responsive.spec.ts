@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 
 import { playGeneratedGame } from '@avalon/test-support'
 
-import { createBrowserReplayHarness } from '../support/browser-replay'
+import { createBrowserReplayHarness, createRoom } from '../support/browser-replay'
 
 const viewports = [
   { width: 320, height: 568 },
@@ -191,6 +191,34 @@ test('the create-game configuration remains fully usable at narrow widths', asyn
     expect(geometry.minButtonHeight).toBeGreaterThanOrEqual(44)
     await expect(dialog.getByLabel('5 人规则摘要')).toBeVisible()
     await dialog.getByRole('button', { name: '取消' }).click()
+  }
+})
+
+test('empty-seat actions stay 44px and keyboard operable at the smallest viewport', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ viewport: { width: 320, height: 568 } })
+  const page = await context.newPage()
+
+  try {
+    await createRoom(page, 5, 'Keyboard Seat Owner')
+    const emptySeat = page.getByRole('button', { name: '移至 2 号空座位' })
+    const bounds = await emptySeat.boundingBox()
+    expect(bounds).not.toBeNull()
+    expect(bounds!.width).toBeGreaterThanOrEqual(44)
+    expect(bounds!.height).toBeGreaterThanOrEqual(44)
+
+    await emptySeat.focus()
+    await expect(emptySeat).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(page.locator('[data-round-table-player][data-player-id="1"]'))
+      .toContainText('Keyboard Seat Owner')
+    await expect(
+      page.locator('[data-round-table-player][data-player-id="1"]')
+        .getByLabel('房间拥有者'),
+    ).toBeVisible()
+  } finally {
+    await context.close()
   }
 })
 

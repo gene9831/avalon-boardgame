@@ -1,5 +1,5 @@
 {
-  "ruleSet": "the-resistance-avalon-original-base",
+  "ruleSet": "the-resistance-avalon-original",
   "players": {
     "min": 5,
     "max": 10
@@ -8,8 +8,22 @@
     "merlin",
     "assassin",
     "loyal_servant",
-    "minion"
+    "minion",
+    "percival",
+    "morgana"
   ],
+  "roleConfigurations": {
+    "default": {
+      "percivalMorgana": true
+    },
+    "legacyMissingConfiguration": {
+      "percivalMorgana": false
+    },
+    "percivalMorgana": {
+      "roles": ["percival", "morgana"],
+      "replaces": ["loyal_servant", "minion"]
+    }
+  },
   "playerCounts": {
     "5": {
       "good": 3,
@@ -67,4 +81,3 @@
     "rotation": "clockwise"
   }
 }
-

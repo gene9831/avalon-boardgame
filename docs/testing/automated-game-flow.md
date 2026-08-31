@@ -6,13 +6,17 @@ Avalon's automated tests use one transcript format from the rule core through So
 
 | Layer | What it protects | Command |
 | --- | --- | --- |
-| Rule replay and properties | 5–10-player rules, legal generated games, quest thresholds, victory paths, and `playerView` secrecy | `pnpm --filter @avalon/test-support test` |
+| Rule replay and properties | 5–10-player base/paired-role rules, authoritative full-lobby fixtures, legal generated games, quest thresholds, victory paths, and `playerView` secrecy | `pnpm --filter @avalon/test-support test` |
 | Socket.IO replay | The same transcript through real Lobby and Socket.IO clients, authoritative-state equivalence, and filtered client state | `pnpm --filter @avalon/server test` |
-| PostgreSQL | Storage semantics, server restart reconnect, and credential-bound state restoration | `pnpm test:postgres` |
-| PR browser gate | Name confirmation and conflict recovery, phase refresh, pending-choice secrecy, all four victory paths, and 10-player desktop/narrow viewport operation | `pnpm test:e2e` |
+| PostgreSQL | Storage semantics, server restart reconnect, credential-bound state restoration, moved-owner persistence, seat-0 reuse, and persisted role configuration | `pnpm test:postgres` |
+| PR browser gate | Atomic create-and-enter, lowest-empty automatic joins, seat-independent ownership, interrupted seat-change recovery across tabs, refresh reconnect, paired-role recognition/privacy, all four victory paths, and 5/7/10-player target-viewport operation | `pnpm test:e2e` |
 | Nightly browser depth | Seeded 5–10-player complete games, the 7-player fourth-quest threshold, and two concurrently active isolated rooms | `pnpm test:e2e:matrix` |
 
 The browser suite creates a separate Playwright context for each player. This is important because a single browser profile shares Avalon identity and credentials across tabs. E2E uses dedicated ports (`15183`, `18000`, and `18001`) and never reuses the developer's running LAN services. A runtime-generated test-only administration token enables the development panel without committing, logging, or exposing a token to Web configuration.
+
+The automatic-seating acceptance creates the owner and session atomically, moves the owner away from seat 0, proves the next ordinary join reuses seat 0, and checks that concurrent joins receive the remaining lowest empty seats without client-selected seat IDs. It also covers the public full-room copy, moved-seat refresh reconnect, and keyboard operation of at least 44px empty-seat actions at 320×568. The route-lifecycle acceptance lets the server commit a seat change while delaying and replacing the browser response with a transient 503; the live requesting lease prevents stale-source invalidation, the uncertain marker recovers the credential at the target seat, and a second tab in the same browser adopts rather than clears the migrated session.
+
+Paired-role coverage verifies exact Percival/Morgana decks, the fourth identity-recognition step, and that only Percival receives the indistinguishable Merlin/Morgana candidate set through `playerView`. The PostgreSQL restart scenario is meaningful only when `test:postgres` actually connects to PostgreSQL; an unavailable or unauthorized database must be reported as blocked instead of substituting memory storage.
 
 ## Seeds and replay
 

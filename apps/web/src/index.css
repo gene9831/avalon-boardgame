@@ -277,6 +277,12 @@ select {
   }
 }
 
+@media (orientation: landscape) and (min-width: 769px) and (max-width: 1100px) and (min-height: 421px) {
+  [data-round-table-seat-count="10"].round-table-layout {
+    transform: translateY(1.5rem);
+  }
+}
+
 @media (orientation: landscape) {
   .round-table-stage[data-recognition-layout="responsive"] .quest-board {
     display: none;

@@ -23,12 +23,23 @@ export interface AvalonRuleDriver
 
 export function createAvalonRuleDriver(options: AvalonRuleDriverOptions) {
   const { gameSeed } = deriveAvalonSeeds(options.masterSeed)
+  const occupiedPlayerIDs = Array.from(
+    { length: options.playerCount },
+    (_, index) => String(index),
+  )
+  const game = createAvalonGame({
+    now: () => 0,
+    seed: gameSeed,
+    serverInstanceID: 'replay-server',
+  })
   const client = Client({
-    game: createAvalonGame({
-      now: () => 0,
-      seed: gameSeed,
-      serverInstanceID: 'replay-server',
-    }),
+    game: {
+      ...game,
+      setup: (context) => game.setup?.(context, {
+        occupiedPlayerIDs,
+        ownerPlayerID: '0',
+      }) as AvalonG,
+    },
     numPlayers: options.playerCount,
     playerID: '0',
   })

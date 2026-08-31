@@ -138,13 +138,13 @@ export function LobbyView({
           <div className="flex flex-wrap items-center gap-2">
             {activeSession !== undefined ? (
               <button className={enterButton} onClick={() => onEnterRoom(room.matchID)} type="button">继续游戏</button>
+            ) : room.status === 'lobby' && occupied >= playerCount ? (
+              <span className="rounded-full bg-slate-700/70 px-3 py-2 text-xs text-slate-300">已满</span>
             ) : canJoinRoom(room) && roomAccessLocked ? (
               <span className="rounded-full bg-slate-700/70 px-3 py-2 text-xs text-slate-300">{roomAccessMessage}</span>
-            ) : canJoinRoom(room) && (occupied >= playerCount ? (
-              <span className="rounded-full bg-slate-700/70 px-3 py-2 text-xs text-slate-300">已满</span>
-            ) : (
+            ) : canJoinRoom(room) ? (
               <button className={joinButton} disabled={busy || !canJoinRoom(room)} onClick={() => onJoin({ type: 'join', matchID: room.matchID })} type="button">加入游戏</button>
-            ))}
+            ) : null}
             {devToolsEnabled && devToken.length > 0 && <button className="rounded-xl border border-rose-300/40 px-4 py-2.5 text-sm text-rose-200 transition hover:border-rose-300 hover:bg-rose-300/10" onClick={() => void onDeleteRoom(room.matchID)} type="button">删除</button>}
           </div>
         </div>
