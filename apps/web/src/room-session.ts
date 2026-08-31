@@ -45,13 +45,17 @@ export interface ActiveRoomSessionValidation {
 }
 
 export interface SeatTransition {
+  transitionID: string
   matchID: string
   sourcePlayerID: string
   targetPlayerID: string
   credentials: string
   startedAt: number
   status: 'requesting' | 'uncertain'
+  leaseExpiresAt: number
 }
+
+type SeatTransitionIDGenerator = () => string
 
 export type ValidateSeat = (
   matchID: string,
@@ -68,6 +72,7 @@ export type SeatTransitionRecovery =
 export const ROOM_SESSION_KEY = 'avalon:room-session'
 export const LAST_ROOM_SESSION_KEY = 'avalon:last-room'
 export const SEAT_TRANSITION_KEY = 'avalon:seat-transition'
+export const SEAT_TRANSITION_LEASE_MS = 120_000
 
 export function getRoomSessionKey(matchID: string) {
   return `${ROOM_SESSION_KEY}:${encodeURIComponent(matchID)}`
@@ -173,14 +178,17 @@ export function beginSeatTransition(
   targetPlayerID: string,
   storage: RoomSessionStorage = browserStorage(),
   startedAt = Date.now(),
+  generateID: SeatTransitionIDGenerator = generateSeatTransitionID,
 ): SeatTransition {
   const transition: SeatTransition = {
+    transitionID: generateID(),
     matchID: source.matchID,
     sourcePlayerID: source.playerID,
     targetPlayerID,
     credentials: source.credentials,
     startedAt,
     status: 'requesting',
+    leaseExpiresAt: startedAt + SEAT_TRANSITION_LEASE_MS,
   }
   storage.setItem(getSeatTransitionKey(transition.matchID), JSON.stringify(transition))
   return transition
@@ -196,7 +204,13 @@ export function loadSeatTransition(
   try {
     const transition: unknown = JSON.parse(raw)
     if (!isSeatTransition(transition) || transition.matchID !== matchID) return null
-    return { ...transition, status: transition.status ?? 'uncertain' }
+    return {
+      ...transition,
+      transitionID: transition.transitionID ?? legacySeatTransitionID(transition),
+      status: transition.status ?? 'uncertain',
+      leaseExpiresAt: transition.leaseExpiresAt ??
+        transition.startedAt + SEAT_TRANSITION_LEASE_MS,
+    }
   } catch {
     return null
   }
@@ -220,11 +234,7 @@ export function completeSeatTransition(
 }
 
 function isSameSeatTransition(current: SeatTransition | null, expected: SeatTransition) {
-  return current?.matchID === expected.matchID &&
-    current.sourcePlayerID === expected.sourcePlayerID &&
-    current.targetPlayerID === expected.targetPlayerID &&
-    current.credentials === expected.credentials &&
-    current.startedAt === expected.startedAt
+  return current?.transitionID === expected.transitionID
 }
 
 export function clearSeatTransitionIfCurrent(
@@ -248,19 +258,49 @@ export function markSeatTransitionUncertain(
   }))
 }
 
+export function renewSeatTransitionLease(
+  expected: SeatTransition,
+  storage: RoomSessionStorage = browserStorage(),
+  now = Date.now(),
+) {
+  const current = loadSeatTransition(expected.matchID, storage)
+  if (!isSameSeatTransition(current, expected) || current?.status !== 'requesting') return
+  storage.setItem(getSeatTransitionKey(expected.matchID), JSON.stringify({
+    ...current,
+    leaseExpiresAt: now + SEAT_TRANSITION_LEASE_MS,
+  }))
+}
+
+export function isSeatTransitionRequestActive(
+  session: Pick<RoomSession, 'matchID' | 'playerID' | 'credentials'>,
+  storage: RoomSessionStorage = browserStorage(),
+  now = Date.now(),
+) {
+  const transition = loadSeatTransition(session.matchID, storage)
+  return transition?.status === 'requesting' &&
+    transition.sourcePlayerID === session.playerID &&
+    transition.credentials === session.credentials &&
+    transition.leaseExpiresAt > now
+}
+
 export async function recoverSeatTransition(
   transition: SeatTransition,
   validate: ValidateSeat,
   storage?: RoomSessionStorage,
+  now = Date.now(),
 ): Promise<SeatTransitionRecovery> {
   const resolvedStorage = storage ?? browserStorage()
   const currentTransition = loadSeatTransition(transition.matchID, resolvedStorage)
   if (currentTransition === null || !isSameSeatTransition(currentTransition, transition)) {
     return { status: 'requesting', playerID: transition.sourcePlayerID }
   }
-  const recoverableTransition = currentTransition
-  if (recoverableTransition.status === 'requesting') {
+  let recoverableTransition = currentTransition
+  if (recoverableTransition.status === 'requesting' && recoverableTransition.leaseExpiresAt > now) {
     return { status: 'requesting', playerID: transition.sourcePlayerID }
+  }
+  if (recoverableTransition.status === 'requesting') {
+    markSeatTransitionUncertain(recoverableTransition, resolvedStorage)
+    recoverableTransition = { ...recoverableTransition, status: 'uncertain' }
   }
   const sourceValid = await validate(
     transition.matchID,
@@ -321,7 +361,13 @@ function readRoomSession(raw: string | null): RoomSession | null {
   }
 }
 
-function isSeatTransition(value: unknown): value is Omit<SeatTransition, 'status'> & { status?: SeatTransition['status'] } {
+type StoredSeatTransition = Omit<SeatTransition, 'status' | 'transitionID' | 'leaseExpiresAt'> & {
+  status?: SeatTransition['status']
+  transitionID?: string
+  leaseExpiresAt?: number
+}
+
+function isSeatTransition(value: unknown): value is StoredSeatTransition {
   if (typeof value !== 'object' || value === null) return false
   const transition = value as Partial<SeatTransition>
   return [
@@ -331,7 +377,28 @@ function isSeatTransition(value: unknown): value is Omit<SeatTransition, 'status
     transition.credentials,
   ].every((field) => typeof field === 'string' && field.length > 0) &&
     typeof transition.startedAt === 'number' && Number.isFinite(transition.startedAt) &&
-    (transition.status === undefined || transition.status === 'requesting' || transition.status === 'uncertain')
+    (transition.status === undefined || transition.status === 'requesting' || transition.status === 'uncertain') &&
+    (transition.transitionID === undefined || (typeof transition.transitionID === 'string' && transition.transitionID.length > 0)) &&
+    (transition.leaseExpiresAt === undefined || (typeof transition.leaseExpiresAt === 'number' && Number.isFinite(transition.leaseExpiresAt)))
+}
+
+function legacySeatTransitionID(transition: StoredSeatTransition) {
+  return `legacy:${JSON.stringify([
+    transition.matchID,
+    transition.sourcePlayerID,
+    transition.targetPlayerID,
+    transition.credentials,
+    transition.startedAt,
+  ])}`
+}
+
+function generateSeatTransitionID() {
+  if (typeof globalThis.crypto?.randomUUID === 'function') return globalThis.crypto.randomUUID()
+  if (typeof globalThis.crypto?.getRandomValues !== 'function') {
+    throw new Error('Secure random values are unavailable')
+  }
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16))
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
 export function getAvailableSeatIDs(

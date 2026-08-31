@@ -102,6 +102,44 @@ describe('room participation client', () => {
     expect(loadSeatTransition(roomSession.matchID, storage)).toBeNull()
   })
 
+  it('treats a 503 response as uncertain and recovers a target committed before the error', async () => {
+    const storage = createStorage()
+    const roomSession = { ...session, playerName: 'Alice' }
+    saveRoomSession(roomSession, storage)
+
+    await expect(changeRoomSeat({
+      changeSeat: async () => { throw new RoomParticipationHttpError(503) },
+      prepareStart: async () => {},
+    }, roomSession, '4', storage)).rejects.toEqual(new RoomParticipationHttpError(503))
+
+    const uncertain = loadSeatTransition(roomSession.matchID, storage)!
+    expect(uncertain.status).toBe('uncertain')
+    await recoverSeatTransition(
+      uncertain,
+      async (_matchID, playerID) => playerID === '4',
+      storage,
+    )
+    expect(loadRoomSession(roomSession.matchID, storage)).toEqual({ ...roomSession, playerID: '4' })
+  })
+
+  it.each([
+    [400, null],
+    [403, 'invalid_seat_session'],
+    [404, 'room_not_found'],
+    [409, 'seat_unavailable'],
+  ] as const)('clears a stable HTTP %s rejection marker', async (status, code) => {
+    const storage = createStorage()
+    const roomSession = { ...session, playerName: 'Alice' }
+    saveRoomSession(roomSession, storage)
+
+    await expect(changeRoomSeat({
+      changeSeat: async () => { throw new RoomParticipationHttpError(status, code) },
+      prepareStart: async () => {},
+    }, roomSession, '4', storage)).rejects.toBeInstanceOf(RoomParticipationHttpError)
+    expect(loadSeatTransition(roomSession.matchID, storage)).toBeNull()
+    expect(loadRoomSession(roomSession.matchID, storage)).toEqual(roomSession)
+  })
+
   it('stores the server-authoritative target seat after changing rooms', async () => {
     const storage = createStorage()
     const roomSession = {

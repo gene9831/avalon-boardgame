@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
-import { canRequestRoomExit, getUpdatedRoomRouteSession, recoverRoomRouteSession, resolveRecoverySeatValidation, resolveRoomRouteSnapshotSession, RoomAccessView, RoomView, type RoomViewProps } from '../src/App'
+import { canRequestRoomExit, getUpdatedRoomRouteSession, recoverRoomRouteSession, resolveRecoverySeatValidation, resolveRoomRouteSnapshotSession, shouldWakeRoomRouteForSeatTransitionChange, RoomAccessView, RoomView, type RoomViewProps } from '../src/App'
 import { beginSeatTransition, loadRoomSession, loadSeatTransition, markSeatTransitionUncertain, saveRoomSession, type RoomSessionStorage } from '../src/room-session'
 
 vi.mock('../src/config', () => ({
@@ -267,7 +267,7 @@ describe('RoomView connection state', () => {
       playerName: 'Alice',
     }
     saveRoomSession(source, storage)
-    const transition = beginSeatTransition(source, '3', storage, 42)
+    const transition = beginSeatTransition(source, '3', storage)
     const validate = vi.fn(async () => true)
 
     await expect(resolveRoomRouteSnapshotSession(source, validate, storage)).resolves.toEqual({
@@ -277,6 +277,51 @@ describe('RoomView connection state', () => {
     expect(validate).not.toHaveBeenCalled()
     expect(loadSeatTransition(source.matchID, storage)).toEqual(transition)
     expect(loadRoomSession(source.matchID, storage)).toEqual(source)
+  })
+
+  it('wakes a waiting route when the owner clears or makes its transition recoverable', async () => {
+    const values = new Map<string, string>()
+    const storage: RoomSessionStorage = {
+      getItem: (key) => values.get(key) ?? null,
+      removeItem: (key) => values.delete(key),
+      setItem: (key, value) => values.set(key, value),
+    }
+    const source = { credentials: 'credential', matchID: 'room-123', playerID: '0', playerName: 'Alice' }
+    saveRoomSession(source, storage)
+    const transition = beginSeatTransition(source, '3', storage, 42, () => 'request-1')
+    const markerKey = 'avalon:seat-transition:room-123'
+
+    expect(shouldWakeRoomRouteForSeatTransitionChange(markerKey, source, storage, 43)).toBe(false)
+    markSeatTransitionUncertain(transition, storage)
+    expect(shouldWakeRoomRouteForSeatTransitionChange(markerKey, source, storage, 43)).toBe(true)
+    await expect(recoverRoomRouteSession(
+      source,
+      async (_matchID, playerID) => playerID === '3',
+      storage,
+    )).resolves.toEqual({ ...source, playerID: '3' })
+
+    saveRoomSession(source, storage)
+    beginSeatTransition(source, '3', storage, 42, () => 'request-2')
+    storage.removeItem(markerKey)
+    expect(shouldWakeRoomRouteForSeatTransitionChange(markerKey, source, storage, 43)).toBe(true)
+  })
+
+  it('wakes a reloaded route after an orphaned requesting lease expires', () => {
+    const values = new Map<string, string>()
+    const storage: RoomSessionStorage = {
+      getItem: (key) => values.get(key) ?? null,
+      removeItem: (key) => values.delete(key),
+      setItem: (key, value) => values.set(key, value),
+    }
+    const source = { credentials: 'credential', matchID: 'room-123', playerID: '0', playerName: 'Alice' }
+    const transition = beginSeatTransition(source, '3', storage, 42, () => 'orphan')
+
+    expect(shouldWakeRoomRouteForSeatTransitionChange(
+      'avalon:seat-transition:room-123',
+      source,
+      storage,
+      transition.leaseExpiresAt + 1,
+    )).toBe(true)
   })
 
   it('treats only definitive session errors as an invalid recovery seat', async () => {

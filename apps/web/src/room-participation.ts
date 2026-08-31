@@ -9,6 +9,8 @@ import {
   clearSeatTransitionIfCurrent,
   completeSeatTransition,
   markSeatTransitionUncertain,
+  renewSeatTransitionLease,
+  SEAT_TRANSITION_LEASE_MS,
   type RoomSession,
   type RoomSessionStorage,
 } from './room-session'
@@ -118,6 +120,10 @@ export async function changeRoomSeat(
   storage?: RoomSessionStorage,
 ) {
   const transition = beginSeatTransition(source, targetPlayerID, storage)
+  const heartbeat = globalThis.setInterval(
+    () => renewSeatTransitionLease(transition, storage),
+    SEAT_TRANSITION_LEASE_MS / 4,
+  )
   try {
     const response = await client.changeSeat(
       source.matchID,
@@ -127,13 +133,21 @@ export async function changeRoomSeat(
     )
     return completeSeatTransition(source, transition, response, storage)
   } catch (error) {
-    if (error instanceof RoomParticipationHttpError) {
+    if (isDefinitiveSeatChangeRejection(error)) {
       clearSeatTransitionIfCurrent(transition, storage)
     } else {
       markSeatTransitionUncertain(transition, storage)
     }
     throw error
+  } finally {
+    globalThis.clearInterval(heartbeat)
   }
+}
+
+function isDefinitiveSeatChangeRejection(error: unknown) {
+  if (!(error instanceof RoomParticipationHttpError)) return false
+  if ([400, 401, 403, 404].includes(error.status)) return true
+  return error.status === 409 && error.code === 'seat_unavailable'
 }
 
 async function requestRoomExit(

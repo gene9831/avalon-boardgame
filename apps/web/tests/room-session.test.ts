@@ -12,11 +12,13 @@ import {
   loadRoomSession,
   loadSeatTransition,
   markSeatTransitionUncertain,
+  renewSeatTransitionLease,
   recoverSeatTransition,
   saveRoomSession,
   validateActiveRoomSessions,
   validateRoomSession,
   RoomSessionValidationHttpError,
+  SEAT_TRANSITION_LEASE_MS,
   type RoomSessionStorage,
 } from '../src/room-session'
 
@@ -118,7 +120,7 @@ describe('room session storage', () => {
     markSeatTransitionUncertain(transition, storage)
     const validate = vi.fn(async (_matchID: string, playerID: string) => playerID === '4')
 
-    await expect(recoverSeatTransition(transition, validate, storage)).resolves.toEqual({
+    await expect(recoverSeatTransition(transition, validate, storage, 43)).resolves.toEqual({
       status: 'target',
       playerID: '4',
     })
@@ -146,7 +148,7 @@ describe('room session storage', () => {
     const transition = beginSeatTransition(session, '4', storage, 42)
     const validate = vi.fn(async () => true)
 
-    await expect(recoverSeatTransition(transition, validate, storage)).resolves.toEqual({
+    await expect(recoverSeatTransition(transition, validate, storage, 43)).resolves.toEqual({
       status: 'requesting',
       playerID: session.playerID,
     })
@@ -166,6 +168,71 @@ describe('room session storage', () => {
     })
 
     expect(loadSeatTransition(session.matchID, storage)).toMatchObject({ status: 'uncertain' })
+  })
+
+  it('keeps a recent requesting marker from the previous schema leased', async () => {
+    const storage = createStorage({
+      'avalon:seat-transition:room-123': JSON.stringify({
+        matchID: session.matchID,
+        sourcePlayerID: session.playerID,
+        targetPlayerID: '4',
+        credentials: session.credentials,
+        startedAt: 42,
+        status: 'requesting',
+      }),
+    })
+    const transition = loadSeatTransition(session.matchID, storage)!
+    const validate = vi.fn(async () => true)
+
+    await expect(recoverSeatTransition(transition, validate, storage, 43)).resolves.toEqual({
+      status: 'requesting',
+      playerID: session.playerID,
+    })
+    expect(validate).not.toHaveBeenCalled()
+  })
+
+  it('expires an orphaned requesting transition before recovering its committed target', async () => {
+    const storage = createStorage()
+    saveRoomSession(session, storage)
+    const transition = beginSeatTransition(session, '4', storage, 42, () => 'orphan')
+    const validate = vi.fn(async (_matchID: string, playerID: string) => playerID === '4')
+
+    await expect(recoverSeatTransition(
+      transition,
+      validate,
+      storage,
+      transition.leaseExpiresAt + 1,
+    )).resolves.toEqual({ status: 'target', playerID: '4' })
+    expect(validate).toHaveBeenCalledTimes(2)
+    expect(loadRoomSession(session.matchID, storage)).toEqual({ ...session, playerID: '4' })
+  })
+
+  it('renews an active request lease without changing its opaque identity', () => {
+    const storage = createStorage()
+    const transition = beginSeatTransition(session, '4', storage, 42, () => 'request-1')
+
+    renewSeatTransitionLease(transition, storage, 1_000)
+
+    expect(loadSeatTransition(session.matchID, storage)).toMatchObject({
+      transitionID: 'request-1',
+      status: 'requesting',
+      leaseExpiresAt: 1_000 + SEAT_TRANSITION_LEASE_MS,
+    })
+  })
+
+  it('does not let an older identical move consume a newer transition marker', () => {
+    const storage = createStorage()
+    saveRoomSession(session, storage)
+    const older = beginSeatTransition(session, '4', storage, 42, () => 'older')
+    const newer = beginSeatTransition(session, '4', storage, 42, () => 'newer')
+
+    completeSeatTransition(session, older, {
+      matchID: session.matchID,
+      playerID: '4',
+      playerCredentials: session.credentials,
+    }, storage)
+
+    expect(loadSeatTransition(session.matchID, storage)).toEqual(newer)
   })
 
   it('can read the previous single-session format for the matching room', () => {

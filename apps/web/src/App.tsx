@@ -93,6 +93,7 @@ import {
   getSeatTransitionKey,
   getRoomSessionInvalidationNotice,
   isRoomSessionStillValid,
+  isSeatTransitionRequestActive,
   loadRoomSession,
   loadSeatTransition,
   recoverSeatTransition,
@@ -157,10 +158,18 @@ function isSeatTransitionRequestingForSession(
   session: RoomSession,
   storage?: RoomSessionStorage,
 ) {
-  const transition = loadSeatTransition(session.matchID, storage)
-  return transition?.status === 'requesting' &&
-    transition.sourcePlayerID === session.playerID &&
-    transition.credentials === session.credentials
+  return isSeatTransitionRequestActive(session, storage)
+}
+
+// oxlint-disable-next-line react/only-export-components
+export function shouldWakeRoomRouteForSeatTransitionChange(
+  storageKey: string | null,
+  session: RoomSession,
+  storage?: RoomSessionStorage,
+  now = Date.now(),
+) {
+  return storageKey === getSeatTransitionKey(session.matchID) &&
+    !isSeatTransitionRequestActive(session, storage, now)
 }
 
 // oxlint-disable-next-line react/only-export-components
@@ -474,6 +483,7 @@ function RoomRoute({
   const [roomExitDialogOpen, setRoomExitDialogOpen] = useState(false)
   const [roomExitBusy, setRoomExitBusy] = useState(false)
   const [seatChangePending, setSeatChangePending] = useState(false)
+  const [seatTransitionRevision, setSeatTransitionRevision] = useState(0)
 
   const invalidateSession = useCallback(
     (reason: string, generation: number, expectedSession?: RoomSession) => {
@@ -512,6 +522,7 @@ function RoomRoute({
       if (isSeatTransitionRequestingForSession(currentSession)) return
 
       try {
+        const hadSeatTransition = loadSeatTransition(currentSession.matchID) !== null
         const recoveredSession = await recoverRoomRouteSession(
           currentSession,
           async (recoveryMatchID, playerID, credentials) => resolveRecoverySeatValidation(async () => {
@@ -529,6 +540,10 @@ function RoomRoute({
         }
         if (!isSameRoomSession(recoveredSession, currentSession)) {
           setSession(recoveredSession)
+          return
+        }
+        if (hadSeatTransition && clientRef.current === null) {
+          setSeatTransitionRevision((revision) => revision + 1)
           return
         }
 
@@ -581,6 +596,9 @@ function RoomRoute({
         event.key !== ROOM_SESSION_KEY &&
         event.key !== LAST_ROOM_SESSION_KEY
       ) return
+      if (shouldWakeRoomRouteForSeatTransitionChange(event.key, routeSession)) {
+        setSeatTransitionRevision((revision) => revision + 1)
+      }
       const storedSession = loadRoomSession(matchID)
       const updatedSession = getUpdatedRoomRouteSession(routeSession, storedSession)
       if (updatedSession !== null) {
@@ -737,7 +755,7 @@ function RoomRoute({
       unsubscribe()
       if (client !== null) stopCurrentClient(clientRef, client)
     }
-  }, [invalidateSession, lobby, matchID, pushToast, refreshRoom, routeSession])
+  }, [invalidateSession, lobby, matchID, pushToast, refreshRoom, routeSession, seatTransitionRevision])
 
   const handleStart = async () => {
     if (gameState?.isActive !== true || routeSession === null || gameState.G.lobby.ownerPlayerID !== routeSession.playerID) return
