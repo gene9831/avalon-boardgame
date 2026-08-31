@@ -53,6 +53,10 @@ describe('Avalon role configuration', () => {
     })
   })
 
+  it("classifies Morgana as evil", () => {
+    expect(loyaltyForRole('morgana')).toBe('evil')
+  })
+
   it('rejects a role deck whose length does not match the seats', () => {
     expect(() => assignRoles(['0'], ['merlin', 'assassin'])).toThrow(
       'Role deck length must match player count',

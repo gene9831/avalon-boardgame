@@ -8,7 +8,7 @@ import {
 } from './types'
 
 export function loyaltyForRole(role: Role): Loyalty {
-  return role === 'assassin' || role === 'minion' ? 'evil' : 'good'
+  return role === 'assassin' || role === 'morgana' || role === 'minion' ? 'evil' : 'good'
 }
 
 export function buildRoleDeck(
