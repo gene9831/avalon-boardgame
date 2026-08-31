@@ -6,6 +6,10 @@ const validRoom = {
   matchID: 'room-1',
   status: 'lobby',
   players: [{ id: 0, name: 'Alice', isConnected: true }],
+  authorityVersion: 1,
+  ownerPlayerID: '0',
+  occupiedPlayerIDs: ['0'],
+  roleConfiguration: { percivalMorgana: true },
   createdAt: 1,
   updatedAt: 2,
 } as const

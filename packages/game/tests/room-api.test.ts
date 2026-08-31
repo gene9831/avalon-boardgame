@@ -1,25 +1,38 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  AvalonJoinRoomRequestSchema,
   parseAvalonCreateRoomRequest,
   parseAvalonJoinRoomRequest,
   parseAvalonRoomDetail,
+  parseAvalonSeatChangeRequest,
 } from '../src/room-api'
 
 describe('Avalon room API contracts', () => {
-  it('accepts the supported create request and rejects extra options', () => {
-    expect(parseAvalonCreateRoomRequest({ numPlayers: 5 })).toEqual({
+  const profile = {
+    playerName: 'Arthur',
+    data: {
+      avatarID: 'merlin',
+      clientID: 'client_a',
+      sessionID: 'session_a',
+    },
+  } as const
+
+  it('parses create as create-and-enter with default paired roles', () => {
+    expect(parseAvalonCreateRoomRequest({ numPlayers: 5, ...profile })).toEqual({
       numPlayers: 5,
+      roleConfiguration: { percivalMorgana: true },
+      ...profile,
     })
     expect(() => parseAvalonCreateRoomRequest({
       numPlayers: 5,
+      ...profile,
       unlisted: true,
     })).toThrow()
   })
 
-  it('normalizes a supported join request', () => {
+  it('parses join without accepting a caller-selected seat', () => {
     expect(parseAvalonJoinRoomRequest({
-      playerID: '0',
       playerName: '  Ａlice  ',
       data: {
         avatarID: 'merlin',
@@ -27,13 +40,22 @@ describe('Avalon room API contracts', () => {
         sessionID: 'join-session-1',
       },
     })).toEqual({
-      playerID: '0',
       playerName: 'Ａlice',
       data: {
         avatarID: 'merlin',
         clientID: 'client-1',
         sessionID: 'join-session-1',
       },
+    })
+    expect(AvalonJoinRoomRequestSchema.safeParse({
+      playerID: '2',
+      ...profile,
+    }).success).toBe(false)
+  })
+
+  it('parses a target-only seat change', () => {
+    expect(parseAvalonSeatChangeRequest({ targetPlayerID: '0' })).toEqual({
+      targetPlayerID: '0',
     })
   })
 
@@ -48,7 +70,6 @@ describe('Avalon room API contracts', () => {
       },
     },
     {
-      playerID: '0',
       playerName: 'Alice',
       data: {
         avatarID: 'unknown',
@@ -57,7 +78,6 @@ describe('Avalon room API contracts', () => {
       },
     },
     {
-      playerID: '0',
       playerName: 'Alice\nAdmin',
       data: {
         avatarID: 'merlin',
@@ -66,7 +86,6 @@ describe('Avalon room API contracts', () => {
       },
     },
     {
-      playerID: '0',
       playerName: 'Alice',
       data: {
         avatarID: 'merlin',
@@ -96,6 +115,10 @@ describe('Avalon room API contracts', () => {
         },
       }, { id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }],
       setupData: { numPlayers: 5, internal: true },
+      authorityVersion: 1,
+      ownerPlayerID: '0',
+      occupiedPlayerIDs: ['0'],
+      roleConfiguration: { percivalMorgana: true },
       gameover: false,
       createdAt: 1,
       updatedAt: 2,
@@ -113,6 +136,10 @@ describe('Avalon room API contracts', () => {
         },
       }, { id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }],
       setupData: { numPlayers: 5 },
+      authorityVersion: 1,
+      ownerPlayerID: '0',
+      occupiedPlayerIDs: ['0'],
+      roleConfiguration: { percivalMorgana: true },
       gameover: false,
       createdAt: 1,
       updatedAt: 2,
