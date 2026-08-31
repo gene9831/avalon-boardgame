@@ -196,6 +196,33 @@ describe('RoomView connection state', () => {
     })
   })
 
+  it('retries transition recovery before the timer can validate a stale source seat', async () => {
+    const values = new Map<string, string>()
+    const storage: RoomSessionStorage = {
+      getItem: (key) => values.get(key) ?? null,
+      removeItem: (key) => values.delete(key),
+      setItem: (key, value) => values.set(key, value),
+    }
+    const source = {
+      credentials: 'credential',
+      matchID: 'room-123',
+      playerID: '0',
+      playerName: 'Alice',
+      sessionID: 'session-123',
+    }
+    saveRoomSession(source, storage)
+    beginSeatTransition(source, '3', storage, 42)
+
+    await expect(recoverRoomRouteSession(source, async () => {
+      throw new TypeError('temporary outage')
+    }, storage)).rejects.toThrow('temporary outage')
+
+    await expect(recoverRoomRouteSession(source, async (_matchID, playerID) => playerID === '3', storage))
+      .resolves.toEqual({ ...source, playerID: '3' })
+    expect(loadRoomSession(source.matchID, storage)).toEqual({ ...source, playerID: '3' })
+    expect(loadSeatTransition(source.matchID, storage)).toBeNull()
+  })
+
   it('treats only definitive session errors as an invalid recovery seat', async () => {
     await expect(resolveRecoverySeatValidation(async () => {
       throw new TypeError('Failed to fetch')

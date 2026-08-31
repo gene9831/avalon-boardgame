@@ -446,6 +446,26 @@ function RoomRoute({
       if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
 
       try {
+        const recoveredSession = await recoverRoomRouteSession(
+          currentSession,
+          async (recoveryMatchID, playerID, credentials) => resolveRecoverySeatValidation(async () => {
+            await validateRoomSession(webConfig.lobbyURL, {
+              matchID: recoveryMatchID,
+              playerID,
+              credentials,
+            })
+          }),
+        )
+        if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
+        if (recoveredSession === null) {
+          invalidateSession('上次的座位已失效。', generation, currentSession)
+          return
+        }
+        if (!isSameRoomSession(recoveredSession, currentSession)) {
+          setSession(recoveredSession)
+          return
+        }
+
         const [nextRoom] = await Promise.all([
           lobby.getMatch(AVALON_GAME_NAME, roomID),
           validateRoomSession(webConfig.lobbyURL, currentSession),
