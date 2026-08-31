@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
-import { recoverRoomRouteSession, resolveRecoverySeatValidation, RoomAccessView, RoomView, type RoomViewProps } from '../src/App'
+import { getUpdatedRoomRouteSession, recoverRoomRouteSession, resolveRecoverySeatValidation, RoomAccessView, RoomView, type RoomViewProps } from '../src/App'
 import { beginSeatTransition, loadRoomSession, loadSeatTransition, saveRoomSession, type RoomSessionStorage } from '../src/room-session'
 
 vi.mock('../src/config', () => ({
@@ -227,6 +227,15 @@ describe('RoomView connection state', () => {
     await expect(resolveRecoverySeatValidation(async () => {
       throw new TypeError('Failed to fetch')
     })).rejects.toThrow('Failed to fetch')
+  })
+
+  it('adopts the current target session saved by another tab without accepting stale storage data', () => {
+    const source = { credentials: 'source', matchID: 'room-123', playerID: '0', playerName: 'Alice' }
+    const target = { ...source, credentials: 'target', playerID: '3' }
+
+    expect(getUpdatedRoomRouteSession(source, target)).toEqual(target)
+    expect(getUpdatedRoomRouteSession(target, target)).toBeNull()
+    expect(getUpdatedRoomRouteSession(source, { ...target, matchID: 'other-room' })).toBeNull()
   })
 })
 

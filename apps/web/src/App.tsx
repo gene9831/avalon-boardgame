@@ -54,6 +54,7 @@ import {
   createRoomParticipationClient,
   getRoomExitErrorMessage,
   getSeatChangeErrorMessage,
+  getStartErrorMessage,
   leaveRoom,
 } from './room-participation'
 import {
@@ -89,6 +90,7 @@ import {
   clearRoomSession,
   clearRoomSessionIfCurrent,
   getRoomSessionKey,
+  getSeatTransitionKey,
   getRoomSessionInvalidationNotice,
   isRoomSessionStillValid,
   loadRoomSession,
@@ -128,6 +130,15 @@ function roomInvalidationNotice(error: unknown) {
 
 function isSameRoomSession(current: RoomSession | null, expected: RoomSession) {
   return current?.playerID === expected.playerID && current.credentials === expected.credentials
+}
+
+// oxlint-disable-next-line react/only-export-components
+export function getUpdatedRoomRouteSession(
+  routeSession: RoomSession,
+  storedSession: RoomSession | null,
+) {
+  if (storedSession?.matchID !== routeSession.matchID) return null
+  return isSameRoomSession(storedSession, routeSession) ? null : storedSession
 }
 
 // oxlint-disable-next-line react/only-export-components
@@ -515,10 +526,20 @@ function RoomRoute({
       if (
         event.key !== null &&
         event.key !== getRoomSessionKey(matchID) &&
+        event.key !== getSeatTransitionKey(matchID) &&
         event.key !== ROOM_SESSION_KEY &&
         event.key !== LAST_ROOM_SESSION_KEY
       ) return
-      if (loadRoomSession(matchID) !== null) return
+      const storedSession = loadRoomSession(matchID)
+      const updatedSession = getUpdatedRoomRouteSession(routeSession, storedSession)
+      if (updatedSession !== null) {
+        stopCurrentClient(clientRef)
+        setSession(updatedSession)
+        setRoomExitDialogOpen(false)
+        setRoomExitBusy(false)
+        return
+      }
+      if (storedSession !== null) return
 
       stopCurrentClient(clientRef)
       setSession(null)
@@ -601,7 +622,30 @@ function RoomRoute({
           if (client?.matchData !== undefined) {
             const players = client.matchData as unknown as LobbyPlayer[]
             if (!isRoomSessionStillValid({ players }, routeSession)) {
-              invalidateSession('上次的座位已失效。', generation, routeSession)
+              void recoverRoomRouteSession(
+                routeSession,
+                async (recoveryMatchID, playerID, credentials) => resolveRecoverySeatValidation(async () => {
+                  await validateRoomSession(webConfig.lobbyURL, {
+                    matchID: recoveryMatchID,
+                    playerID,
+                    credentials,
+                  })
+                }),
+              ).then((recoveredSession) => {
+                if (!active || !isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
+                if (recoveredSession === null) {
+                  invalidateSession('上次的座位已失效。', generation, routeSession)
+                  return
+                }
+                if (!isSameRoomSession(recoveredSession, routeSession)) {
+                  setSession(recoveredSession)
+                  return
+                }
+                invalidateSession('上次的座位已失效。', generation, routeSession)
+              }).catch(() => {
+                if (!active || !isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
+                pushToast({ message: getRequestErrorMessage('connection'), tone: 'error' })
+              })
               return
             }
             setRoom((previousRoom) =>
@@ -653,7 +697,7 @@ function RoomRoute({
       await createRoomParticipationClient(webConfig.lobbyURL).prepareStart(matchID, routeSession.playerID, routeSession.credentials)
       clientRef.current?.moves.startGame()
     } catch (error) {
-      pushToast({ message: getRoomExitErrorMessage(error, true), tone: 'error' })
+      pushToast({ message: getStartErrorMessage(error), tone: 'error' })
     }
   }
 

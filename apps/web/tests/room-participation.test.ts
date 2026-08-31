@@ -5,6 +5,7 @@ import {
   dissolveRoom,
   getRoomExitErrorMessage,
   getSeatChangeErrorMessage,
+  getStartErrorMessage,
   leaveRoom,
   RoomParticipationHttpError,
 } from '../src/room-participation'
@@ -135,5 +136,12 @@ describe('room participation client', () => {
   it('uses the stable seat conflict code instead of exit copy', () => {
     expect(getSeatChangeErrorMessage(new RoomParticipationHttpError(409, 'seat_unavailable')))
       .toBe('该空座刚刚被其他玩家占用。')
+  })
+
+  it('uses dedicated start failure copy', () => {
+    expect(getStartErrorMessage(new RoomParticipationHttpError(403, 'not_room_owner')))
+      .toBe('只有房间拥有者可以执行此操作。')
+    expect(getStartErrorMessage(new Error('network unavailable')))
+      .toBe('开始游戏失败，请重试。')
   })
 })

@@ -93,6 +93,13 @@ export function getSeatChangeErrorMessage(error: unknown) {
   return '换座失败，请重试。'
 }
 
+export function getStartErrorMessage(error: unknown) {
+  if (error instanceof RoomParticipationHttpError && error.code !== null) {
+    return getLobbyErrorMessage(error.code)
+  }
+  return '开始游戏失败，请重试。'
+}
+
 export function getRoomExitErrorMessage(error: unknown, isHost: boolean) {
   if (error instanceof RoomParticipationHttpError && error.status === 409) {
     return isHost
