@@ -63,20 +63,267 @@ export type SeatTransitionLock = <T>(
   action: () => Promise<T>,
 ) => Promise<T | null>
 
-export const withBrowserSeatTransitionLock: SeatTransitionLock = async (
-  matchID,
-  action,
-) => {
-  if (typeof navigator === 'undefined' || navigator.locks === undefined) {
+export interface SeatTransitionLeaseRecord {
+  matchID: string
+  ownerToken: string
+  expiresAt: number
+}
+
+export interface SeatTransitionLeaseTransaction {
+  get: (matchID: string) => Promise<SeatTransitionLeaseRecord | undefined>
+  put: (record: SeatTransitionLeaseRecord) => void
+  delete: (matchID: string) => void
+}
+
+export interface SeatTransitionLeaseDatabase {
+  transaction: <T>(
+    operation: (transaction: SeatTransitionLeaseTransaction) => Promise<T>,
+  ) => Promise<T>
+  close: () => void
+}
+
+type BrowserLockManager = Pick<LockManager, 'request'>
+type OpenSeatTransitionLeaseDatabase = () => Promise<SeatTransitionLeaseDatabase>
+
+interface BrowserSeatTransitionLockOptions {
+  lockManager?: BrowserLockManager | null
+  openLeaseDatabase?: OpenSeatTransitionLeaseDatabase | null
+  now?: () => number
+  generateOwnerToken?: () => string
+  leaseMs?: number
+}
+
+const SEAT_TRANSITION_LOCK_DATABASE = 'avalon-seat-transition-locks'
+const SEAT_TRANSITION_LOCK_STORE = 'leases'
+const SEAT_TRANSITION_LOCK_LEASE_MS = SEAT_TRANSITION_LEASE_MS
+
+function browserLockManager() {
+  return typeof navigator === 'undefined' ? null : navigator.locks ?? null
+}
+
+function browserLeaseDatabaseOpener(): OpenSeatTransitionLeaseDatabase | null {
+  return typeof indexedDB === 'undefined'
+    ? null
+    : () => openIndexedDBSeatTransitionLeaseDatabase(indexedDB)
+}
+
+function generateSeatTransitionLockOwnerToken() {
+  if (typeof globalThis.crypto?.getRandomValues !== 'function') {
+    throw new SeatTransitionLockUnavailableError()
+  }
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16))
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+function isSeatTransitionLeaseRecord(value: unknown): value is SeatTransitionLeaseRecord {
+  if (typeof value !== 'object' || value === null) return false
+  const record = value as Partial<SeatTransitionLeaseRecord>
+  return typeof record.matchID === 'string' && record.matchID.length > 0 &&
+    typeof record.ownerToken === 'string' && record.ownerToken.length > 0 &&
+    typeof record.expiresAt === 'number' && Number.isFinite(record.expiresAt)
+}
+
+function idbRequestResult<T>(request: IDBRequest<T>) {
+  return new Promise<T>((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error ?? new Error('IndexedDB request failed'))
+  })
+}
+
+function wrapIndexedDBDatabase(database: IDBDatabase): SeatTransitionLeaseDatabase {
+  database.onversionchange = () => database.close()
+
+  return {
+    close: () => database.close(),
+    transaction: <T>(
+      operation: (transaction: SeatTransitionLeaseTransaction) => Promise<T>,
+    ) => new Promise<T>((resolve, reject) => {
+      const idbTransaction = database.transaction(
+        SEAT_TRANSITION_LOCK_STORE,
+        'readwrite',
+      )
+      const objectStore = idbTransaction.objectStore(SEAT_TRANSITION_LOCK_STORE)
+      let operationError: unknown
+      let operationFinished = false
+      let operationResult: T
+
+      const transaction: SeatTransitionLeaseTransaction = {
+        delete: (matchID) => { objectStore.delete(matchID) },
+        get: async (matchID) => {
+          const value: unknown = await idbRequestResult(objectStore.get(matchID))
+          if (value === undefined) return undefined
+          if (!isSeatTransitionLeaseRecord(value)) {
+            throw new Error('IndexedDB seat-transition lease is invalid')
+          }
+          return value
+        },
+        put: (record) => { objectStore.put(record) },
+      }
+
+      idbTransaction.oncomplete = () => {
+        if (!operationFinished) {
+          reject(new Error('IndexedDB transaction completed before its operation'))
+          return
+        }
+        resolve(operationResult)
+      }
+      idbTransaction.onerror = () => {
+        reject(operationError ?? idbTransaction.error ?? new Error('IndexedDB transaction failed'))
+      }
+      idbTransaction.onabort = () => {
+        reject(operationError ?? idbTransaction.error ?? new Error('IndexedDB transaction aborted'))
+      }
+
+      void operation(transaction).then((result) => {
+        operationResult = result
+        operationFinished = true
+      }, (error: unknown) => {
+        operationError = error
+        try {
+          idbTransaction.abort()
+        } catch {
+          reject(error)
+        }
+      })
+    }),
+  }
+}
+
+function openIndexedDBSeatTransitionLeaseDatabase(
+  factory: IDBFactory,
+): Promise<SeatTransitionLeaseDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = factory.open(SEAT_TRANSITION_LOCK_DATABASE, 1)
+    let rejected = false
+
+    request.onblocked = () => {
+      rejected = true
+      reject(new Error('IndexedDB seat-transition database is blocked'))
+    }
+    request.onerror = () => {
+      rejected = true
+      reject(request.error ?? new Error('IndexedDB seat-transition database failed to open'))
+    }
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains(SEAT_TRANSITION_LOCK_STORE)) {
+        request.result.createObjectStore(SEAT_TRANSITION_LOCK_STORE, { keyPath: 'matchID' })
+      }
+    }
+    request.onsuccess = () => {
+      if (rejected) {
+        request.result.close()
+        return
+      }
+      resolve(wrapIndexedDBDatabase(request.result))
+    }
+  })
+}
+
+async function withIndexedDBSeatTransitionLock<T>(
+  matchID: string,
+  action: () => Promise<T>,
+  openDatabase: OpenSeatTransitionLeaseDatabase,
+  now: () => number,
+  generateOwnerToken: () => string,
+  leaseMs: number,
+): Promise<T | null> {
+  let database: SeatTransitionLeaseDatabase
+  let ownerToken: string
+  try {
+    ownerToken = generateOwnerToken()
+    database = await openDatabase()
+  } catch {
     throw new SeatTransitionLockUnavailableError()
   }
 
-  return navigator.locks.request(
-    `avalon:seat-transition:${encodeURIComponent(matchID)}`,
-    { ifAvailable: true, mode: 'exclusive' },
-    (lock) => lock === null ? null : action(),
-  )
+  let acquired: boolean
+  try {
+    acquired = await database.transaction(async (transaction) => {
+      const current = await transaction.get(matchID)
+      const acquiredAt = now()
+      if (current !== undefined && current.expiresAt > acquiredAt) return false
+
+      transaction.put({
+        matchID,
+        ownerToken,
+        expiresAt: acquiredAt + leaseMs,
+      })
+      return true
+    })
+  } catch {
+    database.close()
+    throw new SeatTransitionLockUnavailableError()
+  }
+
+  if (!acquired) {
+    database.close()
+    return null
+  }
+
+  let actionOutcome: { status: 'completed', value: T } | { status: 'failed', error: unknown }
+  try {
+    actionOutcome = { status: 'completed', value: await action() }
+  } catch (error) {
+    actionOutcome = { status: 'failed', error }
+  }
+
+  let releaseFailed = false
+  try {
+    await database.transaction(async (transaction) => {
+      const current = await transaction.get(matchID)
+      if (current?.ownerToken === ownerToken) transaction.delete(matchID)
+    })
+  } catch {
+    releaseFailed = true
+  }
+  database.close()
+
+  if (actionOutcome.status === 'failed') throw actionOutcome.error
+  if (releaseFailed) throw new SeatTransitionLockUnavailableError()
+  return actionOutcome.value
 }
+
+export function createBrowserSeatTransitionLock(
+  options: BrowserSeatTransitionLockOptions = {},
+): SeatTransitionLock {
+  const lockManager = Object.hasOwn(options, 'lockManager')
+    ? options.lockManager ?? null
+    : browserLockManager()
+  const openLeaseDatabase = Object.hasOwn(options, 'openLeaseDatabase')
+    ? options.openLeaseDatabase ?? null
+    : browserLeaseDatabaseOpener()
+  const now = options.now ?? Date.now
+  const generateOwnerToken = options.generateOwnerToken ?? generateSeatTransitionLockOwnerToken
+  const leaseMs = options.leaseMs ?? SEAT_TRANSITION_LOCK_LEASE_MS
+
+  return async (matchID, action) => {
+    if (lockManager !== null) {
+      return lockManager.request(
+        `avalon:seat-transition:${encodeURIComponent(matchID)}`,
+        { ifAvailable: true, mode: 'exclusive' },
+        (lock) => lock === null ? null : action(),
+      )
+    }
+
+    if (openLeaseDatabase === null) {
+      throw new SeatTransitionLockUnavailableError()
+    }
+
+    return withIndexedDBSeatTransitionLock(
+      matchID,
+      action,
+      openLeaseDatabase,
+      now,
+      generateOwnerToken,
+      leaseMs,
+    )
+  }
+}
+
+export const withBrowserSeatTransitionLock: SeatTransitionLock = (
+  matchID,
+  action,
+) => createBrowserSeatTransitionLock()(matchID, action)
 
 export interface RoomParticipationClient {
   changeSeat: (

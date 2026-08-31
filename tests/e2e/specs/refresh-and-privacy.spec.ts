@@ -14,13 +14,19 @@ const roomSessionKey = (matchID: string) =>
 const seatTransitionKey = (matchID: string) =>
   `avalon:seat-transition:${encodeURIComponent(matchID)}`
 
-test('a transient committed seat change recovers both same-browser room routes at the target seat', async ({
+test('the IndexedDB lock fallback serializes two tabs and recovers a transient committed seat change', async ({
   browser,
 }) => {
   test.setTimeout(90_000)
 
   const hostContext = await browser.newContext()
   const context = await browser.newContext()
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: undefined,
+    })
+  })
   const hostPage = await hostContext.newPage()
   const movingPage = await context.newPage()
   const stalePage = await context.newPage()
@@ -56,6 +62,10 @@ test('a transient committed seat change recovers both same-browser room routes a
     await joinRoom(movingPage, matchID, '1', 'Recovering Guest')
     await stalePage.goto(roomURL)
     await expect(stalePage.getByLabel('5 人玩家圆桌')).toBeVisible()
+    await expect.poll(() => Promise.all([
+      movingPage.evaluate(() => navigator.locks === undefined),
+      stalePage.evaluate(() => navigator.locks === undefined),
+    ])).toEqual([true, true])
 
     for (const page of [movingPage, stalePage]) {
       await page.evaluate((key) => {
@@ -104,6 +114,26 @@ test('a transient committed seat change recovers both same-browser room routes a
       return (JSON.parse(raw) as { status?: unknown }).status ?? null
     }, seatTransitionKey(matchID))).toBe('requesting')
     await expect(stalePage.locator('button.seat--empty').first()).toBeDisabled()
+    expect(seatChangeRequestCount).toBe(1)
+    const contender = await stalePage.evaluate(async (roomID) => {
+      const modulePath = '/src/room-participation.ts'
+      const roomParticipation = await import(modulePath) as {
+        withBrowserSeatTransitionLock: <T>(
+          matchID: string,
+          action: () => Promise<T>,
+        ) => Promise<T | null>
+      }
+      let actionStarted = false
+      const result = await roomParticipation.withBrowserSeatTransitionLock(
+        roomID,
+        async () => {
+          actionStarted = true
+          return 'started'
+        },
+      )
+      return { actionStarted, result }
+    }, matchID)
+    expect(contender).toEqual({ actionStarted: false, result: null })
     expect(seatChangeRequestCount).toBe(1)
 
     await expect(movingPage).toHaveURL(new RegExp(`/rooms/${matchID}$`))
