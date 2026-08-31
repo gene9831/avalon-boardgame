@@ -1,11 +1,19 @@
 import { koaBody } from 'koa-body'
+import type { StorageAPI } from 'boardgame.io'
 
 import {
   AvalonCreateRoomRequestSchema,
   AvalonJoinRoomRequestSchema,
   AvalonMatchIDSchema,
   parseAvalonRoomDetail,
+  type AvalonLobbyErrorCode,
 } from '@avalon/game'
+
+import {
+  AvalonLobbyError,
+  getPublicLobbyAuthority,
+  type RoomLobbyService,
+} from './room-lobby'
 
 const HTTP_BODY_LIMIT = '16kb'
 
@@ -26,7 +34,7 @@ interface MutableRouter {
 }
 
 type ErrorCode =
-  | 'client_already_joined'
+  | AvalonLobbyErrorCode
   | 'conflict'
   | 'forbidden'
   | 'internal_error'
@@ -84,7 +92,11 @@ function respondWithError(
   ctx.body = { error: { code, message } }
 }
 
-function respondWithRequestFailure(ctx: RouteContext, error: unknown) {
+export function respondWithRequestFailure(ctx: RouteContext, error: unknown) {
+  if (error instanceof AvalonLobbyError) {
+    respondWithError(ctx, error.status, error.code, error.message)
+    return
+  }
   const status = errorStatus(error)
   const message = errorMessage(error)
 
@@ -171,38 +183,71 @@ const joinRoom: RouteMiddleware = async (ctx, next) => {
   await createValidatedBodyMiddleware(AvalonJoinRoomRequestSchema)(ctx, next)
 }
 
-const getRoomDetail: RouteMiddleware = async (ctx, next) => {
-  if (ctx.params.name !== 'avalon') {
-    routeNotFound(ctx, next)
-    return
-  }
-  if (!AvalonMatchIDSchema.safeParse(ctx.params.id).success) {
-    respondWithError(ctx, 400, 'invalid_request', 'Invalid Avalon request')
-    return
-  }
+interface HTTPBoundaryDependencies {
+  db: StorageAPI.Sync | StorageAPI.Async
+  lobby: RoomLobbyService
+}
 
-  try {
-    await next()
-    const source = ctx.body as {
-      createdAt?: unknown
-      gameName?: unknown
-      gameover?: unknown
-      matchID?: unknown
-      players?: unknown
-      updatedAt?: unknown
+function createRoomHandler(lobby: RoomLobbyService): RouteMiddleware {
+  return async (ctx) => {
+    ctx.body = await lobby.createRoomAndJoin(
+      AvalonCreateRoomRequestSchema.parse(ctx.request.body),
+    )
+  }
+}
+
+function joinRoomHandler(lobby: RoomLobbyService): RouteMiddleware {
+  return async (ctx) => {
+    ctx.body = await lobby.joinRoom(
+      ctx.params.id,
+      AvalonJoinRoomRequestSchema.parse(ctx.request.body),
+    )
+  }
+}
+
+function roomDetailHandler(
+  db: StorageAPI.Sync | StorageAPI.Async,
+): RouteMiddleware {
+  return async (ctx) => {
+    try {
+      const { metadata, state } = await (db as StorageAPI.Async).fetch(
+        ctx.params.id,
+        { metadata: true, state: true },
+      )
+      if (metadata === undefined || state === undefined) {
+        throw new AvalonLobbyError(404, 'room_not_found', 'Room not found')
+      }
+      const authority = getPublicLobbyAuthority(state, metadata)
+      ctx.body = parseAvalonRoomDetail({
+        matchID: ctx.params.id,
+        gameName: metadata.gameName,
+        players: Object.values(metadata.players).map((player) => {
+          const data = typeof player.data === 'object' && player.data !== null
+            ? player.data as Record<string, unknown>
+            : {}
+          return {
+            id: player.id,
+            ...(player.name === undefined ? {} : { name: player.name }),
+            ...(player.isConnected === true ? { isConnected: true } : {}),
+            ...(data.avatarID === undefined && data.sessionID === undefined
+              ? {}
+              : {
+                data: {
+                  ...(data.avatarID === undefined ? {} : { avatarID: data.avatarID }),
+                  ...(data.sessionID === undefined ? {} : { sessionID: data.sessionID }),
+                },
+              }),
+          }
+        }),
+        setupData: { numPlayers: Object.keys(metadata.players).length },
+        ...authority,
+        ...(metadata.gameover === undefined ? {} : { gameover: true }),
+        createdAt: metadata.createdAt,
+        updatedAt: metadata.updatedAt,
+      })
+    } catch (error) {
+      respondWithRequestFailure(ctx, error)
     }
-    const players = Array.isArray(source.players) ? source.players : []
-    ctx.body = parseAvalonRoomDetail({
-      matchID: source.matchID,
-      gameName: source.gameName,
-      players,
-      setupData: { numPlayers: players.length },
-      ...(source.gameover === undefined ? {} : { gameover: true }),
-      createdAt: source.createdAt,
-      updatedAt: source.updatedAt,
-    })
-  } catch (error) {
-    respondWithRequestFailure(ctx, error)
   }
 }
 
@@ -217,7 +262,10 @@ function onlyHandler(middleware: unknown[], path: string) {
   return middleware[1]
 }
 
-export function installAvalonHTTPBoundary(routerValue: unknown) {
+export function installAvalonHTTPBoundary(
+  routerValue: unknown,
+  dependencies: HTTPBoundaryDependencies,
+) {
   const router = routerValue as MutableRouter
   const registerGet = router.get.bind(router)
   const registerPost = router.post.bind(router)
@@ -230,29 +278,41 @@ export function installAvalonHTTPBoundary(routerValue: unknown) {
       if (middleware.length !== 1) {
         throw new Error(`Unsupported boardgame.io Lobby route contract: ${path}`)
       }
-      return registerGet(path, getRoomDetail, middleware[0])
+      return registerGet(path, async (ctx: RouteContext, next: Next) => {
+        if (ctx.params.name !== 'avalon') {
+          routeNotFound(ctx, next)
+          return
+        }
+        if (!AvalonMatchIDSchema.safeParse(ctx.params.id).success) {
+          respondWithError(ctx, 400, 'invalid_request', 'Invalid Avalon request')
+          return
+        }
+        await roomDetailHandler(dependencies.db)(ctx, next)
+      })
     }
     throw new Error(`Unsupported boardgame.io Lobby GET route: ${path}`)
   }) as RegisterRoute
 
   router.post = ((path: string, ...middleware: unknown[]) => {
     if (path === '/games/:name/create') {
+      onlyHandler(middleware, path)
       return registerPost(path, async (ctx: RouteContext, next: Next) => {
         if (ctx.params.name !== 'avalon') {
           routeNotFound(ctx, next)
           return
         }
         await createRoom(ctx, next)
-      }, onlyHandler(middleware, path))
+      }, createRoomHandler(dependencies.lobby))
     }
     if (path === '/games/:name/:id/join') {
+      onlyHandler(middleware, path)
       return registerPost(path, async (ctx: RouteContext, next: Next) => {
         if (ctx.params.name !== 'avalon') {
           routeNotFound(ctx, next)
           return
         }
         await joinRoom(ctx, next)
-      }, onlyHandler(middleware, path))
+      }, joinRoomHandler(dependencies.lobby))
     }
     if (
       path === '/games/:name/:id/leave' ||

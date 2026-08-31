@@ -5,6 +5,8 @@ import type {
   AvalonRoomSummary,
 } from '@avalon/game'
 
+import { getPublicLobbyAuthority } from './room-lobby'
+
 function getStatus(metadata: Server.MatchData, state: State): AvalonRoomStatus {
   if (metadata.gameover !== undefined) return 'finished'
   return (state.G as { status?: AvalonRoomStatus }).status === 'lobby'
@@ -17,6 +19,7 @@ export function toAvalonRoomSummary(
   metadata: Server.MatchData,
   state: State,
 ): AvalonRoomSummary {
+  const authority = getPublicLobbyAuthority(state, metadata)
   return {
     matchID,
     status: getStatus(metadata, state),
@@ -25,6 +28,7 @@ export function toAvalonRoomSummary(
       ...(name === undefined ? {} : { name }),
       isConnected: isConnected === true,
     })),
+    ...authority,
     createdAt: metadata.createdAt,
     updatedAt: metadata.updatedAt,
   }

@@ -77,6 +77,16 @@ async function prepare(statePath: string) {
       playerID: '0',
       playerName: 'Restart Probe',
     })
+    await Promise.all(
+      Array.from({ length: 4 }, (_, index) => lobby.joinMatch(
+        'avalon',
+        created.matchID,
+        {
+          playerID: String(index + 1),
+          playerName: `Restart Probe ${index + 2}`,
+        },
+      )),
+    )
     if (player.playerCredentials === null) {
       throw new Error('Restart probe did not receive player credentials')
     }

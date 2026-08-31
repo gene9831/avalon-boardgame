@@ -72,11 +72,22 @@ describeDatabase('PostgreSQL credential reconnection', () => {
         server: `http://127.0.0.1:${running.lobbyPort}`,
       })
       const created = await lobby.createMatch('avalon', { numPlayers: 5 })
-      matchID = created.matchID
-      const player = await lobby.joinMatch('avalon', matchID, {
+      const activeMatchID = created.matchID
+      matchID = activeMatchID
+      const player = await lobby.joinMatch('avalon', activeMatchID, {
         playerID: '0',
         playerName: 'Persistent Alice',
       })
+      await Promise.all(
+        Array.from({ length: 4 }, (_, index) => lobby.joinMatch(
+          'avalon',
+          activeMatchID,
+          {
+            playerID: String(index + 1),
+            playerName: `Persistent Player ${index + 2}`,
+          },
+        )),
+      )
       const connect = () => Client({
         game: AvalonGame,
         numPlayers: 5,
