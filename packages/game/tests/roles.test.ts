@@ -2,8 +2,13 @@ import { describe, expect, it } from 'vitest'
 
 import { getPlayerCountConfig } from '../src/config'
 import {
-  assignRoles,
   buildRoleDeck,
+  DEFAULT_ROLE_CONFIGURATION,
+  LEGACY_ROLE_CONFIGURATION,
+  normalizeRoleConfiguration,
+} from '../src'
+import {
+  assignRoles,
   loyaltyForRole,
 } from '../src/roles'
 
@@ -51,6 +56,24 @@ describe('Avalon role configuration', () => {
   it('rejects a role deck whose length does not match the seats', () => {
     expect(() => assignRoles(['0'], ['merlin', 'assassin'])).toThrow(
       'Role deck length must match player count',
+    )
+  })
+
+  it.each([
+    [5, ['merlin', 'percival', 'loyal_servant', 'assassin', 'morgana']],
+    [6, ['merlin', 'percival', 'loyal_servant', 'loyal_servant', 'assassin', 'morgana']],
+    [7, ['merlin', 'percival', 'loyal_servant', 'loyal_servant', 'assassin', 'morgana', 'minion']],
+    [8, ['merlin', 'percival', 'loyal_servant', 'loyal_servant', 'loyal_servant', 'assassin', 'morgana', 'minion']],
+    [9, ['merlin', 'percival', 'loyal_servant', 'loyal_servant', 'loyal_servant', 'loyal_servant', 'assassin', 'morgana', 'minion']],
+    [10, ['merlin', 'percival', 'loyal_servant', 'loyal_servant', 'loyal_servant', 'loyal_servant', 'assassin', 'morgana', 'minion', 'minion']],
+  ])('builds the paired deck for %i players', (playerCount, expected) => {
+    expect(buildRoleDeck(playerCount, DEFAULT_ROLE_CONFIGURATION).sort()).toEqual(expected.sort())
+  })
+
+  it('uses base roles when persisted configuration is missing', () => {
+    expect(normalizeRoleConfiguration(undefined)).toEqual(LEGACY_ROLE_CONFIGURATION)
+    expect(buildRoleDeck(5, LEGACY_ROLE_CONFIGURATION).sort()).toEqual(
+      ['merlin', 'loyal_servant', 'loyal_servant', 'assassin', 'minion'].sort(),
     )
   })
 })

@@ -44,7 +44,13 @@ export {
   buildRoleDeck,
   loyaltyForRole,
 } from './roles'
+export {
+  DEFAULT_ROLE_CONFIGURATION,
+  LEGACY_ROLE_CONFIGURATION,
+  normalizeRoleConfiguration,
+} from './types'
 export type {
+  AvalonRoleConfiguration,
   AvalonG,
   IdentityRecognitionState,
   IdentityRecognitionStep,

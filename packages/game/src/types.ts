@@ -2,9 +2,23 @@ export type PlayerID = string
 
 export type Role =
   | 'merlin'
+  | 'percival'
   | 'assassin'
+  | 'morgana'
   | 'loyal_servant'
   | 'minion'
+
+export interface AvalonRoleConfiguration {
+  percivalMorgana: boolean
+}
+
+export const DEFAULT_ROLE_CONFIGURATION: Readonly<AvalonRoleConfiguration> = {
+  percivalMorgana: true,
+}
+
+export const LEGACY_ROLE_CONFIGURATION: Readonly<AvalonRoleConfiguration> = {
+  percivalMorgana: false,
+}
 
 export type Loyalty = 'good' | 'evil'
 
@@ -102,6 +116,12 @@ export interface AvalonG {
 export interface AvalonSetupData {
   players?: Record<PlayerID, PlayerInfo>
   timeouts?: TimeoutConfig
+}
+
+export function normalizeRoleConfiguration(
+  value: AvalonRoleConfiguration | undefined,
+): AvalonRoleConfiguration {
+  return value === undefined ? { ...LEGACY_ROLE_CONFIGURATION } : { percivalMorgana: value.percivalMorgana }
 }
 
 export interface AvalonViewer {
