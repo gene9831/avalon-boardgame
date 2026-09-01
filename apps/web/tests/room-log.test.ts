@@ -162,4 +162,16 @@ describe('local waiting-room presence log', () => {
       },
     ])
   })
+
+  it('records a seat change once without duplicate exit and join entries', () => {
+    const previous = [{ id: 1, name: 'Arthur', data: { sessionID: 'session-arthur' } }]
+    const current = [{ id: 3, name: 'Arthur', data: { sessionID: 'session-arthur' } }]
+
+    expect(buildPresenceLogChanges(previous, current, 1)).toEqual([{
+      group: '等待玩家',
+      id: 'presence-1',
+      kind: 'presence',
+      title: 'Arthur 从 2 号座位移动到 4 号座位',
+    }])
+  })
 })

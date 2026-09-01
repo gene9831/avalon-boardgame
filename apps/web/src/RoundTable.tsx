@@ -12,6 +12,7 @@ export interface RoundTableSeat {
   occupied: boolean
   connected: boolean
   isCurrentPlayer: boolean
+  isOwner: boolean
   labelPlacement: 'bottom' | 'left' | 'right' | 'top'
   left: number
   top: number
@@ -29,6 +30,7 @@ export function buildRoundTableSeats(
   players: readonly LobbyPlayer[],
   numPlayers: number,
   viewerPlayerID: string,
+  ownerPlayerID?: string | null,
 ): RoundTableSeat[] {
   const viewerIndex = Number(viewerPlayerID)
 
@@ -48,6 +50,7 @@ export function buildRoundTableSeats(
       occupied,
       connected: occupied && player?.isConnected === true,
       isCurrentPlayer: String(index) === viewerPlayerID,
+      isOwner: String(index) === ownerPlayerID,
       labelPlacement: vertical > 0.5
         ? 'bottom'
         : vertical < -0.5

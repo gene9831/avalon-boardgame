@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 
 import { playGeneratedGame } from '@avalon/test-support'
 
-import { createBrowserReplayHarness } from '../support/browser-replay'
+import { createBrowserReplayHarness, createRoom } from '../support/browser-replay'
 
 const viewports = [
   { width: 320, height: 568 },
@@ -191,6 +191,68 @@ test('the create-game configuration remains fully usable at narrow widths', asyn
     expect(geometry.minButtonHeight).toBeGreaterThanOrEqual(44)
     await expect(dialog.getByLabel('5 人规则摘要')).toBeVisible()
     await dialog.getByRole('button', { name: '取消' }).click()
+  }
+})
+
+test('the create-game role option stays concise and vertically aligned on mobile', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 429, height: 741 })
+  await page.goto('/')
+  await page.getByRole('button', { name: '创建房间' }).click()
+
+  const dialog = page.getByRole('dialog', { name: '创建一局阿瓦隆' })
+  await expect(
+    dialog.getByText('帕西维尔会看到梅林与莫甘娜两名候选人。', { exact: true }),
+  ).toHaveCount(0)
+
+  const centers = await dialog.locator('.role-configuration-toggle').evaluate((element) => {
+    const checkbox = element.querySelector<HTMLInputElement>(
+      '#percival-morgana-role-configuration',
+    )
+    const label = element.querySelector<HTMLLabelElement>(
+      'label[for="percival-morgana-role-configuration"]',
+    )
+    const help = element.querySelector<HTMLButtonElement>('button')
+
+    if (!checkbox || !label || !help) {
+      throw new Error('角色配置控件不完整')
+    }
+
+    return [checkbox, label, help].map((control) => {
+      const rect = control.getBoundingClientRect()
+      return rect.top + rect.height / 2
+    })
+  })
+
+  expect(Math.max(...centers) - Math.min(...centers)).toBeLessThanOrEqual(1)
+})
+
+test('empty-seat actions stay 44px and keyboard operable at the smallest viewport', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ viewport: { width: 320, height: 568 } })
+  const page = await context.newPage()
+
+  try {
+    await createRoom(page, 5, 'Keyboard Seat Owner')
+    const emptySeat = page.getByRole('button', { name: '移至 2 号空座位' })
+    const bounds = await emptySeat.boundingBox()
+    expect(bounds).not.toBeNull()
+    expect(bounds!.width).toBeGreaterThanOrEqual(44)
+    expect(bounds!.height).toBeGreaterThanOrEqual(44)
+
+    await emptySeat.focus()
+    await expect(emptySeat).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(page.locator('[data-round-table-player][data-player-id="1"]'))
+      .toContainText('Keyboard Seat Owner')
+    await expect(
+      page.locator('[data-round-table-player][data-player-id="1"]')
+        .getByLabel('房间拥有者'),
+    ).toBeVisible()
+  } finally {
+    await context.close()
   }
 })
 

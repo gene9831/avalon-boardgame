@@ -6,6 +6,7 @@ import type {
   PlayerID,
   Role,
 } from './types'
+import { normalizeRoleConfiguration } from './types'
 
 function findEvilPlayerIDs(roleByPlayer: Record<PlayerID, Role>) {
   return Object.entries(roleByPlayer)
@@ -21,6 +22,12 @@ export function getAvalonPlayerView(
   identityRecognitionDeadlineEnabled = false,
 ): AvalonPlayerView {
   const { secret, ...publicGame } = G
+  publicGame.rules = {
+    ...publicGame.rules,
+    roleConfiguration: normalizeRoleConfiguration(
+      publicGame.rules.roleConfiguration,
+    ),
+  }
   const role = playerID === null ? undefined : secret.roleByPlayer[playerID]
   const loyalty = role === undefined ? null : loyaltyForRole(role)
   const evilPlayerIDs = findEvilPlayerIDs(secret.roleByPlayer)
@@ -28,13 +35,25 @@ export function getAvalonPlayerView(
   const evilKnowledgeReleased =
     recognitionStep === undefined || recognitionStep !== 'roleReveal'
   const merlinKnowledgeReleased =
-    recognitionStep === undefined || recognitionStep === 'merlinRecognition'
+    recognitionStep === undefined ||
+    recognitionStep === 'merlinRecognition' ||
+    recognitionStep === 'percivalRecognition'
   const knownEvilPlayerIDs =
     role === 'merlin' && merlinKnowledgeReleased
       ? evilPlayerIDs
       : loyalty === 'evil' && evilKnowledgeReleased
         ? evilPlayerIDs.filter((knownID) => knownID !== playerID)
         : []
+  const percivalKnowledgeReleased =
+    recognitionStep === undefined || recognitionStep === 'percivalRecognition'
+  const knownMerlinCandidatePlayerIDs =
+    role === 'percival' && percivalKnowledgeReleased
+      ? Object.entries(secret.roleByPlayer)
+        .filter(([, candidateRole]) =>
+          candidateRole === 'merlin' || candidateRole === 'morgana',
+        )
+        .map(([candidatePlayerID]) => candidatePlayerID)
+      : []
   const recognitionParticipantIDs = recognitionStep === undefined
     ? []
     : getIdentityRecognitionParticipantIDs(
@@ -51,6 +70,7 @@ export function getAvalonPlayerView(
       role: role ?? null,
       loyalty,
       knownEvilPlayerIDs,
+      knownMerlinCandidatePlayerIDs,
       identityRecognition: recognitionStep === undefined
         ? undefined
         : {

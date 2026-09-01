@@ -1,4 +1,9 @@
 import { LobbyClient } from 'boardgame.io/client'
+import {
+  parseAvalonRoomSessionResponse,
+  type AvalonCreateRoomRequest,
+  type AvalonJoinRoomRequest,
+} from '@avalon/game'
 
 import { webConfig } from './config'
 import type { PlayerAvatarID } from './player-profile'
@@ -24,11 +29,63 @@ export interface AvalonMatch {
   setupData?: {
     numPlayers?: number
   }
+  ownerPlayerID: string | null
+  occupiedPlayerIDs: string[]
+  roleConfiguration: { percivalMorgana: boolean }
   gameover?: unknown
 }
 
+class LobbyRequestError extends Error {
+  details: { error?: unknown }
+
+  constructor(details: { error?: unknown }) {
+    super('Lobby request failed')
+    this.details = details
+  }
+}
+
+export class LobbyResponseContractError extends Error {
+  constructor() {
+    super('Lobby room-session response is invalid')
+    this.name = 'LobbyResponseContractError'
+  }
+}
+
 export function createAvalonLobbyClient() {
-  return new LobbyClient({ server: webConfig.lobbyURL })
+  const client = new LobbyClient({ server: webConfig.lobbyURL })
+  const request = async (path: string, body: unknown) => {
+    const response = await fetch(`${webConfig.lobbyURL}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    let result: unknown
+    try {
+      result = await response.json()
+    } catch {
+      if (response.ok) throw new LobbyResponseContractError()
+      throw new LobbyRequestError({})
+    }
+    if (!response.ok) {
+      throw new LobbyRequestError(
+        typeof result === 'object' && result !== null
+          ? result as { error?: unknown }
+          : { error: result },
+      )
+    }
+    try {
+      return parseAvalonRoomSessionResponse(result)
+    } catch {
+      throw new LobbyResponseContractError()
+    }
+  }
+
+  return {
+    createRoomAndJoin: (requestBody: AvalonCreateRoomRequest) => request('/games/avalon/create', requestBody),
+    getMatch: client.getMatch.bind(client),
+    joinMatch: (_gameName: 'avalon', matchID: string, requestBody: AvalonJoinRoomRequest) =>
+      request(`/games/avalon/${encodeURIComponent(matchID)}/join`, requestBody),
+  }
 }
 
 export function getMatchPlayerCount(match: AvalonMatch) {

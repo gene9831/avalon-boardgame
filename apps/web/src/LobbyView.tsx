@@ -1,4 +1,4 @@
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useState } from 'react'
 
 import type {
   AvalonRoomStatus,
@@ -6,6 +6,7 @@ import type {
 } from '@avalon/game'
 
 import { LobbyDevTools } from './LobbyDevTools'
+import { HelpTrigger } from './HelpTrigger'
 import { PlayerProfileControl } from './PlayerProfileControl'
 import type { PlayerProfile } from './player-profile'
 import type { RoomSession } from './room-session'
@@ -27,15 +28,14 @@ export interface LobbyViewProps {
   onDeleteRoom: (matchID: string) => Promise<void>
   onDevTokenChange: (value: string) => void
   onEnterRoom: (matchID: string) => void
-  onJoin: (matchID: string, playerID: string) => void
+  onJoin: (intent: { type: 'join'; matchID: string }) => void
+  onOpenHelp: () => void
   onRefresh: () => void
   onSaveProfile: (profile: PlayerProfile) => void
   profile: PlayerProfile
   roomAccessLocked: boolean
   roomAccessPending: boolean
   roomAccessUnavailable: boolean
-  selectedSeats: Record<string, string>
-  setSelectedSeats: Dispatch<SetStateAction<Record<string, string>>>
 }
 
 type RoomSectionKey = 'active' | 'finished'
@@ -87,14 +87,13 @@ export function LobbyView({
   onDevTokenChange,
   onEnterRoom,
   onJoin,
+  onOpenHelp,
   onRefresh,
   onSaveProfile,
   profile,
   roomAccessLocked,
   roomAccessPending,
   roomAccessUnavailable,
-  selectedSeats,
-  setSelectedSeats,
 }: LobbyViewProps) {
   const activeRoomMatchIDs = new Set(activeRoomSessions.map(({ matchID }) => matchID))
   const roomAccessMessage = roomAccessPending
@@ -126,9 +125,6 @@ export function LobbyView({
     const occupiedPlayerIDs = getOccupiedRoomPlayerIDs(room)
     const occupied = occupiedPlayerIDs.length
     const playerCount = getRoomPlayerCount(room)
-    const availableSeats = Array.from({ length: playerCount }, (_, index) => String(index))
-      .filter((playerID) => !occupiedPlayerIDs.includes(playerID))
-    const selectedSeat = selectedSeats[room.matchID] ?? availableSeats[0] ?? ''
 
     return (
       <article className="rounded-2xl border border-white/10 bg-slate-950/40 p-4 sm:p-5" key={room.matchID}>
@@ -145,23 +141,13 @@ export function LobbyView({
           <div className="flex flex-wrap items-center gap-2">
             {activeSession !== undefined ? (
               <button className={enterButton} onClick={() => onEnterRoom(room.matchID)} type="button">继续游戏</button>
+            ) : room.status === 'lobby' && occupied >= playerCount ? (
+              <span className="rounded-full bg-slate-700/70 px-3 py-2 text-xs text-slate-300">已满</span>
             ) : canJoinRoom(room) && roomAccessLocked ? (
               <span className="rounded-full bg-slate-700/70 px-3 py-2 text-xs text-slate-300">{roomAccessMessage}</span>
-            ) : canJoinRoom(room) && (availableSeats.length === 0 ? (
-              <span className="rounded-full bg-slate-700/70 px-3 py-2 text-xs text-slate-300">已满</span>
-            ) : (
-              <>
-                <select
-                  aria-label={`选择 ${room.matchID} 的座位`}
-                  className="min-h-11 rounded-xl border border-white/10 bg-slate-900 px-3 py-2.5 text-sm text-white"
-                  onChange={(event) => setSelectedSeats((previous) => ({ ...previous, [room.matchID]: event.target.value }))}
-                  value={selectedSeat}
-                >
-                  {availableSeats.map((seatID) => <option key={seatID} value={seatID}>座位 {Number(seatID) + 1}</option>)}
-                </select>
-                <button className={joinButton} disabled={busy || selectedSeat === ''} onClick={() => onJoin(room.matchID, selectedSeat)} type="button">加入</button>
-              </>
-            ))}
+            ) : canJoinRoom(room) ? (
+              <button className={joinButton} disabled={busy || !canJoinRoom(room)} onClick={() => onJoin({ type: 'join', matchID: room.matchID })} type="button">加入游戏</button>
+            ) : null}
             {devToolsEnabled && devToken.length > 0 && <button className="rounded-xl border border-rose-300/40 px-4 py-2.5 text-sm text-rose-200 transition hover:border-rose-300 hover:bg-rose-300/10" onClick={() => void onDeleteRoom(room.matchID)} type="button">删除</button>}
           </div>
         </div>
@@ -195,13 +181,16 @@ export function LobbyView({
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.16),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(34,211,238,0.14),_transparent_35%)] px-4 py-6 text-slate-200 sm:px-8 sm:py-10">
       <div className="mx-auto max-w-6xl">
-        <header className="mb-8 flex items-start justify-between gap-4 sm:mb-10">
+        <header className="mb-8 flex flex-col gap-4 sm:mb-10 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 max-w-3xl">
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-300">阿瓦隆</p>
             <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white sm:text-6xl">今晚，谁值得信任？</h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">一场关于忠诚与背叛的社交推理游戏。创建房间，与朋友开始对局。</p>
           </div>
-          <PlayerProfileControl locked={roomAccessLocked} onSave={onSaveProfile} profile={profile} />
+          <div className="order-first flex shrink-0 items-center gap-2 self-end sm:order-none sm:self-auto">
+            <HelpTrigger onOpen={onOpenHelp} variant="labeled" />
+            <PlayerProfileControl locked={roomAccessLocked} onSave={onSaveProfile} profile={profile} />
+          </div>
         </header>
 
         <section className="flex items-center justify-between gap-4 rounded-3xl border border-amber-300/20 bg-white/[0.06] p-5 shadow-2xl shadow-black/20 backdrop-blur sm:gap-6 sm:p-7">

@@ -3,6 +3,12 @@ import { readFile } from 'node:fs/promises'
 import type { LogEntry, Server, State, StorageAPI } from 'boardgame.io'
 import { Pool } from 'pg'
 
+import type {
+  AtomicLobbyStorage,
+  LobbyMatchMutation,
+  LobbyMatchSnapshot,
+} from './lobby-storage'
+
 const schemaURL = new URL('./schema.sql', import.meta.url)
 
 export interface PostgresStorageOptions {
@@ -35,7 +41,7 @@ function timestamp(milliseconds: number) {
   return new Date(milliseconds)
 }
 
-export class PostgresStorage implements StorageAPI.Async {
+export class PostgresStorage implements StorageAPI.Async, AtomicLobbyStorage {
   private readonly pool: ClosablePool
   private readonly ownsPool: boolean
   private readonly handlePoolError = (error: Error) => {
@@ -184,6 +190,51 @@ export class PostgresStorage implements StorageAPI.Async {
     )
 
     if (result.rowCount === 0) throw matchNotFound(matchID)
+  }
+
+  async mutateLobbyMatch<T>(
+    matchID: string,
+    mutate: (snapshot: LobbyMatchSnapshot) => LobbyMatchMutation<T>,
+  ): Promise<T> {
+    const client = await this.pool.connect()
+
+    try {
+      await client.query('BEGIN')
+      const selected = await client.query<MatchRow>(
+        'SELECT state, metadata FROM matches WHERE match_id = $1 FOR UPDATE',
+        [matchID],
+      )
+      const row = selected.rows[0]
+      if (row?.state === undefined || row.metadata === undefined) {
+        throw matchNotFound(matchID)
+      }
+
+      const next = mutate({ state: row.state, metadata: row.metadata })
+      await client.query(
+        `
+          UPDATE matches
+          SET state = $2::jsonb,
+              metadata = $3::jsonb,
+              game_name = $4,
+              updated_at = $5
+          WHERE match_id = $1
+        `,
+        [
+          matchID,
+          json(next.state),
+          json(next.metadata),
+          next.metadata.gameName,
+          timestamp(next.metadata.updatedAt),
+        ],
+      )
+      await client.query('COMMIT')
+      return next.result
+    } catch (error) {
+      await client.query('ROLLBACK')
+      throw error
+    } finally {
+      client.release()
+    }
   }
 
   async fetch<O extends StorageAPI.FetchOpts>(

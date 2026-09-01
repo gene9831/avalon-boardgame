@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   executePendingJoin,
@@ -6,38 +6,38 @@ import {
   type PendingJoin,
 } from '../src/join-flow'
 
-const calls: unknown[][] = []
-const fakeLobby: LobbyJoinClient = {
-  createMatch: async (gameName, options) => {
-    calls.push(['createMatch', gameName, options])
-    return { matchID: 'room-created' }
-  },
-  joinMatch: async (gameName, matchID, options) => {
-    calls.push(['joinMatch', gameName, matchID, options])
+const createRoomAndJoin = vi.fn(async () => ({
+    matchID: 'room-created',
+    playerID: '0',
+    playerCredentials: 'credential-0',
+  }))
+const joinMatch = vi.fn(async (_gameName: 'avalon', matchID: string, _request: unknown) => {
     return {
-      playerID: options.playerID,
-      playerCredentials: `credential-${options.playerID}`,
+      matchID,
+      playerID: '3',
+      playerCredentials: 'credential-3',
     }
-  },
-}
+  })
+const fakeLobby: LobbyJoinClient = { createRoomAndJoin, joinMatch }
 
 const intent: PendingJoin = {
   type: 'join',
   matchID: 'room-existing',
-  playerID: '3',
 }
 
 beforeEach(() => {
-  calls.length = 0
+  createRoomAndJoin.mockClear()
+  joinMatch.mockClear()
 })
 
 describe('pending join flow', () => {
-  it('creates first and then joins seat 0 with the submitted name', async () => {
+  it('creates and enters with one request', async () => {
     const result = await executePendingJoin(
       fakeLobby,
       {
         type: 'create',
         numPlayers: 5,
+        roleConfiguration: { percivalMorgana: true },
       },
       {
         avatarID: 'percival',
@@ -56,32 +56,21 @@ describe('pending join flow', () => {
       playerName: 'Alice',
       sessionID: 'join-session-1',
     })
-    expect(calls).toEqual([
-      ['createMatch', 'avalon', { numPlayers: 5 }],
-      [
-        'joinMatch',
-        'avalon',
-        'room-created',
-        {
-          data: {
-            avatarID: 'percival',
-            clientID: 'client-1',
-            sessionID: 'join-session-1',
-          },
-          playerID: '0',
-          playerName: 'Alice',
-        },
-      ],
-    ])
+    expect(createRoomAndJoin).toHaveBeenCalledWith({
+      numPlayers: 5,
+      roleConfiguration: { percivalMorgana: true },
+      playerName: 'Alice',
+      data: { avatarID: 'percival', clientID: 'client-1', sessionID: 'join-session-1' },
+    })
+    expect(joinMatch).not.toHaveBeenCalled()
   })
 
-  it('joins the selected seat without creating another room', async () => {
+  it('joins without sending a seat', async () => {
     const result = await executePendingJoin(
       fakeLobby,
       {
         type: 'join',
         matchID: 'room-existing',
-        playerID: '3',
       },
       {
         avatarID: 'morgana',
@@ -94,22 +83,10 @@ describe('pending join flow', () => {
 
     expect(result.matchID).toBe('room-existing')
     expect(result.playerID).toBe('3')
-    expect(calls).toEqual([
-      [
-        'joinMatch',
-        'avalon',
-        'room-existing',
-        {
-          data: {
-            avatarID: 'morgana',
-            clientID: 'client-1',
-            sessionID: 'join-session-2',
-          },
-          playerID: '3',
-          playerName: 'Bob',
-        },
-      ],
-    ])
+    expect(joinMatch).toHaveBeenCalledWith('avalon', 'room-existing', {
+      data: { avatarID: 'morgana', clientID: 'client-1', sessionID: 'join-session-2' },
+      playerName: 'Bob',
+    })
   })
 
   it('rejects a blank name before calling the lobby client', async () => {
@@ -122,7 +99,8 @@ describe('pending join flow', () => {
         playerName: '   ',
       }),
     ).rejects.toThrow('玩家名称不能为空')
-    expect(calls).toEqual([])
+    expect(createRoomAndJoin).not.toHaveBeenCalled()
+    expect(joinMatch).not.toHaveBeenCalled()
   })
 
   it('rejects a name longer than 24 characters before calling the lobby client', async () => {
@@ -135,7 +113,8 @@ describe('pending join flow', () => {
         playerName: 'A'.repeat(25),
       }),
     ).rejects.toThrow('玩家名称不能超过 24 个字符')
-    expect(calls).toEqual([])
+    expect(createRoomAndJoin).not.toHaveBeenCalled()
+    expect(joinMatch).not.toHaveBeenCalled()
   })
 
   it('keeps the public join session ID distinct from player credentials', async () => {

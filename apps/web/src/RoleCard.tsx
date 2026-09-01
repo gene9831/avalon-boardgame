@@ -1,35 +1,21 @@
-import type { Role } from '@avalon/game'
+import { loyaltyForRole, type Role } from '@avalon/game'
 
 import assassinAvatar from './assets/roles/assassin.png'
 import loyalServantAvatar from './assets/roles/loyal-servant.png'
 import merlinAvatar from './assets/roles/merlin.png'
+import morganaAvatar from './assets/roles/morgana.png'
 import minionAvatar from './assets/roles/minion-of-mordred.png'
+import percivalAvatar from './assets/roles/percival.png'
+import { ROLE_GUIDANCE } from './role-guidance'
 import { LOYALTY_LABELS, ROLE_LABELS } from './room-game'
 
 const ROLE_AVATARS: Record<Role, string> = {
   assassin: assassinAvatar,
   loyal_servant: loyalServantAvatar,
   merlin: merlinAvatar,
+  morgana: morganaAvatar,
   minion: minionAvatar,
-}
-
-const ROLE_GUIDANCE: Record<Role, { ability: string; objective: string }> = {
-  assassin: {
-    ability: '你属于邪恶阵营，可在任务中选择成功或失败。正义完成三次任务后，由你刺杀梅林。',
-    objective: '破坏三次任务，或在最后准确找出梅林。',
-  },
-  loyal_servant: {
-    ability: '你没有额外身份视野。参加任务时只能提交成功。',
-    objective: '帮助正义阵营完成三次任务，并保护梅林不被刺客识破。',
-  },
-  merlin: {
-    ability: '你会在辨认阶段看到全部邪恶阵营座位，但不会知道谁是刺客或爪牙。',
-    objective: '引导正义完成三次任务，同时隐藏自己，避免被刺客识破。',
-  },
-  minion: {
-    ability: '你属于邪恶阵营，可辨认同伴，并可在任务中选择成功或失败。',
-    objective: '协助邪恶阵营破坏三次任务，并帮助刺客找出梅林。',
-  },
+  percival: percivalAvatar,
 }
 
 interface RoleAvatarProps {
@@ -54,9 +40,7 @@ interface RoleCardProps {
 
 export function RoleCard({ role }: RoleCardProps) {
   const guidance = ROLE_GUIDANCE[role]
-  const loyalty = role === 'merlin' || role === 'loyal_servant'
-    ? 'good'
-    : 'evil'
+  const loyalty = loyaltyForRole(role)
 
   return (
     <article

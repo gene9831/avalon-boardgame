@@ -67,23 +67,23 @@ describe('room session validation', () => {
       const { matchID } = await lobby.createMatch('avalon', { numPlayers: 5 })
       const publicData = { clientID: 'client-alice', sessionID: 'join-session-alice' }
       const alice = await lobby.joinMatch('avalon', matchID, {
-        playerID: '0',
-        playerName: 'Alice',
+        playerID: '1',
+        playerName: 'Bob',
         data: publicData,
       })
-      const kick = await fetch(`${baseURL(running)}/dev/rooms/${matchID}/players/0`, {
+      const kick = await fetch(`${baseURL(running)}/dev/rooms/${matchID}/players/1`, {
         method: 'DELETE',
         headers: { Authorization: 'Bearer local-dev-token' },
       })
       expect(kick.status).toBe(200)
 
       const bob = await lobby.joinMatch('avalon', matchID, {
-        playerID: '0',
-        playerName: 'Bob',
+        playerID: '1',
+        playerName: 'Bors',
         data: publicData,
       })
       const publicMatch = await lobby.getMatch('avalon', matchID)
-      expect(publicMatch.players[0].data).toEqual({
+      expect(publicMatch.players[1].data).toEqual({
         avatarID: 'loyal-servant',
         sessionID: publicData.sessionID,
       })

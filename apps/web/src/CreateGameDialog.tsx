@@ -1,14 +1,18 @@
-import { getPlayerCountConfig } from '@avalon/game'
+import { getPlayerCountConfig, type AvalonRoleConfiguration } from '@avalon/game'
 
 import { ModalDialog } from './ModalDialog'
+import { HelpTrigger } from './HelpTrigger'
 
 export interface CreateGameDialogProps {
   busy: boolean
   numPlayers: number
   onCancel: () => void
   onConfirm: () => void
+  onOpenRoleHelp: () => void
   onPlayerCountChange: (value: number) => void
+  onRoleConfigurationChange: (value: AvalonRoleConfiguration) => void
   open: boolean
+  roleConfiguration: AvalonRoleConfiguration
 }
 
 const PLAYER_COUNTS = [5, 6, 7, 8, 9, 10] as const
@@ -18,8 +22,11 @@ export function CreateGameDialog({
   numPlayers,
   onCancel,
   onConfirm,
+  onOpenRoleHelp,
   onPlayerCountChange,
+  onRoleConfigurationChange,
   open,
+  roleConfiguration,
 }: CreateGameDialogProps) {
   const config = getPlayerCountConfig(numPlayers)
 
@@ -62,6 +69,22 @@ export function CreateGameDialog({
             })}
           </div>
         </fieldset>
+
+        <div className="role-configuration-toggle mt-5 flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/45 p-4 text-sm">
+          <input
+            checked={roleConfiguration.percivalMorgana}
+            className="size-5 shrink-0 accent-amber-300"
+            disabled={busy}
+            id="percival-morgana-role-configuration"
+            onChange={(event) => onRoleConfigurationChange({ percivalMorgana: event.target.checked })}
+            role="switch"
+            type="checkbox"
+          />
+          <label className="min-w-0 flex-1 cursor-pointer font-semibold text-slate-100" htmlFor="percival-morgana-role-configuration">
+            帕西维尔与莫甘娜
+          </label>
+          <HelpTrigger onOpen={onOpenRoleHelp} variant="role-pair" />
+        </div>
 
         <section className="mt-5 rounded-2xl border border-white/10 bg-slate-950/45 p-4" aria-label={`${numPlayers} 人规则摘要`}>
           <div className="flex items-center justify-between gap-3 text-sm">

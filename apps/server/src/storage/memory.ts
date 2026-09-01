@@ -1,6 +1,16 @@
 import type { LogEntry, Server, State, StorageAPI } from 'boardgame.io'
 
-export class MemoryStorage implements StorageAPI.Sync {
+import type {
+  AtomicLobbyStorage,
+  LobbyMatchMutation,
+  LobbyMatchSnapshot,
+} from './lobby-storage'
+
+function matchNotFound(matchID: string) {
+  return new Error(`Match ${matchID} was not found`)
+}
+
+export class MemoryStorage implements StorageAPI.Sync, AtomicLobbyStorage {
   private readonly state = new Map<string, State>()
   private readonly initial = new Map<string, State>()
   private readonly metadata = new Map<string, Server.MatchData>()
@@ -30,6 +40,31 @@ export class MemoryStorage implements StorageAPI.Sync {
 
   setMetadata(matchID: string, metadata: Server.MatchData) {
     this.metadata.set(matchID, metadata)
+  }
+
+  mutateLobbyMatch<T>(
+    matchID: string,
+    mutate: (snapshot: LobbyMatchSnapshot) => LobbyMatchMutation<T>,
+  ): Promise<T> {
+    const state = this.state.get(matchID)
+    const metadata = this.metadata.get(matchID)
+    if (state === undefined || metadata === undefined) {
+      return Promise.reject(matchNotFound(matchID))
+    }
+
+    let next: LobbyMatchMutation<T>
+    try {
+      next = mutate({
+        state: structuredClone(state),
+        metadata: structuredClone(metadata),
+      })
+    } catch (error) {
+      return Promise.reject(error)
+    }
+
+    this.state.set(matchID, next.state)
+    this.metadata.set(matchID, next.metadata)
+    return Promise.resolve(next.result)
   }
 
   fetch<O extends StorageAPI.FetchOpts>(

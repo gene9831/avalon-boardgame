@@ -13,9 +13,14 @@ import { AvalonSocketRegistry, registerDevAdminRoutes } from './dev-admin'
 import { registerRoomParticipationRoutes } from './room-participation'
 import { registerRoomSessionValidationRoute } from './session-validation'
 import { createDeletionSafeStorage } from './storage/deletion-safe'
+import {
+  hasAtomicLobbyStorage,
+  type AtomicLobbyStorage,
+} from './storage/lobby-storage'
 import { secretMatches } from './secret'
 import { installAvalonHTTPBoundary } from './http-boundary'
 import { AvalonSocketIO } from './socket-transport'
+import { createRoomLobbyService } from './room-lobby'
 
 type BoardgameServer = ReturnType<typeof createBoardgameServer>
 type ServerHandles = Awaited<ReturnType<BoardgameServer['run']>>
@@ -190,7 +195,7 @@ function createTrackedStorage(
       ) return
     }
   }
-  const trackedStorage: StorageAPI.Async = {
+  const trackedStorage: StorageAPI.Async & Partial<AtomicLobbyStorage> = {
     type: () => 1,
     connect: () => track(() => asyncStorage.connect()),
     createMatch: (matchID, options) =>
@@ -204,6 +209,10 @@ function createTrackedStorage(
     wipe: (matchID) => track(() => asyncStorage.wipe(matchID)),
     listMatches: (options) =>
       track(() => asyncStorage.listMatches(options)),
+  }
+  if (hasAtomicLobbyStorage(asyncStorage)) {
+    trackedStorage.mutateLobbyMatch = (matchID, mutate) =>
+      track(() => asyncStorage.mutateLobbyMatch(matchID, mutate))
   }
   return { storage: trackedStorage, waitForIdle }
 }
@@ -235,16 +244,20 @@ export function createAvalonServer(options: AvalonServerOptions = {}) {
       guardedStorageOptions,
     )
   const db = guardedStorage.storage as StorageAPI.Sync | StorageAPI.Async
+  if (!hasAtomicLobbyStorage(db)) {
+    throw new Error('Avalon lobby requires atomic lobby storage')
+  }
+  const game = createAvalonGame({
+    identityRecognitionDeadlineEnabled:
+      options.identityRecognitionDeadlineEnabled,
+    identityRecognitionStepMs: options.identityRecognitionStepMs,
+    now: options.identityRecognitionNow,
+    seed: options.gameSeed ?? config.testGameSeed,
+    serverInstanceID: options.serverInstanceID ?? randomUUID(),
+  })
   const boardgame = createBoardgameServer({
     games: [
-      createAvalonGame({
-        identityRecognitionDeadlineEnabled:
-          options.identityRecognitionDeadlineEnabled,
-        identityRecognitionStepMs: options.identityRecognitionStepMs,
-        now: options.identityRecognitionNow,
-        seed: options.gameSeed ?? config.testGameSeed,
-        serverInstanceID: options.serverInstanceID ?? randomUUID(),
-      }) as unknown as BoardgameGame,
+      game as unknown as BoardgameGame,
     ],
     db,
     transport: new AvalonSocketIO(),
@@ -261,24 +274,30 @@ export function createAvalonServer(options: AvalonServerOptions = {}) {
   }
   const namespace = app._io?.of('avalon')
   if (namespace !== undefined) registry.attach(namespace as unknown as Parameters<typeof registry.attach>[0])
+  const lobby = createRoomLobbyService({
+    db,
+    storage: db,
+    game,
+    queues: boardgame.transport,
+    deletionGuard: guardedStorage.deletionGuard,
+    disconnectPlayer: (matchID, playerID) =>
+      registry.disconnectPlayer(matchID, playerID),
+    disconnectMatch: (matchID) => registry.disconnectMatch(matchID),
+  })
   registerDevAdminRoutes(boardgame.router, {
     config,
     db,
-    forceUpdateMetadata: guardedStorage.forceUpdateMetadata,
+    storage: db,
     deletionGuard: guardedStorage.deletionGuard,
     registry,
     queues: boardgame.transport,
     unavailableMatchIDs: guardedStorage.deletionGuard.unavailableMatchIDs,
   })
   registerRoomParticipationRoutes(boardgame.router, {
-    db,
-    forceUpdateMetadata: guardedStorage.forceUpdateMetadata,
-    deletionGuard: guardedStorage.deletionGuard,
-    registry,
-    queues: boardgame.transport,
+    lobby,
   })
   registerRoomSessionValidationRoute(boardgame.router, db)
-  installAvalonHTTPBoundary(boardgame.router)
+  installAvalonHTTPBoundary(boardgame.router, { db, lobby })
 
   return {
     boardgame,

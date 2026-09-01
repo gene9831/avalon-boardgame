@@ -1,7 +1,9 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
-import { RoomAccessView, RoomView, type RoomViewProps } from '../src/App'
+import { canRequestRoomExit, getUpdatedRoomRouteSession, recoverRoomRouteSession, resolveRecoverySeatValidation, resolveRoomRouteSnapshotSession, shouldWakeRoomRouteForSeatTransitionChange, RoomAccessView, RoomView, type RoomViewProps } from '../src/App'
+import { RoomParticipationHttpError, type SeatTransitionReplayClient } from '../src/room-participation'
+import { beginSeatTransition, loadRoomSession, loadSeatTransition, markSeatTransitionUncertain, saveRoomSession, type RoomSessionStorage } from '../src/room-session'
 
 vi.mock('../src/config', () => ({
   webConfig: {
@@ -31,6 +33,7 @@ function renderRoomView(overrides: Partial<RoomViewProps> = {}) {
       players: [{ id: 0, name: 'Alice', isConnected: true }],
       setupData: { numPlayers: 5 },
     },
+    roomExitBlocked: false,
     roomExitBusy: false,
     session: {
       credentials: 'credential',
@@ -42,6 +45,20 @@ function renderRoomView(overrides: Partial<RoomViewProps> = {}) {
   }
 
   return renderToStaticMarkup(<RoomView {...props} />)
+}
+
+const replayTarget: SeatTransitionReplayClient = {
+  changeSeat: async (matchID, _sourcePlayerID, credentials, targetPlayerID) => ({
+    matchID,
+    playerID: targetPlayerID,
+    playerCredentials: credentials,
+  }),
+}
+
+const rejectOccupiedTarget: SeatTransitionReplayClient = {
+  changeSeat: async () => {
+    throw new RoomParticipationHttpError(409, 'seat_unavailable')
+  },
 }
 
 function playingGameState(): RoomViewProps['gameState'] {
@@ -96,6 +113,7 @@ describe('RoomView connection state', () => {
     expect(accessHtml).toContain('房间 room-123')
     expect(accessHtml).toContain('你尚未加入这个房间')
     expect(accessHtml).toContain('>返回房间列表<')
+    expect(accessHtml).toContain('选择一个房间后加入')
 
     expect(loadingHtml).toContain('正在进入房间')
     expect(loadingHtml).not.toContain('座位凭据')
@@ -111,6 +129,258 @@ describe('RoomView connection state', () => {
     expect(html).toContain('正在进入房间')
     expect(html.match(/<main\b/g)).toHaveLength(1)
     expect(html).not.toContain('玩家座位')
+  })
+
+  it('recovers a committed target seat after a dropped change response and reload', async () => {
+    const values = new Map<string, string>()
+    const storage: RoomSessionStorage = {
+      getItem: (key) => values.get(key) ?? null,
+      removeItem: (key) => values.delete(key),
+      setItem: (key, value) => values.set(key, value),
+    }
+    const source = {
+      credentials: 'credential',
+      matchID: 'room-123',
+      playerID: '0',
+      playerName: 'Alice',
+      sessionID: 'session-123',
+    }
+    saveRoomSession(source, storage)
+    markSeatTransitionUncertain(beginSeatTransition(source, '3', storage, 42), storage)
+
+    await expect(recoverRoomRouteSession(
+      source,
+      replayTarget,
+      async () => true,
+      storage,
+    )).resolves.toEqual({ ...source, playerID: '3' })
+    expect(loadRoomSession(source.matchID, storage)).toEqual({ ...source, playerID: '3' })
+  })
+
+  it('retains the source session or clears an invalid source during route recovery', async () => {
+    const createStorage = (): RoomSessionStorage => {
+      const values = new Map<string, string>()
+      return {
+        getItem: (key) => values.get(key) ?? null,
+        removeItem: (key) => values.delete(key),
+        setItem: (key, value) => values.set(key, value),
+      }
+    }
+    const source = {
+      credentials: 'credential',
+      matchID: 'room-123',
+      playerID: '0',
+      playerName: 'Alice',
+      sessionID: 'session-123',
+    }
+    const sourceStorage = createStorage()
+    saveRoomSession(source, sourceStorage)
+    markSeatTransitionUncertain(beginSeatTransition(source, '3', sourceStorage, 42), sourceStorage)
+    await expect(recoverRoomRouteSession(
+      source,
+      rejectOccupiedTarget,
+      async (_matchID, playerID) => playerID === '0',
+      sourceStorage,
+    ))
+      .resolves.toEqual(source)
+
+    const invalidStorage = createStorage()
+    saveRoomSession(source, invalidStorage)
+    markSeatTransitionUncertain(beginSeatTransition(source, '3', invalidStorage, 42), invalidStorage)
+    await expect(recoverRoomRouteSession(
+      source,
+      {
+        changeSeat: async () => {
+          throw new RoomParticipationHttpError(403, 'invalid_seat_session')
+        },
+      },
+      async () => false,
+      invalidStorage,
+    )).resolves.toBeNull()
+    expect(loadRoomSession(source.matchID, invalidStorage)).toBeNull()
+  })
+
+  it('preserves a pending transition when recovery validation is transiently unavailable', async () => {
+    const values = new Map<string, string>()
+    const storage: RoomSessionStorage = {
+      getItem: (key) => values.get(key) ?? null,
+      removeItem: (key) => values.delete(key),
+      setItem: (key, value) => values.set(key, value),
+    }
+    const source = {
+      credentials: 'credential',
+      matchID: 'room-123',
+      playerID: '0',
+      playerName: 'Alice',
+      sessionID: 'session-123',
+    }
+    saveRoomSession(source, storage)
+    markSeatTransitionUncertain(beginSeatTransition(source, '3', storage, 42), storage)
+
+    await expect(recoverRoomRouteSession(source, {
+      changeSeat: async () => { throw new TypeError('Failed to fetch') },
+    }, async () => true, storage)).rejects.toThrow('Failed to fetch')
+    expect(loadRoomSession(source.matchID, storage)).toEqual(source)
+    expect(loadSeatTransition(source.matchID, storage)).toMatchObject({
+      sourcePlayerID: '0',
+      targetPlayerID: '3',
+    })
+  })
+
+  it('retries transition recovery before the timer can validate a stale source seat', async () => {
+    const values = new Map<string, string>()
+    const storage: RoomSessionStorage = {
+      getItem: (key) => values.get(key) ?? null,
+      removeItem: (key) => values.delete(key),
+      setItem: (key, value) => values.set(key, value),
+    }
+    const source = {
+      credentials: 'credential',
+      matchID: 'room-123',
+      playerID: '0',
+      playerName: 'Alice',
+      sessionID: 'session-123',
+    }
+    saveRoomSession(source, storage)
+    markSeatTransitionUncertain(beginSeatTransition(source, '3', storage, 42), storage)
+
+    await expect(recoverRoomRouteSession(source, {
+      changeSeat: async () => { throw new TypeError('temporary outage') },
+    }, async () => true, storage)).rejects.toThrow('temporary outage')
+
+    await expect(recoverRoomRouteSession(source, replayTarget, async () => true, storage))
+      .resolves.toEqual({ ...source, playerID: '3' })
+    expect(loadRoomSession(source.matchID, storage)).toEqual({ ...source, playerID: '3' })
+    expect(loadSeatTransition(source.matchID, storage)).toBeNull()
+  })
+
+  it('refreshes an unchanged source session after a stale subscription snapshot omits its seat', async () => {
+    const values = new Map<string, string>()
+    const storage: RoomSessionStorage = {
+      getItem: (key) => values.get(key) ?? null,
+      removeItem: (key) => values.delete(key),
+      setItem: (key, value) => values.set(key, value),
+    }
+    const source = {
+      credentials: 'credential',
+      matchID: 'room-123',
+      playerID: '0',
+      playerName: 'Alice',
+      sessionID: 'session-123',
+    }
+    saveRoomSession(source, storage)
+    markSeatTransitionUncertain(beginSeatTransition(source, '3', storage, 42), storage)
+
+    const resolution = await resolveRoomRouteSnapshotSession(
+      source,
+      rejectOccupiedTarget,
+      async (_matchID, playerID, credentials) => (
+        playerID === source.playerID && credentials === source.credentials
+      ),
+      storage,
+    )
+
+    expect(resolution).toEqual({ status: 'refresh', session: source })
+    expect(loadRoomSession(source.matchID, storage)).toEqual(source)
+    expect(loadSeatTransition(source.matchID, storage)).toBeNull()
+  })
+
+  it('pauses stale subscription recovery while another tab is requesting a seat change', async () => {
+    const values = new Map<string, string>()
+    const storage: RoomSessionStorage = {
+      getItem: (key) => values.get(key) ?? null,
+      removeItem: (key) => values.delete(key),
+      setItem: (key, value) => values.set(key, value),
+    }
+    const source = {
+      credentials: 'credential',
+      matchID: 'room-123',
+      playerID: '0',
+      playerName: 'Alice',
+    }
+    saveRoomSession(source, storage)
+    const transition = beginSeatTransition(source, '3', storage)
+    const validate = vi.fn(async () => true)
+
+    await expect(resolveRoomRouteSnapshotSession(
+      source,
+      { changeSeat: vi.fn() },
+      validate,
+      storage,
+    )).resolves.toEqual({
+      status: 'requesting',
+      session: source,
+    })
+    expect(validate).not.toHaveBeenCalled()
+    expect(loadSeatTransition(source.matchID, storage)).toEqual(transition)
+    expect(loadRoomSession(source.matchID, storage)).toEqual(source)
+  })
+
+  it('wakes a waiting route when the owner clears or makes its transition recoverable', async () => {
+    const values = new Map<string, string>()
+    const storage: RoomSessionStorage = {
+      getItem: (key) => values.get(key) ?? null,
+      removeItem: (key) => values.delete(key),
+      setItem: (key, value) => values.set(key, value),
+    }
+    const source = { credentials: 'credential', matchID: 'room-123', playerID: '0', playerName: 'Alice' }
+    saveRoomSession(source, storage)
+    const transition = beginSeatTransition(source, '3', storage, 42, () => 'request-1')
+    const markerKey = 'avalon:seat-transition:room-123'
+
+    expect(shouldWakeRoomRouteForSeatTransitionChange(markerKey, source, storage, 43)).toBe(false)
+    markSeatTransitionUncertain(transition, storage)
+    expect(shouldWakeRoomRouteForSeatTransitionChange(markerKey, source, storage, 43)).toBe(true)
+    await expect(recoverRoomRouteSession(
+      source,
+      replayTarget,
+      async () => true,
+      storage,
+    )).resolves.toEqual({ ...source, playerID: '3' })
+
+    saveRoomSession(source, storage)
+    beginSeatTransition(source, '3', storage, 42, () => 'request-2')
+    storage.removeItem(markerKey)
+    expect(shouldWakeRoomRouteForSeatTransitionChange(markerKey, source, storage, 43)).toBe(true)
+  })
+
+  it('wakes a reloaded route after an orphaned requesting lease expires', () => {
+    const values = new Map<string, string>()
+    const storage: RoomSessionStorage = {
+      getItem: (key) => values.get(key) ?? null,
+      removeItem: (key) => values.delete(key),
+      setItem: (key, value) => values.set(key, value),
+    }
+    const source = { credentials: 'credential', matchID: 'room-123', playerID: '0', playerName: 'Alice' }
+    const transition = beginSeatTransition(source, '3', storage, 42, () => 'orphan')
+
+    expect(shouldWakeRoomRouteForSeatTransitionChange(
+      'avalon:seat-transition:room-123',
+      source,
+      storage,
+      transition.leaseExpiresAt + 1,
+    )).toBe(true)
+  })
+
+  it('treats only definitive session errors as an invalid recovery seat', async () => {
+    await expect(resolveRecoverySeatValidation(async () => {
+      throw new TypeError('Failed to fetch')
+    })).rejects.toThrow('Failed to fetch')
+  })
+
+  it('adopts the current target session saved by another tab without accepting stale storage data', () => {
+    const source = { credentials: 'source', matchID: 'room-123', playerID: '0', playerName: 'Alice' }
+    const target = { ...source, credentials: 'target', playerID: '3' }
+
+    expect(getUpdatedRoomRouteSession(source, target)).toEqual(target)
+    expect(getUpdatedRoomRouteSession(target, target)).toBeNull()
+    expect(getUpdatedRoomRouteSession(source, { ...target, matchID: 'other-room' })).toBeNull()
+  })
+
+  it('rejects an attempted room exit while seat migration is pending', () => {
+    expect(canRequestRoomExit('lobby', false, true, false)).toBe(false)
+    expect(canRequestRoomExit('lobby', false, false, true)).toBe(false)
+    expect(canRequestRoomExit('lobby', false, false, false)).toBe(true)
   })
 })
 

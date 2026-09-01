@@ -183,7 +183,7 @@ describe('Avalon server', () => {
       })).rejects.toThrow('HTTP status 400')
 
       const match = await lobby.getMatch('avalon', matchID)
-      expect(match.players.find(({ id }) => id === 0)?.name).toBeUndefined()
+      expect(match.players.find(({ id }) => id === 0)?.name).toBe('Alice')
       expect(match.players.find(({ id }) => id === 1)?.name).toBeUndefined()
     } finally {
       await running.close()
@@ -216,7 +216,7 @@ describe('Avalon server', () => {
       const match = await lobby.getMatch('avalon', matchID)
       expect(match.players.find(({ id }) => id === 0)?.name).toBe('Alice')
       expect(match.players.find(({ id }) => id === 1)?.name).toBe('ALICE')
-      expect(match.players.find(({ id }) => id === 0)?.data).toMatchObject({ avatarID: 'merlin' })
+      expect(match.players.find(({ id }) => id === 0)?.data).toMatchObject({ avatarID: 'loyal-servant' })
       expect(match.players.find(({ id }) => id === 1)?.data).toMatchObject({ avatarID: 'morgana' })
     } finally {
       await running.close()
@@ -246,7 +246,7 @@ describe('Avalon server', () => {
     }
   })
 
-  it('returns one seat conflict when two clients concurrently claim the same seat', async () => {
+  it('assigns concurrent clients to successive server-selected seats', async () => {
     const running = await startAvalonServer({
       config: testConfig,
       db: new MemoryStorage(),
@@ -270,23 +270,14 @@ describe('Avalon server', () => {
         }),
       ])
 
-      expect(results.filter(({ status }) => status === 'fulfilled')).toHaveLength(1)
-      expect(results.filter(({ status }) => status === 'rejected')).toEqual([
-        expect.objectContaining({
-          reason: expect.objectContaining({
-            message: 'HTTP status 409',
-            details: {
-              error: {
-                code: 'seat_unavailable',
-                message: 'Seat is unavailable',
-              },
-            },
-          }),
-        }),
-      ])
+      expect(results.filter(({ status }) => status === 'fulfilled')).toHaveLength(2)
+      expect(results.filter(({ status }) => status === 'rejected')).toHaveLength(0)
 
       const match = await lobby.getMatch('avalon', matchID)
-      expect(match.players.find(({ id }) => id === 1)?.name).toMatch(/^(Alice|Bob)$/)
+      expect([
+        match.players.find(({ id }) => id === 1)?.name,
+        match.players.find(({ id }) => id === 2)?.name,
+      ].sort()).toEqual(['Alice', 'Bob'])
     } finally {
       await running.close()
     }
@@ -312,7 +303,7 @@ describe('Avalon server', () => {
       await expect(lobby.joinMatch('avalon', matchID, {
         playerID: '1',
         playerName: 'Alice on another tab',
-        data: { clientID: 'client-1' },
+        data: { clientID: 'test-owner-client-1' },
       })).rejects.toThrow('HTTP status 409')
 
       const match = await lobby.getMatch('avalon', matchID)
@@ -422,6 +413,16 @@ describe('Avalon server', () => {
         playerID: '0',
         playerName: 'Alice',
       })
+      await Promise.all(
+        Array.from({ length: 4 }, (_, index) => lobby.joinMatch(
+          'avalon',
+          matchID,
+          {
+            playerID: String(index + 1),
+            playerName: `Player ${index + 2}`,
+          },
+        )),
+      )
       const createClient = () => Client({
         game: AvalonGame,
         numPlayers: 5,

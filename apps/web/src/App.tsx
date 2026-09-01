@@ -22,6 +22,7 @@ import {
   AvalonGame,
   type AvalonG,
   type AvalonPlayerView,
+  type AvalonRoleConfiguration,
   type AvalonRoomSummary,
   type PlayerID,
   type QuestCard,
@@ -33,10 +34,14 @@ import { ConnectionRecoveryTimer } from './connection-recovery'
 import { CreateGameDialog } from './CreateGameDialog'
 import {
   loadPreferredPlayerCount,
+  loadPreferredRoleConfiguration,
   savePreferredPlayerCount,
+  savePreferredRoleConfiguration,
 } from './create-game-preference'
 import { getClientID } from './client-identity'
 import { createDevToolsClient } from './dev-tools'
+import { useHelp } from './help-context'
+import { HelpProvider } from './HelpProvider'
 import { useDevTools } from './use-dev-tools'
 import { executePendingJoin, type PendingJoin } from './join-flow'
 import { classifyJoinError } from './join-error'
@@ -47,8 +52,15 @@ import { RoomGamePanel } from './RoomGamePanel'
 import { RoomLobbyPanel } from './RoomLobbyPanel'
 import {
   dissolveRoom,
+  changeRoomSeat,
+  createRoomParticipationClient,
   getRoomExitErrorMessage,
+  getSeatChangeErrorMessage,
+  getStartErrorMessage,
   leaveRoom,
+  reconcileRoomExit,
+  recoverRoomSeatTransition,
+  type SeatTransitionReplayClient,
 } from './room-participation'
 import {
   consumeRoomNavigationNotice,
@@ -81,14 +93,19 @@ import {
   LAST_ROOM_SESSION_KEY,
   ROOM_SESSION_KEY,
   clearRoomSession,
+  clearRoomSessionIfCurrent,
   getRoomSessionKey,
+  getSeatTransitionKey,
   getRoomSessionInvalidationNotice,
   isRoomSessionStillValid,
+  isSeatTransitionRequestActive,
   loadRoomSession,
+  loadSeatTransition,
   saveRoomSession,
   validateActiveRoomSessions,
   validateRoomSession,
   type RoomSession,
+  type RoomSessionStorage,
 } from './room-session'
 import {
   getRequestErrorMessage,
@@ -116,10 +133,113 @@ function roomInvalidationNotice(error: unknown) {
   )
 }
 
+function isSameRoomSession(current: RoomSession | null, expected: RoomSession) {
+  return current?.playerID === expected.playerID && current.credentials === expected.credentials
+}
+
+// oxlint-disable-next-line react/only-export-components
+export function getUpdatedRoomRouteSession(
+  routeSession: RoomSession,
+  storedSession: RoomSession | null,
+) {
+  if (storedSession?.matchID !== routeSession.matchID) return null
+  return isSameRoomSession(storedSession, routeSession) ? null : storedSession
+}
+
+// oxlint-disable-next-line react/only-export-components
+export async function recoverRoomRouteSession(
+  session: RoomSession,
+  client: SeatTransitionReplayClient,
+  validate: (matchID: string, playerID: string, credentials: string) => Promise<boolean>,
+  storage?: RoomSessionStorage,
+) {
+  const transition = loadSeatTransition(session.matchID, storage)
+  if (transition === null) return session
+  await recoverRoomSeatTransition(client, transition, validate, storage)
+  return loadRoomSession(session.matchID, storage)
+}
+
+function isSeatTransitionRequestingForSession(
+  session: RoomSession,
+  storage?: RoomSessionStorage,
+) {
+  return isSeatTransitionRequestActive(session, storage)
+}
+
+// oxlint-disable-next-line react/only-export-components
+export function shouldWakeRoomRouteForSeatTransitionChange(
+  storageKey: string | null,
+  session: RoomSession,
+  storage?: RoomSessionStorage,
+  now = Date.now(),
+) {
+  return storageKey === getSeatTransitionKey(session.matchID) &&
+    !isSeatTransitionRequestActive(session, storage, now)
+}
+
+// oxlint-disable-next-line react/only-export-components
+export async function resolveRoomRouteSnapshotSession(
+  session: RoomSession,
+  client: SeatTransitionReplayClient,
+  validate: (matchID: string, playerID: string, credentials: string) => Promise<boolean>,
+  storage?: RoomSessionStorage,
+) {
+  if (isSeatTransitionRequestingForSession(session, storage)) {
+    return { status: 'requesting' as const, session }
+  }
+  const hadPendingTransition = loadSeatTransition(session.matchID, storage) !== null
+  const recoveredSession = await recoverRoomRouteSession(session, client, validate, storage)
+  if (recoveredSession === null) return { status: 'invalid' as const }
+  if (!isSameRoomSession(recoveredSession, session)) {
+    return { status: 'rebind' as const, session: recoveredSession }
+  }
+
+  if (hadPendingTransition) {
+    return { status: 'refresh' as const, session: recoveredSession }
+  }
+
+  const sourceValid = await validate(
+    recoveredSession.matchID,
+    recoveredSession.playerID,
+    recoveredSession.credentials,
+  )
+  return sourceValid
+    ? { status: 'refresh' as const, session: recoveredSession }
+    : { status: 'invalid' as const }
+}
+
+// oxlint-disable-next-line react/only-export-components
+export async function resolveRecoverySeatValidation(
+  validate: () => Promise<void>,
+) {
+  try {
+    await validate()
+    return true
+  } catch (error) {
+    if (getRoomSessionInvalidationNotice(error) !== null) return false
+    throw error
+  }
+}
+
+// oxlint-disable-next-line react/only-export-components
+export function canRequestRoomExit(
+  phase: string | null | undefined,
+  roomExitBusy: boolean,
+  seatChangePending: boolean,
+  persistedSeatTransitionPending: boolean,
+) {
+  return phase === 'lobby' &&
+    !roomExitBusy &&
+    !seatChangePending &&
+    !persistedSeatTransitionPending
+}
+
 function App() {
   return (
     <ToastProvider>
-      <AppRoutes />
+      <HelpProvider>
+        <AppRoutes />
+      </HelpProvider>
     </ToastProvider>
   )
 }
@@ -170,10 +290,11 @@ function LobbyRoute({
   const [roomAccessStatus, setRoomAccessStatus] = useState<'checking' | 'ready' | 'unavailable'>('checking')
   const [roomAccessError, setRoomAccessError] = useState<string | null>(null)
   const { pushToast } = useToast()
+  const { openHelp } = useHelp()
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [numPlayers, setNumPlayers] = useState(loadPreferredPlayerCount)
+  const [roleConfiguration, setRoleConfiguration] = useState<AvalonRoleConfiguration>(loadPreferredRoleConfiguration)
   const [matches, setMatches] = useState<AvalonRoomSummary[]>([])
-  const [selectedSeats, setSelectedSeats] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const roomNotice = getRoomNavigationNotice(location.state)
   useEffect(() => {
@@ -214,7 +335,7 @@ function LobbyRoute({
       setActiveRoomSessions(validation.sessions)
       setRoomAccessStatus(validation.validationFailed ? 'unavailable' : 'ready')
       setRoomAccessError(getRoomAccessValidationError(validation.validationFailed))
-    } catch (requestError) {
+    } catch {
       if (generation !== refreshGenerationRef.current) return
       setRoomAccessStatus('unavailable')
       setRoomAccessError(getRequestErrorMessage('room-directory'))
@@ -282,8 +403,8 @@ function LobbyRoute({
     [clientID, lobby, navigate, profile, pushToast, refreshMatches, roomAccessLocked],
   )
 
-  const handleJoin = (matchID: string, playerID: string) => {
-    void executePendingJoinRequest({ type: 'join', matchID, playerID })
+  const handleJoin = (intent: { type: 'join'; matchID: string }) => {
+    void executePendingJoinRequest(intent)
   }
 
   const handleCreate = () => {
@@ -298,7 +419,8 @@ function LobbyRoute({
   const handleCreateDialogConfirm = () => {
     if (requestInFlightRef.current || roomAccessLocked) return
     savePreferredPlayerCount(numPlayers)
-    void executePendingJoinRequest({ type: 'create', numPlayers })
+    savePreferredRoleConfiguration(roleConfiguration)
+    void executePendingJoinRequest({ type: 'create', numPlayers, roleConfiguration })
   }
 
   const handleEnterRoom = (matchID: string) => {
@@ -329,6 +451,7 @@ function LobbyRoute({
         onCreate={handleCreate}
         onEnterRoom={handleEnterRoom}
         onJoin={handleJoin}
+        onOpenHelp={() => openHelp()}
         onRefresh={() => void refreshMatches()}
         onSaveProfile={onSaveProfile}
         onDeleteRoom={handleDeleteRoom}
@@ -337,8 +460,6 @@ function LobbyRoute({
         roomAccessPending={roomAccessPending}
         roomAccessUnavailable={roomAccessUnavailable}
         profile={profile}
-        selectedSeats={selectedSeats}
-        setSelectedSeats={setSelectedSeats}
       />
       <CreateGameDialog
         busy={busy}
@@ -346,7 +467,10 @@ function LobbyRoute({
         onCancel={handleCreateDialogCancel}
         onConfirm={handleCreateDialogConfirm}
         onPlayerCountChange={setNumPlayers}
+        onOpenRoleHelp={() => openHelp({ focusRoles: true, tab: 'roles' })}
+        onRoleConfigurationChange={setRoleConfiguration}
         open={createDialogOpen}
+        roleConfiguration={roleConfiguration}
       />
     </>
   )
@@ -362,8 +486,13 @@ function RoomRoute({
   const { matchID = '' } = useParams()
   const navigate = useNavigate()
   const lobby = useMemo(() => createAvalonLobbyClient(), [])
+  const roomParticipation = useMemo(
+    () => createRoomParticipationClient(webConfig.lobbyURL),
+    [],
+  )
   const devTools = useMemo(() => createDevToolsClient(webConfig.lobbyURL), [])
   const { pushToast } = useToast()
+  const { openHelp } = useHelp()
   const clientRef = useRef<AvalonClient | null>(null)
   const routeGenerationRef = useRef(0)
   const [session, setSession] = useState<RoomSession | null>(() =>
@@ -373,13 +502,31 @@ function RoomRoute({
   const [gameState, setGameState] = useState<AvalonClientState | null>(null)
   const [roomExitDialogOpen, setRoomExitDialogOpen] = useState(false)
   const [roomExitBusy, setRoomExitBusy] = useState(false)
+  const [seatChangePending, setSeatChangePending] = useState(false)
+  const [seatTransitionRevision, setSeatTransitionRevision] = useState(0)
+  const [, setSeatTransitionGuardRevision] = useState(0)
+  const seatTransitionChangeRevisionRef = useRef(0)
 
   const invalidateSession = useCallback(
-    (reason: string, generation: number) => {
+    (reason: string, generation: number, expectedSession?: RoomSession) => {
       if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
 
+      if (
+        expectedSession !== undefined &&
+        isSeatTransitionRequestingForSession(expectedSession)
+      ) return
+
+      if (
+        expectedSession !== undefined &&
+        !isSameRoomSession(loadRoomSession(matchID), expectedSession)
+      ) return
+
       stopCurrentClient(clientRef)
-      clearRoomSession(matchID)
+      if (expectedSession !== undefined) {
+        clearRoomSessionIfCurrent(expectedSession)
+      } else {
+        clearRoomSession(matchID)
+      }
       setSession(null)
       navigate('/', { state: { roomNotice: reason } })
     },
@@ -394,25 +541,48 @@ function RoomRoute({
       silent = false,
     ) => {
       if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
+      if (isSeatTransitionRequestingForSession(currentSession)) return
 
       try {
+        const hadSeatTransition = loadSeatTransition(currentSession.matchID) !== null
+        const recoveredSession = await recoverRoomRouteSession(
+          currentSession,
+          roomParticipation,
+          async (recoveryMatchID, playerID, credentials) => resolveRecoverySeatValidation(async () => {
+            await validateRoomSession(webConfig.lobbyURL, {
+              matchID: recoveryMatchID,
+              playerID,
+              credentials,
+            })
+          }),
+        )
+        if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
+        if (recoveredSession === null) {
+          invalidateSession('上次的座位已失效。', generation, currentSession)
+          return
+        }
+        if (!isSameRoomSession(recoveredSession, currentSession)) {
+          setSession(recoveredSession)
+          return
+        }
+        if (hadSeatTransition && clientRef.current === null) {
+          setSeatTransitionRevision((revision) => revision + 1)
+          return
+        }
+
         const [nextRoom] = await Promise.all([
           lobby.getMatch(AVALON_GAME_NAME, roomID),
           validateRoomSession(webConfig.lobbyURL, currentSession),
         ])
         if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
 
-        const nextRoomValue = nextRoom as AvalonMatch
-        if (!isRoomSessionStillValid(nextRoomValue, currentSession)) {
-          invalidateSession('上次的座位已失效。', generation)
-          return
-        }
+        const nextRoomValue = nextRoom as unknown as AvalonMatch
         setRoom(nextRoomValue)
       } catch (requestError) {
         if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
         const invalidationNotice = roomInvalidationNotice(requestError)
         if (invalidationNotice !== null) {
-          invalidateSession(invalidationNotice, generation)
+          invalidateSession(invalidationNotice, generation, currentSession)
           return
         }
         if (!silent) {
@@ -423,7 +593,7 @@ function RoomRoute({
         }
       }
     },
-    [invalidateSession, lobby, pushToast],
+    [invalidateSession, lobby, pushToast, roomParticipation],
   )
 
   useEffect(() => {
@@ -438,6 +608,8 @@ function RoomRoute({
   }, [matchID])
 
   const routeSession = session?.matchID === matchID ? session : null
+  const persistedSeatTransitionPending = routeSession !== null &&
+    loadSeatTransition(matchID) !== null
 
   useEffect(() => {
     const handleRoomSessionStorage = (event: StorageEvent) => {
@@ -445,10 +617,30 @@ function RoomRoute({
       if (
         event.key !== null &&
         event.key !== getRoomSessionKey(matchID) &&
+        event.key !== getSeatTransitionKey(matchID) &&
         event.key !== ROOM_SESSION_KEY &&
         event.key !== LAST_ROOM_SESSION_KEY
       ) return
-      if (loadRoomSession(matchID) !== null) return
+      if (event.key === getSeatTransitionKey(matchID)) {
+        seatTransitionChangeRevisionRef.current += 1
+        setSeatTransitionGuardRevision((revision) => revision + 1)
+        if (loadSeatTransition(matchID) !== null) {
+          setRoomExitDialogOpen(false)
+        }
+      }
+      if (shouldWakeRoomRouteForSeatTransitionChange(event.key, routeSession)) {
+        setSeatTransitionRevision((revision) => revision + 1)
+      }
+      const storedSession = loadRoomSession(matchID)
+      const updatedSession = getUpdatedRoomRouteSession(routeSession, storedSession)
+      if (updatedSession !== null) {
+        stopCurrentClient(clientRef)
+        setSession(updatedSession)
+        setRoomExitDialogOpen(false)
+        setRoomExitBusy(false)
+        return
+      }
+      if (storedSession !== null) return
 
       stopCurrentClient(clientRef)
       setSession(null)
@@ -479,22 +671,41 @@ function RoomRoute({
 
     const connect = async () => {
       try {
+        if (isSeatTransitionRequestingForSession(routeSession)) return
+        const recoveredSession = await recoverRoomRouteSession(
+          routeSession,
+          roomParticipation,
+          async (recoveryMatchID, playerID, credentials) => {
+            return resolveRecoverySeatValidation(async () => {
+              await validateRoomSession(webConfig.lobbyURL, {
+                matchID: recoveryMatchID,
+                playerID,
+                credentials,
+              })
+            })
+          },
+        )
+        if (!active || !isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
+        if (recoveredSession === null) {
+          invalidateSession('上次的座位已失效。', generation, routeSession)
+          return
+        }
+        if (!isSameRoomSession(recoveredSession, routeSession)) {
+          setSession(recoveredSession)
+          return
+        }
+
         const [initialRoom] = await Promise.all([
           lobby.getMatch(AVALON_GAME_NAME, matchID),
           validateRoomSession(webConfig.lobbyURL, routeSession),
         ])
         if (!active || !isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
 
-        if (!isRoomSessionStillValid(initialRoom as AvalonMatch, routeSession)) {
-          invalidateSession('上次的座位已失效。', generation)
-          return
-        }
-
-        setRoom(initialRoom as AvalonMatch)
+        setRoom(initialRoom as unknown as AvalonMatch)
         client = Client({
           debug: BOARDGAME_CLIENT_DEBUG,
           game: AvalonGame,
-          numPlayers: getMatchPlayerCount(initialRoom as AvalonMatch),
+          numPlayers: getMatchPlayerCount(initialRoom as unknown as AvalonMatch),
           multiplayer: SocketIO({
             server: webConfig.gameURL,
           }),
@@ -509,7 +720,32 @@ function RoomRoute({
           if (client?.matchData !== undefined) {
             const players = client.matchData as unknown as LobbyPlayer[]
             if (!isRoomSessionStillValid({ players }, routeSession)) {
-              invalidateSession('上次的座位已失效。', generation)
+              void resolveRoomRouteSnapshotSession(
+                routeSession,
+                roomParticipation,
+                async (recoveryMatchID, playerID, credentials) => resolveRecoverySeatValidation(async () => {
+                  await validateRoomSession(webConfig.lobbyURL, {
+                    matchID: recoveryMatchID,
+                    playerID,
+                    credentials,
+                  })
+                }),
+              ).then((resolution) => {
+                if (!active || !isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
+                if (resolution.status === 'invalid') {
+                  invalidateSession('上次的座位已失效。', generation, routeSession)
+                  return
+                }
+                if (resolution.status === 'rebind') {
+                  setSession(resolution.session)
+                  return
+                }
+                if (resolution.status === 'requesting') return
+                void refreshRoom(matchID, resolution.session, generation, true)
+              }).catch(() => {
+                if (!active || !isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
+                pushToast({ message: getRequestErrorMessage('connection'), tone: 'error' })
+              })
               return
             }
             setRoom((previousRoom) =>
@@ -527,7 +763,7 @@ function RoomRoute({
         if (active && isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) {
           const invalidationNotice = roomInvalidationNotice(requestError)
           if (invalidationNotice !== null) {
-            invalidateSession(invalidationNotice, generation)
+            invalidateSession(invalidationNotice, generation, routeSession)
           } else {
             pushToast({
               message: getRequestErrorMessage('connection'),
@@ -553,11 +789,34 @@ function RoomRoute({
       unsubscribe()
       if (client !== null) stopCurrentClient(clientRef, client)
     }
-  }, [invalidateSession, lobby, matchID, pushToast, refreshRoom, routeSession])
+  }, [invalidateSession, lobby, matchID, pushToast, refreshRoom, roomParticipation, routeSession, seatTransitionRevision])
 
-  const handleStart = () => {
-    if (gameState?.isActive && routeSession?.playerID === '0') {
+  const handleStart = async () => {
+    if (gameState?.isActive !== true || routeSession === null || gameState.G.lobby.ownerPlayerID !== routeSession.playerID) return
+    try {
+      await roomParticipation.prepareStart(matchID, routeSession.playerID, routeSession.credentials)
       clientRef.current?.moves.startGame()
+    } catch (error) {
+      pushToast({ message: getStartErrorMessage(error), tone: 'error' })
+    }
+  }
+
+  const handleChangeSeat = async (targetPlayerID: string) => {
+    if (
+      routeSession === null ||
+      gameState?.ctx.phase !== 'lobby' ||
+      seatChangePending ||
+      loadSeatTransition(routeSession.matchID) !== null ||
+      targetPlayerID === routeSession.playerID
+    ) return
+    setSeatChangePending(true)
+    try {
+      const nextSession = await changeRoomSeat(roomParticipation, routeSession, targetPlayerID)
+      setSession(nextSession)
+    } catch (error) {
+      pushToast({ message: getSeatChangeErrorMessage(error), tone: 'error' })
+    } finally {
+      setSeatChangePending(false)
     }
   }
 
@@ -611,7 +870,15 @@ function RoomRoute({
   }
 
   const handleRequestRoomExit = () => {
-    if (routeSession === null || gameState?.ctx.phase !== 'lobby' || roomExitBusy) return
+    if (
+      routeSession === null ||
+      !canRequestRoomExit(
+        gameState?.ctx.phase,
+        roomExitBusy,
+        seatChangePending,
+        loadSeatTransition(routeSession.matchID) !== null,
+      )
+    ) return
 
     setRoomExitDialogOpen(true)
   }
@@ -623,28 +890,60 @@ function RoomRoute({
   }
 
   const handleConfirmRoomExit = async () => {
-    if (routeSession === null || gameState?.ctx.phase !== 'lobby' || roomExitBusy) return
+    if (
+      routeSession === null ||
+      gameState === null ||
+      !canRequestRoomExit(
+        gameState.ctx.phase,
+        roomExitBusy,
+        seatChangePending,
+        loadSeatTransition(routeSession.matchID) !== null,
+      )
+    ) return
 
     const currentSession = routeSession
     const generation = routeGenerationRef.current
-    const isHost = currentSession.playerID === '0'
+    const transitionRevision = seatTransitionChangeRevisionRef.current
+    const isOwner = gameState.G.lobby.ownerPlayerID === currentSession.playerID
     setRoomExitBusy(true)
 
     try {
-      if (isHost) {
-        await dissolveRoom(webConfig.lobbyURL, currentSession)
-      } else {
-        await leaveRoom(webConfig.lobbyURL, currentSession)
-      }
+      const result = isOwner
+        ? await dissolveRoom(webConfig.lobbyURL, currentSession)
+        : await leaveRoom(webConfig.lobbyURL, currentSession)
       if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
 
+      const resolution = await reconcileRoomExit(
+        currentSession,
+        result,
+        transitionRevision !== seatTransitionChangeRevisionRef.current,
+        roomParticipation,
+        async (recoveryMatchID, playerID, credentials) => resolveRecoverySeatValidation(async () => {
+          await validateRoomSession(webConfig.lobbyURL, {
+            matchID: recoveryMatchID,
+            playerID,
+            credentials,
+          })
+        }),
+      )
+      if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
+      if (resolution.status === 'rebind') {
+        setSession(resolution.session)
+        setRoomExitDialogOpen(false)
+        return
+      }
+      if (resolution.status !== 'completed') {
+        setRoomExitDialogOpen(false)
+        pushToast({ message: '座位正在恢复，请稍后重试退出。', tone: 'error' })
+        return
+      }
+
       stopCurrentClient(clientRef)
-      clearRoomSession(matchID)
       setSession(null)
       setRoomExitDialogOpen(false)
       navigate('/', {
         state: {
-          roomNotice: isHost
+          roomNotice: isOwner
             ? '房间已解散。'
             : '已退出房间并释放座位。',
         },
@@ -652,7 +951,7 @@ function RoomRoute({
     } catch (actionError) {
       if (!isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
       pushToast({
-        message: getRoomExitErrorMessage(actionError, isHost),
+        message: getRoomExitErrorMessage(actionError, isOwner),
         tone: 'error',
       })
     } finally {
@@ -692,6 +991,8 @@ function RoomRoute({
     return <RoomAccessView matchID={matchID} onBackHome={() => navigate('/')} />
   }
 
+  const roomExitBlocked = seatChangePending || persistedSeatTransitionPending
+
   return (
     <>
       <RoomView
@@ -703,20 +1004,24 @@ function RoomRoute({
         onClearLocalSession={handleClearLocalSessionForTesting}
         onProposeTeam={handleProposeTeam}
         onPlayQuestCard={handlePlayQuestCard}
+        onOpenHelp={(playerCount) => openHelp({ playerCount })}
         onReconnect={handleReconnect}
         onRequestRoomExit={handleRequestRoomExit}
         onStart={handleStart}
+        onChangeSeat={handleChangeSeat}
         onDeleteRoom={handleDeleteRoom}
         onKickPlayer={handleKickPlayer}
         onSaveProfile={onSaveProfile}
         profile={profile}
         room={room}
+        roomExitBlocked={roomExitBlocked}
         roomExitBusy={roomExitBusy}
+        seatChangePending={seatChangePending || persistedSeatTransitionPending}
         session={routeSession}
       />
       <RoomExitDialog
         busy={roomExitBusy}
-        isHost={routeSession.playerID === '0'}
+        isOwner={gameState?.G.lobby.ownerPlayerID === routeSession.playerID}
         onCancel={handleCancelRoomExit}
         onConfirm={() => void handleConfirmRoomExit()}
         open={roomExitDialogOpen}
@@ -736,7 +1041,7 @@ export function RoomAccessView({
     <PageShell eyebrow={`房间 ${matchID}`} title="进入房间">
       <section className="mx-auto max-w-xl rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8">
         <p className="text-sm leading-6 text-slate-300">
-          你尚未加入这个房间。请返回房间列表选择座位。
+          你尚未加入这个房间。请返回房间列表，选择一个房间后加入。
         </p>
         <button
           className="mt-6 rounded-xl bg-amber-300 px-4 py-3 font-semibold text-slate-950 transition hover:bg-amber-200"
@@ -785,9 +1090,11 @@ export interface RoomViewProps {
   onBackHome: () => void
   onCastTeamVote: (vote: TeamVote) => void
   onConfirmIdentityRecognition: () => void
+  onChangeSeat: (targetPlayerID: string) => void
   onClearLocalSession: () => void
   onProposeTeam: (team: PlayerID[]) => void
   onPlayQuestCard: (card: QuestCard) => void
+  onOpenHelp: (playerCount: number) => void
   onReconnect: () => void
   onRequestRoomExit: () => void
   onStart: () => void
@@ -796,7 +1103,9 @@ export interface RoomViewProps {
   onSaveProfile: (profile: PlayerProfile) => void
   profile: PlayerProfile
   room: AvalonMatch | null
+  roomExitBlocked: boolean
   roomExitBusy: boolean
+  seatChangePending: boolean
   session: RoomSession
 }
 
@@ -806,9 +1115,11 @@ export function RoomView({
   onBackHome,
   onCastTeamVote,
   onConfirmIdentityRecognition,
+  onChangeSeat,
   onClearLocalSession,
   onProposeTeam,
   onPlayQuestCard,
+  onOpenHelp,
   onReconnect,
   onRequestRoomExit,
   onStart,
@@ -818,6 +1129,8 @@ export function RoomView({
   profile,
   room,
   roomExitBusy,
+  roomExitBlocked,
+  seatChangePending,
   session,
 }: RoomViewProps) {
   const connected = gameState?.isConnected === true
@@ -850,7 +1163,7 @@ export function RoomView({
   const canStart =
     connected &&
     gameState?.isActive === true &&
-    session.playerID === '0' &&
+    room.ownerPlayerID === session.playerID &&
     phase === 'lobby' &&
     isFull
   const currentRoomPlayer = room.players.find(
@@ -887,14 +1200,19 @@ export function RoomView({
           matchID={room.matchID}
           numPlayers={numPlayers}
           occupiedPlayerIDs={occupiedPlayerIDs}
+          ownerPlayerID={room.ownerPlayerID}
           onBackHome={onBackHome}
+          onChangeSeat={onChangeSeat}
           onReconnect={handleManualReconnect}
+          onOpenHelp={() => onOpenHelp(numPlayers)}
           onRequestRoomExit={onRequestRoomExit}
           onStart={onStart}
           onSaveProfile={onSaveProfile}
           players={room.players}
           profile={roomProfile}
           roomExitBusy={roomExitBusy}
+          roomExitBlocked={roomExitBlocked}
+          seatChangePending={seatChangePending}
         />
       </ImmersiveLobbyShell>
     )
@@ -926,12 +1244,14 @@ export function RoomView({
         onConfirmIdentityRecognition={onConfirmIdentityRecognition}
         onPlayQuestCard={onPlayQuestCard}
         onProposeTeam={onProposeTeam}
+        onOpenHelp={() => onOpenHelp(numPlayers)}
         onReconnect={handleManualReconnect}
         onSaveProfile={onSaveProfile}
         phase={phase ?? 'teamProposal'}
         playerID={session.playerID}
         players={room.players}
         profile={roomProfile}
+        ownerPlayerID={room.ownerPlayerID}
       />
     </ImmersiveLobbyShell>
   )

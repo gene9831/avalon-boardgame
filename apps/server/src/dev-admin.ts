@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto'
 
-import type { Server, StorageAPI } from 'boardgame.io'
+import type { StorageAPI } from 'boardgame.io'
+
+import { AvalonSeatIDSchema, type AvalonG } from '@avalon/game'
 
 import type { AvalonServerConfig } from './config'
 import {
@@ -9,6 +11,8 @@ import {
 } from './room-directory'
 import type { MatchDeletionGuard } from './storage/deletion-safe'
 import { secretMatches } from './secret'
+import { normalizeLobbyAuthority } from './room-lobby'
+import type { AtomicLobbyStorage } from './storage/lobby-storage'
 
 type MatchQueue = { add<T>(task: () => Promise<T>): Promise<T> }
 type SocketListener = (...args: never[]) => unknown
@@ -100,10 +104,7 @@ export class AvalonSocketRegistry {
 interface AdminContext {
   config: AvalonServerConfig
   db: StorageAPI.Sync | StorageAPI.Async
-  forceUpdateMetadata(
-    matchID: string,
-    update: (metadata: Server.MatchData) => void,
-  ): Server.MatchData | undefined | Promise<Server.MatchData | undefined>
+  storage: AtomicLobbyStorage
   deletionGuard: MatchDeletionGuard
   registry: AvalonSocketRegistry
   queues: { getMatchQueue(matchID: string): MatchQueue }
@@ -171,23 +172,44 @@ export function registerDevAdminRoutes(
       const { metadata, state } = await fetchMatch(context.db, matchID)
       if (metadata === undefined || state === undefined) ctx.throw(404)
       if ((state.G as { status?: string }).status !== 'lobby') ctx.throw(409)
-      const numericPlayerID = Number(playerID)
+      const parsedPlayerID = AvalonSeatIDSchema.safeParse(playerID)
+      if (!parsedPlayerID.success) ctx.throw(400)
+      const normalizedPlayerID = AvalonSeatIDSchema.parse(playerID)
+      const numericPlayerID = Number(normalizedPlayerID)
       const player = metadata.players[numericPlayerID]
       if (player === undefined || player.name === undefined) ctx.throw(409)
-      const updatedMetadata = await context.forceUpdateMetadata(matchID, (currentMetadata) => {
-        const updatedPlayer = currentMetadata.players[numericPlayerID]
+      const summary = await context.storage.mutateLobbyMatch(matchID, (snapshot) => {
+        const G = snapshot.state.G as AvalonG
+        const lobby = normalizeLobbyAuthority(G, snapshot.metadata)
+        if (normalizedPlayerID === lobby.ownerPlayerID) ctx.throw(409)
+        const updatedPlayer = snapshot.metadata.players[numericPlayerID]
         if (updatedPlayer === undefined || updatedPlayer.name === undefined) ctx.throw(409)
-        delete updatedPlayer.name
-        delete updatedPlayer.data
-        updatedPlayer.isConnected = false
-        updatedPlayer.credentials = randomUUID()
+        snapshot.metadata.players[numericPlayerID] = {
+          id: numericPlayerID,
+          credentials: randomUUID(),
+          isConnected: false,
+        }
+        G.players[normalizedPlayerID] = {
+          name: `Player ${numericPlayerID + 1}`,
+        }
+        G.lobby = {
+          ...lobby,
+          occupiedPlayerIDs: lobby.occupiedPlayerIDs.filter(
+            (occupiedPlayerID) => occupiedPlayerID !== normalizedPlayerID,
+          ),
+        }
+        snapshot.metadata.updatedAt = Date.now()
+        return {
+          state: { ...snapshot.state, G },
+          metadata: snapshot.metadata,
+          result: toAvalonRoomSummary(matchID, snapshot.metadata, {
+            ...snapshot.state,
+            G,
+          }),
+        }
       })
-      if (updatedMetadata === undefined) {
-        ctx.throw(404)
-        throw new Error('unreachable')
-      }
       context.registry.disconnectPlayer(matchID, playerID)
-      return toAvalonRoomSummary(matchID, updatedMetadata, state)
+      return summary
     })
     ctx.body = summary
   })

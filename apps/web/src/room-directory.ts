@@ -56,8 +56,10 @@ export function paginateRooms<T>(rooms: readonly T[], page: number, pageSize = 2
   }
 }
 
-export function canJoinRoom(room: Pick<AvalonRoomSummary, 'status'>) {
-  return room.status === 'lobby'
+export function canJoinRoom(room: Pick<AvalonRoomSummary, 'status' | 'ownerPlayerID' | 'occupiedPlayerIDs' | 'players'>) {
+  return room.status === 'lobby' &&
+    room.ownerPlayerID !== null &&
+    (room.occupiedPlayerIDs?.length ?? 0) < (room.players?.length ?? 1)
 }
 
 export function getOccupiedRoomPlayerIDs(room: Pick<AvalonRoomSummary, 'players'>) {

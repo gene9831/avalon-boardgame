@@ -9,7 +9,9 @@ export const ROLE_LABELS: Record<Role, string> = {
   assassin: '刺客',
   loyal_servant: '亚瑟的忠臣',
   merlin: '梅林',
+  morgana: '莫甘娜',
   minion: '莫德雷德的爪牙',
+  percival: '帕西维尔',
 }
 
 export const LOYALTY_LABELS = {

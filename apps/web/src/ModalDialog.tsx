@@ -7,6 +7,7 @@ export interface ModalDialogProps {
   onAfterOpen?: () => void
   onRequestClose: () => void
   open: boolean
+  size?: 'default' | 'wide'
   tone?: 'default' | 'danger'
 }
 
@@ -17,12 +18,14 @@ export function ModalDialog({
   onAfterOpen,
   onRequestClose,
   open,
+  size = 'default',
   tone = 'default',
 }: ModalDialogProps) {
   const dialogRef = useRef<HTMLDialogElement | null>(null)
   const toneClasses = tone === 'danger'
     ? 'border-rose-300/20 backdrop:bg-slate-950/75'
     : 'border-white/15 backdrop:bg-slate-950/70'
+  const sizeClasses = size === 'wide' ? 'max-w-5xl' : 'max-w-md'
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -39,7 +42,7 @@ export function ModalDialog({
   return (
     <dialog
       aria-labelledby={ariaLabelledBy}
-      className={`m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-3xl border bg-slate-900 p-0 text-slate-200 shadow-2xl shadow-black/40 ${toneClasses}`}
+      className={`m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] overflow-y-auto rounded-3xl border bg-slate-900 p-0 text-slate-200 shadow-2xl shadow-black/40 ${sizeClasses} ${toneClasses}`}
       onCancel={(event) => {
         event.preventDefault()
         if (!closeDisabled) onRequestClose()

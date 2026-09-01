@@ -17,6 +17,39 @@
   }
 }
 
+.seat--empty {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.seat--empty:focus-visible {
+  outline: 2px solid #fbbf24;
+  outline-offset: 4px;
+}
+
+.knowledge-badge {
+  position: absolute;
+  right: -0.125rem;
+  bottom: -0.125rem;
+  z-index: 20;
+  display: grid;
+  width: clamp(1rem, 3.5vw, 1.5rem);
+  height: clamp(1rem, 3.5vw, 1.5rem);
+  place-items: center;
+  border-radius: 9999px;
+  font-size: clamp(0.7rem, 2.4vw, 1rem);
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 45%);
+}
+
+.knowledge-badge--merlin-candidate {
+  border: 1px solid rgb(254 243 199 / 78%);
+  background: linear-gradient(145deg, #6b7280, #334155);
+  color: #fef3c7;
+}
+
 .hero {
   position: relative;
 

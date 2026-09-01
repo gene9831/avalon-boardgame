@@ -2,7 +2,7 @@ import { ModalDialog } from './ModalDialog'
 
 export interface RoomExitDialogProps {
   busy: boolean
-  isHost: boolean
+  isOwner: boolean
   onCancel: () => void
   onConfirm: () => void
   open: boolean
@@ -10,17 +10,17 @@ export interface RoomExitDialogProps {
 
 export function RoomExitDialog({
   busy,
-  isHost,
+  isOwner,
   onCancel,
   onConfirm,
   open,
 }: RoomExitDialogProps) {
-  const title = isHost ? '确认解散房间' : '确认退出房间'
-  const actionLabel = isHost ? '解散房间' : '退出房间'
-  const busyLabel = isHost ? '正在解散…' : '正在退出…'
-  const description = isHost
+  const title = isOwner ? '确认解散房间' : '确认退出房间'
+  const actionLabel = isOwner ? '解散房间' : '退出房间'
+  const busyLabel = isOwner ? '正在解散…' : '正在退出…'
+  const description = isOwner
     ? '解散后，所有玩家都会返回房间列表，这个房间无法恢复。'
-    : '退出后将释放你的座位。再次加入时需要重新选择座位。'
+    : '退出后将释放你的座位。再次加入时会自动分配空座位。'
 
   return (
     <ModalDialog
