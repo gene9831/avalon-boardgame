@@ -9,6 +9,7 @@ import type {
 } from '@avalon/game'
 
 import { ConnectionRecoveryControl } from './ConnectionRecoveryControl'
+import { HelpTrigger } from './HelpTrigger'
 import {
   GAME_CLIENT_SETTINGS_KEY,
   loadGameClientSettings,
@@ -44,6 +45,7 @@ interface RoomGamePanelProps {
   onBackHome: () => void
   onCastTeamVote: (vote: TeamVote) => void
   onConfirmIdentityRecognition: () => void
+  onOpenHelp: () => void
   onPlayQuestCard: (card: QuestCard) => void
   onProposeTeam: (team: PlayerID[]) => void
   onReconnect: () => void
@@ -66,6 +68,7 @@ export function RoomGamePanel({
   onBackHome,
   onCastTeamVote,
   onConfirmIdentityRecognition,
+  onOpenHelp,
   onPlayQuestCard,
   onProposeTeam,
   onReconnect,
@@ -167,6 +170,7 @@ export function RoomGamePanel({
         </div>
         <div className="mr-12 flex shrink-0 items-center gap-2">
           <ConnectionRecoveryControl connected={connected} manualReconnectAvailable={manualReconnectAvailable} onReconnect={onReconnect} />
+          <HelpTrigger onOpen={onOpenHelp} variant="icon" />
           <RoomLogControl entries={logEntries} />
           <PlayerProfileControl locked onSave={onSaveProfile} profile={profile} />
         </div>

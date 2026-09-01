@@ -92,6 +92,7 @@ function renderLobby(overrides: Partial<LobbyViewProps> = {}) {
     onDevTokenChange: vi.fn(),
     onEnterRoom: vi.fn(),
     onJoin: vi.fn(),
+    onOpenHelp: vi.fn(),
     onRefresh: vi.fn(),
     onSaveProfile: vi.fn(),
     profile: { avatarID: 'merlin', name: '银月骑士' },
@@ -128,6 +129,7 @@ describe('LobbyView room access', () => {
   it('shows the browser profile in the header and defers configuration to the create dialog', () => {
     const html = renderLobby()
 
+    expect(html).toContain('>帮助说明<')
     expect(html).toContain('打开用户中心')
     expect(html).toContain('银月骑士')
     expect(html).toContain('>创建房间<')

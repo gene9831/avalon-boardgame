@@ -194,6 +194,40 @@ test('the create-game configuration remains fully usable at narrow widths', asyn
   }
 })
 
+test('the create-game role option stays concise and vertically aligned on mobile', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 429, height: 741 })
+  await page.goto('/')
+  await page.getByRole('button', { name: '创建房间' }).click()
+
+  const dialog = page.getByRole('dialog', { name: '创建一局阿瓦隆' })
+  await expect(
+    dialog.getByText('帕西维尔会看到梅林与莫甘娜两名候选人。', { exact: true }),
+  ).toHaveCount(0)
+
+  const centers = await dialog.locator('.role-configuration-toggle').evaluate((element) => {
+    const checkbox = element.querySelector<HTMLInputElement>(
+      '#percival-morgana-role-configuration',
+    )
+    const label = element.querySelector<HTMLLabelElement>(
+      'label[for="percival-morgana-role-configuration"]',
+    )
+    const help = element.querySelector<HTMLButtonElement>('button')
+
+    if (!checkbox || !label || !help) {
+      throw new Error('角色配置控件不完整')
+    }
+
+    return [checkbox, label, help].map((control) => {
+      const rect = control.getBoundingClientRect()
+      return rect.top + rect.height / 2
+    })
+  })
+
+  expect(Math.max(...centers) - Math.min(...centers)).toBeLessThanOrEqual(1)
+})
+
 test('empty-seat actions stay 44px and keyboard operable at the smallest viewport', async ({
   browser,
 }) => {

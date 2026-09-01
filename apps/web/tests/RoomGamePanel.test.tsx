@@ -63,6 +63,7 @@ function renderPanel({
       onBackHome={vi.fn()}
       onCastTeamVote={vi.fn()}
       onConfirmIdentityRecognition={vi.fn()}
+      onOpenHelp={vi.fn()}
       onPlayQuestCard={vi.fn<(card: QuestCard) => void>()}
       onProposeTeam={vi.fn()}
       onReconnect={vi.fn()}
@@ -80,6 +81,7 @@ describe('RoomGamePanel operation log', () => {
   it('keeps a public operation-log control in the room header without a badge', () => {
     const html = renderPanel()
 
+    expect(html).toContain('aria-label="打开帮助说明"')
     expect(html).toContain('aria-label="查看对局记录"')
     expect(html).not.toContain('data-unread')
   })

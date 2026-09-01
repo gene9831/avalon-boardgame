@@ -26,6 +26,7 @@
 - 新房间默认成对启用 Percival 与 Morgana，也可在创建时关闭并使用基础角色；缺少持久化角色配置的旧房间继续使用基础角色。开局在首次组队前依次进行全员身份查看、邪恶阵营互认、梅林辨认邪恶阵营和按配置启用的帕西维尔辨认梅林候选；当前版本不显示或使用倒计时，每步等待全部参与者确认，其他玩家保持在不透明幕布后。
 - Web 使用仅保存在浏览器的随机默认名称与八款装饰头像；主页 Header 用户中心可修改资料，存在任何活动房间座位时锁定名称和头像。创建/加入直接使用当前资料，不再弹出名称确认；同一房间允许同名并以座位号区分。
 - 创建房间先打开配置弹窗，当前支持 5–10 人选择、阵营/任务人数摘要与 Percival/Morgana 成对配置。
+- Web 提供统一“帮助说明”：主页桌面端使用文字入口、移动端收为 44px 图标，等待大厅和游戏页使用图标入口；弹窗分为“游戏基础规则”和“角色说明”两个 Tab。创建配置中的角色问号会直接打开角色说明，将帕西维尔与莫甘娜前置并短暂脉冲高亮；六个角色卡暂留矩形素材位，不使用现有头像扩图。
 - 系统通知统一使用最多三条的顶部 Toast；主页不提供通知历史入口。房间 Header 提供无未读徽标的操作日志，记录当前客户端观察到的公开加入/退出，以及开局、提案、结算投票、匿名任务结果、刺杀和胜负。
 - Web 主页和个人设备圆桌等待大厅已完成响应式重设计；大厅以当前玩家为底部锚点，在所有宽度采用同一套圆形座位 DOM。房主开局进入桌面中央，退出/解散进入顶部房间菜单；健康连接不显示状态，连续断线 8 秒后才在顶部提供手动重连。房间页在最低 320×568 竖屏与 568×320 横屏内按宽高可用空间缩放，不产生页面滚动。
 - 等待大厅支持玩家凭据授权的主动离座：普通玩家只释放自己的座位，房主解散整个房间；游戏开始后拒绝这两类操作，返回主页仍是保留座位的无损导航。
@@ -82,6 +83,7 @@
 | PostgreSQL 存储 | ✅ | `PostgresStorage`、schema、delta logs、列表过滤和 wipe 已实现；空闲连接错误由 Pool 监听器处理，活动查询错误在 boardgame.io Socket.IO 请求边界处理，两类日志都不记录 Client、连接信息或请求参数，本地集成测试可执行。 |
 | 创建/加入/列出房间 | ✅ | 创建与创建者入座由一个服务端操作原子完成；普通加入不接受客户端选择座位，而是在 match queue 内分配提交时的最低空座位。`@avalon/game` 使用共享 Zod schema 定义严格请求和公开房间目录，Server 通过推导类型构造允许列表，Web 在接收边界原子拒绝无效或重复数据并保留上一次有效限制状态。响应式主页将 lobby/playing 合并为进行中列表，满房显示“已满”，finished 房间单独分页展示。主页验证本机全部活动房间凭据，已加入房间置顶并直接进入；存在活动会话时禁用创建和其他房间的加入入口。等待大厅允许普通玩家凭据授权释放自己的座位，房间拥有者可解散房间，playing 状态拒绝两类操作。 |
 | 主页与等待大厅体验 | ✅ | 主页、创建配置、房间列表和等待提示已使用面向普通玩家的中文产品文案；公共按钮统一使用至少 44px 的触控尺寸和一致交互态。创建配置与退出/解散房间的业务弹窗共用原生 `ModalDialog`，统一管理打开、关闭、Escape、遮罩、危险色、视口内滚动及水平垂直居中；默认配置不显示开发控制入口。创建配置当前提供 5–10 人按钮、阵营构成、五次任务人数摘要和 Percival/Morgana 成对开关。等待大厅在 PC、平板和移动端使用同一套圆桌座位 DOM，当前玩家固定在底部，空位显示虚线头像与座位号；不再使用底部操作栏，房间拥有者开局位于桌面中央，退出/解散位于顶部房间菜单。窄屏使用“等待创建者”等紧凑等待文案，并保留完整的可访问名称；断线状态在窄屏收为 44px 图标，等待大厅暂时以重连控件替代不可用的房间操作入口。房间壳层仅使用 `100dvh` 并关闭 overscroll，避免 iOS Chrome 的 `100vh` 包含动态工具栏而产生页面滚动；主页仍可按内容滚动。高度至少 421px 的横屏会回收 Header 中部空白供圆桌舞台使用，同时保持 Header 左右内容位于更高层级；5–6 人桌底部座位与裁剪边界至少保留 24px，7–10 人桌会向下补偿以保护顶部密集座位。Playwright 使用 5、7、10 人房间在 320×568、568×320、390×844、768×1024、1024×768、1077×722、1280×685、1440×900 验证页面无滚动、座位不被面板裁切、Header 左右内容不与座位重叠、座位与中央区无实质重叠，以及开局、选队和投票可操作。 |
+| 游戏与角色帮助 | ✅ | 统一宽版弹窗提供“游戏基础规则”和“角色说明”语义化 Tab；基础规则包含阵营目标、回合流程、关键规则及 5–10 人配置表，房间内会标出当前人数。角色说明覆盖 Merlin、Percival、Loyal Servant、Assassin、Morgana、Minion 的阵营、能力、目标与新手提示。创建配置中的问号支持 hover/focus tooltip 和 click/touch 深入说明；上下文打开时帕西维尔与莫甘娜前置并以较平缓的节奏脉冲两次，`prefers-reduced-motion` 下关闭动画。移动端角色说明使用横向列表项，左侧保留 88×112 空白素材位、右侧显示完整说明；`sm` 及以上保持三列纵向卡片和 4:3 空白素材位。主页在移动端只显示 44×44 问号图标，`sm` 及以上显示“帮助说明”文字；等待大厅和游戏页继续使用图标入口。所有入口复用同一弹窗，支持方向键切换 Tab、Escape 关闭及焦点恢复。 |
 | 玩家名称与入座入口 | ✅ | 浏览器首次使用从 24 个中世纪奇幻意象与 24 个身份词中组合随机中文名称（576 种组合），并随机选择八款装饰头像，一并保存在 `localStorage`；主页 Header 用户中心支持名称校验、头像选择和重新随机，跨标签页同步。只要本机仍保存并验证出活动房间座位，即使返回主页也只展示锁定资料，真正退出/解散后才恢复编辑。创建和加入直接使用当前资料，不再询问名称；客户端和服务端共同限制 trim 后 1–24 字符。同一房间允许同名，所有公开日志使用名称加座位号区分；client ID 仍防止同一浏览器重复占座。头像采用 ImperialOctopus/avalon-printable 的八款角色图标并按 CC BY 4.0 署名，但仅作为装饰，不表达隐藏角色；用户中心的“素材与许可”可用键盘展开与折叠，折叠时不暴露许可链接。 |
 | 通知与房间操作日志 | ✅ | 系统通知统一显示为顶部 Toast：桌面右上、移动端顶部居中，普通/成功 4 秒、错误 8 秒，最多保留三条且可手动关闭；主页不显示铃铛或通知历史。房间 Header 使用日志图标且不显示未读圆点/数量，桌面为右侧抽屉、移动端为底部抽屉；日志按旧到新记录公开玩家操作，不含时间戳、清空或分页。等待房间只记录当前客户端实际观察到的加入/退出；开局后可从公开状态重建开局、提案、已结算的逐人投票、匿名成功/失败牌总数、刺杀目标和胜负，不读取 viewer 私密信息。 |
 | 座位绑定与重连 | ✅ | 房间路由、按房间保存凭据、client ID 防重复占座和自动重新连接已实现。等待房间可使用当前 seat credential 换到空座位，credential 和房间拥有者身份一起重绑到目标；请求期间使用可续租的浏览器全局 transition marker 暂停其他标签页的过期源座位失效处理。丢失、超时或瞬态响应转为 uncertain 后，浏览器先通过真实换座客户端精确重放原 match/source/credential/target，让服务端 match queue 与目标凭据幂等检查确定结算顺序；只有稳定拒绝才继续校验源与目标，网络、5xx 或无效成功响应会保留 marker 和会话等待重试。旧标签页只能更新或清理仍与相同 opaque transition ID 及精确源会话匹配的状态。健康连接不占用界面；断线时顶部先显示自动恢复状态，连续失败 8 秒后才出现手动重连。房间首次加载与轮询通过只返回 204/403/404 的服务端端点校验私有 seat credential；公开 session ID 仅作提前失效优化，不能授权会话。 |
@@ -161,7 +163,21 @@
 
 ## 当前验证基线
 
-最近一次验证日期：2026-08-31
+最近一次验证日期：2026-09-01
+
+2026-09-01 游戏与角色帮助验证：主页 Header 在移动端显示 44×44 问号图标、`sm` 及以上显示文字“帮助说明”，等待大厅与游戏页 Header 使用图标入口；统一弹窗默认打开游戏基础规则，包含阵营目标、回合流程、关键规则和 5–10 人配置，房间入口会传入并标出当前人数。角色说明覆盖当前六个角色；创建配置的帕西维尔/莫甘娜问号提供 hover/focus 提示，点击或触摸直接进入角色 Tab，将两张相关角色卡前置并以约 1.6 秒两次平缓脉冲引导视线，随后回归普通边框，减少动态效果偏好下不播放。创建配置开关已移除重复的候选人说明，checkbox、标题和帮助问号收为同一行并垂直居中。移动端每个角色使用横向列表项，左侧 88×112 空白素材位、右侧完整说明；桌面继续使用三列纵向卡片和 4:3 空白素材位，没有使用或扩展现有头像。弹窗使用语义化 Tab、方向键/Home/End 切换、Escape 关闭及触发按钮焦点恢复；320×568 下四边至少保留 16px。应用内浏览器人工复核桌面基础规则、上下文角色说明和 320px/390px/429px 主页、创建弹窗与角色列表；429×741 下三个角色配置控件中心线均为 438.5px，且配置行不再出现重复说明。确认角色顺序为 Percival、Morgana、Merlin、Loyal Servant、Assassin、Minion，390px 下素材位为 88×112 且位于名称左侧，角色说明中 `img` 数量为 0，页面无横向溢出且控制台无 error。Web 239 tests、Web build、lint 和 workspace typecheck 通过；帮助与响应式 Playwright 7 passed。Web build 仍有单个 555.89 kB minified JavaScript chunk 超过 500 kB 的建议性警告，Playwright 仅出现既有 `NO_COLOR`/`FORCE_COLOR` Node 警告。
+
+```text
+pnpm test ✅ Game 88；test-support 23；Server 84；Web 239（共 434 passed）
+pnpm build ✅ Game、Server TypeScript 与 Web TypeScript + Vite build；单个 556.21 kB minified / 167.24 kB gzip chunk 建议性警告
+pnpm lint ✅ exit 0，无 diagnostics
+pnpm typecheck ✅ Game、test-support、Server、Web、E2E exit 0
+pnpm --filter @avalon/e2e test:e2e dialogs.spec.ts responsive.spec.ts ✅ 6 passed
+Playwright 本地日志 ⚠️ Node 子进程提示 `NO_COLOR` 被 `FORCE_COLOR` 覆盖；无业务 warning/error
+pnpm --filter @avalon/server test:postgres ⚠️ 本轮未运行；未以 memory storage 替代
+真实 5–10 浏览器 LAN 验收 ⬜ 未执行
+部署环境 PostgreSQL 重启与原凭据重连 ⬜ 未执行
+```
 
 2026-08-31 普通 HTTP LAN 换座互斥补充：浏览器继续优先使用 Web Locks；当文档所用的 `http://<LAN IP>` origin 不提供 SecureContext Web Locks 时，改用同源 IndexedDB `readwrite` 事务原子获取每房间独占 lease。lease 使用 opaque owner token、有限过期时间和 owner-matched release；活动请求即使超过 lock lease，锁内重新检查的持久化 `requesting` 标记仍拒绝第二次请求，原有 transition ID、源会话和恢复 fence 保持权威。IndexedDB 缺失、打开失败或事务失败时换座安全关闭并显示既有兼容性文案，不会无锁发送请求。真实浏览器回归在应用代码运行前移除 `navigator.locks`，通过实际 IndexedDB 完成一次换座并拒绝第二标签页 contender。完整 `pnpm test` 为 Game 88、test-support 23、Server 83、Web 227，共 421 passed；`pnpm build`、`pnpm lint`、`pnpm typecheck` 均 exit 0；强制 fallback 聚焦 Playwright 为 1 passed，完整 `pnpm test:e2e` 为 18 passed / 9 nightly skipped。Web build 报告单个 540.97 kB minified / 163.29 kB gzip JavaScript chunk 超过 500 kB 的 Vite 建议性警告；Playwright 仅出现既有 `NO_COLOR`/`FORCE_COLOR` Node 警告。部署环境 PostgreSQL restart acceptance 继续 blocked，未使用内存存储替代；Manual LAN 5-browser acceptance 仍 pending，本次自动化普通 HTTP loopback 测试不等同于真实 LAN 设备、实际 CORS/Socket.IO 或部署环境 PostgreSQL 重启演练。
 

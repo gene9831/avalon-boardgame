@@ -16,6 +16,7 @@ function renderPanel(overrides: Partial<RoomLobbyPanelProps> = {}) {
     ownerPlayerID: '0',
     onBackHome: vi.fn(),
     onChangeSeat: vi.fn(),
+    onOpenHelp: vi.fn(),
     onReconnect: vi.fn(),
     onRequestRoomExit: vi.fn(),
     onStart: vi.fn(),
@@ -167,6 +168,7 @@ describe('RoomLobbyPanel operation log', () => {
   it('places the log control in the room header without an unread badge', () => {
     const html = renderPanel()
 
+    expect(html).toContain('aria-label="打开帮助说明"')
     expect(html).toContain('aria-label="查看对局记录"')
     expect(html).not.toContain('data-unread')
   })

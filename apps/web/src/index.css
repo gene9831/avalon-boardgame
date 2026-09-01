@@ -218,12 +218,31 @@ select {
   }
 }
 
+@keyframes help-role-focus-pulse {
+  0%, 100% {
+    border-color: rgb(255 255 255 / 0.1);
+    box-shadow: none;
+  }
+
+  50% {
+    border-color: rgb(252 211 77 / 0.9);
+    box-shadow: 0 0 0 2px rgb(252 211 77 / 0.2), 0 0 24px rgb(252 211 77 / 0.14);
+  }
+}
+
+.help-role-card--pulse {
+  animation: help-role-focus-pulse 800ms ease-in-out 2;
+}
+
 .team-vote-indicator[data-team-vote-status="approve"],
 .team-vote-indicator[data-team-vote-status="reject"] {
   animation: team-vote-status-reveal 180ms ease-out both;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .help-role-card--pulse {
+    animation: none;
+  }
   .identity-curtain,
   .identity-curtain *,
   .identity-role-reveal-content,

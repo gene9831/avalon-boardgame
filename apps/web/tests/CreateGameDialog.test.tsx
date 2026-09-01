@@ -11,6 +11,7 @@ describe('CreateGameDialog', () => {
         numPlayers={7}
         onCancel={vi.fn()}
         onConfirm={vi.fn()}
+        onOpenRoleHelp={vi.fn()}
         onPlayerCountChange={vi.fn()}
         onRoleConfigurationChange={vi.fn()}
         open
@@ -37,6 +38,7 @@ describe('CreateGameDialog', () => {
         numPlayers={5}
         onCancel={vi.fn()}
         onConfirm={vi.fn()}
+        onOpenRoleHelp={vi.fn()}
         onPlayerCountChange={vi.fn()}
         onRoleConfigurationChange={vi.fn()}
         open
@@ -50,11 +52,12 @@ describe('CreateGameDialog', () => {
 
   it('enables the Percival and Morgana pair for a new room', () => {
     const html = renderToStaticMarkup(
-      <CreateGameDialog busy={false} numPlayers={5} onCancel={vi.fn()} onConfirm={vi.fn()} onPlayerCountChange={vi.fn()} onRoleConfigurationChange={vi.fn()} open roleConfiguration={{ percivalMorgana: true }} />,
+      <CreateGameDialog busy={false} numPlayers={5} onCancel={vi.fn()} onConfirm={vi.fn()} onOpenRoleHelp={vi.fn()} onPlayerCountChange={vi.fn()} onRoleConfigurationChange={vi.fn()} open roleConfiguration={{ percivalMorgana: true }} />,
     )
 
     expect(html).toContain('role="switch"')
     expect(html).toContain('checked=""')
     expect(html).toContain('帕西维尔与莫甘娜')
+    expect(html).toContain('aria-label="查看帕西维尔与莫甘娜的角色说明"')
   })
 })

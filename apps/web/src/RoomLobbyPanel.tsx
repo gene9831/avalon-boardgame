@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { ConnectionRecoveryControl } from './ConnectionRecoveryControl'
+import { HelpTrigger } from './HelpTrigger'
 import type { LobbyPlayer } from './lobby'
 import { PlayerAvatar } from './player-avatars'
 import { PlayerProfileControl } from './PlayerProfileControl'
@@ -21,6 +22,7 @@ export interface RoomLobbyPanelProps {
   ownerPlayerID: string | null
   onBackHome: () => void
   onChangeSeat: (targetPlayerID: string) => void
+  onOpenHelp: () => void
   onReconnect: () => void
   onRequestRoomExit: () => void
   onStart: () => void
@@ -44,6 +46,7 @@ export function RoomLobbyPanel({
   ownerPlayerID,
   onBackHome,
   onChangeSeat,
+  onOpenHelp,
   onReconnect,
   onRequestRoomExit,
   onStart,
@@ -78,6 +81,7 @@ export function RoomLobbyPanel({
         </div>
         <div className="mr-12 flex shrink-0 items-center gap-2">
           <ConnectionRecoveryControl connected={connected} manualReconnectAvailable={manualReconnectAvailable} onReconnect={onReconnect} />
+          <HelpTrigger onOpen={onOpenHelp} variant="icon" />
           <RoomLogControl entries={logEntries} />
           <PlayerProfileControl locked onSave={onSaveProfile} profile={profile} />
           {connected && <div className="relative">

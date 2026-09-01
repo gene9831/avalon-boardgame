@@ -1,12 +1,14 @@
 import { getPlayerCountConfig, type AvalonRoleConfiguration } from '@avalon/game'
 
 import { ModalDialog } from './ModalDialog'
+import { HelpTrigger } from './HelpTrigger'
 
 export interface CreateGameDialogProps {
   busy: boolean
   numPlayers: number
   onCancel: () => void
   onConfirm: () => void
+  onOpenRoleHelp: () => void
   onPlayerCountChange: (value: number) => void
   onRoleConfigurationChange: (value: AvalonRoleConfiguration) => void
   open: boolean
@@ -20,6 +22,7 @@ export function CreateGameDialog({
   numPlayers,
   onCancel,
   onConfirm,
+  onOpenRoleHelp,
   onPlayerCountChange,
   onRoleConfigurationChange,
   open,
@@ -67,20 +70,21 @@ export function CreateGameDialog({
           </div>
         </fieldset>
 
-        <label className="role-configuration-toggle mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 bg-slate-950/45 p-4 text-sm">
+        <div className="role-configuration-toggle mt-5 flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/45 p-4 text-sm">
           <input
             checked={roleConfiguration.percivalMorgana}
-            className="mt-0.5 size-5 accent-amber-300"
+            className="size-5 shrink-0 accent-amber-300"
             disabled={busy}
+            id="percival-morgana-role-configuration"
             onChange={(event) => onRoleConfigurationChange({ percivalMorgana: event.target.checked })}
             role="switch"
             type="checkbox"
           />
-          <span>
-            <span className="block font-semibold text-slate-100">帕西维尔与莫甘娜</span>
-            <small className="mt-1 block leading-5 text-slate-400">帕西维尔会看到梅林与莫甘娜两名候选人。</small>
-          </span>
-        </label>
+          <label className="min-w-0 flex-1 cursor-pointer font-semibold text-slate-100" htmlFor="percival-morgana-role-configuration">
+            帕西维尔与莫甘娜
+          </label>
+          <HelpTrigger onOpen={onOpenRoleHelp} variant="role-pair" />
+        </div>
 
         <section className="mt-5 rounded-2xl border border-white/10 bg-slate-950/45 p-4" aria-label={`${numPlayers} 人规则摘要`}>
           <div className="flex items-center justify-between gap-3 text-sm">

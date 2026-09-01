@@ -40,6 +40,8 @@ import {
 } from './create-game-preference'
 import { getClientID } from './client-identity'
 import { createDevToolsClient } from './dev-tools'
+import { useHelp } from './help-context'
+import { HelpProvider } from './HelpProvider'
 import { useDevTools } from './use-dev-tools'
 import { executePendingJoin, type PendingJoin } from './join-flow'
 import { classifyJoinError } from './join-error'
@@ -235,7 +237,9 @@ export function canRequestRoomExit(
 function App() {
   return (
     <ToastProvider>
-      <AppRoutes />
+      <HelpProvider>
+        <AppRoutes />
+      </HelpProvider>
     </ToastProvider>
   )
 }
@@ -286,6 +290,7 @@ function LobbyRoute({
   const [roomAccessStatus, setRoomAccessStatus] = useState<'checking' | 'ready' | 'unavailable'>('checking')
   const [roomAccessError, setRoomAccessError] = useState<string | null>(null)
   const { pushToast } = useToast()
+  const { openHelp } = useHelp()
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [numPlayers, setNumPlayers] = useState(loadPreferredPlayerCount)
   const [roleConfiguration, setRoleConfiguration] = useState<AvalonRoleConfiguration>(loadPreferredRoleConfiguration)
@@ -446,6 +451,7 @@ function LobbyRoute({
         onCreate={handleCreate}
         onEnterRoom={handleEnterRoom}
         onJoin={handleJoin}
+        onOpenHelp={() => openHelp()}
         onRefresh={() => void refreshMatches()}
         onSaveProfile={onSaveProfile}
         onDeleteRoom={handleDeleteRoom}
@@ -461,6 +467,7 @@ function LobbyRoute({
         onCancel={handleCreateDialogCancel}
         onConfirm={handleCreateDialogConfirm}
         onPlayerCountChange={setNumPlayers}
+        onOpenRoleHelp={() => openHelp({ focusRoles: true, tab: 'roles' })}
         onRoleConfigurationChange={setRoleConfiguration}
         open={createDialogOpen}
         roleConfiguration={roleConfiguration}
@@ -485,6 +492,7 @@ function RoomRoute({
   )
   const devTools = useMemo(() => createDevToolsClient(webConfig.lobbyURL), [])
   const { pushToast } = useToast()
+  const { openHelp } = useHelp()
   const clientRef = useRef<AvalonClient | null>(null)
   const routeGenerationRef = useRef(0)
   const [session, setSession] = useState<RoomSession | null>(() =>
@@ -996,6 +1004,7 @@ function RoomRoute({
         onClearLocalSession={handleClearLocalSessionForTesting}
         onProposeTeam={handleProposeTeam}
         onPlayQuestCard={handlePlayQuestCard}
+        onOpenHelp={(playerCount) => openHelp({ playerCount })}
         onReconnect={handleReconnect}
         onRequestRoomExit={handleRequestRoomExit}
         onStart={handleStart}
@@ -1085,6 +1094,7 @@ export interface RoomViewProps {
   onClearLocalSession: () => void
   onProposeTeam: (team: PlayerID[]) => void
   onPlayQuestCard: (card: QuestCard) => void
+  onOpenHelp: (playerCount: number) => void
   onReconnect: () => void
   onRequestRoomExit: () => void
   onStart: () => void
@@ -1109,6 +1119,7 @@ export function RoomView({
   onClearLocalSession,
   onProposeTeam,
   onPlayQuestCard,
+  onOpenHelp,
   onReconnect,
   onRequestRoomExit,
   onStart,
@@ -1193,6 +1204,7 @@ export function RoomView({
           onBackHome={onBackHome}
           onChangeSeat={onChangeSeat}
           onReconnect={handleManualReconnect}
+          onOpenHelp={() => onOpenHelp(numPlayers)}
           onRequestRoomExit={onRequestRoomExit}
           onStart={onStart}
           onSaveProfile={onSaveProfile}
@@ -1232,6 +1244,7 @@ export function RoomView({
         onConfirmIdentityRecognition={onConfirmIdentityRecognition}
         onPlayQuestCard={onPlayQuestCard}
         onProposeTeam={onProposeTeam}
+        onOpenHelp={() => onOpenHelp(numPlayers)}
         onReconnect={handleManualReconnect}
         onSaveProfile={onSaveProfile}
         phase={phase ?? 'teamProposal'}
