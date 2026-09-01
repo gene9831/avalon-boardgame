@@ -22,6 +22,21 @@ const tabs: readonly { id: HelpTab; label: string }[] = [
   { id: 'roles', label: '角色说明' },
 ]
 
+interface HelpRoleArtworkSource {
+  height: number
+  slug: string
+  width: number
+}
+
+const HELP_ROLE_ARTWORK: Partial<Record<Role, HelpRoleArtworkSource>> = {
+  assassin: { height: 1051, slug: 'assassin', width: 674 },
+  merlin: { height: 1010, slug: 'merlin', width: 674 },
+  morgana: { height: 1010, slug: 'morgana', width: 674 },
+  percival: { height: 1010, slug: 'percival', width: 674 },
+}
+
+const HELP_ROLE_ARTWORK_SIZES = '(min-width: 1024px) 18rem, (min-width: 640px) 42vw, 5.5rem'
+
 export interface HelpDialogProps {
   activeTab: HelpTab
   focusRoles: boolean
@@ -265,11 +280,7 @@ function HelpRoleCard({
       className={`help-role-card grid grid-cols-[5.5rem_minmax(0,1fr)] items-start gap-3 rounded-2xl border border-white/10 bg-slate-950/40 p-3 sm:block sm:p-4 ${focused ? 'help-role-card--pulse' : ''}`}
       data-help-role={role}
     >
-      <div
-        aria-hidden="true"
-        className="aspect-[11/14] w-[5.5rem] rounded-xl border border-dashed border-white/15 bg-slate-950/35 sm:aspect-[4/3] sm:w-auto"
-        data-role-artwork-placeholder={role}
-      />
+      <HelpRoleArtwork role={role} />
       <div className="min-w-0">
         <div className="flex flex-wrap items-start justify-between gap-2 sm:mt-4">
           <div>
@@ -298,5 +309,37 @@ function HelpRoleCard({
         </dl>
       </div>
     </article>
+  )
+}
+
+function HelpRoleArtwork({ role }: { role: Role }) {
+  const artwork = HELP_ROLE_ARTWORK[role]
+  const className = 'w-[5.5rem] overflow-hidden rounded-xl border border-white/15 bg-slate-950/35 sm:aspect-[4/3] sm:w-auto'
+
+  if (artwork === undefined) {
+    return (
+      <div
+        aria-hidden="true"
+        className={`${className} aspect-[11/14] border-dashed`}
+        data-role-artwork-placeholder={role}
+      />
+    )
+  }
+
+  return (
+    <div aria-hidden="true" className={className}>
+      <img
+        alt=""
+        className="block h-auto w-full sm:size-full sm:object-contain"
+        data-help-role-artwork={role}
+        decoding="async"
+        height={artwork.height}
+        loading="lazy"
+        sizes={HELP_ROLE_ARTWORK_SIZES}
+        src={`/images/roles/${artwork.slug}-674.webp`}
+        srcSet={`/images/roles/${artwork.slug}-320.webp 320w, /images/roles/${artwork.slug}-480.webp 480w, /images/roles/${artwork.slug}-674.webp 674w`}
+        width={artwork.width}
+      />
+    </div>
   )
 }

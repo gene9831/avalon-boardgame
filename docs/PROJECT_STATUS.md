@@ -26,7 +26,8 @@
 - 新房间默认成对启用 Percival 与 Morgana，也可在创建时关闭并使用基础角色；缺少持久化角色配置的旧房间继续使用基础角色。开局在首次组队前依次进行全员身份查看、邪恶阵营互认、梅林辨认邪恶阵营和按配置启用的帕西维尔辨认梅林候选；当前版本不显示或使用倒计时，每步等待全部参与者确认，其他玩家保持在不透明幕布后。
 - Web 使用仅保存在浏览器的随机默认名称与八款装饰头像；主页 Header 用户中心可修改资料，存在任何活动房间座位时锁定名称和头像。创建/加入直接使用当前资料，不再弹出名称确认；同一房间允许同名并以座位号区分。
 - 创建房间先打开配置弹窗，当前支持 5–10 人选择、阵营/任务人数摘要与 Percival/Morgana 成对配置。
-- Web 提供统一“帮助说明”：主页桌面端使用文字入口、移动端收为 44px 图标，等待大厅和游戏页使用图标入口；弹窗分为“游戏基础规则”和“角色说明”两个 Tab。创建配置中的角色问号会直接打开角色说明，将帕西维尔与莫甘娜前置并短暂脉冲高亮；六个角色卡暂留矩形素材位，不使用现有头像扩图。
+- Web 提供统一“帮助说明”：主页桌面端使用文字入口、移动端收为 44px 图标，等待大厅和游戏页使用图标入口；弹窗分为“游戏基础规则”和“角色说明”两个 Tab。创建配置中的角色问号会直接打开角色说明，将帕西维尔与莫甘娜前置并短暂脉冲高亮；Merlin、Percival、Assassin、Morgana 使用响应式角色立绘，Loyal Servant 与 Minion 暂留矩形素材位。
+- Web 角色立绘已建立显式素材转换流程：无损 PNG 母版保存在 `images/source/roles/`，`apps/web` 使用 Sharp 按原比例生成 `320w`、`480w`、`674w` WebP，并保留透明通道、验证输出后原子替换派生文件；以下划线开头的保留母版不参与转换。当前已生成 Assassin、Merlin、Mordred、Morgana、Oberon、Percival 六个角色的三档素材；帮助说明已使用原生 `srcset` 接入 Merlin、Percival、Assassin、Morgana，Loyal Servant 与 Minion 暂留占位，游戏圆桌仍使用既有方形角色头像。
 - 系统通知统一使用最多三条的顶部 Toast；主页不提供通知历史入口。房间 Header 提供无未读徽标的操作日志，记录当前客户端观察到的公开加入/退出，以及开局、提案、结算投票、匿名任务结果、刺杀和胜负。
 - Web 主页和个人设备圆桌等待大厅已完成响应式重设计；大厅以当前玩家为底部锚点，在所有宽度采用同一套圆形座位 DOM。房主开局进入桌面中央，退出/解散进入顶部房间菜单；健康连接不显示状态，连续断线 8 秒后才在顶部提供手动重连。房间页在最低 320×568 竖屏与 568×320 横屏内按宽高可用空间缩放，不产生页面滚动。
 - 等待大厅支持玩家凭据授权的主动离座：普通玩家只释放自己的座位，房主解散整个房间；游戏开始后拒绝这两类操作，返回主页仍是保留座位的无损导航。
@@ -164,6 +165,10 @@
 ## 当前验证基线
 
 最近一次验证日期：2026-09-01
+
+2026-09-01 帮助说明角色图片接入验证：角色说明为 Merlin、Percival、Assassin、Morgana 渲染三档 WebP `srcset`，浏览器根据 `sizes` 和显示密度原生选择资源；Loyal Servant 与 Minion 继续显示原占位，不使用不对应的 Mordred 或 Oberon 素材。应用内浏览器在 1280×720、DPR 2 下实际选择 674w，在 390×844、DPR 1 下实际选择 320w；移动端仅固定图片宽度并使用固有宽高自动计算高度，三张常规图片实测显示比例为 0.6667，Assassin 为 0.6413，均与文件比例一致，`sm` 以上继续保留当前 4:3 容器。六张角色卡均未越出视口，页面无横向溢出且控制台无 error/warning。Web 240 tests、Web build、lint 均 exit 0；build 保留单个 556.66 kB minified / 167.46 kB gzip JavaScript chunk 建议性警告。本次未运行完整 Playwright、真实 LAN 或 PostgreSQL 验收。
+
+2026-09-01 角色立绘转换流程验证：Assassin、Merlin、Mordred、Morgana、Oberon、Percival 六个正式 PNG 母版已归档到 `images/source/roles/`；Assassin 的保留母版命名为 `_Assassin(Original).png`。显式 `pnpm --filter @avalon/web images:roles` 命令使用 Web 包的 Sharp 开发依赖为六个角色生成三档 WebP；Assassin 为 320×499、480×748、674×1051，其余角色为 320×480、480×719、674×1010，全部为 sRGB，五个含 Alpha 的源文件均保留 Alpha；Assassin 源文件本身不含 Alpha。转换脚本默认扫描和显式指定均排除下划线开头的母版，未生成 `assassin-original-*`。指定不存在的角色以 exit 1 汇总报告。Web 239 tests、Web build、lint 均 exit 0；build 保留既有单个 555.89 kB minified / 167.20 kB gzip JavaScript chunk 建议性警告。本次未修改图片消费 UI、未运行 Playwright，也未执行真实 LAN 或 PostgreSQL 验收。
 
 2026-09-01 游戏与角色帮助验证：主页 Header 在移动端显示 44×44 问号图标、`sm` 及以上显示文字“帮助说明”，等待大厅与游戏页 Header 使用图标入口；统一弹窗默认打开游戏基础规则，包含阵营目标、回合流程、关键规则和 5–10 人配置，房间入口会传入并标出当前人数。角色说明覆盖当前六个角色；创建配置的帕西维尔/莫甘娜问号提供 hover/focus 提示，点击或触摸直接进入角色 Tab，将两张相关角色卡前置并以约 1.6 秒两次平缓脉冲引导视线，随后回归普通边框，减少动态效果偏好下不播放。创建配置开关已移除重复的候选人说明，checkbox、标题和帮助问号收为同一行并垂直居中。移动端每个角色使用横向列表项，左侧 88×112 空白素材位、右侧完整说明；桌面继续使用三列纵向卡片和 4:3 空白素材位，没有使用或扩展现有头像。弹窗使用语义化 Tab、方向键/Home/End 切换、Escape 关闭及触发按钮焦点恢复；320×568 下四边至少保留 16px。应用内浏览器人工复核桌面基础规则、上下文角色说明和 320px/390px/429px 主页、创建弹窗与角色列表；429×741 下三个角色配置控件中心线均为 438.5px，且配置行不再出现重复说明。确认角色顺序为 Percival、Morgana、Merlin、Loyal Servant、Assassin、Minion，390px 下素材位为 88×112 且位于名称左侧，角色说明中 `img` 数量为 0，页面无横向溢出且控制台无 error。Web 239 tests、Web build、lint 和 workspace typecheck 通过；帮助与响应式 Playwright 7 passed。Web build 仍有单个 555.89 kB minified JavaScript chunk 超过 500 kB 的建议性警告，Playwright 仅出现既有 `NO_COLOR`/`FORCE_COLOR` Node 警告。
 
