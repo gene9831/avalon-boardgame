@@ -2,9 +2,23 @@ export type PlayerID = string
 
 export type Role =
   | 'merlin'
+  | 'percival'
   | 'assassin'
+  | 'morgana'
   | 'loyal_servant'
   | 'minion'
+
+export interface AvalonRoleConfiguration {
+  percivalMorgana: boolean
+}
+
+export const DEFAULT_ROLE_CONFIGURATION: Readonly<AvalonRoleConfiguration> = {
+  percivalMorgana: true,
+}
+
+export const LEGACY_ROLE_CONFIGURATION: Readonly<AvalonRoleConfiguration> = {
+  percivalMorgana: false,
+}
 
 export type Loyalty = 'good' | 'evil'
 
@@ -14,6 +28,7 @@ export type IdentityRecognitionStep =
   | 'roleReveal'
   | 'evilRecognition'
   | 'merlinRecognition'
+  | 'percivalRecognition'
 
 export interface IdentityRecognitionState {
   step: IdentityRecognitionStep
@@ -80,8 +95,15 @@ export interface AvalonSecret {
   pendingQuestCards: Partial<Record<PlayerID, QuestCard>>
 }
 
+export interface AvalonLobbyState {
+  authorityVersion: 1
+  ownerPlayerID: PlayerID
+  occupiedPlayerIDs: PlayerID[]
+}
+
 export interface AvalonG {
   status: 'lobby' | 'playing' | 'finished'
+  lobby: AvalonLobbyState
   players: Record<PlayerID, PlayerInfo>
   secret: AvalonSecret
   identityRecognition: IdentityRecognitionState | null
@@ -94,6 +116,7 @@ export interface AvalonG {
   goodSuccesses: number
   evilFailures: number
   rules: {
+    roleConfiguration: AvalonRoleConfiguration
     timeouts: TimeoutConfig
   }
   result?: AvalonResult
@@ -101,13 +124,23 @@ export interface AvalonG {
 
 export interface AvalonSetupData {
   players?: Record<PlayerID, PlayerInfo>
+  ownerPlayerID?: PlayerID
+  occupiedPlayerIDs?: PlayerID[]
+  roleConfiguration?: AvalonRoleConfiguration
   timeouts?: TimeoutConfig
+}
+
+export function normalizeRoleConfiguration(
+  value: AvalonRoleConfiguration | undefined,
+): AvalonRoleConfiguration {
+  return value === undefined ? { ...LEGACY_ROLE_CONFIGURATION } : { percivalMorgana: value.percivalMorgana }
 }
 
 export interface AvalonViewer {
   role: Role | null
   loyalty: Loyalty | null
   knownEvilPlayerIDs: PlayerID[]
+  knownMerlinCandidatePlayerIDs: PlayerID[]
   knownEvilRoles?: never
   identityRecognition?: {
     isParticipant: boolean

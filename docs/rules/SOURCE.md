@@ -26,6 +26,7 @@ PDF 是 8 页扫描版原版规则书，项目同时保留原始 PDF 和本目�
 - Minion of Mordred
 - Merlin
 - Assassin
+- Percival（创建新房间时与 Morgana 成对默认启用）
+- Morgana（创建新房间时与 Percival 成对默认启用）
 
-首版暂不启用：Percival、Morgana、Mordred、Oberon、Lady of the Lake、Targeting、Plot & Loyalty Cards。
-
+首版暂不启用：Mordred、Oberon、Lady of the Lake、Targeting、Plot & Loyalty Cards。

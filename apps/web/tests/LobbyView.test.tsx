@@ -15,6 +15,10 @@ const currentSession: RoomSession = {
 const currentRoom = {
   matchID: 'room-current',
   status: 'playing' as const,
+  authorityVersion: 1 as const,
+  ownerPlayerID: '0',
+  occupiedPlayerIDs: ['0', '1', '2', '3', '4'],
+  roleConfiguration: { percivalMorgana: true },
   createdAt: 1,
   updatedAt: 3,
   players: [
@@ -29,6 +33,10 @@ const currentRoom = {
 const openRoom = {
   matchID: 'room-open',
   status: 'lobby' as const,
+  authorityVersion: 1 as const,
+  ownerPlayerID: '0',
+  occupiedPlayerIDs: ['0'],
+  roleConfiguration: { percivalMorgana: true },
   createdAt: 2,
   updatedAt: 2,
   players: [
@@ -40,9 +48,26 @@ const openRoom = {
   ],
 }
 
+const fullRoom = {
+  ...openRoom,
+  matchID: 'room-full',
+  occupiedPlayerIDs: ['0', '1', '2', '3', '4'],
+  players: currentRoom.players,
+}
+
+const ownerlessLegacyRoom = {
+  ...openRoom,
+  matchID: 'room-ownerless',
+  ownerPlayerID: null,
+}
+
 const finishedRoom = {
   matchID: 'room-finished',
   status: 'finished' as const,
+  authorityVersion: 1 as const,
+  ownerPlayerID: '0',
+  occupiedPlayerIDs: ['0'],
+  roleConfiguration: { percivalMorgana: true },
   createdAt: 3,
   updatedAt: 4,
   players: [
@@ -67,14 +92,13 @@ function renderLobby(overrides: Partial<LobbyViewProps> = {}) {
     onDevTokenChange: vi.fn(),
     onEnterRoom: vi.fn(),
     onJoin: vi.fn(),
+    onOpenHelp: vi.fn(),
     onRefresh: vi.fn(),
     onSaveProfile: vi.fn(),
     profile: { avatarID: 'merlin', name: '银月骑士' },
     roomAccessLocked: false,
     roomAccessPending: false,
     roomAccessUnavailable: false,
-    selectedSeats: {},
-    setSelectedSeats: vi.fn(),
     ...overrides,
   }
 
@@ -105,6 +129,7 @@ describe('LobbyView room access', () => {
   it('shows the browser profile in the header and defers configuration to the create dialog', () => {
     const html = renderLobby()
 
+    expect(html).toContain('>帮助说明<')
     expect(html).toContain('打开用户中心')
     expect(html).toContain('银月骑士')
     expect(html).toContain('>创建房间<')
@@ -122,7 +147,7 @@ describe('LobbyView room access', () => {
 
     expect(html).toContain('>继续游戏<')
     expect(html).toContain('data-profile-locked="true"')
-    expect(html).not.toContain('>加入<')
+    expect(html).not.toContain('>加入游戏<')
     expect(html).not.toContain('最近的房间')
   })
 
@@ -134,7 +159,7 @@ describe('LobbyView room access', () => {
     })
 
     expect(html).toContain('请先完成当前房间')
-    expect(html).not.toContain('>加入<')
+    expect(html).not.toContain('>加入游戏<')
     expect(html).not.toContain('aria-label="选择 room-open 的座位"')
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>创建房间<\/button>/)
     expect(html.indexOf('房间 room-current')).toBeLessThan(html.indexOf('房间 room-open'))
@@ -149,7 +174,7 @@ describe('LobbyView room access', () => {
 
     expect(html).toContain('正在确认房间状态')
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>创建房间<\/button>/)
-    expect(html).not.toContain('>加入<')
+    expect(html).not.toContain('>加入游戏<')
     expect(html).not.toContain('aria-label="选择 room-open 的座位"')
   })
 
@@ -162,6 +187,28 @@ describe('LobbyView room access', () => {
 
     expect(html).toContain('暂时无法确认房间状态')
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>创建房间<\/button>/)
-    expect(html).not.toContain('>加入<')
+    expect(html).not.toContain('>加入游戏<')
+  })
+
+  it('offers one join action and no seat selector', () => {
+    const html = renderLobby({ matches: [openRoom] })
+
+    expect(html).toContain('>加入游戏<')
+    expect(html).not.toContain('选择 room-open 的座位')
+    expect(html).not.toContain('<select')
+  })
+
+  it('shows the approved full-room copy without offering a join action', () => {
+    const html = renderLobby({ matches: [fullRoom] })
+
+    expect(html).toContain('>已满<')
+    expect(html).not.toContain('>加入游戏<')
+  })
+
+  it('does not offer joining an ownerless legacy room', () => {
+    const html = renderLobby({ matches: [ownerlessLegacyRoom] })
+
+    expect(html).toContain('房间 room-ownerless')
+    expect(html).not.toContain('>加入游戏<')
   })
 })

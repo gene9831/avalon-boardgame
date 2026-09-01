@@ -1,14 +1,25 @@
 import { Client } from 'boardgame.io/client'
 import { describe, expect, it } from 'vitest'
 
-import { AvalonGame } from '../src/game'
+import { createAvalonGame } from '../src/game'
 import { getAvalonPlayerView } from '../src/player-view'
 import { loyaltyForRole } from '../src/roles'
 import type { AvalonG, PlayerID, TeamVote } from '../src/types'
 
 function createStartedClient(numPlayers = 5) {
+  const game = createAvalonGame()
   const client = Client({
-    game: AvalonGame,
+    game: {
+      ...game,
+      setup: (context) => game.setup?.(context, {
+        ownerPlayerID: '0',
+        occupiedPlayerIDs: Array.from(
+          { length: numPlayers },
+          (_, index) => String(index),
+        ),
+        roleConfiguration: { percivalMorgana: false },
+      }) as AvalonG,
+    },
     numPlayers,
     playerID: '0',
     credentials: 'test-credentials',

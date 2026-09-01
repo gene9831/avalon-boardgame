@@ -1,5 +1,12 @@
 import { z } from 'zod'
 
+import {
+  AvalonMatchIDSchema,
+  AvalonRoleConfigurationSchema,
+  AvalonSeatIDSchema,
+  getAvalonRoomAuthorityIssue,
+} from './room-api'
+
 export const AvalonRoomStatusSchema = z.enum([
   'lobby',
   'playing',
@@ -13,12 +20,29 @@ export const AvalonRoomPlayerSummarySchema = z.object({
 })
 
 export const AvalonRoomSummarySchema = z.object({
-  matchID: z.string().min(1),
+  matchID: AvalonMatchIDSchema,
   status: AvalonRoomStatusSchema,
   players: z.array(AvalonRoomPlayerSummarySchema),
+  authorityVersion: z.literal(1),
+  ownerPlayerID: AvalonSeatIDSchema.nullable(),
+  occupiedPlayerIDs: z.array(AvalonSeatIDSchema),
+  roleConfiguration: AvalonRoleConfigurationSchema,
   createdAt: z.number().finite().nonnegative(),
   updatedAt: z.number().finite().nonnegative(),
 }).superRefine((room, context) => {
+  const authorityIssue = getAvalonRoomAuthorityIssue(
+    room,
+    room.status === 'lobby',
+  )
+
+  if (authorityIssue !== null) {
+    context.addIssue({
+      code: 'custom',
+      message: authorityIssue,
+      path: ['ownerPlayerID'],
+    })
+  }
+
   const playerIDs = new Set<number>()
 
   room.players.forEach((player, index) => {

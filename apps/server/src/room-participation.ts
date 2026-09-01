@@ -1,128 +1,120 @@
-import { randomUUID } from 'node:crypto'
+import { koaBody } from 'koa-body'
 
-import type { Server, State, StorageAPI } from 'boardgame.io'
+import {
+  AvalonMatchIDSchema,
+  AvalonSeatChangeRequestSchema,
+  AvalonSeatIDSchema,
+} from '@avalon/game'
 
-import { AvalonSocketRegistry } from './dev-admin'
-import { secretMatches } from './secret'
+import { respondWithRequestFailure } from './http-boundary'
+import {
+  AvalonLobbyError,
+  type RoomLobbyService,
+} from './room-lobby'
 import { readBearerCredential } from './session-validation'
-import type { MatchDeletionGuard } from './storage/deletion-safe'
-
-type MatchQueue = { add<T>(task: () => Promise<T>): Promise<T> }
 
 type RouteContext = {
+  body?: unknown
   params: Record<string, string>
+  request: { body?: unknown }
   status: number
   get(name: string): string
-  throw(status: number, message?: string): never
 }
+
+type RouteHandler = (ctx: RouteContext) => Promise<void>
+type Next = () => Promise<unknown>
+type RouteMiddleware = (ctx: RouteContext, next: Next) => Promise<void>
 
 interface RoomParticipationContext {
-  db: StorageAPI.Sync | StorageAPI.Async
-  forceUpdateMetadata(
-    matchID: string,
-    update: (metadata: Server.MatchData) => void,
-  ): Server.MatchData | undefined | Promise<Server.MatchData | undefined>
-  deletionGuard: MatchDeletionGuard
-  registry: AvalonSocketRegistry
-  queues: { getMatchQueue(matchID: string): MatchQueue }
+  lobby: RoomLobbyService
 }
 
-async function fetchMatch(db: StorageAPI.Sync | StorageAPI.Async, matchID: string) {
-  return (db as StorageAPI.Async).fetch(matchID, { metadata: true, state: true })
+const parseJSONBody = koaBody({
+  formLimit: '16kb',
+  jsonLimit: '16kb',
+  multipart: false,
+  text: false,
+  textLimit: '16kb',
+  urlencoded: false,
+}) as unknown as RouteMiddleware
+
+function invalidRequest() {
+  return new AvalonLobbyError(400, 'invalid_request', 'Invalid Avalon request')
 }
 
-function getCredential(ctx: RouteContext) {
+function validatedPath(ctx: RouteContext) {
+  const matchID = AvalonMatchIDSchema.safeParse(ctx.params.matchID)
+  const playerID = AvalonSeatIDSchema.safeParse(ctx.params.playerID)
+  if (!matchID.success || !playerID.success) throw invalidRequest()
+  return { matchID: matchID.data, playerID: playerID.data }
+}
+
+function credential(ctx: RouteContext) {
   return readBearerCredential(ctx.get('authorization'))
 }
 
-function normalizePlayerID(ctx: RouteContext, playerID: string) {
-  const numericPlayerID = Number(playerID)
-  if (!Number.isInteger(numericPlayerID) || numericPlayerID < 0) ctx.throw(403)
-  return String(numericPlayerID)
-}
-
-function getPlayer(
-  metadata: Server.MatchData,
-  playerID: string,
-) {
-  const numericPlayerID = Number(playerID)
-  return Number.isInteger(numericPlayerID)
-    ? metadata.players[numericPlayerID]
-    : undefined
-}
-
-function authenticatePlayer(
+async function handle(
   ctx: RouteContext,
-  metadata: Server.MatchData,
-  playerID: string,
-  credential: string,
+  action: () => Promise<void>,
 ) {
-  const player = getPlayer(metadata, playerID)
-  if (
-    player === undefined ||
-    player.name === undefined ||
-    !secretMatches(credential, player.credentials)
-  ) {
-    ctx.throw(403)
+  try {
+    await action()
+  } catch (error) {
+    respondWithRequestFailure(ctx, error)
   }
-  return player
-}
-
-function requireWaitingRoom(ctx: RouteContext, state: State) {
-  if ((state.G as { status?: string }).status !== 'lobby') ctx.throw(409)
 }
 
 export function registerRoomParticipationRoutes(
   router: {
-    delete(path: string, handler: (ctx: RouteContext) => Promise<void>): void
+    delete(path: string, handler: RouteHandler): void
+    post?(path: string, ...middleware: RouteHandler[]): void
   },
   context: RoomParticipationContext,
 ) {
-  router.delete('/rooms/avalon/:matchID/players/:playerID', async (ctx) => {
-    const { matchID, playerID } = ctx.params
-    const normalizedPlayerID = normalizePlayerID(ctx, playerID)
-    const credential = getCredential(ctx)
+  router.post?.(
+    '/rooms/avalon/:matchID/players/:playerID/seat',
+    async (ctx) => handle(ctx, async () => {
+      await parseJSONBody(ctx, async () => undefined)
+      const { matchID, playerID } = validatedPath(ctx)
+      const parsed = AvalonSeatChangeRequestSchema.safeParse(ctx.request.body)
+      if (!parsed.success) throw invalidRequest()
+      ctx.body = await context.lobby.changeSeat(
+        matchID,
+        playerID,
+        credential(ctx),
+        parsed.data.targetPlayerID,
+      )
+      ctx.status = 200
+    }),
+  )
 
-    await context.queues.getMatchQueue(matchID).add(async () => {
-      const { metadata, state } = await fetchMatch(context.db, matchID)
-      if (metadata === undefined || state === undefined) ctx.throw(404)
-      requireWaitingRoom(ctx, state)
-      authenticatePlayer(ctx, metadata, normalizedPlayerID, credential)
-      if (normalizedPlayerID === '0') ctx.throw(409)
+  router.post?.(
+    '/rooms/avalon/:matchID/players/:playerID/prepare-start',
+    async (ctx) => handle(ctx, async () => {
+      const { matchID, playerID } = validatedPath(ctx)
+      await context.lobby.prepareStart(matchID, playerID, credential(ctx))
+      ctx.status = 204
+    }),
+  )
 
-      const updatedMetadata = await context.forceUpdateMetadata(matchID, (currentMetadata) => {
-        const player = authenticatePlayer(ctx, currentMetadata, normalizedPlayerID, credential)
-        delete player.name
-        delete player.data
-        player.isConnected = false
-        player.credentials = randomUUID()
-      })
-      if (updatedMetadata === undefined) ctx.throw(404)
-      context.registry.disconnectPlayer(matchID, normalizedPlayerID)
-    })
+  router.delete('/rooms/avalon/:matchID/players/:playerID', async (ctx) =>
+    handle(ctx, async () => {
+      const { matchID, playerID } = validatedPath(ctx)
+      await context.lobby.leaveRoom(matchID, playerID, credential(ctx))
+      ctx.status = 204
+    }),
+  )
 
-    ctx.status = 204
-  })
-
-  router.delete('/rooms/avalon/:matchID', async (ctx) => {
-    const { matchID } = ctx.params
-    const credential = getCredential(ctx)
-
-    await context.queues.getMatchQueue(matchID).add(async () => {
-      const { metadata, state } = await fetchMatch(context.db, matchID)
-      if (metadata === undefined || state === undefined) ctx.throw(404)
-      requireWaitingRoom(ctx, state)
-      authenticatePlayer(ctx, metadata, '0', credential)
-
-      context.deletionGuard.markMatchDeleted(matchID)
-      context.registry.disconnectMatch(matchID)
-      try {
-        await context.db.wipe(matchID)
-      } catch (error) {
-        if (!String(error).toLowerCase().includes('not found')) throw error
-      }
-    })
-
-    ctx.status = 204
-  })
+  router.delete('/rooms/avalon/:matchID', async (ctx) =>
+    handle(ctx, async () => {
+      const matchID = AvalonMatchIDSchema.safeParse(ctx.params.matchID)
+      if (!matchID.success) throw invalidRequest()
+      await context.lobby.dissolveRoom(
+        matchID.data,
+        '',
+        credential(ctx),
+      )
+      ctx.status = 204
+    }),
+  )
 }

@@ -62,6 +62,16 @@ describe('identity recognition server recovery', () => {
       playerID: '0',
       playerName: 'Alice',
     })
+    await Promise.all(
+      Array.from({ length: 4 }, (_, index) => lobby.joinMatch(
+        'avalon',
+        matchID,
+        {
+          playerID: String(index + 1),
+          playerName: `Player ${index + 2}`,
+        },
+      )),
+    )
     let client = Client({
       game: AvalonGame,
       numPlayers: 5,

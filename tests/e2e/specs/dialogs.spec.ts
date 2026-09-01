@@ -27,6 +27,18 @@ test('business dialogs remain centered within a narrow viewport', async ({ page 
   await page.setViewportSize({ width: 320, height: 568 })
   await page.goto('/')
 
+  const mobileHelpTrigger = page.getByRole('button', { name: '帮助说明' })
+  await expect(
+    mobileHelpTrigger.getByText('帮助说明', { exact: true }),
+  ).toBeHidden()
+  const mobileHelpTriggerBox = await mobileHelpTrigger.boundingBox()
+  expect(mobileHelpTriggerBox?.width).toBe(44)
+  expect(mobileHelpTriggerBox?.height).toBe(44)
+  await mobileHelpTrigger.click()
+  const helpDialog = page.getByRole('dialog', { name: '帮助说明' })
+  await expectCenteredWithinViewport(helpDialog)
+  await helpDialog.getByRole('button', { name: '关闭帮助说明' }).click()
+
   await page.getByRole('button', { name: '创建房间' }).click()
   const createGameDialog = page.getByRole('dialog', {
     name: '创建一局阿瓦隆',
@@ -84,4 +96,49 @@ test('user center and room log contain focus and restore it after closing', asyn
   await page.keyboard.press('Escape')
   await expect(roomLog).not.toBeVisible()
   await expect(logTrigger).toBeFocused()
+})
+
+test('help center supports contextual role guidance and keyboard dismissal', async ({
+  page,
+}) => {
+  await page.goto('/')
+
+  const generalTrigger = page.getByRole('button', { name: '帮助说明' })
+  await generalTrigger.click()
+  const help = page.getByRole('dialog', { name: '帮助说明' })
+  const rulesTab = help.getByRole('tab', { name: '游戏基础规则' })
+  const rolesTab = help.getByRole('tab', { name: '角色说明' })
+  await expect(rulesTab).toHaveAttribute('aria-selected', 'true')
+  await expect(rulesTab).toBeFocused()
+  await page.keyboard.press('ArrowRight')
+  await expect(rolesTab).toHaveAttribute('aria-selected', 'true')
+  await expect(rolesTab).toBeFocused()
+  await page.keyboard.press('ArrowLeft')
+  await expect(rulesTab).toHaveAttribute('aria-selected', 'true')
+  await page.keyboard.press('Escape')
+  await expect(generalTrigger).toBeFocused()
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByRole('button', { name: '创建房间' }).click()
+  await page.getByRole('button', {
+    name: '查看帕西维尔与莫甘娜的角色说明',
+  }).click()
+  await expect(
+    help.getByRole('tab', { name: '角色说明' }),
+  ).toHaveAttribute('aria-selected', 'true')
+  const cards = help.locator('[data-help-role]')
+  await expect(cards.nth(0)).toHaveAttribute('data-help-role', 'percival')
+  await expect(cards.nth(1)).toHaveAttribute('data-help-role', 'morgana')
+  await expect(help.locator('[data-role-artwork-placeholder]')).toHaveCount(6)
+
+  const percivalCard = cards.nth(0)
+  const artworkBox = await percivalCard
+    .locator('[data-role-artwork-placeholder]')
+    .boundingBox()
+  const roleNameBox = await percivalCard
+    .getByRole('heading', { name: '帕西维尔' })
+    .boundingBox()
+  expect(artworkBox).not.toBeNull()
+  expect(roleNameBox).not.toBeNull()
+  expect(artworkBox!.x + artworkBox!.width).toBeLessThan(roleNameBox!.x)
 })

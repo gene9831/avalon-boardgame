@@ -15,6 +15,19 @@ import {
 } from '../src/index'
 
 describe('Avalon replay support', () => {
+  it('constructs generated games with every authoritative lobby seat occupied', () => {
+    const driver = createAvalonRuleDriver({
+      masterSeed: 'full-lobby-replay',
+      playerCount: 5,
+    })
+
+    expect(driver.snapshot().G.lobby).toEqual({
+      authorityVersion: 1,
+      ownerPlayerID: '0',
+      occupiedPlayerIDs: ['0', '1', '2', '3', '4'],
+    })
+  })
+
   it('derives stable independent game and action seeds from one master seed', () => {
     expect(AVALON_RNG_ALGORITHM_VERSION).toBe(
       'boardgame.io-alea@0.50.2+avalon-rng-v1',

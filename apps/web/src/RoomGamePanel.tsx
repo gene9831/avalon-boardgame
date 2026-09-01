@@ -1,4 +1,4 @@
-import { BadgeCheck, CircleCheck, CircleX } from 'lucide-react'
+import { BadgeCheck, CircleCheck, CircleX, House } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type {
   AvalonPlayerView,
@@ -9,6 +9,7 @@ import type {
 } from '@avalon/game'
 
 import { ConnectionRecoveryControl } from './ConnectionRecoveryControl'
+import { HelpTrigger } from './HelpTrigger'
 import {
   GAME_CLIENT_SETTINGS_KEY,
   loadGameClientSettings,
@@ -44,6 +45,7 @@ interface RoomGamePanelProps {
   onBackHome: () => void
   onCastTeamVote: (vote: TeamVote) => void
   onConfirmIdentityRecognition: () => void
+  onOpenHelp: () => void
   onPlayQuestCard: (card: QuestCard) => void
   onProposeTeam: (team: PlayerID[]) => void
   onReconnect: () => void
@@ -52,6 +54,7 @@ interface RoomGamePanelProps {
   playerID: PlayerID
   players: readonly LobbyPlayer[]
   profile: PlayerProfile
+  ownerPlayerID: string | null
 }
 
 export function RoomGamePanel({
@@ -65,6 +68,7 @@ export function RoomGamePanel({
   onBackHome,
   onCastTeamVote,
   onConfirmIdentityRecognition,
+  onOpenHelp,
   onPlayQuestCard,
   onProposeTeam,
   onReconnect,
@@ -73,9 +77,10 @@ export function RoomGamePanel({
   playerID,
   players,
   profile,
+  ownerPlayerID,
 }: RoomGamePanelProps) {
   const playerIDs = Object.keys(game.players).sort((left, right) => Number(left) - Number(right))
-  const seats = buildRoundTableSeats(players, playerIDs.length, playerID)
+  const seats = buildRoundTableSeats(players, playerIDs.length, playerID, ownerPlayerID)
   const playerNames = Object.fromEntries(seats.map((seat) => [seat.playerID, seat.name]))
   const requiredTeamSize = getQuestTeamSize(playerIDs.length, game.questIndex)
   const displayedTeamVoteResult = getDisplayedTeamVoteResult(game, phase)
@@ -165,6 +170,7 @@ export function RoomGamePanel({
         </div>
         <div className="mr-12 flex shrink-0 items-center gap-2">
           <ConnectionRecoveryControl connected={connected} manualReconnectAvailable={manualReconnectAvailable} onReconnect={onReconnect} />
+          <HelpTrigger onOpen={onOpenHelp} variant="icon" />
           <RoomLogControl entries={logEntries} />
           <PlayerProfileControl locked onSave={onSaveProfile} profile={profile} />
         </div>
@@ -345,6 +351,9 @@ function GameSeat({ canSelect, canSelectAsTarget, dense, displayedTeamVoteResult
   const isLeader = game.leaderID === seat.playerID
   const onQuestTeam = game.proposedTeam?.includes(seat.playerID) === true
   const knownEvil = showKnownPlayerInfo && game.viewer.knownEvilPlayerIDs.includes(seat.playerID)
+  const knownMerlinCandidate = showKnownPlayerInfo &&
+    game.status !== 'finished' &&
+    (game.viewer.knownMerlinCandidatePlayerIDs ?? []).includes(seat.playerID)
   const revealedRole = game.revealedRoles?.[seat.playerID]
   const privateRole = showPrivateRoleKnowledge && seat.isCurrentPlayer
     ? game.viewer.role
@@ -383,6 +392,7 @@ function GameSeat({ canSelect, canSelectAsTarget, dense, displayedTeamVoteResult
     onQuestTeam ? '任务队员' : null,
     !seat.connected ? '已断线' : null,
     knownEvil ? '已知阵营信息：邪恶' : null,
+    knownMerlinCandidate ? 'Merlin 候选' : null,
     teamVoteStatusLabel,
   ].filter((status): status is string => status !== null)
   const seatLabel = [seatAction, ...seatStatuses].join('，')
@@ -397,12 +407,14 @@ function GameSeat({ canSelect, canSelectAsTarget, dense, displayedTeamVoteResult
           : undefined}
       className={`pointer-events-auto flex flex-col items-center border-0 bg-transparent p-0 text-center transition ${dense ? 'w-[clamp(3.1rem,14vw,6.5rem)]' : 'w-[clamp(4.2rem,17vw,8rem)]'} ${canSelect || canSelectAsTarget ? 'cursor-pointer hover:scale-105' : 'cursor-default'}`}
       data-round-table-player
+      data-player-id={seat.playerID}
       disabled={!canSelect && !canSelectAsTarget}
       onClick={onSelect}
       type="button"
     >
       <div className="relative">
         {isLeader && <CrownIcon />}
+        {seat.isOwner && <span aria-label="房间拥有者" className="seat-owner-badge absolute -left-1 -top-1 z-20 grid size-5 place-items-center rounded-full bg-amber-300 text-slate-950 shadow-lg"><House aria-hidden="true" className="size-3" /></span>}
         <div
           className={`${dense ? 'size-[clamp(2.5rem,9.5vw,4.5rem)]' : 'size-[clamp(3rem,12vw,5.5rem)]'} relative grid shrink-0 place-items-center overflow-hidden rounded-full border-2 text-[clamp(0.9rem,4vw,1.8rem)] font-semibold transition ${avatarClasses} ${!seat.connected ? 'grayscale opacity-45' : ''}`}
           data-round-table-avatar
@@ -413,6 +425,7 @@ function GameSeat({ canSelect, canSelectAsTarget, dense, displayedTeamVoteResult
             : <RoleAvatar className="size-full object-cover" role={avatarRole} />}
         </div>
         {knownEvil && <KnownEvilEmblem />}
+        {knownMerlinCandidate && <MerlinCandidateBadge />}
       </div>
       <div className="round-table-label-stack mt-1 flex w-full flex-col items-stretch" data-label-placement={seat.labelPlacement}>
         <div className="relative w-full" data-round-table-label-anchor>
@@ -490,6 +503,14 @@ function KnownEvilEmblem() {
         <path d="M12 3l8 4v5c0 4.8-3.3 8-8 9-4.7-1-8-4.2-8-9V7l8-4z" fill="currentColor" />
         <path d="M8 10l2.2 1.4L8.8 14M16 10l-2.2 1.4 1.4 2.6" fill="none" stroke="#4c0519" strokeLinecap="round" strokeWidth="1.5" />
       </svg>
+    </span>
+  )
+}
+
+function MerlinCandidateBadge() {
+  return (
+    <span aria-label="Merlin 候选" className="knowledge-badge knowledge-badge--merlin-candidate">
+      <span aria-hidden="true">?</span>
     </span>
   )
 }

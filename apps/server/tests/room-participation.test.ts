@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import type { Server, State, StorageAPI } from 'boardgame.io'
+import type { State } from 'boardgame.io'
 
-import { AvalonSocketRegistry } from '../src/dev-admin'
-import { registerRoomParticipationRoutes } from '../src/room-participation'
 import { startAvalonServer } from '../src/server'
-import { createDeletionSafeStorage } from '../src/storage/deletion-safe'
 import { MemoryStorage } from '../src/storage/memory'
 import { AvalonTestLobbyClient as LobbyClient } from './support/lobby-client'
 
@@ -47,79 +44,6 @@ function dissolveRoom(
   })
 }
 
-function createLobbyState(): State {
-  return {
-    G: { status: 'lobby' },
-    ctx: {
-      numPlayers: 5,
-      playOrder: ['0', '1', '2', '3', '4'],
-      playOrderPos: 0,
-      activePlayers: null,
-      currentPlayer: '0',
-      turn: 0,
-      phase: 'lobby',
-    },
-    plugins: {},
-    _undo: [],
-    _redo: [],
-    _stateID: 0,
-  }
-}
-
-function createLobbyMetadata(): Server.MatchData {
-  return {
-    gameName: 'avalon',
-    players: {
-      0: { id: 0, name: 'Alice', credentials: 'host-credential' },
-      1: { id: 1, name: 'Bob', credentials: 'guest-credential' },
-    },
-    createdAt: 100,
-    updatedAt: 100,
-  }
-}
-
-function createDelayedMetadataStorage() {
-  const storage = new MemoryStorage()
-  const pendingWrites: Array<() => void> = []
-  let deferNextWrite = false
-  const asyncStorage: StorageAPI.Async = {
-    type: () => 1,
-    connect: async () => storage.connect(),
-    createMatch: async (matchID, opts) => storage.createMatch(matchID, opts),
-    setState: async (matchID, state, deltalog) => storage.setState(matchID, state, deltalog),
-    setMetadata: async (matchID, metadata) => {
-      if (!deferNextWrite) {
-        storage.setMetadata(matchID, metadata)
-        return
-      }
-      deferNextWrite = false
-      await new Promise<void>((resolve) => {
-        pendingWrites.push(() => {
-          storage.setMetadata(matchID, metadata)
-          resolve()
-        })
-      })
-    },
-    fetch: async (matchID, opts) => storage.fetch(matchID, opts),
-    wipe: async (matchID) => storage.wipe(matchID),
-    listMatches: async (opts) => storage.listMatches(opts),
-  }
-  return {
-    storage: asyncStorage,
-    deferNextWrite() {
-      deferNextWrite = true
-    },
-    get pendingWrites() {
-      return pendingWrites.length
-    },
-    releaseNextWrite() {
-      const release = pendingWrites.shift()
-      if (release === undefined) throw new Error('no deferred metadata write')
-      release()
-    },
-  }
-}
-
 describe('room participation APIs', () => {
   it('releases a non-host lobby seat and invalidates its credential', async () => {
     const running = await startAvalonServer({ config, db: new MemoryStorage() })
@@ -146,7 +70,6 @@ describe('room participation APIs', () => {
       const room = await lobby.getMatch('avalon', matchID)
       expect(room.players.find(({ id }) => id === 1)).toMatchObject({
         id: 1,
-        isConnected: false,
       })
       expect(room.players.find(({ id }) => id === 1)?.name).toBeUndefined()
 
@@ -243,7 +166,7 @@ describe('room participation APIs', () => {
         matchID,
         '00',
         host.playerCredentials,
-      )).status).toBe(409)
+      )).status).toBe(400)
       expect((await lobby.getMatch('avalon', matchID)).players[0].name).toBe('Alice')
     } finally {
       await running.close()
@@ -292,66 +215,4 @@ describe('room participation APIs', () => {
     }
   })
 
-  it('persists a seat release after an older metadata write settles', async () => {
-    const delayed = createDelayedMetadataStorage()
-    const guarded = createDeletionSafeStorage(delayed.storage)
-    await guarded.storage.createMatch('room-1', {
-      initialState: createLobbyState(),
-      metadata: createLobbyMetadata(),
-    })
-
-    const staleMetadata = (await guarded.storage.fetch('room-1', { metadata: true })).metadata!
-    staleMetadata.players[1].isConnected = true
-    delayed.deferNextWrite()
-    const oldWrite = guarded.storage.setMetadata('room-1', staleMetadata)
-    await Promise.resolve()
-    expect(delayed.pendingWrites).toBe(1)
-
-    type TestContext = {
-      params: Record<string, string>
-      status: number
-      get(name: string): string
-      throw(status: number, message?: string): never
-    }
-    const handlers = new Map<string, (ctx: TestContext) => Promise<void>>()
-    registerRoomParticipationRoutes(
-      {
-        delete: (path, handler) => handlers.set(
-          path,
-          handler as (ctx: TestContext) => Promise<void>,
-        ),
-      },
-      {
-        db: guarded.storage,
-        forceUpdateMetadata: guarded.forceUpdateMetadata,
-        deletionGuard: guarded.deletionGuard,
-        registry: new AvalonSocketRegistry(),
-        queues: { getMatchQueue: () => ({ add: async (task) => task() }) },
-      },
-    )
-    const leave = handlers.get('/rooms/avalon/:matchID/players/:playerID')
-    if (leave === undefined) throw new Error('leave route was not registered')
-    const context: TestContext = {
-      params: { matchID: 'room-1', playerID: '1' },
-      status: 200,
-      get: (name) => name === 'authorization' ? 'Bearer guest-credential' : '',
-      throw: (status, message) => {
-        throw new Error(`HTTP ${status}: ${message ?? ''}`)
-      },
-    }
-
-    const leaveRequest = leave(context)
-    await Promise.resolve()
-    expect(delayed.pendingWrites).toBe(1)
-
-    delayed.releaseNextWrite()
-    await expect(oldWrite).resolves.toBeUndefined()
-    await expect(leaveRequest).resolves.toBeUndefined()
-    expect(context.status).toBe(204)
-
-    const persisted = (await guarded.storage.fetch('room-1', { metadata: true })).metadata!
-    expect(persisted.players[1].name).toBeUndefined()
-    expect(persisted.players[1].credentials).not.toBe('guest-credential')
-    expect(persisted.players[1].isConnected).toBe(false)
-  })
 })

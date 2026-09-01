@@ -1,22 +1,37 @@
 import { getPlayerCountConfig } from './config'
-import type { Loyalty, PlayerID, Role } from './types'
+import {
+  type AvalonRoleConfiguration,
+  type Loyalty,
+  type PlayerID,
+  type Role,
+  LEGACY_ROLE_CONFIGURATION,
+} from './types'
 
 export function loyaltyForRole(role: Role): Loyalty {
-  return role === 'assassin' || role === 'minion' ? 'evil' : 'good'
+  return role === 'assassin' || role === 'morgana' || role === 'minion' ? 'evil' : 'good'
 }
 
-export function buildRoleDeck(playerCount: number): Role[] {
+export function buildRoleDeck(
+  playerCount: number,
+  roleConfiguration: AvalonRoleConfiguration = LEGACY_ROLE_CONFIGURATION,
+): Role[] {
   const config = getPlayerCountConfig(playerCount)
-  const roles: Role[] = ['merlin', 'assassin']
+  const goodRoles: Role[] = ['merlin']
+  const evilRoles: Role[] = ['assassin']
 
-  roles.push(
-    ...Array.from({ length: config.good - 1 }, () => 'loyal_servant' as const),
+  if (roleConfiguration.percivalMorgana) {
+    goodRoles.push('percival')
+    evilRoles.push('morgana')
+  }
+
+  goodRoles.push(
+    ...Array.from({ length: config.good - goodRoles.length }, () => 'loyal_servant' as const),
   )
-  roles.push(
-    ...Array.from({ length: config.evil - 1 }, () => 'minion' as const),
+  evilRoles.push(
+    ...Array.from({ length: config.evil - evilRoles.length }, () => 'minion' as const),
   )
 
-  return roles
+  return [...goodRoles, ...evilRoles]
 }
 
 export function assignRoles(

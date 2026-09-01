@@ -1,6 +1,9 @@
+import { DEFAULT_ROLE_CONFIGURATION, type AvalonRoleConfiguration } from '@avalon/game'
+
 import type { RoomSessionStorage } from './room-session'
 
 const CREATE_PLAYER_COUNT_KEY = 'avalon:create-player-count'
+const CREATE_ROLE_CONFIGURATION_KEY = 'avalon:create-role-configuration'
 const SUPPORTED_PLAYER_COUNTS = new Set([5, 6, 7, 8, 9, 10])
 
 function browserStorage(): RoomSessionStorage {
@@ -30,4 +33,27 @@ export function savePreferredPlayerCount(
   }
   storage.setItem(CREATE_PLAYER_COUNT_KEY, String(numPlayers))
   return numPlayers
+}
+
+export function loadPreferredRoleConfiguration(
+  storage: RoomSessionStorage = browserStorage(),
+): AvalonRoleConfiguration {
+  try {
+    const value: unknown = JSON.parse(storage.getItem(CREATE_ROLE_CONFIGURATION_KEY) ?? '')
+    if (typeof value === 'object' && value !== null && typeof (value as { percivalMorgana?: unknown }).percivalMorgana === 'boolean') {
+      return { percivalMorgana: (value as { percivalMorgana: boolean }).percivalMorgana }
+    }
+  } catch {
+    // Use the current new-room default for missing or malformed local preference.
+  }
+  return { ...DEFAULT_ROLE_CONFIGURATION }
+}
+
+export function savePreferredRoleConfiguration(
+  roleConfiguration: AvalonRoleConfiguration,
+  storage: RoomSessionStorage = browserStorage(),
+) {
+  const next = { percivalMorgana: roleConfiguration.percivalMorgana }
+  storage.setItem(CREATE_ROLE_CONFIGURATION_KEY, JSON.stringify(next))
+  return next
 }

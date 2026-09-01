@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 
 import {
   loadPreferredPlayerCount,
+  loadPreferredRoleConfiguration,
   savePreferredPlayerCount,
+  savePreferredRoleConfiguration,
 } from '../src/create-game-preference'
 import type { RoomSessionStorage } from '../src/room-session'
 
@@ -28,5 +30,13 @@ describe('create game preference', () => {
 
     expect(savePreferredPlayerCount(10, storage)).toBe(10)
     expect(loadPreferredPlayerCount(storage)).toBe(10)
+  })
+
+  it('defaults the paired roles on and persists only the future-create preference', () => {
+    const storage = createStorage()
+
+    expect(loadPreferredRoleConfiguration(storage)).toEqual({ percivalMorgana: true })
+    expect(savePreferredRoleConfiguration({ percivalMorgana: false }, storage)).toEqual({ percivalMorgana: false })
+    expect(loadPreferredRoleConfiguration(storage)).toEqual({ percivalMorgana: false })
   })
 })

@@ -15,3 +15,9 @@ export function getRoomAccessValidationError(validationFailed: boolean) {
     ? '暂时无法确认部分房间状态，请刷新房间列表后重试。'
     : null
 }
+
+export function getSeatTransitionRecoveryError(
+  status: 'invalid' | 'source' | 'target',
+) {
+  return status === 'invalid' ? '当前座位会话已失效。' : null
+}

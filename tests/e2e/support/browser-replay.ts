@@ -2,6 +2,16 @@ import { expect, type Browser, type BrowserContext, type Page } from '@playwrigh
 
 import type { AvalonCommand, ReplayDriver } from '@avalon/test-support'
 
+interface BrowserRoleConfiguration {
+  percivalMorgana: boolean
+}
+
+export type BrowserRecognitionStep =
+  | 'roleReveal'
+  | 'evilRecognition'
+  | 'merlinRecognition'
+  | 'percivalRecognition'
+
 export interface BrowserReplaySnapshot {
   resultHeadings: string[]
   urls: string[]
@@ -29,6 +39,7 @@ export async function createRoom(
   page: Page,
   playerCount: number,
   name = playerName('0'),
+  roleConfiguration: BrowserRoleConfiguration = { percivalMorgana: false },
 ) {
   await page.goto('/')
   await setPlayerProfileName(page, name)
@@ -37,6 +48,12 @@ export async function createRoom(
   await createButton.click()
   const createDialog = page.getByRole('dialog', { name: '创建一局阿瓦隆' })
   await createDialog.getByRole('button', { name: String(playerCount), exact: true }).click()
+  const pairedRoleSwitch = createDialog.getByRole('switch', {
+    name: /帕西维尔与莫甘娜/,
+  })
+  if (await pairedRoleSwitch.isChecked() !== roleConfiguration.percivalMorgana) {
+    await pairedRoleSwitch.click()
+  }
   await createDialog.getByRole('button', { name: '创建房间' }).click()
   await expect(page).toHaveURL(/\/rooms\/[^/]+$/)
 
@@ -56,14 +73,54 @@ export async function joinRoom(
   const roomHeading = page.getByText(`房间 ${matchID}`, { exact: true })
   await expect(roomHeading).toBeVisible()
   const room = roomHeading.locator('xpath=ancestor::article')
-  await room.getByLabel(`选择 ${matchID} 的座位`).selectOption(playerID)
   await room.getByRole('button', { name: '加入' }).click()
   await expect(page).toHaveURL(new RegExp(`/rooms/${matchID}$`))
+}
+
+const RECOGNITION_CONFIRMATION_LABELS: Record<BrowserRecognitionStep, string> = {
+  roleReveal: '我已确认身份',
+  evilRecognition: '我已辨认同伴',
+  merlinRecognition: '我已辨认邪恶阵营',
+  percivalRecognition: '我已辨认梅林候选',
+}
+
+export async function confirmRecognitionParticipants(
+  pages: readonly Page[],
+  step: BrowserRecognitionStep,
+) {
+  const confirmationLabel = RECOGNITION_CONFIRMATION_LABELS[step]
+  const participants: { page: Page; playerID: string }[] = []
+
+  for (const [index, page] of pages.entries()) {
+    const layer = page.locator(`[data-identity-step="${step}"]`)
+    await expect(layer).toBeVisible()
+    const confirmation = layer.getByRole('button', {
+      exact: true,
+      name: confirmationLabel,
+    })
+    if (await confirmation.count() === 1) {
+      participants.push({ page, playerID: String(index) })
+    }
+  }
+
+  for (const { page } of participants) {
+    await page.getByRole('button', {
+      exact: true,
+      name: confirmationLabel,
+    }).click()
+    await expect(page.getByRole('button', {
+      exact: true,
+      name: confirmationLabel,
+    })).toHaveCount(0)
+  }
+
+  return participants.map(({ playerID }) => playerID)
 }
 
 export async function createBrowserReplayHarness(options: {
   browser: Browser
   playerCount: number
+  roleConfiguration?: BrowserRoleConfiguration
 }): Promise<BrowserReplayHarness> {
   const contexts: BrowserContext[] = []
 
@@ -72,7 +129,12 @@ export async function createBrowserReplayHarness(options: {
       contexts.push(await options.browser.newContext())
     }
     const pages = await Promise.all(contexts.map((context) => context.newPage()))
-    const matchID = await createRoom(pages[0], options.playerCount)
+    const matchID = await createRoom(
+      pages[0],
+      options.playerCount,
+      playerName('0'),
+      options.roleConfiguration,
+    )
     for (let index = 1; index < options.playerCount; index += 1) {
       await joinRoom(pages[index], matchID, String(index))
     }
@@ -98,7 +160,7 @@ export async function createBrowserReplayHarness(options: {
             return
           case 'confirmIdentityRecognition':
             const confirmationButton = page.getByRole('button', {
-              name: /^我已(确认身份|辨认同伴|辨认邪恶阵营)$/,
+              name: /^我已(确认身份|辨认同伴|辨认邪恶阵营|辨认梅林候选)$/,
             })
             const confirmationLabel = await confirmationButton.textContent()
             if (confirmationLabel === null) {

@@ -20,23 +20,32 @@ export {
   AvalonClientIDSchema,
   AvalonCreateRoomRequestSchema,
   AvalonJoinRoomRequestSchema,
+  AvalonRoleConfigurationSchema,
   AvalonMatchIDSchema,
   AvalonPlayerAvatarIDSchema,
   AvalonPlayerNameSchema,
   AvalonPublicSessionIDSchema,
   AvalonRoomDetailSchema,
+  AvalonRoomSessionResponseSchema,
   AvalonSeatIDSchema,
+  AvalonSeatChangeRequestSchema,
+  AVALON_LOBBY_ERROR_CODES,
   parseAvalonCreateRoomRequest,
   parseAvalonJoinRoomRequest,
   parseAvalonRoomDetail,
+  parseAvalonRoomSessionResponse,
+  parseAvalonSeatChangeRequest,
 } from './room-api'
 export type {
   AvalonCreateRoomRequest,
   AvalonJoinRoomRequest,
+  AvalonLobbyErrorCode,
   AvalonMatchID,
   AvalonPlayerAvatarID,
   AvalonRoomDetail,
+  AvalonRoomSessionResponse,
   AvalonSeatID,
+  AvalonSeatChangeRequest,
 } from './room-api'
 export { getIdentityRecognitionParticipantIDs } from './identity-recognition'
 export {
@@ -44,8 +53,15 @@ export {
   buildRoleDeck,
   loyaltyForRole,
 } from './roles'
+export {
+  DEFAULT_ROLE_CONFIGURATION,
+  LEGACY_ROLE_CONFIGURATION,
+  normalizeRoleConfiguration,
+} from './types'
 export type {
+  AvalonRoleConfiguration,
   AvalonG,
+  AvalonLobbyState,
   IdentityRecognitionState,
   IdentityRecognitionStep,
   AvalonPlayerView,

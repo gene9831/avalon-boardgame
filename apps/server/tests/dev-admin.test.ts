@@ -1,7 +1,6 @@
 import { io, type Socket } from 'socket.io-client'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { Server, State, StorageAPI } from 'boardgame.io'
 import { Client } from 'boardgame.io/client'
 import { SocketIO } from 'boardgame.io/multiplayer'
 
@@ -10,11 +9,9 @@ import {
   parseAvalonRoomDirectoryResponse,
 } from '@avalon/game'
 
-import { AvalonSocketRegistry, registerDevAdminRoutes } from '../src/dev-admin'
 import { listAvalonRoomSummaries } from '../src/room-directory'
 import { startAvalonServer } from '../src/server'
 import { MemoryStorage } from '../src/storage/memory'
-import { createDeletionSafeStorage } from '../src/storage/deletion-safe'
 import { AvalonTestLobbyClient as LobbyClient } from './support/lobby-client'
 
 const config = {
@@ -27,84 +24,6 @@ const config = {
 
 type AvalonClient = ReturnType<typeof Client>
 type AvalonClientState = NonNullable<ReturnType<AvalonClient['getState']>>
-
-type TestRouteContext = {
-  params: Record<string, string>
-  status: number
-  body: unknown
-  get(name: string): string
-  throw(status: number, message?: string): never
-}
-
-function createLobbyState(): State {
-  return {
-    G: { status: 'lobby' },
-    ctx: {
-      numPlayers: 5,
-      playOrder: ['0', '1', '2', '3', '4'],
-      playOrderPos: 0,
-      activePlayers: null,
-      currentPlayer: '0',
-      turn: 0,
-      phase: 'lobby',
-    },
-    plugins: {},
-    _undo: [],
-    _redo: [],
-    _stateID: 0,
-  }
-}
-
-function createLobbyMetadata(): Server.MatchData {
-  return {
-    gameName: 'avalon',
-    players: { 0: { id: 0, name: 'Alice', credentials: 'old-credential' } },
-    createdAt: 100,
-    updatedAt: 100,
-  }
-}
-
-function createDelayedMetadataStorage() {
-  const storage = new MemoryStorage()
-  const pendingWrites: Array<() => void> = []
-  let deferNextWrite = false
-  const asyncStorage: StorageAPI.Async = {
-    type: () => 1,
-    connect: async () => storage.connect(),
-    createMatch: async (matchID, opts) => storage.createMatch(matchID, opts),
-    setState: async (matchID, state, deltalog) => storage.setState(matchID, state, deltalog),
-    setMetadata: async (matchID, metadata) => {
-      if (!deferNextWrite) {
-        storage.setMetadata(matchID, metadata)
-        return
-      }
-      deferNextWrite = false
-      await new Promise<void>((resolve) => {
-        pendingWrites.push(() => {
-          storage.setMetadata(matchID, metadata)
-          resolve()
-        })
-      })
-    },
-    fetch: async (matchID, opts) => storage.fetch(matchID, opts),
-    wipe: async (matchID) => storage.wipe(matchID),
-    listMatches: async (opts) => storage.listMatches(opts),
-  }
-  return {
-    storage: asyncStorage,
-    deferNextWrite() {
-      deferNextWrite = true
-    },
-    get pendingWrites() {
-      return pendingWrites.length
-    },
-    releaseNextWrite() {
-      const release = pendingWrites.shift()
-      if (release === undefined) throw new Error('no deferred metadata write')
-      release()
-    },
-  }
-}
 
 function waitForClientState(
   client: AvalonClient,
@@ -185,67 +104,6 @@ describe('Avalon development APIs', () => {
     } finally {
       await running.close()
     }
-  })
-
-  it('does not report a successful kick until it persists after an older write', async () => {
-    const delayed = createDelayedMetadataStorage()
-    const guarded = createDeletionSafeStorage(delayed.storage)
-    await guarded.storage.createMatch('room-1', {
-      initialState: createLobbyState(),
-      metadata: createLobbyMetadata(),
-    })
-
-    const staleMetadata = (await guarded.storage.fetch('room-1', { metadata: true })).metadata!
-    staleMetadata.players[0].isConnected = true
-    delayed.deferNextWrite()
-    const oldWrite = guarded.storage.setMetadata('room-1', staleMetadata)
-    await Promise.resolve()
-    expect(delayed.pendingWrites).toBe(1)
-
-    const deleteHandlers = new Map<string, (ctx: TestRouteContext) => Promise<void>>()
-    const matchQueue = {
-      add: async <T>(task: () => Promise<T>) => task(),
-    }
-    registerDevAdminRoutes(
-      {
-        get: () => undefined,
-        delete: (path, handler) => deleteHandlers.set(path, handler as (ctx: TestRouteContext) => Promise<void>),
-      },
-      {
-        config,
-        db: guarded.storage,
-        forceUpdateMetadata: guarded.forceUpdateMetadata,
-        deletionGuard: guarded.deletionGuard,
-        registry: new AvalonSocketRegistry(),
-        queues: { getMatchQueue: () => matchQueue },
-        unavailableMatchIDs: guarded.deletionGuard.unavailableMatchIDs,
-      },
-    )
-
-    const context: TestRouteContext = {
-      params: { matchID: 'room-1', playerID: '0' },
-      status: 200,
-      body: undefined,
-      get: (name) => name === 'authorization' ? 'Bearer local-dev-token' : '',
-      throw: (status, message) => {
-        throw new Error(`HTTP ${status}: ${message ?? ''}`)
-      },
-    }
-    const kick = deleteHandlers.get('/dev/rooms/:matchID/players/:playerID')
-    if (kick === undefined) throw new Error('kick route was not registered')
-    const kickRequest = kick(context)
-    await Promise.resolve()
-    expect(delayed.pendingWrites).toBe(1)
-
-    delayed.releaseNextWrite()
-    await expect(oldWrite).resolves.toBeUndefined()
-    await expect(kickRequest).resolves.toBeUndefined()
-    expect(context.body).toMatchObject({ players: [{ id: 0, isConnected: false }] })
-
-    const persisted = (await guarded.storage.fetch('room-1', { metadata: true })).metadata!
-    expect(persisted.players[0].name).toBeUndefined()
-    expect(persisted.players[0].credentials).not.toBe('old-credential')
-    expect(persisted.players[0].isConnected).toBe(false)
   })
 
   it('does not expose a secret or client ID in public room summaries', async () => {
@@ -397,41 +255,70 @@ describe('Avalon development APIs', () => {
     }
   }, 10000)
 
-  it('releases a lobby seat and invalidates its old credentials', async () => {
+  it('rejects kicking the owner and invalidates a kicked guest credential', async () => {
     const running = await startAvalonServer({ config, db: new MemoryStorage() })
     const lobby = new LobbyClient({ server: `http://127.0.0.1:${running.lobbyPort}` })
 
     try {
       const { matchID } = await lobby.createMatch('avalon', { numPlayers: 5 })
-      const joined = await lobby.joinMatch('avalon', matchID, {
+      const owner = await lobby.joinMatch('avalon', matchID, {
         playerID: '0',
         playerName: 'Alice',
       })
-      const response = await fetch(`${baseURL(running)}/dev/rooms/${matchID}/players/0`, {
+      const joined = await lobby.joinMatch('avalon', matchID, {
+        playerID: '1',
+        playerName: 'Bob',
+      })
+      const moved = await fetch(
+        `${baseURL(running)}/rooms/avalon/${matchID}/players/0/seat`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${owner.playerCredentials}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({ targetPlayerID: '3' }),
+        },
+      )
+      expect(moved.status).toBe(200)
+
+      const ownerKick = await fetch(`${baseURL(running)}/dev/rooms/${matchID}/players/3`, {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer local-dev-token' },
+      })
+      expect(ownerKick.status).toBe(409)
+      expect((await lobby.getMatch('avalon', matchID)).players[3].name).toBe('Alice')
+
+      const response = await fetch(`${baseURL(running)}/dev/rooms/${matchID}/players/1`, {
         method: 'DELETE',
         headers: { Authorization: 'Bearer local-dev-token' },
       })
 
       expect(response.status).toBe(200)
-      expect((await lobby.getMatch('avalon', matchID)).players[0].name).toBeUndefined()
+      expect((await lobby.getMatch('avalon', matchID)).players[1].name).toBeUndefined()
       const replacement = await lobby.joinMatch('avalon', matchID, {
-        playerID: '0',
-        playerName: 'Bob',
+        playerID: '1',
+        playerName: 'Bors',
       })
       expect(replacement.playerID).toBe('0')
 
-      const sessionURL = `${baseURL(running)}/rooms/avalon/${matchID}/players/0/session`
-      const oldSession = await fetch(sessionURL, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${joined.playerCredentials}` },
-      })
-      const replacementSession = await fetch(sessionURL, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${replacement.playerCredentials}` },
-      })
+      const oldSession = await fetch(
+        `${baseURL(running)}/rooms/avalon/${matchID}/players/1/session`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${joined.playerCredentials}` },
+        },
+      )
+      const replacementSession = await fetch(
+        `${baseURL(running)}/rooms/avalon/${matchID}/players/0/session`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${replacement.playerCredentials}` },
+        },
+      )
       expect(oldSession.status).toBe(403)
       expect(replacementSession.status).toBe(204)
-      expect((await lobby.getMatch('avalon', matchID)).players[0].name).toBe('Bob')
+      expect((await lobby.getMatch('avalon', matchID)).players[0].name).toBe('Bors')
     } finally {
       await running.close()
     }

@@ -16,19 +16,28 @@ _Avoid_: match metadata, complete match data
 **Seat**: A stable position in a room, identified by a seat number and occupied by at most one player at a time.
 _Avoid_: slot, account
 
+**Initial seat assignment**: The binding of a newly joining player to the lowest-numbered unoccupied seat at that moment. Reconnection resumes the player's existing seat instead of assigning a new one.
+_Avoid_: initial seat selection, slot selection
+
+**Seat change**: A player's immediate movement from their current seat to an unoccupied seat while the room is waiting to start. The player retains their identity and any room ownership through the move.
+_Avoid_: leave and rejoin, player replacement
+
 **Seat credential**: A secret bound to one room and seat that proves authority to reconnect to or act for that seat. Public client IDs and session IDs are not seat credentials.
 _Avoid_: player credential, playerCredentials
 
 **Player**: The person occupying a seat in a room. A player is not an account; reconnecting uses the credentials bound to the seat.
 _Avoid_: user, member
 
-**Room creator**: The player in seat 0 who may start the room after all seats are occupied. This role has no ongoing administrative authority after the game starts.
-_Avoid_: host admin, administrator
+**Room owner**: The player who creates a room and may start or dissolve it while the room is waiting. Ownership belongs to that player rather than to a seat and follows the player through a seat change; it grants no authority to alter an active game.
+_Avoid_: seat 0, host admin, administrator
 
 ## Roles and loyalty
 
-**Role**: A character identity assigned to one player, such as Merlin, Assassin, Loyal Servant of Arthur, or Minion of Mordred.
+**Role**: A character identity assigned to one player, such as Merlin, Percival, Assassin, Morgana, Loyal Servant of Arthur, or Minion of Mordred.
 _Avoid_: class, character type
+
+**Role configuration**: The public, creation-time selection of optional roles for a room. It is fixed for that room so every player enters under the same known rules.
+_Avoid_: secret role settings, runtime role toggle
 
 **Role card**: The complete presentation of a role's artwork, name, loyalty, ability, and objective during opening identity recognition. Ordinary play may privately reveal only the current player's role avatar and role name; final role revelation remains a separate public result.
 _Avoid_: avatar, profile card, nameplate
@@ -36,13 +45,16 @@ _Avoid_: avatar, profile card, nameplate
 **Loyalty**: A player's faction, either Good or Evil. Loyalty is distinct from the exact role.
 _Avoid_: team, side
 
-**Role visibility**: The information a player is allowed to know about roles and loyalties. A player always knows their own role; Merlin and Evil players receive the limited faction information defined by the MVP rules.
+**Role visibility**: The information a player is allowed to know about roles and loyalties. A player always knows their own role; Merlin, Percival, and Evil players receive the limited information defined by the room's role configuration.
 _Avoid_: permissions, role access
 
-**Identity recognition**: The opening ceremony in which players privately learn their own role, Evil players recognize one another, and Merlin recognizes Evil seats before the first team proposal.
+**Merlin candidate**: A seat that Percival knows belongs to either Merlin or Morgana without knowing which role it holds. When both roles are present, their candidate status is indistinguishable.
+_Avoid_: known Merlin, suspected Evil
+
+**Identity recognition**: The opening ceremony in which players privately learn their own role, Evil players recognize one another, Merlin recognizes Evil seats, and Percival recognizes Merlin candidates before the first team proposal.
 _Avoid_: night phase, role reveal phase
 
-**Recognition step**: One ordered part of identity recognition: role reveal, Evil recognition, or Merlin recognition. Only that step's participants may view and confirm its private information.
+**Recognition step**: One ordered part of identity recognition: role reveal, Evil recognition, Merlin recognition, or Percival recognition. Only that step's participants may view and confirm its private information; steps without a participating role are skipped.
 _Avoid_: recognition round, night action
 
 **Identity confirmation**: A participant's acknowledgement that they have finished viewing the current recognition step. It is not a game decision and carries no strategic choice.

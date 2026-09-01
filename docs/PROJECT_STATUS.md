@@ -2,7 +2,7 @@
 
 > 这是项目进度的唯一维护入口。更新代码或完成一个独立模块后，同时更新本文件的状态、验收条件和提交记录。
 >
-> 最后更新：2026-08-30
+> 最后更新：2026-09-01
 
 ## 当前结论
 
@@ -19,12 +19,14 @@
 - 服务端权威角色、秘密状态和 `playerView`。
 - PostgreSQL 持久化、房间列表过滤和日志级联删除；空闲连接的 Pool 错误和活动查询从 boardgame.io Socket.IO 事件逸出的错误都会输出凭据安全的诊断摘要，不再以未处理事件或 Promise rejection 终止 Node 进程。
 - 座位绑定、浏览器 client ID 防重复占座、房间路由、凭据重连和服务端凭据会话校验。
+- 创建房间会原子创建并让创建者以房间拥有者身份进入；普通加入由服务端按提交时的最低空座位自动分配，等待房间允许凭据授权换到任一空座位，拥有者身份和权限跟随玩家而不是固定在 0 号座位。
 - Web 主页将等待开局和游戏中的房间统一列入“进行中的圆桌”，卡片显示具体状态并提供分页；已结束房间单独列出。
 - Web 主页会验证本机保存的全部活动房间凭据；已加入房间置顶并直接“进入”，存在活动房间时禁止从正常浏览器流程创建或加入其他房间，并同步同一浏览器的其他标签页。
 - Web 等待大厅和游戏页共用单一圆桌结构，PC、平板和移动端都将当前玩家固定在底部、其他玩家顺时针排布；中央采用实体桌游式五任务计分板，并已接入角色信息、队伍提案、全员投票、任务秘密出牌、公开任务结果、刺杀和最终角色揭示。
-- 开局在首次组队前依次进行全员身份查看、邪恶阵营互认和梅林辨认邪恶阵营；当前版本不显示或使用倒计时，每步等待全部参与者确认，其他玩家保持在不透明幕布后。
+- 新房间默认成对启用 Percival 与 Morgana，也可在创建时关闭并使用基础角色；缺少持久化角色配置的旧房间继续使用基础角色。开局在首次组队前依次进行全员身份查看、邪恶阵营互认、梅林辨认邪恶阵营和按配置启用的帕西维尔辨认梅林候选；当前版本不显示或使用倒计时，每步等待全部参与者确认，其他玩家保持在不透明幕布后。
 - Web 使用仅保存在浏览器的随机默认名称与八款装饰头像；主页 Header 用户中心可修改资料，存在任何活动房间座位时锁定名称和头像。创建/加入直接使用当前资料，不再弹出名称确认；同一房间允许同名并以座位号区分。
-- 创建房间先打开配置弹窗，当前支持 5–10 人选择与阵营/任务人数摘要，并保留后续扩展角色配置的入口边界。
+- 创建房间先打开配置弹窗，当前支持 5–10 人选择、阵营/任务人数摘要与 Percival/Morgana 成对配置。
+- Web 提供统一“帮助说明”：主页桌面端使用文字入口、移动端收为 44px 图标，等待大厅和游戏页使用图标入口；弹窗分为“游戏基础规则”和“角色说明”两个 Tab。创建配置中的角色问号会直接打开角色说明，将帕西维尔与莫甘娜前置并短暂脉冲高亮；六个角色卡暂留矩形素材位，不使用现有头像扩图。
 - 系统通知统一使用最多三条的顶部 Toast；主页不提供通知历史入口。房间 Header 提供无未读徽标的操作日志，记录当前客户端观察到的公开加入/退出，以及开局、提案、结算投票、匿名任务结果、刺杀和胜负。
 - Web 主页和个人设备圆桌等待大厅已完成响应式重设计；大厅以当前玩家为底部锚点，在所有宽度采用同一套圆形座位 DOM。房主开局进入桌面中央，退出/解散进入顶部房间菜单；健康连接不显示状态，连续断线 8 秒后才在顶部提供手动重连。房间页在最低 320×568 竖屏与 568×320 横屏内按宽高可用空间缩放，不产生页面滚动。
 - 等待大厅支持玩家凭据授权的主动离座：普通玩家只释放自己的座位，房主解散整个房间；游戏开始后拒绝这两类操作，返回主页仍是保留座位的无损导航。
@@ -40,7 +42,7 @@
 
 - 局域网内 5–10 个浏览器客户端进入同一个房间。
 - 多房间同时存在，房间状态互不影响。
-- Merlin、Assassin、Loyal Servant of Arthur、Minion of Mordred。
+- Merlin、Assassin、Loyal Servant of Arthur、Minion of Mordred、Percival、Morgana。
 - 首次组队前的线上身份辨认仪式与分阶段角色视野。
 - 队伍提案、全员投票、任务出牌、三次任务成功后的刺杀和胜负结算。
 - 服务端权威管理秘密状态；客户端不得收到其他玩家不应看到的角色或未结算选择。
@@ -48,7 +50,7 @@
 
 ### 明确不在当前 MVP
 
-- Percival、Morgana、Mordred、Oberon、Lady of the Lake 和其他扩展。
+- Mordred、Oberon、Lady of the Lake 和其他扩展。
 - 账号、服务端持久玩家档案、语音、聊天、AI、排行榜。浏览器本地装饰资料不属于账号系统。
 - 队伍提案、投票、任务牌或刺杀等战略阶段的自动超时推进。
 - 房主/管理员修改已发生游戏状态。
@@ -63,6 +65,8 @@
 - [MVP 不自动超时或管理员修改](adr/0003-no-automatic-timeout-or-admin-mutation-in-mvp.md)
 - [预留可选的服务端权威身份辨认截止线](adr/0006-server-authoritative-identity-recognition-deadlines.md)
 - [收紧 boardgame.io 协议面](adr/0007-restrict-boardgame-protocol-surface.md)
+- [保留已持久化房间的角色配置](adr/0008-preserve-persisted-room-role-configuration.md)
+- [房间拥有者独立于 0 号座位](adr/0009-seat-independent-room-ownership.md)
 - [pnpm workspace 边界](adr/0004-pnpm-workspace-package-boundaries.md)
 
 ## 里程碑状态
@@ -77,22 +81,23 @@
 | 秘密状态与玩家视图 | ✅ | `packages/game/src/player-view.ts` 过滤 `secret`，只返回当前玩家允许看到的信息。 |
 | Socket.IO 游戏服务 | ✅ | 游戏端口 8000，Lobby API 8001；支持独立 match。 |
 | PostgreSQL 存储 | ✅ | `PostgresStorage`、schema、delta logs、列表过滤和 wipe 已实现；空闲连接错误由 Pool 监听器处理，活动查询错误在 boardgame.io Socket.IO 请求边界处理，两类日志都不记录 Client、连接信息或请求参数，本地集成测试可执行。 |
-| 创建/加入/列出房间 | ✅ | Web Lobby 创建/加入流程已接入；`@avalon/game` 使用共享 Zod schema 定义公开房间目录，Server 通过推导类型构造允许列表，Web 在接收边界原子拒绝无效或重复数据并保留上一次有效限制状态。响应式主页将 lobby/playing 合并为进行中列表并在卡片显示具体状态，finished 房间单独分页展示。主页验证本机全部活动房间凭据，已加入房间置顶并直接进入；存在活动会话时禁用创建和其他房间的加入入口。等待大厅允许非房主凭据授权释放自己的座位，房主可解散房间，playing 状态拒绝两类操作。 |
-| 主页与等待大厅体验 | ✅ | 主页、创建配置、房间列表和等待提示已使用面向普通玩家的中文产品文案；公共按钮统一使用至少 44px 的触控尺寸和一致交互态。创建配置与退出/解散房间的业务弹窗共用原生 `ModalDialog`，统一管理打开、关闭、Escape、遮罩、危险色、视口内滚动及水平垂直居中；默认配置不显示开发控制入口。创建配置当前提供 5–10 人按钮、阵营构成和五次任务人数摘要。等待大厅在 PC、平板和移动端使用同一套圆桌座位 DOM，当前玩家固定在底部，空位显示虚线头像与座位号；不再使用底部操作栏，房主开局位于桌面中央，退出/解散位于顶部房间菜单。窄屏使用“等待创建者”等紧凑等待文案，并保留完整的可访问名称；断线状态在窄屏收为 44px 图标，等待大厅暂时以重连控件替代不可用的房间操作入口。房间壳层仅使用 `100dvh` 并关闭 overscroll，避免 iOS Chrome 的 `100vh` 包含动态工具栏而产生页面滚动；主页仍可按内容滚动。高度至少 421px 的横屏会回收 Header 中部空白供圆桌舞台使用，同时保持 Header 左右内容位于更高层级；5–6 人桌底部座位与裁剪边界至少保留 24px，7–10 人桌会向下补偿以保护顶部密集座位。Playwright 使用 5、7、10 人房间在 320×568、568×320、390×844、768×1024、1024×768、1077×722、1280×685、1440×900 验证页面无滚动、座位不被面板裁切、Header 左右内容不与座位重叠、座位与中央区无实质重叠，以及开局、选队和投票可操作。 |
+| 创建/加入/列出房间 | ✅ | 创建与创建者入座由一个服务端操作原子完成；普通加入不接受客户端选择座位，而是在 match queue 内分配提交时的最低空座位。`@avalon/game` 使用共享 Zod schema 定义严格请求和公开房间目录，Server 通过推导类型构造允许列表，Web 在接收边界原子拒绝无效或重复数据并保留上一次有效限制状态。响应式主页将 lobby/playing 合并为进行中列表，满房显示“已满”，finished 房间单独分页展示。主页验证本机全部活动房间凭据，已加入房间置顶并直接进入；存在活动会话时禁用创建和其他房间的加入入口。等待大厅允许普通玩家凭据授权释放自己的座位，房间拥有者可解散房间，playing 状态拒绝两类操作。 |
+| 主页与等待大厅体验 | ✅ | 主页、创建配置、房间列表和等待提示已使用面向普通玩家的中文产品文案；公共按钮统一使用至少 44px 的触控尺寸和一致交互态。创建配置与退出/解散房间的业务弹窗共用原生 `ModalDialog`，统一管理打开、关闭、Escape、遮罩、危险色、视口内滚动及水平垂直居中；默认配置不显示开发控制入口。创建配置当前提供 5–10 人按钮、阵营构成、五次任务人数摘要和 Percival/Morgana 成对开关。等待大厅在 PC、平板和移动端使用同一套圆桌座位 DOM，当前玩家固定在底部，空位显示虚线头像与座位号；不再使用底部操作栏，房间拥有者开局位于桌面中央，退出/解散位于顶部房间菜单。窄屏使用“等待创建者”等紧凑等待文案，并保留完整的可访问名称；断线状态在窄屏收为 44px 图标，等待大厅暂时以重连控件替代不可用的房间操作入口。房间壳层仅使用 `100dvh` 并关闭 overscroll，避免 iOS Chrome 的 `100vh` 包含动态工具栏而产生页面滚动；主页仍可按内容滚动。高度至少 421px 的横屏会回收 Header 中部空白供圆桌舞台使用，同时保持 Header 左右内容位于更高层级；5–6 人桌底部座位与裁剪边界至少保留 24px，7–10 人桌会向下补偿以保护顶部密集座位。Playwright 使用 5、7、10 人房间在 320×568、568×320、390×844、768×1024、1024×768、1077×722、1280×685、1440×900 验证页面无滚动、座位不被面板裁切、Header 左右内容不与座位重叠、座位与中央区无实质重叠，以及开局、选队和投票可操作。 |
+| 游戏与角色帮助 | ✅ | 统一宽版弹窗提供“游戏基础规则”和“角色说明”语义化 Tab；基础规则包含阵营目标、回合流程、关键规则及 5–10 人配置表，房间内会标出当前人数。角色说明覆盖 Merlin、Percival、Loyal Servant、Assassin、Morgana、Minion 的阵营、能力、目标与新手提示。创建配置中的问号支持 hover/focus tooltip 和 click/touch 深入说明；上下文打开时帕西维尔与莫甘娜前置并以较平缓的节奏脉冲两次，`prefers-reduced-motion` 下关闭动画。移动端角色说明使用横向列表项，左侧保留 88×112 空白素材位、右侧显示完整说明；`sm` 及以上保持三列纵向卡片和 4:3 空白素材位。主页在移动端只显示 44×44 问号图标，`sm` 及以上显示“帮助说明”文字；等待大厅和游戏页继续使用图标入口。所有入口复用同一弹窗，支持方向键切换 Tab、Escape 关闭及焦点恢复。 |
 | 玩家名称与入座入口 | ✅ | 浏览器首次使用从 24 个中世纪奇幻意象与 24 个身份词中组合随机中文名称（576 种组合），并随机选择八款装饰头像，一并保存在 `localStorage`；主页 Header 用户中心支持名称校验、头像选择和重新随机，跨标签页同步。只要本机仍保存并验证出活动房间座位，即使返回主页也只展示锁定资料，真正退出/解散后才恢复编辑。创建和加入直接使用当前资料，不再询问名称；客户端和服务端共同限制 trim 后 1–24 字符。同一房间允许同名，所有公开日志使用名称加座位号区分；client ID 仍防止同一浏览器重复占座。头像采用 ImperialOctopus/avalon-printable 的八款角色图标并按 CC BY 4.0 署名，但仅作为装饰，不表达隐藏角色；用户中心的“素材与许可”可用键盘展开与折叠，折叠时不暴露许可链接。 |
 | 通知与房间操作日志 | ✅ | 系统通知统一显示为顶部 Toast：桌面右上、移动端顶部居中，普通/成功 4 秒、错误 8 秒，最多保留三条且可手动关闭；主页不显示铃铛或通知历史。房间 Header 使用日志图标且不显示未读圆点/数量，桌面为右侧抽屉、移动端为底部抽屉；日志按旧到新记录公开玩家操作，不含时间戳、清空或分页。等待房间只记录当前客户端实际观察到的加入/退出；开局后可从公开状态重建开局、提案、已结算的逐人投票、匿名成功/失败牌总数、刺杀目标和胜负，不读取 viewer 私密信息。 |
-| 座位绑定与重连 | ✅ | 房间路由、按房间保存凭据、client ID 防重复占座和自动重新连接已实现。健康连接不占用界面；断线时顶部先显示自动恢复状态，连续失败 8 秒后才出现手动重连。房间首次加载与轮询通过只返回 204/403/404 的服务端端点校验私有 player credential；公开 session ID 仅作提前失效优化，不能授权会话。 |
+| 座位绑定与重连 | ✅ | 房间路由、按房间保存凭据、client ID 防重复占座和自动重新连接已实现。等待房间可使用当前 seat credential 换到空座位，credential 和房间拥有者身份一起重绑到目标；请求期间使用可续租的浏览器全局 transition marker 暂停其他标签页的过期源座位失效处理。丢失、超时或瞬态响应转为 uncertain 后，浏览器先通过真实换座客户端精确重放原 match/source/credential/target，让服务端 match queue 与目标凭据幂等检查确定结算顺序；只有稳定拒绝才继续校验源与目标，网络、5xx 或无效成功响应会保留 marker 和会话等待重试。旧标签页只能更新或清理仍与相同 opaque transition ID 及精确源会话匹配的状态。健康连接不占用界面；断线时顶部先显示自动恢复状态，连续失败 8 秒后才出现手动重连。房间首次加载与轮询通过只返回 204/403/404 的服务端端点校验私有 seat credential；公开 session ID 仅作提前失效优化，不能授权会话。 |
 | Debug Panel 默认关闭 | ✅ | boardgame.io 内置 Debug Panel 显式设为 `false`；生产默认配置下不显示内置调试入口，也不显示自定义开发控制入口。 |
-| 角色与阶段展示 | ✅ | 游戏开始后保持统一圆桌布局；中央面板始终显示五次任务、当前任务、连续否决轨道和阶段操作。进行中的姓名牌不常驻显示本人角色；左下角“眼睛”按钮默认关闭，打开后只把本人的装饰头像替换为角色头像，并在姓名牌正下方显示角色名称，同时显示获授权知道的邪恶阵营座位，不遮挡中央面板或暂停选队、投票、任务牌和刺杀操作。角色名称使用不参与座位布局的定位层，出现时不会移动头像或姓名牌。开关值以只含版本号和布尔值的浏览器全局客户端设置保存在 `localStorage`，跨刷新、房间、阶段和同浏览器标签页同步；开局身份辨认结束后按该偏好显示。对局结束时隐藏眼睛和已知邪恶标记，自动把所有座位头像替换为公开角色头像，并在姓名牌第二行显示角色名，但不覆盖下局偏好。当前 MVP 仍以暗红光环和无文字徽记表示已知邪恶阵营，不泄露精确角色。断线、队长和任务队员分别通过头像灰度、头冠和高亮表达。 |
-| 开局身份辨认 | ✅ | `startGame` 后先进入三步身份辨认：全员查看自己的完整身份牌，邪恶阵营辨认其他邪恶座位，梅林辨认全部邪恶座位。第一幕先让深蓝实体幕布落下并完全遮住圆桌，落定后才淡入身份牌、进度和确认按钮；第二、三幕参与者升幕查看获授权的圆桌座位。竖屏继续使用顶部提示与底部确认浮层，横屏则由同一份控件替换中央任务面板，极矮横屏使用紧凑文案并保持 44px 热区；方向切换不会重新挂载确认按钮，提示、按钮和面板边界不得遮挡头像或姓名牌。参与者确认后保留信息并显示“等待其他玩家确认”，匿名 `x/n` 进度会以礼貌级状态更新提供给辅助技术；非参与者始终处于静态不透明幕布后。顶部返回与连接恢复控件在仪式期间保持可见可操作。当前版本不显示倒计时、不发送自动唤醒，必须等待当前步骤全部参与者确认，仪式结束才进入首次组队。服务端保留默认关闭的截止线、原时间线追赶与重启保护架构，供未来创建房间配置使用；实时及持久化日志和公开框架 `ctx` 均不记录或编码确认者、唤醒者座位。仪式期间隐藏眼睛按钮，结束后恢复原功能。 |
+| 角色与阶段展示 | ✅ | 游戏开始后保持统一圆桌布局；中央面板始终显示五次任务、当前任务、连续否决轨道和阶段操作。进行中的姓名牌不常驻显示本人角色；左下角“眼睛”按钮默认关闭，打开后只把本人的装饰头像替换为角色头像，并在姓名牌正下方显示角色名称，同时显示 `playerView` 授权的邪恶阵营座位或 Percival 的两个不可区分 Merlin 候选，不遮挡中央面板或暂停选队、投票、任务牌和刺杀操作。角色名称使用不参与座位布局的定位层，出现时不会移动头像或姓名牌。开关值以只含版本号和布尔值的浏览器全局客户端设置保存在 `localStorage`，跨刷新、房间、阶段和同浏览器标签页同步；开局身份辨认结束后按该偏好显示。对局结束时隐藏眼睛和私密知识标记，自动把所有座位头像替换为公开角色头像，并在姓名牌第二行显示角色名，但不覆盖下局偏好。暗红徽记只表示已知邪恶阵营，统一候选徽记只表示 Merlin/Morgana 候选，均不泄露精确角色。断线、队长和任务队员分别通过头像灰度、头冠和高亮表达。 |
+| 开局身份辨认 | ✅ | `startGame` 后先进入按角色配置确定的身份辨认：全员查看自己的完整身份牌，邪恶阵营辨认其他邪恶座位，Merlin 辨认全部邪恶座位，启用成对角色时由 Percival 辨认 Merlin 与 Morgana 两个不可区分候选。第一幕先让深蓝实体幕布落下并完全遮住圆桌，落定后才淡入身份牌、进度和确认按钮；后续各幕仅参与者升幕查看获授权的圆桌座位。竖屏继续使用顶部提示与底部确认浮层，横屏则由同一份控件替换中央任务面板，极矮横屏使用紧凑文案并保持 44px 热区；方向切换不会重新挂载确认按钮，提示、按钮和面板边界不得遮挡头像或姓名牌。参与者确认后保留信息并显示“等待其他玩家确认”，匿名 `x/n` 进度会以礼貌级状态更新提供给辅助技术；非参与者始终处于静态不透明幕布后。顶部返回与连接恢复控件在仪式期间保持可见可操作。当前版本不显示倒计时、不发送自动唤醒，必须等待当前步骤全部参与者确认，仪式结束才进入首次组队。服务端保留默认关闭的截止线、原时间线追赶与重启保护架构；实时及持久化日志和公开框架 `ctx` 均不记录或编码确认者、唤醒者座位。仪式期间隐藏眼睛按钮，结束后恢复原功能。 |
 | 队伍提案 | ✅ | 队长直接点击圆桌座位选择正确人数，动作转发到服务端 `proposeTeam`。 |
 | 队伍投票 | ✅ | 所有玩家可独立提交 approve/reject；投票进行中公开提交者座位和 `x/n 已投票` 进度，但每张赞成/反对选择在全部提交前仍只向本人可见。提交状态以无边框、透明背景的中性 Lucide `BadgeCheck` 显示在姓名牌框外，结算后原位替换为绿色赞成勾或红色反对叉；图标不参与布局、不占用姓名牌内容宽度，也不会移动头像或姓名牌。右侧座位的图标放在姓名牌左边，其余座位放在右边，避免窄屏边缘裁切。中央区域同时显示通过/否决及赞成、反对总数；通过结果保留到该任务全部队员提交任务牌，否决结果保留到下一次投票开始，连续第五次否决的结果保留在最终结算。图标的完整文字含义也包含在座位可访问名称中，不只依赖颜色。 |
-| 开发房间删除与踢人 | ✅ | `/dev/status` 确认启用后，主页与房间统一显示右下角 Lucide `Bug` 悬浮入口；桌面使用悬浮面板，移动端使用最大 70dvh 的底部抽屉，Token 仅保存在当前路由内存中。面板支持遮罩、再次点击、Escape、焦点循环和安全区避让，操作错误通过触发器圆点和面板详情反馈；状态接口关闭或失败时不暴露入口。主页删除仍保留在对应房间卡片，房间内删除支持 lobby/playing/finished，踢人仅支持 lobby；连接中删除、匿名同步和延迟写入不会复活房间，快速复用座位即使复制旧公开数据也会由凭据校验拒绝旧会话；活动房间 metadata 使用按房间版本保护，延迟 fetch 不会被重新标记为当前版本，kick 和正式离座都会在旧写入之后权威落盘。当前 Server tests: 44 passed / PostgreSQL 5 skipped；Web tests: 113 passed. |
+| 开发房间删除与踢人 | ✅ | `/dev/status` 确认启用后，主页与房间统一显示右下角 Lucide `Bug` 悬浮入口；桌面使用悬浮面板，移动端使用最大 70dvh 的底部抽屉，Token 仅保存在当前路由内存中。面板支持遮罩、再次点击、Escape、焦点循环和安全区避让，操作错误通过触发器圆点和面板详情反馈；状态接口关闭或失败时不暴露入口。主页删除仍保留在对应房间卡片，房间内删除支持 lobby/playing/finished，踢人仅支持 lobby；连接中删除、匿名同步和延迟写入不会复活房间，快速复用座位即使复制旧公开数据也会由凭据校验拒绝旧会话；活动房间 metadata 使用按房间版本保护，延迟 fetch 不会被重新标记为当前版本，kick 和正式离座都会在旧写入之后权威落盘。 |
 | 任务出牌 UI | ✅ | 仅任务队员可以操作；正义阵营只能让任务成功，邪恶阵营可以让任务成功或失败，提交后只向本人显示自己的牌并进入等待。 |
 | 任务历史与公开结果 | ✅ | 中央任务板展示已结算任务的成功/失败状态和公开成功/失败牌总数，不把任务牌关联到具体玩家。 |
 | 刺杀 UI 与最终结算 | ✅ | 刺客从圆桌座位选择非已知邪恶目标；其他玩家等待。结算展示胜方、原因和目标，并在每个座位公开最终角色。 |
 | 确定性随机与回放 | ✅ | `@avalon/test-support` 从 master seed 派生游戏/行动 seed，以统一 transcript 驱动规则层和 Socket.IO；失败 artifact 不包含凭据、Token 或秘密状态。 |
-| 自动化完整局流程 | ✅ | 属性测试覆盖 5–10 人规则与可见性不变量；Socket.IO 回放与规则层权威状态对比；PR Playwright 门禁覆盖本地资料持久化/锁定、同名入座、创建配置弹窗、并发抢座恢复、提案/投票/任务牌刷新、待结算秘密隔离、四种胜负结局和 10 人桌面/窄屏操作。Nightly 继续覆盖 5–10 人完整局矩阵，并增加 7 人第四次任务一败/两败和双活跃房间并行隔离。 |
+| 自动化完整局流程 | ✅ | 属性测试覆盖 5–10 人基础/成对角色规则与可见性不变量，test-support 以完整权威 occupancy 启动回放；Socket.IO 回放与规则层权威状态对比。Playwright 门禁覆盖原子创建入座、自动最低空座加入、并发加入、拥有者换座、0 号座位复用、满房文案、换座瞬态响应与同浏览器旧标签页恢复、刷新、44px 键盘操作、Percival 私密视野、提案/投票/任务牌秘密隔离、四种胜负结局和 5/7/10 人目标视口。Nightly 继续覆盖 5–10 人完整局矩阵、7 人第四次任务阈值和双活跃房间并行隔离。 |
 | GitHub Actions 测试门禁 | ✅ | `main` 已启用分支保护并将质量、单元/Socket.IO、PostgreSQL 和浏览器 smoke 配置为 required checks；Nightly 每个人数 1,667 次属性测试及 5–10 人浏览器分片也已在 GitHub 托管 runner 上实际通过，可按 seed 回放。 |
 | 真实环境人工验收 | ⬜ | 应用数据与模拟视口已自动化；人工只保留真实 Node 服务重启、目标 PostgreSQL 服务/volume 重启，以及手机、平板或其他电脑的实际 LAN/CORS/Socket.IO 链路。 |
 | 重启后重连验收 | ⬜ | 存储、凭据和 GitHub 临时 PostgreSQL 容器重启已有自动测试，尚未完成目标部署环境的 Node 与 PostgreSQL 手工演练。 |
@@ -158,7 +163,32 @@
 
 ## 当前验证基线
 
-最近一次验证日期：2026-08-30
+最近一次验证日期：2026-09-01
+
+2026-09-01 游戏与角色帮助验证：主页 Header 在移动端显示 44×44 问号图标、`sm` 及以上显示文字“帮助说明”，等待大厅与游戏页 Header 使用图标入口；统一弹窗默认打开游戏基础规则，包含阵营目标、回合流程、关键规则和 5–10 人配置，房间入口会传入并标出当前人数。角色说明覆盖当前六个角色；创建配置的帕西维尔/莫甘娜问号提供 hover/focus 提示，点击或触摸直接进入角色 Tab，将两张相关角色卡前置并以约 1.6 秒两次平缓脉冲引导视线，随后回归普通边框，减少动态效果偏好下不播放。创建配置开关已移除重复的候选人说明，checkbox、标题和帮助问号收为同一行并垂直居中。移动端每个角色使用横向列表项，左侧 88×112 空白素材位、右侧完整说明；桌面继续使用三列纵向卡片和 4:3 空白素材位，没有使用或扩展现有头像。弹窗使用语义化 Tab、方向键/Home/End 切换、Escape 关闭及触发按钮焦点恢复；320×568 下四边至少保留 16px。应用内浏览器人工复核桌面基础规则、上下文角色说明和 320px/390px/429px 主页、创建弹窗与角色列表；429×741 下三个角色配置控件中心线均为 438.5px，且配置行不再出现重复说明。确认角色顺序为 Percival、Morgana、Merlin、Loyal Servant、Assassin、Minion，390px 下素材位为 88×112 且位于名称左侧，角色说明中 `img` 数量为 0，页面无横向溢出且控制台无 error。Web 239 tests、Web build、lint 和 workspace typecheck 通过；帮助与响应式 Playwright 7 passed。Web build 仍有单个 555.89 kB minified JavaScript chunk 超过 500 kB 的建议性警告，Playwright 仅出现既有 `NO_COLOR`/`FORCE_COLOR` Node 警告。
+
+```text
+pnpm test ✅ Game 88；test-support 23；Server 84；Web 239（共 434 passed）
+pnpm build ✅ Game、Server TypeScript 与 Web TypeScript + Vite build；单个 556.21 kB minified / 167.24 kB gzip chunk 建议性警告
+pnpm lint ✅ exit 0，无 diagnostics
+pnpm typecheck ✅ Game、test-support、Server、Web、E2E exit 0
+pnpm --filter @avalon/e2e test:e2e dialogs.spec.ts responsive.spec.ts ✅ 6 passed
+Playwright 本地日志 ⚠️ Node 子进程提示 `NO_COLOR` 被 `FORCE_COLOR` 覆盖；无业务 warning/error
+pnpm --filter @avalon/server test:postgres ⚠️ 本轮未运行；未以 memory storage 替代
+真实 5–10 浏览器 LAN 验收 ⬜ 未执行
+部署环境 PostgreSQL 重启与原凭据重连 ⬜ 未执行
+```
+
+2026-08-31 普通 HTTP LAN 换座互斥补充：浏览器继续优先使用 Web Locks；当文档所用的 `http://<LAN IP>` origin 不提供 SecureContext Web Locks 时，改用同源 IndexedDB `readwrite` 事务原子获取每房间独占 lease。lease 使用 opaque owner token、有限过期时间和 owner-matched release；活动请求即使超过 lock lease，锁内重新检查的持久化 `requesting` 标记仍拒绝第二次请求，原有 transition ID、源会话和恢复 fence 保持权威。IndexedDB 缺失、打开失败或事务失败时换座安全关闭并显示既有兼容性文案，不会无锁发送请求。真实浏览器回归在应用代码运行前移除 `navigator.locks`，通过实际 IndexedDB 完成一次换座并拒绝第二标签页 contender。完整 `pnpm test` 为 Game 88、test-support 23、Server 83、Web 227，共 421 passed；`pnpm build`、`pnpm lint`、`pnpm typecheck` 均 exit 0；强制 fallback 聚焦 Playwright 为 1 passed，完整 `pnpm test:e2e` 为 18 passed / 9 nightly skipped。Web build 报告单个 540.97 kB minified / 163.29 kB gzip JavaScript chunk 超过 500 kB 的 Vite 建议性警告；Playwright 仅出现既有 `NO_COLOR`/`FORCE_COLOR` Node 警告。部署环境 PostgreSQL restart acceptance 继续 blocked，未使用内存存储替代；Manual LAN 5-browser acceptance 仍 pending，本次自动化普通 HTTP loopback 测试不等同于真实 LAN 设备、实际 CORS/Socket.IO 或部署环境 PostgreSQL 重启演练。
+
+2026-08-31 最终分支审查收口：同一房间换座现在使用 Web Locks `exclusive` + `ifAvailable` 浏览器全局互斥，并在锁内重新检查持久化标记和精确源会话；`requesting`、`uncertain` 及 legacy 标记都会拒绝第二次换座，不会排队到不确定迁移之后。迟到的成功、失败和恢复结果必须同时通过 opaque transition ID 与源会话 fence，不能覆盖或清除较新的标记/会话；退出/解散继续读取同一全局标记。两个同源标签页的真实浏览器回归证明首个请求持锁时空座按钮立即禁用、只发出一次换座请求，并在瞬态 503 后共同恢复唯一有效目标。Lobby 客户端保留服务端稳定错误 envelope，且创建、加入和换座的所有成功响应都在客户端边界使用共享 RoomSession Schema 解析；畸形创建/加入 2xx 不会产生可持久化会话，畸形换座 2xx 会保留 `uncertain` 标记并按源座位、目标座位顺序恢复。ownerless legacy lobby 不再展示加入操作；Percival 候选只在身份辨认或主动打开私密信息时显示、结算时移除，候选父座位可访问名称包含 `Merlin 候选`；成对房间中 Merlin 的邪恶座位知识从 Merlin 辨认持续到 Percival 辨认及之后，legacy 三步流程不变。完整 `pnpm test` 为 Game 88、test-support 23、Server 83、Web 220，共 414 passed；`pnpm build`、`pnpm lint`、`pnpm typecheck` 均 exit 0；本次聚焦 `smoke` 与 `refresh-and-privacy` Playwright 为 4 passed。此前同一最终审查轮次的完整 `pnpm test:e2e` 为 18 passed / 9 nightly skipped，本次窄幅响应解析补丁后未重跑完整 E2E。Web build 报告单个 538.44 kB minified / 162.41 kB gzip JavaScript chunk 超过 500 kB 的 Vite 建议性警告；Playwright 仅出现既有 `NO_COLOR`/`FORCE_COLOR` Node 警告。本轮没有运行或声称通过 CI，也没有单独运行强制 PostgreSQL 命令或重启探针；部署环境 PostgreSQL restart acceptance 继续为 blocked，未用内存存储替代该验收。Manual LAN 5-browser acceptance: pending；本次未执行真实 5–10 台设备、实际 LAN/CORS/Socket.IO 或部署环境 PostgreSQL 重启演练。
+
+2026-08-31 同日此前的自动入座、座位无关拥有者和成对角色验证：创建房间会原子进入拥有者，普通玩家由服务端分配提交时最低空座位，并发加入不会重复；拥有者移离 0 号座位后权限随玩家保持，新玩家可复用 0 号座位，刷新仍以原凭据重连。满房公共文案、320×568 下至少 44px 且可用键盘操作的换座按钮、Percival 仅看到不可区分的 Merlin/Morgana 候选，以及 10 人桌在 1024×768/1077×722 不与 Header 重叠均有浏览器回归。真实路由生命周期在服务端已提交换座但浏览器收到瞬态 503 时验证：实时 `requesting` 标记暂停旧座位失效，转为 `uncertain` 后重新校验并绑定唯一有效目标，同一浏览器的旧标签页不会删除新会话或丢失凭据。Automatic seating / seat-independent ownership / paired roles: complete。完整 `pnpm test` 为 Game 87、test-support 23、Server 83、Web 195，共 388 passed；`pnpm build`、`pnpm lint`、`pnpm typecheck` 均 exit 0；聚焦 Playwright 9 passed，完整 `pnpm test:e2e` 为 18 passed / 9 nightly skipped。Web build 报告单个 534.85 kB minified JavaScript chunk 超过 500 kB 的 Vite 建议性警告；Playwright 仅出现既有 `NO_COLOR`/`FORCE_COLOR` Node 警告。`pnpm --filter @avalon/server test:postgres` 已强制使用真实 PostgreSQL，但当前配置的 `192.168.100.13:5432` 在沙箱内以 `EPERM` 拒绝连接（2 failed / 3 passed / 4 skipped），而外部执行因套件会初始化 schema 和清理数据、目标又不是已确认的一次性数据库而未获授权；因此 PostgreSQL restart acceptance: blocked，未用内存存储替代，也未声称通过。Manual LAN 5-browser acceptance: pending；本次未执行真实 5–10 台设备、实际 LAN/CORS/Socket.IO 或部署环境 PostgreSQL 重启演练。
+
+- Automatic seating / seat-independent ownership / paired roles: complete
+- Validation: `pnpm test` — passed; `pnpm build` — passed; `pnpm lint` — passed; `pnpm typecheck` — passed; `pnpm test:e2e` — passed
+- Manual LAN 5-browser acceptance: pending
+- PostgreSQL restart acceptance: blocked by unavailable/unauthorized real PostgreSQL; no memory substitute was used
 
 2026-08-30 队伍投票可见性与按需角色头像验证：未结算队伍投票只公开提交者座位和 `x/n 已投票`，其他玩家的赞成/反对仍由 `playerView` 隔离；最后一票后逐座位结果和中央合计同时公开，并按通过任务、普通否决及第五次否决分别保留到既定边界。投票提交和结算图标位于姓名牌框外且不占用文字空间；Playwright 几何回归验证首张投票出现前后头像与姓名牌位置、尺寸不变、姓名牌左右内边距一致、图标完全位于框外，并验证 320px 窄屏右侧座位图标不会越出视口。进行中姓名牌不常驻显示本人角色；眼睛按钮只替换本人的角色头像，角色名称显示在姓名牌正下方且不参与布局，不遮挡头像或中央任务板、不暂停操作、不响应 Escape，开关偏好以版本化、无角色数据的客户端设置跨刷新、房间、阶段和同浏览器标签页同步。对局结束自动显示全部角色头像和姓名牌角色名，并隐藏眼睛与已知邪恶标记。完整验证结果见下方命令基线；聚焦 Playwright 回归 5 passed，覆盖 5、7、10 人、角色偏好持久化/跨标签页同步、投票座位几何、结算角色头像和响应式布局。应用内浏览器在当前 5 人投票房间实测姓名牌左右内边距均为 6px、框外图标间距 4px、角色名称位于姓名牌下方 2px且不与头像重叠。Web build 仍有单个 522.14 kB minified JavaScript chunk 超过 500 kB 的 Vite 建议性警告；Playwright 仅出现既有 `NO_COLOR`/`FORCE_COLOR` Node 警告。本次未执行真实 5–10 台 LAN 设备、多房间人工隔离或 PostgreSQL 重启/凭据重连验收。
 
@@ -186,28 +216,24 @@
 
 2026-08-23 PostgreSQL 网络中断崩溃修复验证：确认 `a90095d` 的范围仅是空闲客户端触发的 `pg.Pool` `error` 事件，不包含活动 `query()` 返回的 rejected Promise。新增 boardgame.io Socket.IO `update`、`sync`、`disconnect`、`chat` 请求错误边界；聚焦回归测试完成 RED（`sync` rejection 逸出）→ GREEN（安全日志并关闭底层连接）；Server tests 48 passed；Server typecheck exit 0。
 
+2026-09-01 换座迟到提交与服务端错误边界修正验证：uncertain 或租约过期的换座恢复不再用一次源座位探测直接结算，而是先通过真实 participation client 精确重放原 match/source/credential/target；服务端 match queue 和“目标已持有相同 credential”幂等分支会在返回前序列化原请求与重放请求。重放成功保存目标后只清除匹配的 opaque marker；稳定 409 等拒绝才探测并保留有效源或恢复有效目标；网络、5xx、无效成功响应继续保留 uncertain marker、源会话和后续重试能力。路由刷新、陈旧 Socket snapshot 与退出/解散对账共用该路径；Playwright 的双标签页丢响应场景已实际发送重放请求并恢复目标。`prepare-start` 先认证请求中的 player ID 与 credential，再判断房间拥有者，因此有效访客稳定得到 `not_room_owner`，错误 credential 仍为 `invalid_seat_session`。换座 JSON parser 的异常进入统一 HTTP 错误边界：无效 JSON 返回结构化 400 `invalid_request`，超过 16 KiB 返回结构化 413 `payload_too_large`，限制未放宽。
+
 ```text
-pnpm test ✅ Game 60 passed；test-support 22 passed；Server 70 passed；Web 142 passed（共 294 个用例）
-pnpm build ✅ Game、Server TypeScript 与 Web TypeScript + Vite build
-pnpm lint ✅ exit 0
+pnpm test ✅ Game 88；test-support 23；Server 84；Web 234（共 429 passed）
+pnpm build ✅ Game、Server TypeScript 与 Web TypeScript + Vite build；单个 542.05 kB minified / 163.62 kB gzip chunk 建议性警告
+pnpm lint ✅ exit 0，无 diagnostics
 pnpm typecheck ✅ Game、test-support、Server、Web、E2E exit 0
-pnpm test:e2e ✅ 身份辨认、角色头像偏好同步、本地资料持久化与锁定、同名入座、创建配置、用户中心与日志焦点循环、并发抢座恢复、投票座位几何、阶段刷新与秘密隔离、四种结局、主页/房间悬浮开发控制、5/7/10 人响应式操作；15 passed / 9 nightly skipped
-pnpm test:e2e:matrix ✅ 5–10 人完整局、7 人第四次任务一败/两败、双活跃房间及 PR 场景；18 passed，2.7 分钟
-Playwright 本地日志 ⚠️ Node 子进程提示 `NO_COLOR` 被 `FORCE_COLOR` 覆盖；测试无业务 warning/error，待 GitHub runner 验证新 workflow
-PostgreSQL 本地集成测试 ✅ 5 个存储/重连用例实际连接本地 PostgreSQL 并通过；服务关闭会等待断连元数据写入完成后再关闭 pool
-PostgreSQL 容器重启探针 ✅ GitHub Actions service container 中已完成存档、重启 PostgreSQL 和使用原凭据重连
-GitHub Actions runner ✅ 质量、单元/Socket.IO、PostgreSQL 和浏览器 smoke 全部通过；workflow 已由 actionlint 校验，action 运行时为 Node.js 24，日志无 warning/deprecation
-GitHub Actions Nightly ✅ 每个人数 1,667 次、共 10,002 局属性测试和 5–10 人浏览器矩阵全部通过；Property games 4 分 34 秒完成，完整日志无 timeout/warning/deprecation
-浏览器交互复测 ✅ 已加入房间置顶并显示“进入”，创建和其他房间加入入口被锁定；“进入”直接复用凭据且不打开名称对话框
-浏览器资料复测 ✅ 首次使用生成随机名称和头像；用户中心可编辑、重新随机并跨标签页同步；活动房间座位存在时即使返回主页仍锁定资料，清除/退出后恢复编辑；创建/加入不再显示名称弹窗；同名玩家可占据不同座位
-浏览器退出复测 ✅ 普通玩家正式退出后释放座位并返回主页；房主解散后房间消失；同浏览器第二标签页在 300ms 内同步返回主页
-浏览器初始化复测 ✅ Chrome 连续 5 轮刷新均捕获连接态和圆桌态；每轮 60 次高频采样中 `#root main` 最大为 1，且页面高度始终未超出视口
-浏览器布局复测 ✅ 5、7、10 人大厅在 320×568、568×320、390×844、768×1024、1024×768、1077×722、1280×685、1440×900 下无横向/纵向滚动、座位裁切或实质重叠，横屏 Header 左右内容不与座位重叠
-游戏圆桌布局复测 ✅ 5、7、10 人游戏页在上述八档视口下中央任务板和可见头像/姓名条不实质重叠；横屏紧凑模式保留五任务、否决轨道与当前操作；结束态角色在各座位公开
-游戏圆桌交互复测 ✅ 桌面 5 人队长选择 2 名队员后，中央按钮从 `提交 0/2` 正确变为 `提交 2/2` 并触发提案；透明座位层不再拦截中央操作，外围座位仍可点击
+pnpm exec vitest run tests/http-boundary.test.ts（apps/server）✅ 13 passed
+pnpm exec vitest run tests/room-session.test.ts tests/room-participation.test.ts tests/RoomView.test.tsx（apps/web）✅ 90 passed
+pnpm --filter @avalon/e2e test:e2e refresh-and-privacy.spec.ts ✅ 2 passed
+pnpm test:e2e ✅ 18 passed / 9 nightly skipped
+Playwright 本地日志 ⚠️ Node 子进程提示 `NO_COLOR` 被 `FORCE_COLOR` 覆盖；无业务 warning/error
+pnpm --filter @avalon/server test:postgres ⚠️ 本轮未重跑；既有真实 PostgreSQL 环境/授权阻塞未解除，未以 memory storage 替代
+真实 5–10 浏览器 LAN 验收 ⬜ 未执行
+部署环境 PostgreSQL 重启与原凭据重连 ⬜ 未执行
 ```
 
-以上结果证明当前代码、构建、隔离浏览器自动化和 GitHub Actions/PostgreSQL 容器检查范围通过，**不等价于已经完成真实 5–10 台设备的局域网验收或部署环境的 PostgreSQL 重启演练**。
+以上本地结果只证明本功能提交的 `pnpm test`、构建和隔离浏览器自动化通过；上文 2026-08-30 及更早条目中的 GitHub Actions/PostgreSQL 容器结果仅记录当时已运行的历史基线，并未执行本功能提交。本轮没有单独运行强制 PostgreSQL 命令或重启探针，部署环境重启演练仍未运行，**也尚未完成真实 5–10 台设备的局域网验收或部署环境的 PostgreSQL 重启演练**。未声称当前提交已有 CI 结果。
 
 ## 当前架构与运行方式
 
@@ -244,7 +270,7 @@ http://192.168.100.117:5183/
 - 同一浏览器配置的多个 Tab 共享 `localStorage`，因此属于同一个客户端；多人测试必须使用不同浏览器、浏览器配置或设备。
 - 玩家名称和装饰头像也只保存在浏览器 `localStorage`，不构成账号或认证身份。加入房间时会把当时的名称和头像复制到公开座位 metadata；同名允许存在，界面和操作日志以座位号区分。头像来源与 CC BY 4.0 署名可在用户中心和 `apps/web/src/assets/avatars/README.md` 查看，头像选择不表达服务端隐藏角色。
 - 正常 Web 流程一次只允许同一浏览器参与现存的活动房间：所有已保存且通过凭据验证的 lobby/playing 房间显示“进入”，并阻止创建或加入新房间。该规则会同步其他标签页，但属于浏览器 UX 约束，不是可抵抗直接 API 调用的服务端授权边界。
-- 等待大厅的正式离座与解散使用 boardgame.io player credential 授权并在 match queue 内重新校验状态；普通玩家只能释放自己的座位，座位 0 只能解散房间。playing 状态返回冲突并保留凭据；“返回主页”不会释放座位。
+- 等待大厅的正式离座与解散使用 boardgame.io player credential 授权并在 match queue 内重新校验状态；普通玩家只能释放自己的座位，只有当前房间拥有者可以解散房间，0 号座位本身不授予管理权限。playing 状态返回冲突并保留凭据；“返回主页”不会释放座位。
 - 隐私窗口通常与普通窗口隔离，但同一隐私会话内的多个 Tab/窗口通常仍共享身份；关闭全部隐私窗口后本地凭据会消失，服务器座位不一定释放。
 - 开发房间控制需要在服务端 `.env.local` 同时设置 `AVALON_DEV_TOOLS=true` 和非空 `AVALON_DEV_ADMIN_TOKEN`；本地测试时由操作者手动输入页面，Token 不得提交、嵌入 Web 配置或持久化，其他场景仍是服务器 secret。
 - PostgreSQL 或 LAN 短暂不可达时，进行中的请求仍可能失败，需要在网络恢复后重试。提交 `a90095d` 只处理空闲客户端的 Pool `error` 事件；活动查询失败是独立的 Promise rejection 路径。当前空闲连接错误由 `PostgresStorage` 记录，boardgame.io Socket.IO 活动请求错误由请求边界记录并关闭底层连接以触发客户端重连；两者都只记录事件、错误码和消息，不记录凭据或请求参数，也不会把数据库故障伪装成房间不存在。

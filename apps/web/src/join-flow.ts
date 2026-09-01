@@ -1,30 +1,28 @@
+import type {
+  AvalonCreateRoomRequest,
+  AvalonJoinRoomRequest,
+  AvalonRoleConfiguration,
+  AvalonRoomSessionResponse,
+} from '@avalon/game'
+
 import type { RoomSession } from './room-session'
 import { createClientID } from './client-identity'
 import { getPlayerNameValidationError } from './player-name'
 import type { PlayerAvatarID } from './player-profile'
 
 export type PendingJoin =
-  | { type: 'create'; numPlayers: number }
-  | { type: 'join'; matchID: string; playerID: string }
+  | { type: 'create'; numPlayers: number; roleConfiguration: AvalonRoleConfiguration }
+  | { type: 'join'; matchID: string }
 
 export interface LobbyJoinClient {
-  createMatch: (
-    gameName: string,
-    options: { numPlayers: number },
-  ) => Promise<{ matchID: string }>
+  createRoomAndJoin: (
+    request: AvalonCreateRoomRequest,
+  ) => Promise<AvalonRoomSessionResponse>
   joinMatch: (
-    gameName: string,
+    gameName: 'avalon',
     matchID: string,
-    options: {
-      data: {
-        avatarID: PlayerAvatarID
-        clientID: string
-        sessionID: string
-      }
-      playerID: string
-      playerName: string
-    },
-  ) => Promise<{ playerID: string; playerCredentials: string }>
+    request: AvalonJoinRoomRequest,
+  ) => Promise<AvalonRoomSessionResponse>
 }
 
 export async function executePendingJoin(
@@ -34,7 +32,7 @@ export async function executePendingJoin(
     avatarID: PlayerAvatarID
     clientID: string
     createSessionID?: () => string
-    gameName: string
+    gameName: 'avalon'
     playerName: string
   },
 ): Promise<RoomSession> {
@@ -43,32 +41,24 @@ export async function executePendingJoin(
   if (validationError !== null) throw new Error(validationError)
   const sessionID = options.createSessionID?.() ?? `join-${createClientID()}`
 
-  let matchID: string
-  let playerID: string
-
-  if (intent.type === 'create') {
-    const created = await lobby.createMatch(options.gameName, {
-      numPlayers: intent.numPlayers,
-    })
-    matchID = created.matchID
-    playerID = '0'
-  } else {
-    matchID = intent.matchID
-    playerID = intent.playerID
-  }
-
-  const joined = await lobby.joinMatch(options.gameName, matchID, {
+  const profile = {
     data: {
       avatarID: options.avatarID,
       clientID: options.clientID,
       sessionID,
     },
-    playerID,
     playerName,
-  })
+  }
+  const joined = intent.type === 'create'
+    ? await lobby.createRoomAndJoin({
+      ...profile,
+      numPlayers: intent.numPlayers,
+      roleConfiguration: intent.roleConfiguration,
+    })
+    : await lobby.joinMatch(options.gameName, intent.matchID, profile)
 
   return {
-    matchID,
+    matchID: joined.matchID,
     playerID: joined.playerID,
     credentials: joined.playerCredentials,
     avatarID: options.avatarID,

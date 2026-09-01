@@ -10,13 +10,22 @@ function createRecognitionClient(
   now: () => number,
   identityRecognitionDeadlineEnabled = false,
 ) {
+  const game = createAvalonGame({
+    identityRecognitionDeadlineEnabled,
+    identityRecognitionStepMs: 10_000,
+    now,
+    serverInstanceID: 'server-one',
+  })
+
   return Client({
-    game: createAvalonGame({
-      identityRecognitionDeadlineEnabled,
-      identityRecognitionStepMs: 10_000,
-      now,
-      serverInstanceID: 'server-one',
-    }),
+    game: {
+      ...game,
+      setup: (context) => game.setup?.(context, {
+        ownerPlayerID: '0',
+        occupiedPlayerIDs: ['0', '1', '2', '3', '4'],
+        roleConfiguration: { percivalMorgana: false },
+      }) as AvalonG,
+    },
     numPlayers: 5,
     playerID: '0',
   })
