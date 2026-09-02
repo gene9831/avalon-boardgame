@@ -129,7 +129,13 @@ test('help center supports contextual role guidance and keyboard dismissal', asy
   const cards = help.locator('[data-help-role]')
   await expect(cards.nth(0)).toHaveAttribute('data-help-role', 'percival')
   await expect(cards.nth(1)).toHaveAttribute('data-help-role', 'morgana')
-  await expect(help.locator('[data-help-role-artwork]')).toHaveCount(6)
+  const foregroundArtwork = help.locator('[data-help-role-artwork]')
+  const backdropArtwork = help.locator('[data-help-role-artwork-backdrop]')
+  await expect(foregroundArtwork).toHaveCount(6)
+  await expect(backdropArtwork).toHaveCount(6)
+  expect(await backdropArtwork.evaluateAll((images) => images.every(
+    (image) => getComputedStyle(image).display === 'none',
+  ))).toBe(true)
 
   const percivalCard = cards.nth(0)
   const artworkBox = await percivalCard
@@ -141,4 +147,39 @@ test('help center supports contextual role guidance and keyboard dismissal', asy
   expect(artworkBox).not.toBeNull()
   expect(roleNameBox).not.toBeNull()
   expect(artworkBox!.x + artworkBox!.width).toBeLessThan(roleNameBox!.x)
+
+  await page.setViewportSize({ width: 1280, height: 720 })
+  expect(await backdropArtwork.evaluateAll((images) => images.every((image) => {
+    const style = getComputedStyle(image)
+    return style.display !== 'none' && style.objectFit === 'cover'
+  }))).toBe(true)
+  expect(await foregroundArtwork.evaluateAll((images) => images.every(
+    (image) => getComputedStyle(image).objectFit === 'contain',
+  ))).toBe(true)
+})
+
+test('help tabs stay above scrolled role artwork on narrow screens', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 369, height: 812 })
+  await page.goto('/')
+
+  await page.getByRole('button', { name: '帮助说明' }).click()
+  const help = page.getByRole('dialog', { name: '帮助说明' })
+  const rulesTab = help.getByRole('tab', { name: '游戏基础规则' })
+  await help.getByRole('tab', { name: '角色说明' }).click()
+  await help.evaluate((dialog) => {
+    dialog.scrollTop = 80
+  })
+
+  const rulesTabIsTopmost = await rulesTab.evaluate((tab) => {
+    const rect = tab.getBoundingClientRect()
+    const topmostElement = document.elementFromPoint(
+      rect.x + rect.width / 2,
+      rect.y + rect.height / 2,
+    )
+    return topmostElement === tab || tab.contains(topmostElement)
+  })
+
+  expect(rulesTabIsTopmost).toBe(true)
 })
