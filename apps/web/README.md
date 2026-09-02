@@ -27,6 +27,27 @@ Run it from the workspace root:
 pnpm dev
 ```
 
+## Role image conversion
+
+Lossless PNG role masters live in `images/source/roles/`. Generate deployable WebP
+variants in `apps/web/public/images/roles/` with:
+
+```bash
+# Convert every PNG master.
+pnpm --filter @avalon/web images:roles
+
+# Convert one role by filename, case-insensitively.
+pnpm --filter @avalon/web images:roles -- Merlin
+```
+
+The converter preserves aspect ratio and transparency, strips nonessential
+metadata, and writes `320w`, `480w`, and `674w` variants without enlarging a
+source that is narrower than a requested output. Generated files use lowercase
+names such as `merlin-320.webp`. The command is explicit and is not part of the
+normal Web build. Prefix a PNG master filename with `_` to retain it in the
+source directory without including it in default or explicitly requested
+conversion.
+
 The Vite server binds to `0.0.0.0` for LAN testing. By default, the browser derives the Lobby API and Socket.IO URLs from the hostname used to open the page:
 
 - Lobby API: `http://<browser-host>:8001`

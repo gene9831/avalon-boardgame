@@ -129,11 +129,11 @@ test('help center supports contextual role guidance and keyboard dismissal', asy
   const cards = help.locator('[data-help-role]')
   await expect(cards.nth(0)).toHaveAttribute('data-help-role', 'percival')
   await expect(cards.nth(1)).toHaveAttribute('data-help-role', 'morgana')
-  await expect(help.locator('[data-role-artwork-placeholder]')).toHaveCount(6)
+  await expect(help.locator('[data-help-role-artwork]')).toHaveCount(6)
 
   const percivalCard = cards.nth(0)
   const artworkBox = await percivalCard
-    .locator('[data-role-artwork-placeholder]')
+    .locator('[data-help-role-artwork="percival"]')
     .boundingBox()
   const roleNameBox = await percivalCard
     .getByRole('heading', { name: '帕西维尔' })
