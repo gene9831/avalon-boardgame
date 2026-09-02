@@ -3,6 +3,7 @@ import {
   useRef,
   type KeyboardEvent,
 } from 'react'
+import { ChevronDown } from 'lucide-react'
 
 import { loyaltyForRole, type Role } from '@avalon/game'
 
@@ -187,7 +188,7 @@ function RulesHelpPanel({ playerCount }: { playerCount?: number }) {
         <details className="group rounded-2xl border border-white/10 bg-slate-950/35">
           <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-semibold text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-300">
             关键规则
-            <span aria-hidden="true" className="text-slate-400 transition group-open:rotate-180">⌄</span>
+            <ChevronDown aria-hidden="true" className="size-5 shrink-0 self-center text-slate-400 transition-transform group-open:rotate-180" strokeWidth={2} />
           </summary>
           <ul className="space-y-2 border-t border-white/10 px-4 py-4 text-sm leading-6 text-slate-300">
             {HELP_KEY_RULES.map((rule) => <li key={rule}>• {rule}</li>)}
@@ -197,7 +198,7 @@ function RulesHelpPanel({ playerCount }: { playerCount?: number }) {
         <details className="group rounded-2xl border border-white/10 bg-slate-950/35">
           <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-semibold text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-300">
             人数配置
-            <span aria-hidden="true" className="text-slate-400 transition group-open:rotate-180">⌄</span>
+            <ChevronDown aria-hidden="true" className="size-5 shrink-0 self-center text-slate-400 transition-transform group-open:rotate-180" strokeWidth={2} />
           </summary>
           <div className="overflow-x-auto border-t border-white/10 p-3 sm:p-4">
             <table className="w-full min-w-[38rem] text-left text-xs sm:text-sm">
@@ -305,7 +306,7 @@ function HelpRoleCard({
             <dd className="mt-1 text-slate-400">{guidance.objective}</dd>
           </div>
           <div>
-            <dt className="font-semibold text-slate-200">新手提示</dt>
+            <dt className="font-semibold text-slate-200">提示</dt>
             <dd className="mt-1 text-slate-400">{guidance.beginnerTip}</dd>
           </div>
         </dl>
@@ -316,7 +317,7 @@ function HelpRoleCard({
 
 function HelpRoleArtwork({ role }: { role: Role }) {
   const artwork = HELP_ROLE_ARTWORK[role]
-  const className = 'w-[5.5rem] overflow-hidden rounded-xl border border-white/15 bg-slate-950/35 sm:aspect-[4/3] sm:w-auto'
+  const className = 'relative isolate w-[5.5rem] overflow-hidden rounded-xl border border-white/15 bg-slate-950/35 sm:aspect-[4/3] sm:w-auto'
 
   if (artwork === undefined) {
     return (
@@ -328,18 +329,41 @@ function HelpRoleArtwork({ role }: { role: Role }) {
     )
   }
 
+  const src = `/images/roles/${artwork.slug}-674.webp`
+  const srcSet = `/images/roles/${artwork.slug}-320.webp 320w, /images/roles/${artwork.slug}-480.webp 480w, /images/roles/${artwork.slug}-674.webp 674w`
+
   return (
     <div aria-hidden="true" className={className}>
       <img
         alt=""
-        className="block h-auto w-full sm:size-full sm:object-contain"
+        aria-hidden="true"
+        className="absolute inset-0 hidden size-full scale-[1.08] object-cover blur-[18px] brightness-[.55] saturate-[.8] sm:block"
+        data-help-role-artwork-backdrop={role}
+        decoding="async"
+        height={artwork.height}
+        loading="lazy"
+        sizes={HELP_ROLE_ARTWORK_SIZES}
+        src={src}
+        srcSet={srcSet}
+        width={artwork.width}
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 hidden sm:block"
+        style={{
+          backgroundImage: 'radial-gradient(ellipse at center, transparent 35%, rgb(2 6 23 / 0.18) 72%, rgb(2 6 23 / 0.42) 100%), linear-gradient(to bottom, rgb(15 23 42 / 0.02) 0%, rgb(15 23 42 / 0.08) 55%, rgb(2 6 23 / 0.30) 100%)',
+        }}
+      />
+      <img
+        alt=""
+        className="relative z-10 block h-auto w-full sm:size-full sm:object-contain"
         data-help-role-artwork={role}
         decoding="async"
         height={artwork.height}
         loading="lazy"
         sizes={HELP_ROLE_ARTWORK_SIZES}
-        src={`/images/roles/${artwork.slug}-674.webp`}
-        srcSet={`/images/roles/${artwork.slug}-320.webp 320w, /images/roles/${artwork.slug}-480.webp 480w, /images/roles/${artwork.slug}-674.webp 674w`}
+        src={src}
+        srcSet={srcSet}
         width={artwork.width}
       />
     </div>
