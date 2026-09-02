@@ -30,7 +30,9 @@ interface HelpRoleArtworkSource {
 
 const HELP_ROLE_ARTWORK: Partial<Record<Role, HelpRoleArtworkSource>> = {
   assassin: { height: 1051, slug: 'assassin', width: 674 },
+  loyal_servant: { height: 1010, slug: 'loyal-servant', width: 674 },
   merlin: { height: 1010, slug: 'merlin', width: 674 },
+  minion: { height: 1010, slug: 'minion', width: 674 },
   morgana: { height: 1010, slug: 'morgana', width: 674 },
   percival: { height: 1010, slug: 'percival', width: 674 },
 }
