@@ -106,6 +106,12 @@ function renderLobby(overrides: Partial<LobbyViewProps> = {}) {
 }
 
 describe('LobbyView room access', () => {
+  it('uses the shared Lucide refresh icon without changing the button name', () => {
+    const html = renderLobby()
+
+    expect(html).toMatch(/<button[^>]*aria-label="刷新房间列表"[^>]*>[\s\S]*?lucide-refresh-cw[\s\S]*?<\/button>/)
+  })
+
   it('uses the production homepage positioning and avoids implementation copy', () => {
     const html = renderLobby({
       matches: [openRoom, currentRoom, finishedRoom],

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { RefreshCw } from 'lucide-react'
 
 import type {
   AvalonRoomStatus,
@@ -205,7 +206,7 @@ export function LobbyView({
         </section>
 
         <section className="mt-6 rounded-3xl border border-white/10 bg-white/[0.06] p-5 shadow-2xl shadow-black/20 backdrop-blur sm:p-7">
-          <div className="flex items-center justify-between gap-4"><div><h2 className="text-2xl font-semibold text-white">进行中的房间</h2><p className="mt-1 text-sm text-slate-400">选择一个房间加入，或继续尚未结束的对局。</p></div><button aria-label="刷新房间列表" className={neutralIconButton} onClick={onRefresh} title="刷新房间列表" type="button"><svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0 2 5.5M20 4v7h-7" strokeLinecap="round" strokeLinejoin="round" /></svg></button></div>
+          <div className="flex items-center justify-between gap-4"><div><h2 className="text-2xl font-semibold text-white">进行中的房间</h2><p className="mt-1 text-sm text-slate-400">选择一个房间加入，或继续尚未结束的对局。</p></div><button aria-label="刷新房间列表" className={neutralIconButton} onClick={onRefresh} title="刷新房间列表" type="button"><RefreshCw aria-hidden="true" className="size-5" strokeWidth={2} /></button></div>
           <div className="mt-6">{renderSection(sections[0], { showHeading: false })}</div>
           <div className="mt-8">{renderSection(sections[1], { secondary: true })}</div>
         </section>
