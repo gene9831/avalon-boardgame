@@ -77,6 +77,63 @@ describe('Avalon replay support', () => {
     expect(snapshot).toEqual({ dispatched: 3 })
   })
 
+  it('reports safe command progress before each transcript dispatch', async () => {
+    const events: string[] = []
+    const progress: unknown[] = []
+    const transcript: AvalonCommand[] = [
+      { actor: '0', command: 'startGame' },
+      {
+        actor: '3',
+        command: 'proposeTeam',
+        payload: { team: ['1', '4'] },
+      },
+      {
+        actor: '0',
+        command: 'castTeamVote',
+        payload: { vote: 'approve' },
+      },
+    ]
+    const driver: ReplayDriver<void> = {
+      dispatch(command) {
+        events.push(`dispatch:${command.command}`)
+      },
+      snapshot() {},
+    }
+
+    await replayTranscript(driver, transcript, {
+      onCommandStart(value) {
+        events.push(`progress:${value.currentCommand}`)
+        progress.push(value)
+      },
+    })
+
+    expect(events).toEqual([
+      'progress:startGame',
+      'dispatch:startGame',
+      'progress:proposeTeam',
+      'dispatch:proposeTeam',
+      'progress:castTeamVote',
+      'dispatch:castTeamVote',
+    ])
+    expect(progress).toEqual([
+      {
+        completedCommands: 0,
+        currentCommand: 'startGame',
+        totalCommands: 3,
+      },
+      {
+        completedCommands: 1,
+        currentCommand: 'proposeTeam',
+        totalCommands: 3,
+      },
+      {
+        completedCommands: 2,
+        currentCommand: 'castTeamVote',
+        totalCommands: 3,
+      },
+    ])
+  })
+
   it('replays the same authoritative game state from one seed and transcript', async () => {
     const transcript: AvalonCommand[] = [
       { actor: '0', command: 'startGame' },
