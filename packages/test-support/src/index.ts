@@ -25,4 +25,9 @@ export type {
   ScriptedScenarioOptions,
 } from './scripted-scenarios'
 export { replayTranscript } from './transcript'
-export type { AvalonCommand, ReplayDriver } from './transcript'
+export type {
+  AvalonCommand,
+  ReplayCommandProgress,
+  ReplayDriver,
+  ReplayTranscriptOptions,
+} from './transcript'

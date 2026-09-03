@@ -23,7 +23,7 @@ export default defineConfig({
   use: {
     baseURL: webURL,
     screenshot: 'only-on-failure',
-    trace: 'retain-on-failure',
+    trace: process.env.CI ? 'on-first-retry' : 'retain-on-failure',
     viewport: { width: 1280, height: 900 },
   },
   webServer: [
