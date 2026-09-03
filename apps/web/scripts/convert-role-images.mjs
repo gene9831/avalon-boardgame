@@ -4,7 +4,7 @@ import path from 'node:path'
 
 import sharp from 'sharp'
 
-const TARGET_WIDTHS = [320, 480, 674]
+const RESPONSIVE_WIDTHS = [320, 480]
 const WEBP_OPTIONS = {
   quality: 82,
   alphaQuality: 100,
@@ -128,7 +128,9 @@ async function convertSource(filename) {
   }
 
   const variants = []
-  for (const width of TARGET_WIDTHS) {
+  const targetWidths = [...new Set([...RESPONSIVE_WIDTHS, sourceMetadata.width])]
+    .sort((left, right) => left - right)
+  for (const width of targetWidths) {
     variants.push(await writeVariant({ sourcePath, sourceMetadata, slug, width }))
   }
 

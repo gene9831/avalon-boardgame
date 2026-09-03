@@ -27,7 +27,7 @@
 - Web 使用仅保存在浏览器的随机默认名称与八款装饰头像；主页 Header 用户中心可修改资料，存在任何活动房间座位时锁定名称和头像。创建/加入直接使用当前资料，不再弹出名称确认；同一房间允许同名并以座位号区分。
 - 创建房间先打开配置弹窗，当前支持 5–10 人选择、阵营/任务人数摘要与 Percival/Morgana 成对配置。
 - Web 提供统一“帮助说明”：主页桌面端使用文字入口、移动端收为 44px 图标，等待大厅和游戏页使用图标入口；弹窗分为“游戏基础规则”和“角色说明”两个 Tab。创建配置中的角色问号会直接打开角色说明，将帕西维尔与莫甘娜前置并短暂脉冲高亮；Merlin、Percival、Loyal Servant、Assassin、Morgana、Minion 六个 MVP 角色均使用响应式角色立绘，宽屏 4:3 区域使用同图模糊背景填充并在上层完整显示清晰原图。
-- Web 角色立绘已建立显式素材转换流程：无损 PNG 母版保存在 `images/source/roles/`，`apps/web` 使用 Sharp 按原比例生成 `320w`、`480w`、`674w` WebP，并保留透明通道、验证输出后原子替换派生文件；以下划线开头的保留母版不参与转换。当前已为 Assassin、Loyal Servant、Merlin、Minion、Mordred、Morgana、Oberon、Percival 生成三档素材；帮助说明使用原生 `srcset` 接入六个 MVP 角色，游戏圆桌仍使用既有方形角色头像。
+- Web 角色立绘已建立显式素材转换流程：无损 PNG 母版保存在 `images/source/roles/`，`apps/web` 使用 Sharp 按原比例生成 `320w`、`480w` 与各母版原生宽度的 WebP，并保留透明通道、验证输出后原子替换派生文件；以下划线开头的保留母版不参与转换。当前 674px 与 752px 两类母版均保留各自原生最大候选，帮助说明按角色元数据输出对应的固有宽高和原生 `srcset`；游戏圆桌仍使用既有方形角色头像。
 - 系统通知统一使用最多三条的顶部 Toast；主页不提供通知历史入口。房间 Header 提供无未读徽标的操作日志，记录当前客户端观察到的公开加入/退出，以及开局、提案、结算投票、匿名任务结果、刺杀和胜负。
 - Web 主页和个人设备圆桌等待大厅已完成响应式重设计；大厅以当前玩家为底部锚点，在所有宽度采用同一套圆形座位 DOM。房主开局进入桌面中央，退出/解散进入顶部房间菜单；健康连接不显示状态，连续断线 8 秒后才在顶部提供手动重连。房间页在最低 320×568 竖屏与 568×320 横屏内按宽高可用空间缩放，不产生页面滚动。
 - 等待大厅支持玩家凭据授权的主动离座：普通玩家只释放自己的座位，房主解散整个房间；游戏开始后拒绝这两类操作，返回主页仍是保留座位的无损导航。
@@ -165,6 +165,8 @@
 ## 当前验证基线
 
 最近一次验证日期：2026-09-03
+
+2026-09-03 角色立绘原生最大宽度修正验证：角色图片转换器不再把所有母版的最大 WebP 宽度固定为 674px，而是为每张母版生成 `320w`、`480w` 与原生宽度候选；674px 的 Assassin、Loyal Servant、Minion 继续生成 674w，752px 的 Merlin、Mordred、Morgana、Oberon、Percival 新增 752w。帮助说明按每个角色的真实宽高生成默认 `src` 与 `srcset`，其中 Merlin、Morgana、Percival 使用 752×1127 固有尺寸，其余 MVP 角色保持各自 674px 原生尺寸。隔离临时目录中的真实 Sharp 转换回归完成 RED（752px fixture 错误产出 674w）→ GREEN（产出 752w），帮助说明静态输出回归同样完成 RED → GREEN。`pnpm --filter @avalon/web images:roles` 成功生成全部当前母版候选；完整 `pnpm test` 为 Game 88、test-support 23、Server 84、Web 243，共 438 passed；Web build 与 lint exit 0。Build 保留既有单个 557.35 kB minified / 167.65 kB gzip JavaScript chunk 建议性警告。本次未运行 Playwright、真实 LAN 或 PostgreSQL 验收。
 
 2026-09-03 PC 角色说明卡片渐变层次优化验证：在同图双层填充结构不变的基础上，将宽屏装饰背景调整为 55% 亮度和 80% 饱和度；遮罩改为中央透亮、边缘由 18% 收暗至 42% 的径向渐变，并叠加顶部 2%、中部 8%、底部 30% 的纵向深色渐变，形成中央聚焦、边缘与底部自然回落的海报式层次。应用内浏览器在 1280×720 检查两排六张角色卡，确认双渐变均生效、前景保持 `object-contain`、背景没有黑框或光晕，页面无横向溢出；390×844 下六个背景和六个遮罩均为 `display:none`，前景继续保持约 88px 宽原比例布局。角色图片容器使用独立 stacking context，使内部前景层不会越过弹窗 sticky Header；369×812 下将角色图滚到 Tab 后方时，浏览器命中测试和实际页面都确认“游戏基础规则”仍是最上层可见、可点击元素。六张角色卡的“新手提示”标题统一精简为“提示”，466×812 页面统计六处新标题且无旧标题残留。主页房间列表刷新按钮改用 Lucide `RefreshCw`，帮助规则折叠项改用 20px Lucide `ChevronDown`；466×812 实测两类图标均与 44px 按钮或 48px 折叠栏精确居中，折叠箭头展开后旋转 180°。各档视口控制台均无 warning/error。Web 242 tests、Web build 与 E2E typecheck 均 exit 0，dialogs Playwright 4 passed；build 保留既有单个 557.38 kB minified / 167.65 kB gzip JavaScript chunk 建议性警告，Playwright 仅出现既有 `NO_COLOR`/`FORCE_COLOR` Node 警告。本次未运行完整 Playwright、lint、真实 LAN 或 PostgreSQL 验收。
 
