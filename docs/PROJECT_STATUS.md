@@ -27,7 +27,7 @@
 - Web 使用仅保存在浏览器的随机默认名称与八款装饰头像；主页 Header 用户中心可修改资料，存在任何活动房间座位时锁定名称和头像。创建/加入直接使用当前资料，不再弹出名称确认；同一房间允许同名并以座位号区分。
 - 创建房间先打开配置弹窗，当前支持 5–10 人选择、阵营/任务人数摘要与 Percival/Morgana 成对配置。
 - Web 提供统一“帮助说明”：主页桌面端使用文字入口、移动端收为 44px 图标，等待大厅和游戏页使用图标入口；弹窗分为“游戏基础规则”和“角色说明”两个 Tab。创建配置中的角色问号会直接打开角色说明，将帕西维尔与莫甘娜前置并短暂脉冲高亮；Merlin、Percival、Loyal Servant、Assassin、Morgana、Minion 六个 MVP 角色均使用响应式角色立绘，宽屏 4:3 区域使用同图模糊背景填充并在上层完整显示清晰原图。
-- Web 角色立绘已建立显式素材转换流程：无损 PNG 母版保存在 `images/source/roles/`，`apps/web` 使用 Sharp 按原比例生成 `320w`、`480w`、`674w` WebP，并保留透明通道、验证输出后原子替换派生文件；以下划线开头的保留母版不参与转换。当前已为 Assassin、Loyal Servant、Merlin、Minion、Mordred、Morgana、Oberon、Percival 生成三档素材；帮助说明使用原生 `srcset` 接入六个 MVP 角色，游戏圆桌仍使用既有方形角色头像。
+- Web 角色立绘已建立显式素材转换流程：无损 PNG 母版保存在 `images/source/roles/`，`apps/web` 使用 Sharp 按原比例生成 `320w`、`480w` 与各母版原生宽度的 WebP，并保留透明通道、验证输出后原子替换派生文件；以下划线开头的保留母版不参与转换。当前 674px 与 752px 两类母版均保留各自原生最大候选，帮助说明按角色元数据输出对应的固有宽高和原生 `srcset`；游戏圆桌仍使用既有方形角色头像。
 - 系统通知统一使用最多三条的顶部 Toast；主页不提供通知历史入口。房间 Header 提供无未读徽标的操作日志，记录当前客户端观察到的公开加入/退出，以及开局、提案、结算投票、匿名任务结果、刺杀和胜负。
 - Web 主页和个人设备圆桌等待大厅已完成响应式重设计；大厅以当前玩家为底部锚点，在所有宽度采用同一套圆形座位 DOM。房主开局进入桌面中央，退出/解散进入顶部房间菜单；健康连接不显示状态，连续断线 8 秒后才在顶部提供手动重连。房间页在最低 320×568 竖屏与 568×320 横屏内按宽高可用空间缩放，不产生页面滚动。
 - 等待大厅支持玩家凭据授权的主动离座：普通玩家只释放自己的座位，房主解散整个房间；游戏开始后拒绝这两类操作，返回主页仍是保留座位的无损导航。
@@ -165,6 +165,8 @@
 ## 当前验证基线
 
 最近一次验证日期：2026-09-03
+
+2026-09-03 角色立绘原生最大宽度修正验证：角色图片转换器不再把所有母版的最大 WebP 宽度固定为 674px，而是为每张母版生成 `320w`、`480w` 与原生宽度候选；674px 的 Assassin、Loyal Servant、Minion 继续生成 674w，752px 的 Merlin、Mordred、Morgana、Oberon、Percival 新增 752w。帮助说明按每个角色的真实宽高生成默认 `src` 与 `srcset`，其中 Merlin、Morgana、Percival 使用 752×1127 固有尺寸，其余 MVP 角色保持各自 674px 原生尺寸。隔离临时目录中的真实 Sharp 转换回归完成 RED（752px fixture 错误产出 674w）→ GREEN（产出 752w），帮助说明静态输出回归同样完成 RED → GREEN。`pnpm --filter @avalon/web images:roles` 成功生成全部当前母版候选；完整 `pnpm test` 为 Game 88、test-support 23、Server 84、Web 243，共 438 passed；Web build 与 lint exit 0。Build 保留既有单个 557.35 kB minified / 167.65 kB gzip JavaScript chunk 建议性警告。本次未运行 Playwright、真实 LAN 或 PostgreSQL 验收。
 
 2026-09-03 Nightly game-flow matrix 超时稳定性修复验证：保持普通 Playwright 用例 60 秒默认超时，仅将 5–10 人完整浏览器回放 matrix 提高至 120 秒；CI 首次尝试不再录制 trace，只有首次重试录制，本地无重试运行继续保留失败 trace。共享 transcript 回放器在每条命令 dispatch 前提供脱敏进度，仅含已完成/总命令数和命令类型；matrix 每 10 秒记录人数、公开阶段、命令类型和耗时，不记录 actor、投票、任务卡、暗杀目标、角色、凭据或命令 payload。最近失败的 10 人 seed `nightly-2026-09-02-10p` 在 `CI=true` 配置下使用真实 Chromium 和十个独立 browser context 完成 92 条命令，1 passed（Playwright 27.9s、回放 22.8s），首次尝试未生成 `trace.zip`。完整 `pnpm test` 为 Game 88、test-support 24、Server 78 passed / 6 skipped、Web 242，共 432 passed / 6 skipped；`pnpm build`、`pnpm lint`、`pnpm typecheck` 均 exit 0。常规 `pnpm test:e2e` 为 21 passed / 9 nightly skipped；完整 `pnpm test:e2e:matrix` 为 30 passed，5–10 人完整游戏分别约 10.2s、14.5s、16.0s、21.4s、18.3s、28.6s。Web build 保留既有单个 557.38 kB minified / 167.65 kB gzip JavaScript chunk 建议性警告；Playwright 仅出现既有 `NO_COLOR`/`FORCE_COLOR` Node 警告。本次未运行 GitHub Actions，因此未声称远端 Nightly 已恢复；也未执行真实 LAN 或 PostgreSQL 重启验收。
 
