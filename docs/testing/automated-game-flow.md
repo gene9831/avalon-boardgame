@@ -1,6 +1,6 @@
 # Automated game-flow testing
 
-Avalon's automated tests use one transcript format from the rule core through Socket.IO and the browser. Every randomized run has an explicit seed so a failure can be replayed without depending on timing or the machine that found it.
+Avalon's automated tests use one transcript format from the rule core through Socket.IO and the browser. Every generated game carries an explicit master seed, and GitHub's property-test jobs also pin the fast-check seed so a failure can be replayed without depending on timing or the machine that found it.
 
 ## Test layers
 
@@ -52,6 +52,8 @@ Keep the failing seed, player count, and transcript together in bug reports. A r
 - `Browser smoke`
 
 The PostgreSQL job creates a credential-bound game, stops the application, restarts the PostgreSQL service container, and reconnects with the original credential. Its temporary credential file is mode `0600`, stays inside the ephemeral runner, is not printed, and is deleted after verification.
+
+The `Unit and Socket.IO replay` job uses fast-check seed `424242` for the regular 100-run property suite on both pull requests and `main` pushes. It reports safe ten-percent progress checkpoints and gives each player-count property test 15 seconds, so hosted-runner CPU variance does not turn the correctness suite into an accidental five-second performance gate. The fixed smoke seed makes the two CI triggers directly comparable; the nightly workflow supplies the changing seed that broadens generated coverage.
 
 `.github/workflows/nightly.yml` runs at 18:00 UTC (02:00 Asia/Shanghai) and can also be started manually. The scheduled master seed is `nightly-YYYY-MM-DD`; browser shards append `-<players>p`. The default property depth is 1,667 runs for each of the six player counts (10,002 generated games total). The property job logs the active player count, completed runs, percentage, and elapsed time at roughly 10% intervals. The 5-player browser shard also runs concurrent-room isolation; the 7-player shard runs both fourth-quest threshold outcomes. A manual run can provide a safe custom `master_seed` and 1–5,000 property runs per player count. Long property tests use a run-count-aware timeout, while each complete browser-matrix game has a 120-second timeout and the complete property job is capped at 20 minutes.
 

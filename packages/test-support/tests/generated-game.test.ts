@@ -13,7 +13,7 @@ import { createPropertyProgress } from './property-progress'
 const propertyRuns = Number(process.env.AVALON_PROPERTY_RUNS ?? 100)
 const propertyProgressEnabled = process.env.AVALON_PROPERTY_PROGRESS === '1'
 const propertyTimeoutMs = propertyRuns <= 100
-  ? 5_000
+  ? 15_000
   : Math.max(120_000, propertyRuns * 60)
 const replaySeed = process.env.FAST_CHECK_SEED === undefined
   ? undefined
@@ -64,6 +64,10 @@ function assertGameInvariants(
 }
 
 describe('generated Avalon games', () => {
+  it('allows hosted runners enough time for the default property coverage', () => {
+    expect(propertyTimeoutMs).toBeGreaterThanOrEqual(15_000)
+  })
+
   for (const playerCount of [5, 6, 7, 8, 9, 10]) {
     it(`preserves rule and visibility invariants for ${playerCount} players`, () => {
       const visitedPhases = new Set<string>()
