@@ -58,6 +58,7 @@ test('the homepage and room share responsive floating development controls', asy
   page,
 }) => {
   await page.goto('/')
+  await expect(page.getByRole('button', { name: '创建房间' })).toBeEnabled()
   for (const viewport of targetViewports) {
     await page.setViewportSize(viewport)
     await expectFloatingDevelopmentControls(page, false)
