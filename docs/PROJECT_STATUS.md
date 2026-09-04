@@ -28,6 +28,7 @@
 - 创建房间先打开配置弹窗，当前支持 5–10 人选择、阵营/任务人数摘要与 Percival/Morgana 成对配置。
 - Web 提供统一“帮助说明”：主页桌面端使用文字入口、移动端收为 44px 图标，等待大厅和游戏页使用图标入口；弹窗分为“游戏基础规则”和“角色说明”两个 Tab。创建配置中的角色问号会直接打开角色说明，将帕西维尔与莫甘娜前置并短暂脉冲高亮；Merlin、Percival、Loyal Servant、Assassin、Morgana、Minion 六个 MVP 角色均使用响应式角色立绘，宽屏 4:3 区域使用同图模糊背景填充并在上层完整显示清晰原图。
 - Web 角色立绘已建立显式素材转换流程：无损 PNG 母版保存在 `images/source/roles/`，`apps/web` 使用 Sharp 按原比例生成 `320w`、`480w` 与各母版原生宽度的 WebP，并保留透明通道、验证输出后原子替换派生文件；以下划线开头的保留母版不参与转换。当前 674px 与 752px 两类母版均保留各自原生最大候选，帮助说明按角色元数据输出对应的固有宽高和原生 `srcset`；游戏圆桌仍使用既有方形角色头像。
+- Assassin、Loyal Servant、Merlin、Minion、Mordred、Morgana、Oberon 与 Percival 的角色头像使用独立于角色说明立绘的 AI 横向扩图母版；原始高度为 1051/1010/1127 px，方形不透明 sRGB PNG 母版保存在 `images/source/role-avatars/`。Web 使用质量 90 的 256×256 不透明 WebP 衍生图；当前六个 MVP 角色的身份卡和圆桌通过 CSS 圆形蒙版显示，Mordred 与 Oberon 仅预先生成头像资产，未加入当前规则或 UI。
 - 系统通知统一使用最多三条的顶部 Toast；主页不提供通知历史入口。房间 Header 提供无未读徽标的操作日志，记录当前客户端观察到的公开加入/退出，以及开局、提案、结算投票、匿名任务结果、刺杀和胜负。
 - Web 主页和个人设备圆桌等待大厅已完成响应式重设计；大厅以当前玩家为底部锚点，在所有宽度采用同一套圆形座位 DOM。房主开局进入桌面中央，退出/解散进入顶部房间菜单；健康连接不显示状态，连续断线 8 秒后才在顶部提供手动重连。房间页在最低 320×568 竖屏与 568×320 横屏内按宽高可用空间缩放，不产生页面滚动。
 - 等待大厅支持玩家凭据授权的主动离座：普通玩家只释放自己的座位，房主解散整个房间；游戏开始后拒绝这两类操作，返回主页仍是保留座位的无损导航。
@@ -164,7 +165,11 @@
 
 ## 当前验证基线
 
-最近一次验证日期：2026-09-03
+最近一次验证日期：2026-09-04
+
+2026-09-04 方形角色头像复核与 Morgana/Loyal Servant 返工验证：重新检查此前使用“候选底图 + 原图主体全高固定 48px 羽化”的结果，确认该方法虽能保护中央身份并降低精确边界梯度，却会在两套不同的头发、服装和肩甲几何之间产生语义断裂；此前对 Morgana 与 Loyal Servant 的“未发现明显接缝”结论不成立，全图 SSIM 也不再作为扩图成功判据。返工以 `images/source/roles/Morgana.png`（752×1127）和 `images/source/roles/Loyal-Servant.png`（674×1010）为唯一权威编辑目标，分别通过内置 ImageGen 单独生成四个候选并选用候选 3；最终仅用不贯穿全图、远离原图左右边界且沿头部自然轮廓变化的语义蒙版保护脸、眼睛、头饰、伤痕和颈部，头发外缘、肩部、服装和盔甲继续使用候选重绘。最终不透明 8-bit sRGB PNG 分别为 1127×1127 和 1010×1010；身份保护区 patch SSIM 为 Morgana 脸部 0.968376、头饰 0.996080，Loyal Servant 脸部 0.993148、眼睛/伤痕 1.000000。原图边界 96px 带相对原图的 ΔE2000 均值/P95 为 Morgana 左 8.9188/37.3086、右 6.9283/25.8000，Loyal Servant 左 4.9411/13.0903、右 3.8894/12.5096；这些重绘差异明显高于旧 48px 合成和部分基线，因此按要求人工复核。边界相邻列 ΔE 均值相对附近列的比值为 Morgana 0.8919/0.9158、Loyal Servant 0.8383/0.8047，Sobel 梯度均值分别为 6.7523/8.0445 与 12.7617/12.5004，未形成垂直离群线；100%/200% 放大、256×256 方形及圆形预览确认发束、服装、肩甲曲率与高光跨界连续，无黑色楔形、双重轮廓或压缩新增光晕。质量 90 的 256×256 WebP 相对同尺寸无损 PNG 的全局亮度 SSIM 为 0.999310/0.999152，大小为 10.98/12.07 KiB。Assassin 只做诊断且未替换：以中央剑轴为基准，y=740/800/920 的左右主要肩部或披风轮廓距离约为 402/397、429/428、443/425 px，最大可辨差异约 4%，Sobel 轮廓和圆形预览均支持合理的光照/发丝遮挡与非完全对称姿态，而非右肩异常收窄。角色头像资产测试 16 passed，完整 Web 测试 258 passed，Web build 与 lint exit 0；Build 保留既有单个 557.38 kB minified / 167.65 kB gzip JavaScript chunk 建议性警告。本次未运行 LPIPS/DISTS（当前环境未提供实现）、Playwright、真实 LAN 或 PostgreSQL 验收。
+
+2026-09-03 Merlin/Assassin 方形角色头像试点验证：以角色说明竖图为唯一原始参考，通过内置 ImageGen 横向扩充左右背景、兜帽、头发与服装，每个角色比较四个候选后选用候选 2；最终母版使用 48px 羽化融合保留原角色主体，Merlin 为 1127×1127、Assassin 为 1051×1051，均为 sRGB、8-bit、不透明 PNG。未经融合的 AI 重绘候选在 256px 中央对应区域 SSIM 为 0.37–0.46，未达到感知等价；最终候选分别提升至 0.9702 和 0.9675，方形与圆形蒙版预览人工复核未发现明显接缝、身份漂移或新增物件。Web 部署资源使用质量 90 的 256×256 不透明 WebP，Assassin 为 9.4 KiB、Merlin 为 12 KiB，相对同尺寸无损参考图的亮度 SSIM 分别为 0.999309 和 0.999253，圆桌继续由既有 `overflow-hidden rounded-full` 容器裁切；资产契约回归完成 RED（目标 WebP 缺失）→ GREEN（4 passed），同时保护 PNG 母版和 WebP 衍生图，完整 Web 测试为 246 passed，Web build 与 lint exit 0。Build 保留既有单个 557.38 kB minified / 167.65 kB gzip JavaScript chunk 建议性警告。本次未运行 Playwright、真实 LAN 或 PostgreSQL 验收。
 
 2026-09-03 角色立绘原生最大宽度修正验证：角色图片转换器不再把所有母版的最大 WebP 宽度固定为 674px，而是为每张母版生成 `320w`、`480w` 与原生宽度候选；674px 的 Assassin、Loyal Servant、Minion 继续生成 674w，752px 的 Merlin、Mordred、Morgana、Oberon、Percival 新增 752w。帮助说明按每个角色的真实宽高生成默认 `src` 与 `srcset`，其中 Merlin、Morgana、Percival 使用 752×1127 固有尺寸，其余 MVP 角色保持各自 674px 原生尺寸。隔离临时目录中的真实 Sharp 转换回归完成 RED（752px fixture 错误产出 674w）→ GREEN（产出 752w），帮助说明静态输出回归同样完成 RED → GREEN。`pnpm --filter @avalon/web images:roles` 成功生成全部当前母版候选；完整 `pnpm test` 为 Game 88、test-support 23、Server 84、Web 243，共 438 passed；Web build 与 lint exit 0。Build 保留既有单个 557.35 kB minified / 167.65 kB gzip JavaScript chunk 建议性警告。本次未运行 Playwright、真实 LAN 或 PostgreSQL 验收。
 
