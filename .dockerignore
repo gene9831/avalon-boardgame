@@ -12,5 +12,4 @@ test-results
 data
 **/data
 *.tar.gz
-docs/superpowers/plans
-docs/superpowers/specs/2026-09-04-docker-compose-deployment-design.md
+docs
