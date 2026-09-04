@@ -29,10 +29,28 @@ export interface ReplayDriver<Snapshot> {
   snapshot(): Promise<Snapshot> | Snapshot
 }
 
+export interface ReplayCommandProgress {
+  completedCommands: number
+  currentCommand: AvalonCommand['command']
+  totalCommands: number
+}
+
+export interface ReplayTranscriptOptions {
+  onCommandStart?: (progress: ReplayCommandProgress) => void
+}
+
 export async function replayTranscript<Snapshot>(
   driver: ReplayDriver<Snapshot>,
   transcript: readonly AvalonCommand[],
+  options: ReplayTranscriptOptions = {},
 ) {
-  for (const command of transcript) await driver.dispatch(command)
+  for (const [index, command] of transcript.entries()) {
+    options.onCommandStart?.({
+      completedCommands: index,
+      currentCommand: command.command,
+      totalCommands: transcript.length,
+    })
+    await driver.dispatch(command)
+  }
   return driver.snapshot()
 }

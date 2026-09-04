@@ -58,14 +58,14 @@ describe('HelpDialog', () => {
     expect(backdropImages).toHaveLength(6)
 
     const artworkByRole = [
-      { height: 1010, role: 'merlin', slug: 'merlin' },
-      { height: 1010, role: 'percival', slug: 'percival' },
-      { height: 1010, role: 'loyal_servant', slug: 'loyal-servant' },
-      { height: 1051, role: 'assassin', slug: 'assassin' },
-      { height: 1010, role: 'morgana', slug: 'morgana' },
-      { height: 1010, role: 'minion', slug: 'minion' },
+      { height: 1127, role: 'merlin', slug: 'merlin', width: 752 },
+      { height: 1127, role: 'percival', slug: 'percival', width: 752 },
+      { height: 1010, role: 'loyal_servant', slug: 'loyal-servant', width: 674 },
+      { height: 1051, role: 'assassin', slug: 'assassin', width: 674 },
+      { height: 1127, role: 'morgana', slug: 'morgana', width: 752 },
+      { height: 1010, role: 'minion', slug: 'minion', width: 674 },
     ] as const
-    for (const { height, role, slug } of artworkByRole) {
+    for (const { height, role, slug, width } of artworkByRole) {
       const foregroundImage = foregroundImages.find((image) => image.includes(`data-help-role-artwork="${role}"`))
       const backdropImage = backdropImages.find((image) => image.includes(`data-help-role-artwork-backdrop="${role}"`))
 
@@ -77,9 +77,10 @@ describe('HelpDialog', () => {
       for (const image of [foregroundImage, backdropImage]) {
         expect(image).toContain(`/images/roles/${slug}-320.webp 320w`)
         expect(image).toContain(`/images/roles/${slug}-480.webp 480w`)
-        expect(image).toContain(`/images/roles/${slug}-674.webp 674w`)
+        expect(image).toContain(`/images/roles/${slug}-${width}.webp ${width}w`)
+        expect(image).toContain(`src="/images/roles/${slug}-${width}.webp"`)
         expect(image).toContain(`sizes="(min-width: 1024px) 18rem, (min-width: 640px) 42vw, 5.5rem"`)
-        expect(image).toContain('width="674"')
+        expect(image).toContain(`width="${width}"`)
         expect(image).toContain(`height="${height}"`)
         expect(image).toContain('loading="lazy"')
         expect(image).toContain('decoding="async"')
