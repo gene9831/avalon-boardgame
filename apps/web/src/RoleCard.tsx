@@ -1,11 +1,11 @@
 import { loyaltyForRole, type Role } from '@avalon/game'
 
-import assassinAvatar from './assets/roles/assassin.png'
-import loyalServantAvatar from './assets/roles/loyal-servant.png'
-import merlinAvatar from './assets/roles/merlin.png'
-import morganaAvatar from './assets/roles/morgana.png'
-import minionAvatar from './assets/roles/minion-of-mordred.png'
-import percivalAvatar from './assets/roles/percival.png'
+import assassinAvatar from './assets/roles/assassin.webp'
+import loyalServantAvatar from './assets/roles/loyal-servant.webp'
+import merlinAvatar from './assets/roles/merlin.webp'
+import morganaAvatar from './assets/roles/morgana.webp'
+import minionAvatar from './assets/roles/minion-of-mordred.webp'
+import percivalAvatar from './assets/roles/percival.webp'
 import { ROLE_GUIDANCE } from './role-guidance'
 import { LOYALTY_LABELS, ROLE_LABELS } from './room-game'
 

@@ -38,6 +38,9 @@ jobs:
   unit-and-socket:
     name: Unit and Socket.IO replay
     runs-on: ubuntu-latest
+    env:
+      AVALON_PROPERTY_PROGRESS: '1'
+      FAST_CHECK_SEED: '424242'
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
