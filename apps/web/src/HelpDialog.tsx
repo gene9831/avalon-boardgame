@@ -32,10 +32,10 @@ interface HelpRoleArtworkSource {
 const HELP_ROLE_ARTWORK: Partial<Record<Role, HelpRoleArtworkSource>> = {
   assassin: { height: 1051, slug: 'assassin', width: 674 },
   loyal_servant: { height: 1010, slug: 'loyal-servant', width: 674 },
-  merlin: { height: 1010, slug: 'merlin', width: 674 },
+  merlin: { height: 1127, slug: 'merlin', width: 752 },
   minion: { height: 1010, slug: 'minion', width: 674 },
-  morgana: { height: 1010, slug: 'morgana', width: 674 },
-  percival: { height: 1010, slug: 'percival', width: 674 },
+  morgana: { height: 1127, slug: 'morgana', width: 752 },
+  percival: { height: 1127, slug: 'percival', width: 752 },
 }
 
 const HELP_ROLE_ARTWORK_SIZES = '(min-width: 1024px) 18rem, (min-width: 640px) 42vw, 5.5rem'
@@ -329,8 +329,10 @@ function HelpRoleArtwork({ role }: { role: Role }) {
     )
   }
 
-  const src = `/images/roles/${artwork.slug}-674.webp`
-  const srcSet = `/images/roles/${artwork.slug}-320.webp 320w, /images/roles/${artwork.slug}-480.webp 480w, /images/roles/${artwork.slug}-674.webp 674w`
+  const src = `/images/roles/${artwork.slug}-${artwork.width}.webp`
+  const srcSet = [320, 480, artwork.width]
+    .map((width) => `/images/roles/${artwork.slug}-${width}.webp ${width}w`)
+    .join(', ')
 
   return (
     <div aria-hidden="true" className={className}>
