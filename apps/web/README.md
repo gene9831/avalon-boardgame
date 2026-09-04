@@ -54,4 +54,6 @@ The Vite server binds to `0.0.0.0` for LAN testing. By default, the browser deri
 - Lobby API: `http://<browser-host>:8001`
 - Game transport: `http://<browser-host>:8000`
 
-When the web client and game server run on different hosts, copy `.env.example` to `.env.local` and set `VITE_LOBBY_URL` and `VITE_GAME_URL` explicitly. Local storage holds the browser profile (name and avatar), client and public session IDs, preferred player count, room and seat IDs, and the boardgame.io seat credential needed for reconnecting. Game secrets and other players' credentials remain server-side.
+When the web client and game server run on different hosts, copy `.env.example` to `.env.local` and set `VITE_LOBBY_URL` and `VITE_GAME_URL` explicitly. In the integrated production deployment, both overrides are normally omitted: Lobby traffic uses the page base URL, game traffic uses the page origin, and Socket.IO uses a path derived from `document.baseURI`. This lets the gateway serve the same image at `/` or at a validated prefix supplied by an upstream reverse proxy. See the [Docker Compose deployment guide](../../docs/deployment/docker-compose.md).
+
+Local storage holds the browser profile (name and avatar), client and public session IDs, preferred player count, room and seat IDs, and the boardgame.io seat credential needed for reconnecting. Game secrets and other players' credentials remain server-side.

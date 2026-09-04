@@ -3,11 +3,6 @@ import { startAvalonServer } from './server'
 
 const running = await startAvalonServer({ config: loadServerConfig() })
 
-console.log(
-  `Avalon game server listening on ${running.gamePort}; ` +
-    `Lobby API listening on ${running.lobbyPort}`,
-)
-
 let shuttingDown = false
 const shutdown = async () => {
   if (shuttingDown) return
@@ -18,3 +13,8 @@ const shutdown = async () => {
 
 process.once('SIGINT', () => void shutdown())
 process.once('SIGTERM', () => void shutdown())
+
+console.log(
+  `Avalon game server listening on ${running.gamePort}; ` +
+    `Lobby API listening on ${running.lobbyPort}`,
+)

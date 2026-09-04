@@ -4,7 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "build": "node scripts/build.mjs",
     "dev": "node --env-file-if-exists=.env.local --import tsx src/index.ts",
+    "start": "node dist/index.js",
     "test": "vitest run",
     "test:postgres": "AVALON_REQUIRE_POSTGRES_TESTS=1 vitest run tests/postgres.test.ts tests/postgres-reconnect.test.ts",
     "test:postgres:restart-probe": "tsx tests/support/postgres-restart-probe.ts",
@@ -20,6 +22,7 @@
     "@avalon/test-support": "workspace:*",
     "@types/node": "^24.13.3",
     "@types/pg": "^8.21.0",
+    "esbuild": "^0.28.2",
     "socket.io-client": "4.8.3",
     "tsx": "^4.23.12",
     "typescript": "~6.0.3",

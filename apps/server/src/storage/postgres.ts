@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 
 import type { LogEntry, Server, State, StorageAPI } from 'boardgame.io'
-import { Pool } from 'pg'
+import { Pool, type PoolConfig } from 'pg'
 
 import type {
   AtomicLobbyStorage,
@@ -13,6 +13,10 @@ const schemaURL = new URL('./schema.sql', import.meta.url)
 
 export interface PostgresStorageOptions {
   connectionString?: string
+  connection?: Pick<
+    PoolConfig,
+    'host' | 'port' | 'database' | 'user' | 'password'
+  >
   pool?: Pool
 }
 
@@ -57,12 +61,13 @@ export class PostgresStorage implements StorageAPI.Async, AtomicLobbyStorage {
       this.pool = options.pool
       this.ownsPool = false
     } else {
-      const connectionString = options.connectionString ?? process.env.DATABASE_URL
-      if (connectionString === undefined || connectionString.trim() === '') {
-        throw new Error('DATABASE_URL is required for PostgresStorage')
+      if (options.connectionString !== undefined) {
+        this.pool = new Pool({ connectionString: options.connectionString })
+      } else if (options.connection !== undefined) {
+        this.pool = new Pool(options.connection)
+      } else {
+        throw new Error('PostgreSQL connection configuration is required')
       }
-
-      this.pool = new Pool({ connectionString })
       this.ownsPool = true
     }
 
@@ -77,6 +82,10 @@ export class PostgresStorage implements StorageAPI.Async, AtomicLobbyStorage {
     const schema = await readFile(schemaURL, 'utf8')
     await this.pool.query('SELECT 1')
     await this.pool.query(schema)
+  }
+
+  async checkHealth() {
+    await this.pool.query('SELECT 1')
   }
 
   async close() {

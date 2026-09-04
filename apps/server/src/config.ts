@@ -9,7 +9,7 @@ export interface AvalonServerConfig {
 
 const DEFAULT_GAME_PORT = 8000
 const DEFAULT_LOBBY_PORT = 8001
-const DEFAULT_ORIGINS = ['http://localhost:5173']
+const DEFAULT_ORIGINS = ['http://localhost:5183']
 
 function parsePort(name: string, rawValue: string | undefined, fallback: number) {
   if (rawValue === undefined || rawValue.trim() === '') {

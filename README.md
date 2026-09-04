@@ -18,8 +18,9 @@ packages/
 tests/
   e2e/          Playwright multi-context browser flows
 infra/
-  postgres/     PostgreSQL deployment boundary
+  postgres/     Development-only PostgreSQL Compose stack
 docs/
+  deployment/   Integrated Docker Compose deployment guide
   rules/        Rule references and visibility constraints
   adr/          Architecture decisions
   testing/      Automated and manual acceptance procedures
@@ -59,9 +60,11 @@ pnpm dev:server
 pnpm dev
 ```
 
-Open `http://localhost:5173`. The server listens on game port `8000` and Lobby API port `8001` by default.
+Open `http://localhost:5183`. The server listens on game port `8000` and Lobby API port `8001` by default.
 
-For LAN access, the browser derives both server URLs from the hostname used to open the page. If the web client and server run on different hosts, configure `VITE_LOBBY_URL` and `VITE_GAME_URL` in `apps/web/.env.local`. See the [server](apps/server/README.md), [web](apps/web/README.md), and [PostgreSQL deployment](infra/postgres/README.md) guides for detailed configuration.
+For LAN development, the browser derives both server URLs from the hostname used to open the page. If the web client and server run on different hosts, configure `VITE_LOBBY_URL` and `VITE_GAME_URL` in `apps/web/.env.local`. See the [server](apps/server/README.md), [web](apps/web/README.md), and [development PostgreSQL](infra/postgres/README.md) guides for detailed configuration.
+
+For an integrated deployment, copy the root `.env.example` to `.env` and run `docker compose up -d --build`. The stack publishes one configurable gateway port and keeps the Node and PostgreSQL ports internal. It supports both Docker-managed and bind-mounted database volumes, plus runtime nested-path deployment behind an existing reverse proxy. See the [Docker Compose deployment guide](docs/deployment/docker-compose.md).
 
 ## Root scripts
 
@@ -71,7 +74,7 @@ The following table covers every script declared in the root `package.json`.
 | --- | --- |
 | `pnpm dev` | Starts the `@avalon/web` Vite development server on all network interfaces. |
 | `pnpm dev:server` | Starts the `@avalon/server` Lobby API and Socket.IO game server, loading `apps/server/.env.local` when present. |
-| `pnpm build` | Type-checks `@avalon/game` and `@avalon/server`, then creates the production Web bundle. |
+| `pnpm build` | Type-checks `@avalon/game` and `@avalon/server`, creates the production server JavaScript artifact, then creates the production Web bundle. |
 | `pnpm lint` | Runs Oxlint for `@avalon/web`. |
 | `pnpm preview` | Serves the built Web bundle with Vite preview. Run `pnpm build` first. |
 | `pnpm test` | Runs every workspace package that declares a `test` script: rule core, replay/property, server, and Web unit tests. It does not run Playwright or required-PostgreSQL suites. |
@@ -93,6 +96,8 @@ Run a package script from the repository root with `pnpm --filter <package> <scr
 | `@avalon/test-support` | `test` | Runs generated-game, transcript, replay, and property tests. |
 | `@avalon/test-support` | `typecheck` | Type-checks replay and test-support code. |
 | `@avalon/server` | `dev` | Starts the server directly and loads `.env.local` when present. |
+| `@avalon/server` | `build` | Bundles the production Node ESM artifact and copies the PostgreSQL schema beside it. |
+| `@avalon/server` | `start` | Starts the previously built production JavaScript artifact. |
 | `@avalon/server` | `test` | Runs Lobby, Socket.IO replay, configuration, lifecycle, and server unit/integration tests that do not require PostgreSQL. |
 | `@avalon/server` | `test:postgres` | Requires PostgreSQL and runs storage plus restart-reconnect tests. |
 | `@avalon/server` | `test:postgres:restart-probe` | Internal CI probe with `prepare` and `verify` modes around a PostgreSQL service restart. |
@@ -139,7 +144,7 @@ pnpm test:replay --seed nightly-2026-08-22-7p --players 7
 E2E_MASTER_SEED=nightly-2026-08-22-7p E2E_PLAYER_COUNT=7 pnpm test:e2e:matrix
 ```
 
-GitHub Actions runs quality checks, unit and Socket.IO replay tests, PostgreSQL restart/reconnect tests, and a browser smoke flow for pull requests and pushes to `main`. A nightly workflow runs deeper property tests and seeded 5–10-player browser shards entirely on GitHub-hosted runners. See [automated game-flow testing](docs/testing/automated-game-flow.md) for replay controls, CI job names, and failure artifacts.
+GitHub Actions runs quality checks, unit and Socket.IO replay tests, PostgreSQL restart/reconnect tests, a browser smoke flow, and a non-publishing Docker Compose smoke test for pull requests and pushes to `main`. A nightly workflow runs deeper property tests and seeded 5–10-player browser shards entirely on GitHub-hosted runners. See [automated game-flow testing](docs/testing/automated-game-flow.md) for replay controls, CI job names, and failure artifacts.
 
 Automation is not a substitute for real-device LAN acceptance. Use the [LAN multiplayer acceptance guide](docs/testing/lan-multiplayer-acceptance.md) for physical-device, network interruption, multi-room, and deployment restart checks.
 
