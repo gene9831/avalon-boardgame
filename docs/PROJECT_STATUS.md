@@ -34,7 +34,7 @@
 - 等待大厅支持玩家凭据授权的主动离座：普通玩家只释放自己的座位，房主解散整个房间；游戏开始后拒绝这两类操作，返回主页仍是保留座位的无损导航。
 - 开发模式房间页控制：可删除任意状态房间、在大厅踢出占用座位；删除 ID 在进程生命周期内保持不可用，匿名 Socket.IO 同步和延迟写入都不能复活房间，被删除/踢出后会清理失效凭据并返回主页；活动房间的过期 metadata 快照也不能恢复旧名称或凭据，kick 会在旧写入之后权威落盘。
 - 游戏测试使用版本化 RNG seed、统一命令 transcript 和确定性 replay；同一失败可在规则层、Socket.IO 层或浏览器层重放。
-- Playwright 使用每玩家独立 browser context 自动完成创建、加入、刷新重连和整局游戏；GitHub Actions 负责 PR smoke/PostgreSQL 检查和每日 5–10 人分片矩阵，不依赖开发者电脑。
+- Playwright 使用每玩家独立 browser context 自动完成创建、加入、刷新重连和整局游戏；GitHub Actions 负责快速 PR smoke、两片浏览器回归、PostgreSQL 检查和每日 5–10 人分片矩阵，不依赖开发者电脑。
 
 当前最大缺口：**5–10 台真实设备的完整局域网验收，以及部署环境中的 PostgreSQL 重启演练**。CI 的质量、单元/Socket.IO、数据库容器重启重连、浏览器 smoke、Nightly 10,002 局属性测试和 5–10 人浏览器矩阵均已在 GitHub 托管 runner 上通过。
 
@@ -99,8 +99,8 @@
 | 任务历史与公开结果 | ✅ | 中央任务板展示已结算任务的成功/失败状态和公开成功/失败牌总数，不把任务牌关联到具体玩家。 |
 | 刺杀 UI 与最终结算 | ✅ | 刺客从圆桌座位选择非已知邪恶目标；其他玩家等待。结算展示胜方、原因和目标，并在每个座位公开最终角色。 |
 | 确定性随机与回放 | ✅ | `@avalon/test-support` 从 master seed 派生游戏/行动 seed，以统一 transcript 驱动规则层和 Socket.IO；失败 artifact 不包含凭据、Token 或秘密状态。 |
-| 自动化完整局流程 | ✅ | 属性测试覆盖 5–10 人基础/成对角色规则与可见性不变量，test-support 以完整权威 occupancy 启动回放；Socket.IO 回放与规则层权威状态对比。Playwright 门禁覆盖原子创建入座、自动最低空座加入、并发加入、拥有者换座、0 号座位复用、满房文案、换座瞬态响应与同浏览器旧标签页恢复、刷新、44px 键盘操作、Percival 私密视野、提案/投票/任务牌秘密隔离、四种胜负结局和 5/7/10 人目标视口。Nightly 继续覆盖 5–10 人完整局矩阵、7 人第四次任务阈值和双活跃房间并行隔离。 |
-| GitHub Actions 测试门禁 | ✅ | `main` 已启用分支保护并将质量、单元/Socket.IO、PostgreSQL 和浏览器 smoke 配置为 required checks；普通 PR 与 `main` 的属性测试固定使用 fast-check seed `424242`、输出脱敏进度并为每个人数保留 15 秒 runner 抖动余量，Nightly 每个人数 1,667 次属性测试及 5–10 人浏览器分片继续使用每日可回放 seed。 |
+| 自动化完整局流程 | ✅ | 属性测试覆盖 5–10 人基础/成对角色规则与可见性不变量，test-support 以完整权威 occupancy 启动回放；Socket.IO 回放与规则层权威状态对比。Playwright 快速 smoke 覆盖原子创建入座、自动最低空座加入、并发加入、拥有者换座、0 号座位复用及完整五拒绝游戏；其余两片浏览器回归覆盖满房文案、换座瞬态响应与同浏览器旧标签页恢复、刷新、44px 键盘操作、Percival 私密视野、提案/投票/任务牌秘密隔离、四种胜负结局和 5/7/10 人目标视口。Nightly 继续覆盖 5–10 人完整局矩阵、7 人第四次任务阈值和双活跃房间并行隔离。 |
+| GitHub Actions 测试门禁 | ✅ | `main` 已启用分支保护；质量、单元/Socket.IO、PostgreSQL 与兼容既有 context 名称的浏览器聚合检查保持 required，浏览器聚合仅在快速 smoke execution 和两片 regression 全部成功后通过。普通 CI 使用 pnpm 11 原生 setup action，避免旧 action 的 npm self-installer 抖动；普通 PR 与 `main` 的属性测试固定使用 fast-check seed `424242`、输出脱敏进度并为每个人数保留 15 秒 runner 抖动余量，Nightly 每个人数 1,667 次属性测试及 5–10 人浏览器分片继续使用每日可回放 seed。 |
 | 真实环境人工验收 | ⬜ | 应用数据与模拟视口已自动化；人工只保留真实 Node 服务重启、目标 PostgreSQL 服务/volume 重启，以及手机、平板或其他电脑的实际 LAN/CORS/Socket.IO 链路。 |
 | 重启后重连验收 | ⬜ | 存储、凭据和 GitHub 临时 PostgreSQL 容器重启已有自动测试，尚未完成目标部署环境的 Node 与 PostgreSQL 手工演练。 |
 | 开发服务稳定运行方式 | ⚠️ | Codex 工具启动的长期进程会被环境回收；多人测试应在用户自己的两个终端中运行服务。 |
@@ -166,6 +166,8 @@
 ## 当前验证基线
 
 最近一次验证日期：2026-09-04
+
+2026-09-04 浏览器 CI 稳定性与耗时治理验证：确认开发控制回归的首轮失败并非浮层撑高页面，而是测试在主页房间目录和活动会话校验完成前记录高度；受控延迟以与远端相同的 `844 → 1051` 失败完成 RED，改为等待“创建房间”入口进入可用态后 GREEN。两个核心 `@smoke` 流程独立为快速执行项，其余 28 项按文件分为两个 regression shard；既有 required `Browser smoke` context 改为三者的兼容聚合门禁。本地 smoke 为 2 passed（16.7 秒），regression shard 1 为 7 passed / 9 nightly skipped（37.3 秒），shard 2 为 12 passed（1.3 分钟）；原 CI 顺序重复十轮为 30 passed（1.3 分钟），开发控制回归未触发重试；最终未分片完整 E2E 为 21 passed / 9 nightly skipped（2.2 分钟），同样无重试。普通 CI 的四类执行 job 从 npm self-installer 路径迁移到 pnpm 11 原生 `pnpm/setup`，保留显式 frozen-lockfile 安装；CI workflow YAML 解析和 2/28 测试发现边界验证通过。本次尚未运行远端 GitHub Actions、真实 PostgreSQL 或 LAN 验收。
 
 2026-09-04 普通 CI 属性测试稳定性修复验证：确认 PR #20 临时 merge commit 与 `main` squash commit 的 tree SHA 相同，而 5 人 generated-game property test 分别以 3.337 秒通过和 5.263 秒触发原 5 秒超时；历史 run `33319936335` 也曾在同一测试以 5.106 秒超时。普通 `Unit and Socket.IO replay` job 现固定使用 fast-check seed `424242`，为 5–10 人各 100 轮测试输出不含游戏选择或秘密状态的 10% 进度，并将每个人数的 correctness-test 超时从 5 秒提高到 15 秒；每日 Nightly 的轮换 seed 和长测试超时保持不变。回归完成 RED（期望至少 15 秒，实际 5 秒）→ GREEN；固定 CI 环境下 `@avalon/test-support` 为 25 passed，完整 `pnpm test` 为 Game 88、test-support 25、Server 84、Web 259，共 456 passed；`pnpm build`、`pnpm lint`、`pnpm typecheck` 均 exit 0，CI workflow YAML 解析成功。Build 保留既有单个 557.35 kB minified / 167.65 kB gzip JavaScript chunk 建议性警告。本次尚未运行远端 GitHub Actions、Playwright、真实 PostgreSQL 或 LAN 验收。
 

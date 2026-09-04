@@ -20,9 +20,9 @@ async function storedPlayerID(
   }, matchID)
 }
 
-test('creation enters the owner, seat zero is reusable, and concurrent joins fill the lowest empty seats', async ({
-  browser,
-}) => {
+test('creation enters the owner, seat zero is reusable, and concurrent joins fill the lowest empty seats', {
+  tag: '@smoke',
+}, async ({ browser }) => {
   test.setTimeout(90_000)
 
   const contexts = await Promise.all(
@@ -87,9 +87,9 @@ test('creation enters the owner, seat zero is reusable, and concurrent joins fil
   }
 })
 
-test('five isolated browser players complete a rejected-team game', async ({
-  browser,
-}) => {
+test('five isolated browser players complete a rejected-team game', {
+  tag: '@smoke',
+}, async ({ browser }) => {
   const masterSeed = process.env.E2E_MASTER_SEED ?? 'playwright-smoke'
   const generated = playScriptedScenario({
     masterSeed,
