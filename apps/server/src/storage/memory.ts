@@ -24,6 +24,8 @@ export class MemoryStorage implements StorageAPI.Sync, AtomicLobbyStorage {
     return undefined
   }
 
+  async checkHealth(): Promise<void> {}
+
   createMatch(matchID: string, opts: StorageAPI.CreateMatchOpts) {
     this.initial.set(matchID, opts.initialState)
     this.setState(matchID, opts.initialState)

@@ -18,8 +18,9 @@ packages/
 tests/
   e2e/          Playwright 多浏览器上下文流程
 infra/
-  postgres/     PostgreSQL 部署边界
+  postgres/     仅用于开发的 PostgreSQL Compose
 docs/
+  deployment/   一体化 Docker Compose 部署说明
   rules/        规则参考与可见性约束
   adr/          架构决策记录
   testing/      自动化与人工验收流程
@@ -59,9 +60,11 @@ pnpm dev:server
 pnpm dev
 ```
 
-打开 `http://localhost:5173`。默认情况下，游戏服务监听 `8000` 端口，大厅 API 监听 `8001` 端口。
+打开 `http://localhost:5183`。默认情况下，游戏服务监听 `8000` 端口，大厅 API 监听 `8001` 端口。
 
-通过局域网访问时，浏览器会根据打开页面所使用的主机名推导两个服务地址。如果 Web 客户端和服务端运行在不同主机上，请在 `apps/web/.env.local` 中配置 `VITE_LOBBY_URL` 和 `VITE_GAME_URL`。详细配置请阅读[服务端](apps/server/README.md)、[Web 客户端](apps/web/README.md)和 [PostgreSQL 部署](infra/postgres/README.md)说明。
+局域网开发时，浏览器会根据打开页面所使用的主机名推导两个服务地址。如果 Web 客户端和服务端运行在不同主机上，请在 `apps/web/.env.local` 中配置 `VITE_LOBBY_URL` 和 `VITE_GAME_URL`。详细配置请阅读[服务端](apps/server/README.md)、[Web 客户端](apps/web/README.md)和[开发用 PostgreSQL](infra/postgres/README.md)说明。
+
+一体化部署时，将根目录 `.env.example` 复制为 `.env`，然后运行 `docker compose up -d --build`。该栈只发布一个可配置的网关端口，Node 与 PostgreSQL 端口保持在容器网络内部；数据库既可使用 Docker 管理的 volume，也可绑定宿主机目录，并支持在已有反向代理后通过运行时前缀部署。详见 [Docker Compose 部署指南](docs/deployment/docker-compose.md)。
 
 ## 根目录脚本
 
@@ -71,7 +74,7 @@ pnpm dev
 | --- | --- |
 | `pnpm dev` | 启动 `@avalon/web` Vite 开发服务，并监听所有网络接口。 |
 | `pnpm dev:server` | 启动 `@avalon/server` 大厅 API 和 Socket.IO 游戏服务；存在 `apps/server/.env.local` 时会自动加载。 |
-| `pnpm build` | 对 `@avalon/game` 和 `@avalon/server` 做类型检查，然后生成 Web 生产构建。 |
+| `pnpm build` | 对 `@avalon/game` 和 `@avalon/server` 做类型检查，生成服务端生产 JavaScript，再生成 Web 生产构建。 |
 | `pnpm lint` | 对 `@avalon/web` 运行 Oxlint。 |
 | `pnpm preview` | 使用 Vite preview 提供已构建的 Web 文件；需要先运行 `pnpm build`。 |
 | `pnpm test` | 运行所有声明了 `test` 脚本的 workspace：规则核心、回放/属性、服务端和 Web 单元测试；不包含 Playwright 和强制使用 PostgreSQL 的测试。 |
@@ -93,6 +96,8 @@ pnpm dev
 | `@avalon/test-support` | `test` | 运行生成游戏、transcript、回放和属性测试。 |
 | `@avalon/test-support` | `typecheck` | 对回放和测试支持代码做类型检查。 |
 | `@avalon/server` | `dev` | 直接启动服务端；存在 `.env.local` 时会自动加载。 |
+| `@avalon/server` | `build` | 生成生产 Node ESM 文件，并把 PostgreSQL schema 复制到其相对位置。 |
+| `@avalon/server` | `start` | 启动已生成的生产 JavaScript 文件。 |
 | `@avalon/server` | `test` | 运行不依赖 PostgreSQL 的大厅、Socket.IO 回放、配置、生命周期及服务端单元/集成测试。 |
 | `@avalon/server` | `test:postgres` | 强制使用 PostgreSQL，运行存储和重启重连测试。 |
 | `@avalon/server` | `test:postgres:restart-probe` | CI 内部探针，在 PostgreSQL 服务重启前后分别使用 `prepare` 和 `verify` 模式。 |
@@ -139,7 +144,7 @@ pnpm test:replay --seed nightly-2026-08-22-7p --players 7
 E2E_MASTER_SEED=nightly-2026-08-22-7p E2E_PLAYER_COUNT=7 pnpm test:e2e:matrix
 ```
 
-GitHub Actions 会在 pull request 和推送到 `main` 时运行质量检查、单元与 Socket.IO 回放测试、PostgreSQL 重启/重连测试和浏览器 smoke 流程。夜间 workflow 完全运行在 GitHub 托管 runner 上，执行更深的属性测试以及 5–10 人确定性浏览器分片。回放参数、CI job 名称和失败 artifact 说明见[自动化游戏流程测试](docs/testing/automated-game-flow.md)。
+GitHub Actions 会在 pull request 和推送到 `main` 时运行质量检查、单元与 Socket.IO 回放测试、PostgreSQL 重启/重连测试、浏览器 smoke 流程和不发布镜像的 Docker Compose 烟测。夜间 workflow 完全运行在 GitHub 托管 runner 上，执行更深的属性测试以及 5–10 人确定性浏览器分片。回放参数、CI job 名称和失败 artifact 说明见[自动化游戏流程测试](docs/testing/automated-game-flow.md)。
 
 自动化不能代替真实设备的局域网验收。物理设备、网络中断、多房间和部署环境重启测试请使用[局域网多人验收指南](docs/testing/lan-multiplayer-acceptance.md)。
 

@@ -264,7 +264,7 @@ function AppRoutes() {
   }, [])
 
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={webConfig.routerBasename}>
       <Routes>
         <Route element={<LobbyRoute onSaveProfile={handleSaveProfile} profile={profile} />} path="/" />
         <Route element={<RoomRoute onSaveProfile={handleSaveProfile} profile={profile} />} path="/rooms/:matchID" />
@@ -708,6 +708,7 @@ function RoomRoute({
           numPlayers: getMatchPlayerCount(initialRoom as unknown as AvalonMatch),
           multiplayer: SocketIO({
             server: webConfig.gameURL,
+            socketOpts: { path: webConfig.socketPath },
           }),
           matchID,
           playerID: routeSession.playerID,

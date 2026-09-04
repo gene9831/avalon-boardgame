@@ -32,6 +32,9 @@ importers:
       '@types/pg':
         specifier: ^8.21.0
         version: 8.21.0
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
       socket.io-client:
         specifier: 4.8.3
         version: 4.8.3

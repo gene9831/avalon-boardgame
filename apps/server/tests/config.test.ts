@@ -7,7 +7,7 @@ describe('loadServerConfig', () => {
     expect(loadServerConfig({})).toEqual({
       gamePort: 8000,
       lobbyPort: 8001,
-      origins: ['http://localhost:5173'],
+      origins: ['http://localhost:5183'],
       devToolsEnabled: false,
       devAdminToken: undefined,
       testGameSeed: undefined,

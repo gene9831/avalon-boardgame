@@ -1,8 +1,10 @@
-# PostgreSQL deployment
+# Development PostgreSQL service
 
-This directory contains the database-only Docker Compose deployment for the Avalon server. It runs PostgreSQL 16 with a named persistent volume and no extra admin service.
+This directory contains the database-only Docker Compose service for local and split-process development. It runs PostgreSQL 16 with a named persistent volume and no extra admin service.
 
-## Deploy
+For deployment of the complete application, use the root `compose.yml` and the [integrated deployment guide](../../docs/deployment/docker-compose.md). The root stack keeps PostgreSQL private to the container network; this development stack intentionally publishes its database port.
+
+## Start for development
 
 ```bash
 cd infra/postgres
@@ -20,7 +22,7 @@ The persistent volume is `avalon-postgres-data`. Stop the service without deleti
 docker compose down
 ```
 
-The future server connection string will have this shape:
+The server connection string has this shape:
 
 ```text
 postgresql://POSTGRES_USER:POSTGRES_PASSWORD@DATABASE_HOST:POSTGRES_PORT/POSTGRES_DB

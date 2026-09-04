@@ -7,8 +7,7 @@ import { Server as createBoardgameServer } from 'boardgame.io/server'
 import { createAvalonGame } from '@avalon/game'
 
 import { loadServerConfig, type AvalonServerConfig } from './config'
-import { MemoryStorage } from './storage/memory'
-import { PostgresStorage } from './storage/postgres'
+import { createConfiguredStorage } from './storage/configured'
 import { AvalonSocketRegistry, registerDevAdminRoutes } from './dev-admin'
 import { registerRoomParticipationRoutes } from './room-participation'
 import { registerRoomSessionValidationRoute } from './session-validation'
@@ -19,6 +18,7 @@ import {
 } from './storage/lobby-storage'
 import { secretMatches } from './secret'
 import { installAvalonHTTPBoundary } from './http-boundary'
+import { installHealthRoute } from './health'
 import { AvalonSocketIO } from './socket-transport'
 import { createRoomLobbyService } from './room-lobby'
 
@@ -228,7 +228,7 @@ function getPort(server: NonNullable<ServerHandles['appServer']>) {
 
 export function createAvalonServer(options: AvalonServerOptions = {}) {
   const config = options.config ?? loadServerConfig()
-  const rawDb = options.db ?? createDefaultStorage()
+  const rawDb = options.db ?? createConfiguredStorage()
   const trackedStorage = createTrackedStorage(rawDb)
   const guardedStorageOptions = {
     prepareMetadata: prepareAvalonMetadata,
@@ -297,6 +297,7 @@ export function createAvalonServer(options: AvalonServerOptions = {}) {
     lobby,
   })
   registerRoomSessionValidationRoute(boardgame.router, db)
+  installHealthRoute(boardgame.router, rawDb)
   installAvalonHTTPBoundary(boardgame.router, { db, lobby })
 
   return {
@@ -305,36 +306,6 @@ export function createAvalonServer(options: AvalonServerOptions = {}) {
     db: rawDb,
     waitForStorageIdle: trackedStorage.waitForIdle,
   }
-}
-
-function createDefaultStorage(
-  env: NodeJS.ProcessEnv = process.env,
-): StorageAPI.Sync | StorageAPI.Async {
-  const connectionString = env.DATABASE_URL
-  const storageMode = env.AVALON_STORAGE
-
-  if (storageMode === 'memory') return new MemoryStorage()
-
-  if (
-    storageMode !== undefined &&
-    storageMode !== 'postgres'
-  ) {
-    throw new Error('AVALON_STORAGE must be either postgres or memory')
-  }
-
-  if (connectionString !== undefined && connectionString.trim() !== '') {
-    return new PostgresStorage({ connectionString })
-  }
-
-  if (storageMode === 'postgres') {
-    throw new Error('DATABASE_URL is required when AVALON_STORAGE=postgres')
-  }
-
-  if (env.NODE_ENV === 'test') return new MemoryStorage()
-
-  throw new Error(
-    'DATABASE_URL is required outside tests; set AVALON_STORAGE=memory only for local ephemeral development',
-  )
 }
 
 export async function startAvalonServer(
