@@ -8,7 +8,7 @@
 
 项目已经完成从创建房间、入座开局到任务、刺杀和胜负结算的 Web 操作闭环；规则、Socket.IO、PostgreSQL 和 5–10 个隔离浏览器上下文已有分层自动化方案，但尚未完成 5–10 台真实设备的完整局域网验收。
 
-当前阶段：**LAN MVP 开发中 / 应用数据验收已自动化，等待真实进程、数据库和 LAN 设备验收**
+当前阶段：**LAN MVP 开发中 / Docker Compose 部署链路已验证，等待真实 LAN 设备和宿主机反向代理验收**
 
 当前分支和提交以 `git branch --show-current`、`git log -1 --oneline` 为准；本文件不固定记录 HEAD。
 
@@ -35,8 +35,9 @@
 - 开发模式房间页控制：可删除任意状态房间、在大厅踢出占用座位；删除 ID 在进程生命周期内保持不可用，匿名 Socket.IO 同步和延迟写入都不能复活房间，被删除/踢出后会清理失效凭据并返回主页；活动房间的过期 metadata 快照也不能恢复旧名称或凭据，kick 会在旧写入之后权威落盘。
 - 游戏测试使用版本化 RNG seed、统一命令 transcript 和确定性 replay；同一失败可在规则层、Socket.IO 层或浏览器层重放。
 - Playwright 使用每玩家独立 browser context 自动完成创建、加入、刷新重连和整局游戏；GitHub Actions 负责快速 PR smoke、两片浏览器回归、PostgreSQL 检查和每日 5–10 人分片矩阵，不依赖开发者电脑。
+- 根目录提供一体化生产部署 `compose.yml`：单一网关端口承载静态 Web、Lobby API 与 Socket.IO，Node 和 PostgreSQL 仅在 Compose 内网可达；数据既可使用 Docker named volume，也可通过同一环境变量切换为宿主机目录挂载。
 
-当前最大缺口：**5–10 台真实设备的完整局域网验收，以及部署环境中的 PostgreSQL 重启演练**。CI 的质量、单元/Socket.IO、数据库容器重启重连、浏览器 smoke、Nightly 10,002 局属性测试和 5–10 人浏览器矩阵均已在 GitHub 托管 runner 上通过。
+当前最大缺口：**5–10 台真实设备的完整局域网验收，以及实际域名、TLS 和子路径下的宿主机 Nginx 联调**。隔离 Docker 主机上的 Node 重启、PostgreSQL 重启、整栈停止后重建、named volume 与 bind mount 持久化均已验证；CI 的既有质量、单元/Socket.IO、数据库容器重启重连、浏览器 smoke、Nightly 10,002 局属性测试和 5–10 人浏览器矩阵已在 GitHub 托管 runner 上通过，但本次新增的 Compose smoke workflow 尚未在 GitHub Actions 上运行。
 
 ## 目标与范围
 
@@ -69,6 +70,7 @@
 - [收紧 boardgame.io 协议面](adr/0007-restrict-boardgame-protocol-surface.md)
 - [保留已持久化房间的角色配置](adr/0008-preserve-persisted-room-role-configuration.md)
 - [房间拥有者独立于 0 号座位](adr/0009-seat-independent-room-ownership.md)
+- [开发与部署 Compose 分离](adr/0010-separate-development-and-deployment-compose.md)
 - [pnpm workspace 边界](adr/0004-pnpm-workspace-package-boundaries.md)
 
 ## 里程碑状态
@@ -83,6 +85,7 @@
 | 秘密状态与玩家视图 | ✅ | `packages/game/src/player-view.ts` 过滤 `secret`，只返回当前玩家允许看到的信息。 |
 | Socket.IO 游戏服务 | ✅ | 游戏端口 8000，Lobby API 8001；支持独立 match。 |
 | PostgreSQL 存储 | ✅ | `PostgresStorage`、schema、delta logs、列表过滤和 wipe 已实现；空闲连接错误由 Pool 监听器处理，活动查询错误在 boardgame.io Socket.IO 请求边界处理，两类日志都不记录 Client、连接信息或请求参数，本地集成测试可执行。 |
+| Docker Compose 部署 | ✅ | 根目录 `compose.yml`、多阶段 `Dockerfile` 与轻量 Nginx 网关组成一体化部署；只发布一个可配置端口，内部服务有健康检查和依赖顺序，支持 Docker named volume 与宿主机 bind mount。隔离 Docker 主机已验证构建、健康启动、根路径/子路径、Socket.IO、API、故障响应和两类持久化。 |
 | 创建/加入/列出房间 | ✅ | 创建与创建者入座由一个服务端操作原子完成；普通加入不接受客户端选择座位，而是在 match queue 内分配提交时的最低空座位。`@avalon/game` 使用共享 Zod schema 定义严格请求和公开房间目录，Server 通过推导类型构造允许列表，Web 在接收边界原子拒绝无效或重复数据并保留上一次有效限制状态。响应式主页将 lobby/playing 合并为进行中列表，满房显示“已满”，finished 房间单独分页展示。主页验证本机全部活动房间凭据，已加入房间置顶并直接进入；存在活动会话时禁用创建和其他房间的加入入口。等待大厅允许普通玩家凭据授权释放自己的座位，房间拥有者可解散房间，playing 状态拒绝两类操作。 |
 | 主页与等待大厅体验 | ✅ | 主页、创建配置、房间列表和等待提示已使用面向普通玩家的中文产品文案；公共按钮统一使用至少 44px 的触控尺寸和一致交互态。创建配置与退出/解散房间的业务弹窗共用原生 `ModalDialog`，统一管理打开、关闭、Escape、遮罩、危险色、视口内滚动及水平垂直居中；默认配置不显示开发控制入口。创建配置当前提供 5–10 人按钮、阵营构成、五次任务人数摘要和 Percival/Morgana 成对开关。等待大厅在 PC、平板和移动端使用同一套圆桌座位 DOM，当前玩家固定在底部，空位显示虚线头像与座位号；不再使用底部操作栏，房间拥有者开局位于桌面中央，退出/解散位于顶部房间菜单。窄屏使用“等待创建者”等紧凑等待文案，并保留完整的可访问名称；断线状态在窄屏收为 44px 图标，等待大厅暂时以重连控件替代不可用的房间操作入口。房间壳层仅使用 `100dvh` 并关闭 overscroll，避免 iOS Chrome 的 `100vh` 包含动态工具栏而产生页面滚动；主页仍可按内容滚动。高度至少 421px 的横屏会回收 Header 中部空白供圆桌舞台使用，同时保持 Header 左右内容位于更高层级；5–6 人桌底部座位与裁剪边界至少保留 24px，7–10 人桌会向下补偿以保护顶部密集座位。Playwright 使用 5、7、10 人房间在 320×568、568×320、390×844、768×1024、1024×768、1077×722、1280×685、1440×900 验证页面无滚动、座位不被面板裁切、Header 左右内容不与座位重叠、座位与中央区无实质重叠，以及开局、选队和投票可操作。 |
 | 游戏与角色帮助 | ✅ | 统一宽版弹窗提供“游戏基础规则”和“角色说明”语义化 Tab；基础规则包含阵营目标、回合流程、关键规则及 5–10 人配置表，房间内会标出当前人数。角色说明覆盖 Merlin、Percival、Loyal Servant、Assassin、Morgana、Minion 的阵营、能力、目标与提示。创建配置中的问号支持 hover/focus tooltip 和 click/touch 深入说明；上下文打开时帕西维尔与莫甘娜前置并以较平缓的节奏脉冲两次，`prefers-reduced-motion` 下关闭动画。移动端角色说明使用横向列表项，左侧保留 88px 宽原比例立绘、右侧显示完整说明；`sm` 及以上保持三列纵向卡片和 4:3 图片区域，清晰前景完整显示，同图模糊背景负责填满剩余区域。主页在移动端只显示 44×44 问号图标，`sm` 及以上显示“帮助说明”文字；等待大厅和游戏页继续使用图标入口。所有入口复用同一弹窗，支持方向键切换 Tab、Escape 关闭及焦点恢复。 |
@@ -100,9 +103,9 @@
 | 刺杀 UI 与最终结算 | ✅ | 刺客从圆桌座位选择非已知邪恶目标；其他玩家等待。结算展示胜方、原因和目标，并在每个座位公开最终角色。 |
 | 确定性随机与回放 | ✅ | `@avalon/test-support` 从 master seed 派生游戏/行动 seed，以统一 transcript 驱动规则层和 Socket.IO；失败 artifact 不包含凭据、Token 或秘密状态。 |
 | 自动化完整局流程 | ✅ | 属性测试覆盖 5–10 人基础/成对角色规则与可见性不变量，test-support 以完整权威 occupancy 启动回放；Socket.IO 回放与规则层权威状态对比。Playwright 快速 smoke 覆盖原子创建入座、自动最低空座加入、并发加入、拥有者换座、0 号座位复用及完整五拒绝游戏；其余两片浏览器回归覆盖满房文案、换座瞬态响应与同浏览器旧标签页恢复、刷新、44px 键盘操作、Percival 私密视野、提案/投票/任务牌秘密隔离、四种胜负结局和 5/7/10 人目标视口。Nightly 继续覆盖 5–10 人完整局矩阵、7 人第四次任务阈值和双活跃房间并行隔离。 |
-| GitHub Actions 测试门禁 | ✅ | `main` 已启用分支保护；质量、单元/Socket.IO、PostgreSQL 与兼容既有 context 名称的浏览器聚合检查保持 required，浏览器聚合仅在快速 smoke execution 和两片 regression 全部成功后通过。普通 CI 使用 pnpm 11 原生 setup action，避免旧 action 的 npm self-installer 抖动；普通 PR 与 `main` 的属性测试固定使用 fast-check seed `424242`、输出脱敏进度并为每个人数保留 15 秒 runner 抖动余量，Nightly 每个人数 1,667 次属性测试及 5–10 人浏览器分片继续使用每日可回放 seed。 |
-| 真实环境人工验收 | ⬜ | 应用数据与模拟视口已自动化；人工只保留真实 Node 服务重启、目标 PostgreSQL 服务/volume 重启，以及手机、平板或其他电脑的实际 LAN/CORS/Socket.IO 链路。 |
-| 重启后重连验收 | ⬜ | 存储、凭据和 GitHub 临时 PostgreSQL 容器重启已有自动测试，尚未完成目标部署环境的 Node 与 PostgreSQL 手工演练。 |
+| GitHub Actions 测试门禁 | ✅ | `main` 已启用分支保护；质量、单元/Socket.IO、PostgreSQL 与兼容既有 context 名称的浏览器聚合检查保持 required，浏览器聚合仅在快速 smoke execution 和两片 regression 全部成功后通过。普通 CI 使用 pnpm 11 原生 setup action，避免旧 action 的 npm self-installer 抖动；普通 PR 与 `main` 的属性测试固定使用 fast-check seed `424242`、输出脱敏进度并为每个人数保留 15 秒 runner 抖动余量，Nightly 每个人数 1,667 次属性测试及 5–10 人浏览器分片继续使用每日可回放 seed。本分支新增不发布镜像的 Docker Compose smoke job，等待本 PR 的 GitHub Actions 结果。 |
+| 真实环境人工验收 | 🟡 | 隔离 Docker 主机已完成 Node、PostgreSQL 和整栈重启及原凭据重连；仍需手机、平板或其他电脑的实际 LAN/CORS/Socket.IO 链路，以及宿主机 Nginx 的域名、TLS 和子路径联调。 |
+| 重启后重连验收 | ✅ | 隔离 Docker 主机已分别验证 Node 重启、PostgreSQL 重启和 `down` 后保留数据卷再 `up`，原座位凭据均可继续访问同一房间；named volume 与 bind mount 均通过。 |
 | 开发服务稳定运行方式 | ⚠️ | Codex 工具启动的长期进程会被环境回收；多人测试应在用户自己的两个终端中运行服务。 |
 
 ## 下一步执行顺序
@@ -138,15 +141,17 @@
 
 操作步骤、逐项预期结果和失败记录模板见 [LAN 多客户端人工验收手册](testing/lan-multiplayer-acceptance.md)。
 
-- [ ] 重启 Node 服务，使用原凭据回到未结束房间。
-- [ ] 安全重启 PostgreSQL 服务，确认原房间、座位凭据、进度和历史保持不变并可继续游戏。
+- [x] 在隔离 Docker 部署中重启 Node 服务，使用原凭据回到未结束房间。
+- [x] 在隔离 Docker 部署中重启 PostgreSQL 服务并重建整栈，确认原房间、座位凭据和持久化状态仍可访问。
 - [ ] 使用手机、平板或其他电脑通过真实 LAN IP 完成加入、操作、断网恢复与重连，确认 CORS 和 Socket.IO 链路。
+- [ ] 使用实际域名、TLS 与目标子路径联调宿主机 Nginx；容器仍只接收剥离子路径后的请求和 `X-Forwarded-Prefix`。
 
 ### P3：文档与运维收尾
 
 - [x] 把稳定的多人测试启动方式和分级验收步骤写入 README/人工验收手册，明确需要用户自己的终端保持进程。
-- [ ] 记录 PostgreSQL Compose 部署、备份和房间清理方式。
-- [ ] 决定是否需要生产环境的反向代理、HTTPS 和更安全的会话/凭据恢复方案。
+- [x] 记录 PostgreSQL Compose 部署、更新、备份、恢复和数据卷切换方式。
+- [x] 明确反向代理边界：宿主机 Nginx 负责域名、TLS、子路径剥离与前缀头，容器网关只负责应用内部路由和前缀化页面。
+- [ ] 决定是否需要更安全的跨设备会话/凭据恢复方案。
 - [ ] 对 `docs/adr/` 中仍标记为 `proposed` 但已经执行的决策做状态整理。
 
 ### 工程规范渐进整改
@@ -166,6 +171,8 @@
 ## 当前验证基线
 
 最近一次验证日期：2026-09-04
+
+2026-09-04 Docker Compose 部署验证：合并最新 `main` 后，完整 `pnpm test` 为 Game 88、test-support 25、Web 263、Server 87 passed / 6 PostgreSQL tests skipped，共 463 passed / 6 skipped；`pnpm build`、`pnpm lint`、`pnpm typecheck` 均 exit 0。Web build 保留单个 558.01 kB minified / 167.88 kB gzip JavaScript chunk 超过 500 kB 的建议性警告，Server esbuild 产物约 2.4 MB 并仅有体积提示。生产入口先注册 `SIGINT`/`SIGTERM` 处理器再发布监听完成日志，关闭回归不会在 ready 边界竞态退出。隔离 Docker 主机使用手动构建的镜像完成真实 Compose 验证：三服务按健康条件启动，只有网关发布回环地址端口；根路径、任意合法嵌套前缀、SPA 深链接、Lobby API、Socket.IO polling、静态资源缓存、非法前缀拒绝和上游不可用时的安全 503 均符合预期。使用原座位凭据分别通过 Node 重启、PostgreSQL 重启和整栈停止/重建后的会话校验；Docker named volume 与宿主机 bind mount 都保留数据。空密码配置在 Compose 展开阶段被拒绝，绝对 bind 路径可正确解析。验证完成后已清理测试容器、网络、镜像、named volume、bind 数据和探针状态；未修改宿主机 Nginx 或其他服务。新增 Compose smoke workflow 尚未在 GitHub Actions 上运行；未执行真实 5–10 台设备 LAN 验收，也未执行实际域名/TLS/子路径联调。
 
 2026-09-04 浏览器 CI 稳定性与耗时治理验证：确认开发控制回归的首轮失败并非浮层撑高页面，而是测试在主页房间目录和活动会话校验完成前记录高度；受控延迟以与远端相同的 `844 → 1051` 失败完成 RED，改为等待“创建房间”入口进入可用态后 GREEN。两个核心 `@smoke` 流程独立为快速执行项，其余 28 项按文件分为两个 regression shard；既有 required `Browser smoke` context 改为三者的兼容聚合门禁。本地 smoke 为 2 passed（16.7 秒），regression shard 1 为 7 passed / 9 nightly skipped（37.3 秒），shard 2 为 12 passed（1.3 分钟）；原 CI 顺序重复十轮为 30 passed（1.3 分钟），开发控制回归未触发重试；最终未分片完整 E2E 为 21 passed / 9 nightly skipped（2.2 分钟），同样无重试。普通 CI 的四类执行 job 从 npm self-installer 路径迁移到 pnpm 11 原生 `pnpm/setup`，保留显式 frozen-lockfile 安装；CI workflow YAML 解析和 2/28 测试发现边界验证通过。PR #23 与合入后的 `main` push CI 均通过；`pnpm/setup` 在各 job 中约 5–7 秒，`main` 的 Quality、Unit/Socket.IO、PostgreSQL、smoke、regression 1/2、regression 2/2 分别为 38 秒、47 秒、41 秒、1 分 25 秒、1 分 49 秒和 4 分 17 秒，整体关键路径相对原 8 分 43 秒缩短约 51%。真实 LAN 验收仍未运行。
 
@@ -262,6 +269,19 @@ pnpm --filter @avalon/server test:postgres ⚠️ 本轮未重跑；既有真实
 以上本地结果只证明本功能提交的 `pnpm test`、构建和隔离浏览器自动化通过；上文 2026-08-30 及更早条目中的 GitHub Actions/PostgreSQL 容器结果仅记录当时已运行的历史基线，并未执行本功能提交。本轮没有单独运行强制 PostgreSQL 命令或重启探针，部署环境重启演练仍未运行，**也尚未完成真实 5–10 台设备的局域网验收或部署环境的 PostgreSQL 重启演练**。未声称当前提交已有 CI 结果。
 
 ## 当前架构与运行方式
+
+生产部署：
+
+```text
+宿主机 Nginx（可选：域名 / TLS / 子路径剥离）
+  └── Compose 网关（唯一发布端口）
+        ├── 静态 Web
+        ├── Lobby API ──> Node :8001（Compose 内网）
+        └── Socket.IO ──> Node :8000（Compose 内网）
+                              └── PostgreSQL :5432（Compose 内网）
+```
+
+本地开发：
 
 ```text
 浏览器 :5183
