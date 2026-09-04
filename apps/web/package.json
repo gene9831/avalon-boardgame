@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "images:roles": "node scripts/convert-role-images.mjs",
-    "test": "vitest run",
+    "test": "vitest run --exclude=asset-tests/**",
+    "test:assets": "vitest run asset-tests/source-role-assets.test.ts tests/convert-role-images.test.ts tests/role-avatar-assets.test.ts",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"

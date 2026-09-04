@@ -2,7 +2,7 @@
 
 > 这是项目进度的唯一维护入口。更新代码或完成一个独立模块后，同时更新本文件的状态、验收条件和提交记录。
 >
-> 最后更新：2026-09-04
+> 最后更新：2026-09-05
 
 ## 当前结论
 
@@ -29,6 +29,7 @@
 - Web 提供统一“帮助说明”：主页桌面端使用文字入口、移动端收为 44px 图标，等待大厅和游戏页使用图标入口；弹窗分为“游戏基础规则”和“角色说明”两个 Tab。创建配置中的角色问号会直接打开角色说明，将帕西维尔与莫甘娜前置并短暂脉冲高亮；Merlin、Percival、Loyal Servant、Assassin、Morgana、Minion 六个 MVP 角色均使用响应式角色立绘，宽屏 4:3 区域使用同图模糊背景填充并在上层完整显示清晰原图。
 - Web 角色立绘已建立显式素材转换流程：无损 PNG 母版保存在 `images/source/roles/`，`apps/web` 使用 Sharp 按原比例生成 `320w`、`480w` 与各母版原生宽度的 WebP，并保留透明通道、验证输出后原子替换派生文件；以下划线开头的保留母版不参与转换。当前 674px 与 752px 两类母版均保留各自原生最大候选，帮助说明按角色元数据输出对应的固有宽高和原生 `srcset`；游戏圆桌仍使用既有方形角色头像。
 - Assassin、Loyal Servant、Merlin、Minion、Mordred、Morgana、Oberon 与 Percival 的角色头像使用独立于角色说明立绘的 AI 横向扩图母版；原始高度为 1051/1010/1127 px，方形不透明 sRGB PNG 母版保存在 `images/source/role-avatars/`。Web 使用质量 90 的 256×256 不透明 WebP 衍生图；当前六个 MVP 角色的身份卡和圆桌通过 CSS 圆形蒙版显示，Mordred 与 Oberon 仅预先生成头像资产，未加入当前规则或 UI。
+- `images/source/` 下 17 个 PNG 母版由 Git LFS 管理；每个 clone 运行一次 `pnpm assets:setup` 后，共享 `.git/lfs` 只保留一份母版缓存，普通 worktree 默认检出指针。立绘、头像或全部母版可分别通过 `pnpm assets:pull:roles`、`pnpm assets:pull:avatars`、`pnpm assets:pull` 按需展开；常规测试和构建只依赖已提交 WebP，`pnpm assets:verify` 显式验证已展开母版、转换器和部署头像。素材相关路径另有独立 CI，历史图片迁移和不可达对象清理尚未执行。
 - 系统通知统一使用最多三条的顶部 Toast；主页不提供通知历史入口。房间 Header 提供无未读徽标的操作日志，记录当前客户端观察到的公开加入/退出，以及开局、提案、结算投票、匿名任务结果、刺杀和胜负。
 - Web 主页和个人设备圆桌等待大厅已完成响应式重设计；大厅以当前玩家为底部锚点，在所有宽度采用同一套圆形座位 DOM。房主开局进入桌面中央，退出/解散进入顶部房间菜单；健康连接不显示状态，连续断线 8 秒后才在顶部提供手动重连。房间页在最低 320×568 竖屏与 568×320 横屏内按宽高可用空间缩放，不产生页面滚动。
 - 等待大厅支持玩家凭据授权的主动离座：普通玩家只释放自己的座位，房主解散整个房间；游戏开始后拒绝这两类操作，返回主页仍是保留座位的无损导航。
@@ -170,7 +171,9 @@
 
 ## 当前验证基线
 
-最近一次验证日期：2026-09-04
+最近一次验证日期：2026-09-05
+
+2026-09-05 PNG 母版 Git LFS 按需检出验证：`images/source/**/*.png` 的 17 个母版已转换为 131–132 字节 LFS 指针，指针逻辑总量约 2.2 KiB；当前 clone 已使用 skip-smudge，本地 `.git/lfs` 保留一份共享缓存。分组拉取实测立绘约 10.7 MiB、头像仍为约 1 KiB 指针且 9 项立绘检查通过；再拉取头像后，完整素材套件为 3 files / 26 tests passed。恢复全部指针后，完整 `pnpm test` 在沙箱外以现有 PostgreSQL 配置运行，Game 88、test-support 25、Web 255、Server 93，共 461 passed；`pnpm build`、`pnpm lint`、`pnpm typecheck` 均 exit 0。Web build 保留既有单个 558.01 kB minified / 167.88 kB gzip JavaScript chunk 建议性警告，Server esbuild 产物约 2.4 MB 并仅有体积提示。首次沙箱内全仓库测试因禁止监听本地端口及访问 PostgreSQL 出现 `EPERM`，随后按相同命令在沙箱外通过。新素材 workflow 的 YAML 已本地解析，但尚未在 GitHub Actions 上运行；未重写图片历史、未清理不可达 Git 对象、未触碰两个既有 linked worktree，也未执行 Playwright、真实 LAN 或额外部署验收。
 
 2026-09-04 Docker Compose 部署验证：合并最新 `main` 后，完整 `pnpm test` 为 Game 88、test-support 25、Web 263、Server 87 passed / 6 PostgreSQL tests skipped，共 463 passed / 6 skipped；`pnpm build`、`pnpm lint`、`pnpm typecheck` 均 exit 0。Web build 保留单个 558.01 kB minified / 167.88 kB gzip JavaScript chunk 超过 500 kB 的建议性警告，Server esbuild 产物约 2.4 MB 并仅有体积提示。生产入口先注册 `SIGINT`/`SIGTERM` 处理器再发布监听完成日志，关闭回归不会在 ready 边界竞态退出。隔离 Docker 主机使用手动构建的镜像完成真实 Compose 验证：三服务按健康条件启动，只有网关发布回环地址端口；根路径、任意合法嵌套前缀、SPA 深链接、Lobby API、Socket.IO polling、静态资源缓存、非法前缀拒绝和上游不可用时的安全 503 均符合预期。使用原座位凭据分别通过 Node 重启、PostgreSQL 重启和整栈停止/重建后的会话校验；Docker named volume 与宿主机 bind mount 都保留数据。空密码配置在 Compose 展开阶段被拒绝，绝对 bind 路径可正确解析。验证完成后已清理测试容器、网络、镜像、named volume、bind 数据和探针状态；未修改宿主机 Nginx 或其他服务。新增 Compose smoke workflow 尚未在 GitHub Actions 上运行；未执行真实 5–10 台设备 LAN 验收，也未执行实际域名/TLS/子路径联调。
 

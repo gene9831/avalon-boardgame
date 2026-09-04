@@ -4,6 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "assets:pull": "git lfs pull --include=images/source/** --exclude=",
+    "assets:pull:avatars": "git lfs pull --include=images/source/role-avatars/** --exclude=",
+    "assets:pull:roles": "git lfs pull --include=images/source/roles/** --exclude=",
+    "assets:setup": "git lfs install --local --skip-smudge",
+    "assets:verify": "pnpm --filter @avalon/web test:assets",
     "dev": "pnpm --filter @avalon/web dev",
     "dev:server": "pnpm --filter @avalon/server dev",
     "build": "pnpm --filter @avalon/game typecheck && pnpm --filter @avalon/server typecheck && pnpm --filter @avalon/server build && pnpm --filter @avalon/web build",
