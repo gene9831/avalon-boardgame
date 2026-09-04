@@ -159,7 +159,7 @@ export function RoomGamePanel({
   return (
     <section aria-label="阿瓦隆游戏圆桌" className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.055] p-2.5 shadow-2xl shadow-black/25 backdrop-blur sm:p-3 lg:p-4">
       <header className="round-table-header relative z-[80] flex shrink-0 items-center justify-between gap-2 px-1 pb-2 sm:gap-4">
-        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3 lg:max-w-[42%]">
           <button aria-label="返回主页" className="grid min-h-11 min-w-11 shrink-0 place-items-center rounded-lg border border-white/15 text-lg font-medium text-slate-200 transition hover:border-amber-300/60 hover:text-white" onClick={onBackHome} type="button">
             <span aria-hidden="true">←</span>
           </button>
