@@ -418,6 +418,13 @@ test('five, seven, and ten-player round tables remain compact and operable acros
 
         const questCard = generated.transcript[questCardIndex]!
         const questPage = harness.pages[Number(questCard.actor)]
+        if (questCard.command !== 'playQuestCard') throw new Error('Expected a quest card command')
+        const questCardButtonLabel = questCard.payload.card === 'success'
+          ? '让任务成功'
+          : '让任务失败'
+        await expect(questPage.getByRole('button', {
+          name: questCardButtonLabel,
+        })).toBeVisible()
         for (const viewport of [
           { width: 320, height: 568 },
           { width: 504, height: 741 },
@@ -479,9 +486,8 @@ test('five, seven, and ten-player round tables remain compact and operable acros
         await expect(questPage.getByLabel('连续否决轨道')).toBeVisible()
         await expect(questPage.getByRole('button', { name: /成功/ })).toBeVisible()
         await expectRoundTableFits(questPage, `${playerCount} 人游戏圆桌`)
-        if (questCard.command !== 'playQuestCard') throw new Error('Expected a quest card command')
         await questPage.getByRole('button', {
-          name: questCard.payload.card === 'success' ? /成功/ : /失败/,
+          name: questCardButtonLabel,
         }).click()
         const submittedCardLabel = questCard.payload.card === 'success' ? '成功' : '失败'
         await expect(
