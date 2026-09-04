@@ -2,7 +2,7 @@
 
 > 这是项目进度的唯一维护入口。更新代码或完成一个独立模块后，同时更新本文件的状态、验收条件和提交记录。
 >
-> 最后更新：2026-09-03
+> 最后更新：2026-09-04
 
 ## 当前结论
 
@@ -100,7 +100,7 @@
 | 刺杀 UI 与最终结算 | ✅ | 刺客从圆桌座位选择非已知邪恶目标；其他玩家等待。结算展示胜方、原因和目标，并在每个座位公开最终角色。 |
 | 确定性随机与回放 | ✅ | `@avalon/test-support` 从 master seed 派生游戏/行动 seed，以统一 transcript 驱动规则层和 Socket.IO；失败 artifact 不包含凭据、Token 或秘密状态。 |
 | 自动化完整局流程 | ✅ | 属性测试覆盖 5–10 人基础/成对角色规则与可见性不变量，test-support 以完整权威 occupancy 启动回放；Socket.IO 回放与规则层权威状态对比。Playwright 门禁覆盖原子创建入座、自动最低空座加入、并发加入、拥有者换座、0 号座位复用、满房文案、换座瞬态响应与同浏览器旧标签页恢复、刷新、44px 键盘操作、Percival 私密视野、提案/投票/任务牌秘密隔离、四种胜负结局和 5/7/10 人目标视口。Nightly 继续覆盖 5–10 人完整局矩阵、7 人第四次任务阈值和双活跃房间并行隔离。 |
-| GitHub Actions 测试门禁 | ✅ | `main` 已启用分支保护并将质量、单元/Socket.IO、PostgreSQL 和浏览器 smoke 配置为 required checks；Nightly 每个人数 1,667 次属性测试及 5–10 人浏览器分片也已在 GitHub 托管 runner 上实际通过，可按 seed 回放。 |
+| GitHub Actions 测试门禁 | ✅ | `main` 已启用分支保护并将质量、单元/Socket.IO、PostgreSQL 和浏览器 smoke 配置为 required checks；普通 PR 与 `main` 的属性测试固定使用 fast-check seed `424242`、输出脱敏进度并为每个人数保留 15 秒 runner 抖动余量，Nightly 每个人数 1,667 次属性测试及 5–10 人浏览器分片继续使用每日可回放 seed。 |
 | 真实环境人工验收 | ⬜ | 应用数据与模拟视口已自动化；人工只保留真实 Node 服务重启、目标 PostgreSQL 服务/volume 重启，以及手机、平板或其他电脑的实际 LAN/CORS/Socket.IO 链路。 |
 | 重启后重连验收 | ⬜ | 存储、凭据和 GitHub 临时 PostgreSQL 容器重启已有自动测试，尚未完成目标部署环境的 Node 与 PostgreSQL 手工演练。 |
 | 开发服务稳定运行方式 | ⚠️ | Codex 工具启动的长期进程会被环境回收；多人测试应在用户自己的两个终端中运行服务。 |
@@ -166,6 +166,8 @@
 ## 当前验证基线
 
 最近一次验证日期：2026-09-04
+
+2026-09-04 普通 CI 属性测试稳定性修复验证：确认 PR #20 临时 merge commit 与 `main` squash commit 的 tree SHA 相同，而 5 人 generated-game property test 分别以 3.337 秒通过和 5.263 秒触发原 5 秒超时；历史 run `33319936335` 也曾在同一测试以 5.106 秒超时。普通 `Unit and Socket.IO replay` job 现固定使用 fast-check seed `424242`，为 5–10 人各 100 轮测试输出不含游戏选择或秘密状态的 10% 进度，并将每个人数的 correctness-test 超时从 5 秒提高到 15 秒；每日 Nightly 的轮换 seed 和长测试超时保持不变。回归完成 RED（期望至少 15 秒，实际 5 秒）→ GREEN；固定 CI 环境下 `@avalon/test-support` 为 25 passed，完整 `pnpm test` 为 Game 88、test-support 25、Server 84、Web 259，共 456 passed；`pnpm build`、`pnpm lint`、`pnpm typecheck` 均 exit 0，CI workflow YAML 解析成功。Build 保留既有单个 557.35 kB minified / 167.65 kB gzip JavaScript chunk 建议性警告。本次尚未运行远端 GitHub Actions、Playwright、真实 PostgreSQL 或 LAN 验收。
 
 2026-09-04 方形角色头像复核与 Morgana/Loyal Servant 返工验证：重新检查此前使用“候选底图 + 原图主体全高固定 48px 羽化”的结果，确认该方法虽能保护中央身份并降低精确边界梯度，却会在两套不同的头发、服装和肩甲几何之间产生语义断裂；此前对 Morgana 与 Loyal Servant 的“未发现明显接缝”结论不成立，全图 SSIM 也不再作为扩图成功判据。返工以 `images/source/roles/Morgana.png`（752×1127）和 `images/source/roles/Loyal-Servant.png`（674×1010）为唯一权威编辑目标，分别通过内置 ImageGen 单独生成四个候选并选用候选 3；最终仅用不贯穿全图、远离原图左右边界且沿头部自然轮廓变化的语义蒙版保护脸、眼睛、头饰、伤痕和颈部，头发外缘、肩部、服装和盔甲继续使用候选重绘。最终不透明 8-bit sRGB PNG 分别为 1127×1127 和 1010×1010；身份保护区 patch SSIM 为 Morgana 脸部 0.968376、头饰 0.996080，Loyal Servant 脸部 0.993148、眼睛/伤痕 1.000000。原图边界 96px 带相对原图的 ΔE2000 均值/P95 为 Morgana 左 8.9188/37.3086、右 6.9283/25.8000，Loyal Servant 左 4.9411/13.0903、右 3.8894/12.5096；这些重绘差异明显高于旧 48px 合成和部分基线，因此按要求人工复核。边界相邻列 ΔE 均值相对附近列的比值为 Morgana 0.8919/0.9158、Loyal Servant 0.8383/0.8047，Sobel 梯度均值分别为 6.7523/8.0445 与 12.7617/12.5004，未形成垂直离群线；100%/200% 放大、256×256 方形及圆形预览确认发束、服装、肩甲曲率与高光跨界连续，无黑色楔形、双重轮廓或压缩新增光晕。质量 90 的 256×256 WebP 相对同尺寸无损 PNG 的全局亮度 SSIM 为 0.999310/0.999152，大小为 10.98/12.07 KiB。Assassin 只做诊断且未替换：以中央剑轴为基准，y=740/800/920 的左右主要肩部或披风轮廓距离约为 402/397、429/428、443/425 px，最大可辨差异约 4%，Sobel 轮廓和圆形预览均支持合理的光照/发丝遮挡与非完全对称姿态，而非右肩异常收窄。角色头像资产测试 16 passed，完整 Web 测试 258 passed，Web build 与 lint exit 0；Build 保留既有单个 557.38 kB minified / 167.65 kB gzip JavaScript chunk 建议性警告。本次未运行 LPIPS/DISTS（当前环境未提供实现）、Playwright、真实 LAN 或 PostgreSQL 验收。
 
