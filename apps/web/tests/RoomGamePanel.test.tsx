@@ -105,7 +105,7 @@ describe('RoomGamePanel identity recognition', () => {
 
     expect(html).toContain(`data-role-card="${role}"`)
     expect(html).toContain(`data-role-avatar="${role}"`)
-    expect(html).toContain(`${role}.png`)
+    expect(html).toContain(`${role}.webp`)
     expect(html).toContain(name)
     expect(html).toContain(loyalty)
     expect(html).toContain(guidance)
