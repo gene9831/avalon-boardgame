@@ -29,8 +29,38 @@ pnpm dev
 
 ## Role image conversion
 
-Lossless PNG role masters live in `images/source/roles/`. Generate deployable WebP
-variants in `apps/web/public/images/roles/` with:
+Lossless PNG masters below `images/source/` are tracked with Git LFS and are not
+hydrated in normal worktrees. Configure this once after cloning; the local Git
+setting is shared by every worktree created from that clone:
+
+```bash
+pnpm assets:setup
+```
+
+From the repository root, fetch only the source group needed for an asset task,
+or fetch both groups:
+
+```bash
+pnpm assets:pull:roles
+pnpm assets:pull:avatars
+pnpm assets:pull
+```
+
+The Git LFS object cache is shared by the repository, while each normal
+worktree keeps only small pointer files until one of these commands checks out
+the selected masters. Run the source-dependent asset checks after hydration:
+
+```bash
+pnpm assets:verify
+```
+
+Normal `pnpm test` and `pnpm build` use the committed deployable WebP files and
+do not require hydrated PNG masters. Source-image history remains in ordinary
+Git until the separately planned history migration is performed.
+
+Role-artwork masters live in `images/source/roles/`. Generate deployable WebP
+variants in `apps/web/public/images/roles/` after running
+`pnpm assets:pull:roles`:
 
 ```bash
 # Convert every PNG master.
@@ -47,7 +77,9 @@ master produces a `752w` maximum while a 674px-wide master produces a `674w`
 maximum. Generated files use lowercase names such as `merlin-320.webp`. The
 command is explicit and is not part of the normal Web build. Prefix a PNG master
 filename with `_` to retain it in the source directory without including it in
-default or explicitly requested conversion.
+default or explicitly requested conversion. A path-filtered GitHub Actions
+workflow hydrates and verifies the masters only when source-asset configuration,
+tests, conversion code, masters, or deployable role images change.
 
 The Vite server binds to `0.0.0.0` for LAN testing. By default, the browser derives the Lobby API and Socket.IO URLs from the hostname used to open the page:
 

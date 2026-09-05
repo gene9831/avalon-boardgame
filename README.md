@@ -34,6 +34,7 @@ The CI-tested toolchain uses:
 
 - Node.js 24;
 - pnpm 11.21.0;
+- Git LFS 3.x for fetching or updating lossless role-image masters;
 - PostgreSQL 16 for persistent development and PostgreSQL integration tests;
 - Chromium installed through Playwright for browser tests.
 
@@ -72,6 +73,11 @@ The following table covers every script declared in the root `package.json`.
 
 | Script | Purpose |
 | --- | --- |
+| `pnpm assets:pull` | Hydrates all Git LFS role-artwork and role-avatar PNG masters in the current worktree. |
+| `pnpm assets:pull:avatars` | Hydrates only the role-avatar PNG masters. |
+| `pnpm assets:pull:roles` | Hydrates only the role-artwork PNG masters. |
+| `pnpm assets:setup` | Configures the clone once so its normal worktrees keep LFS source masters as pointers. |
+| `pnpm assets:verify` | Runs the source-dependent role-asset checks after the required masters have been hydrated. |
 | `pnpm dev` | Starts the `@avalon/web` Vite development server on all network interfaces. |
 | `pnpm dev:server` | Starts the `@avalon/server` Lobby API and Socket.IO game server, loading `apps/server/.env.local` when present. |
 | `pnpm build` | Type-checks `@avalon/game` and `@avalon/server`, creates the production server JavaScript artifact, then creates the production Web bundle. |
@@ -103,7 +109,8 @@ Run a package script from the repository root with `pnpm --filter <package> <scr
 | `@avalon/server` | `test:postgres:restart-probe` | Internal CI probe with `prepare` and `verify` modes around a PostgreSQL service restart. |
 | `@avalon/server` | `typecheck` | Type-checks server code without emitting files. |
 | `@avalon/web` | `dev` | Starts Vite on `0.0.0.0` for LAN development. |
-| `@avalon/web` | `test` | Runs Web component and browser-state unit tests. |
+| `@avalon/web` | `test` | Runs source-independent Web component, browser-state, and deployable-asset unit tests. |
+| `@avalon/web` | `test:assets` | Validates hydrated PNG masters, the role-artwork converter, and deployable role avatars. |
 | `@avalon/web` | `build` | Type-checks and creates the production Vite bundle. |
 | `@avalon/web` | `lint` | Runs Oxlint for Web code. |
 | `@avalon/web` | `preview` | Serves the previously built Web bundle locally. |

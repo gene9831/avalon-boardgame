@@ -34,6 +34,7 @@ CI 验证使用以下工具链：
 
 - Node.js 24；
 - pnpm 11.21.0；
+- Git LFS 3.x，用于获取或更新无损角色图片母版；
 - 持久化开发和 PostgreSQL 集成测试使用 PostgreSQL 16；
 - 浏览器测试需要通过 Playwright 安装 Chromium。
 
@@ -72,6 +73,11 @@ pnpm dev
 
 | 脚本 | 用途 |
 | --- | --- |
+| `pnpm assets:pull` | 在当前 worktree 中展开全部由 Git LFS 管理的角色立绘和角色头像 PNG 母版。 |
+| `pnpm assets:pull:avatars` | 仅展开角色头像 PNG 母版。 |
+| `pnpm assets:pull:roles` | 仅展开角色立绘 PNG 母版。 |
+| `pnpm assets:setup` | 每个 clone 配置一次，使其普通 worktree 默认只保留 LFS 母版指针。 |
+| `pnpm assets:verify` | 在所需母版已经展开后运行依赖源图的角色素材检查。 |
 | `pnpm dev` | 启动 `@avalon/web` Vite 开发服务，并监听所有网络接口。 |
 | `pnpm dev:server` | 启动 `@avalon/server` 大厅 API 和 Socket.IO 游戏服务；存在 `apps/server/.env.local` 时会自动加载。 |
 | `pnpm build` | 对 `@avalon/game` 和 `@avalon/server` 做类型检查，生成服务端生产 JavaScript，再生成 Web 生产构建。 |
@@ -103,7 +109,8 @@ pnpm dev
 | `@avalon/server` | `test:postgres:restart-probe` | CI 内部探针，在 PostgreSQL 服务重启前后分别使用 `prepare` 和 `verify` 模式。 |
 | `@avalon/server` | `typecheck` | 对服务端代码做类型检查，不生成文件。 |
 | `@avalon/web` | `dev` | 在 `0.0.0.0` 上启动 Vite，供局域网开发使用。 |
-| `@avalon/web` | `test` | 运行 Web 组件和浏览器状态单元测试。 |
+| `@avalon/web` | `test` | 运行不依赖母版的 Web 组件、浏览器状态和部署素材单元测试。 |
+| `@avalon/web` | `test:assets` | 验证已展开的 PNG 母版、角色立绘转换器和部署角色头像。 |
 | `@avalon/web` | `build` | 做类型检查并生成 Vite 生产构建。 |
 | `@avalon/web` | `lint` | 对 Web 代码运行 Oxlint。 |
 | `@avalon/web` | `preview` | 在本地提供已生成的 Web 构建。 |

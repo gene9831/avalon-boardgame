@@ -1,0 +1,62 @@
+name: Source assets
+
+on:
+  pull_request:
+    paths:
+      - .gitattributes
+      - .lfsconfig
+      - .github/workflows/assets.yml
+      - apps/web/asset-tests/**
+      - apps/web/package.json
+      - apps/web/public/images/roles/**
+      - apps/web/scripts/convert-role-images.mjs
+      - apps/web/src/assets/roles/**
+      - apps/web/tests/convert-role-images.test.ts
+      - apps/web/tests/role-avatar-assets.test.ts
+      - images/source/**
+      - package.json
+      - pnpm-lock.yaml
+  push:
+    branches: [main]
+    paths:
+      - .gitattributes
+      - .lfsconfig
+      - .github/workflows/assets.yml
+      - apps/web/asset-tests/**
+      - apps/web/package.json
+      - apps/web/public/images/roles/**
+      - apps/web/scripts/convert-role-images.mjs
+      - apps/web/src/assets/roles/**
+      - apps/web/tests/convert-role-images.test.ts
+      - apps/web/tests/role-avatar-assets.test.ts
+      - images/source/**
+      - package.json
+      - pnpm-lock.yaml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: source-assets-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  PNPM_VERSION: 11.21.0
+  NODE_VERSION: 24
+
+jobs:
+  verify:
+    name: Hydrate and verify source assets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          runtime: node@${{ env.NODE_VERSION }}
+          cache: true
+          install: false
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm assets:pull
+      - run: pnpm assets:verify
