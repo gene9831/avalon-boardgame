@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">Avalon 横向房间布局几何模型</title>
+  <desc id="desc">顶栏横跨顶部，主舞台与阶段侧栏位于下方。主舞台内显示安全矩形、圆桌布局正方形、圆形桌面、玩家轨道、座位和完整占用包络。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#d6c39a"/>
+    </marker>
+    <style>
+      .label { font: 16px system-ui, sans-serif; fill: #f4ebdd; }
+      .small { font: 13px system-ui, sans-serif; fill: #c6bdaf; }
+      .measure { fill: none; stroke: #d6c39a; stroke-width: 1.5; marker-start: url(#arrow); marker-end: url(#arrow); }
+      .guide { fill: none; stroke-width: 2; stroke-dasharray: 8 6; }
+      .seat { fill: #263b4b; stroke: #e7d8bc; stroke-width: 2; }
+      .name { fill: #101821; stroke: #5f6f7e; stroke-width: 1; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="720" fill="#0b111b"/>
+  <rect x="20" y="20" width="1160" height="680" rx="4" fill="#101821" stroke="#67798a" stroke-width="2"/>
+  <text class="small" x="34" y="45">有效布局矩形（Wu × Hu）</text>
+
+  <rect x="36" y="56" width="1128" height="64" fill="#17212e" stroke="#8fbce0" stroke-width="2"/>
+  <text class="label" x="54" y="94">左侧房间信息</text>
+  <text class="label" x="516" y="94">任务轨道</text>
+  <text class="label" x="986" y="94">右侧入口</text>
+  <text class="small" x="1105" y="146">T</text>
+  <line class="measure" x1="1140" y1="58" x2="1140" y2="118"/>
+
+  <rect x="36" y="120" width="818" height="564" fill="#0d2028" stroke="#6cb5d9" stroke-width="3"/>
+  <text class="label" x="52" y="151">圆桌舞台 Stage</text>
+  <rect x="854" y="120" width="310" height="564" fill="#17212e" stroke="#a88245" stroke-width="3"/>
+  <text class="label" x="876" y="154">阶段侧栏 P</text>
+  <rect x="876" y="177" width="266" height="310" rx="8" fill="#223140"/>
+  <text class="small" x="895" y="210">当前阶段主要操作</text>
+  <rect x="876" y="509" width="266" height="151" rx="8" fill="#121b25"/>
+  <text class="small" x="895" y="541">剩余空间：最近记录</text>
+
+  <rect x="54" y="138" width="782" height="528" class="guide" stroke="#8fbce0"/>
+  <text class="small" x="63" y="658">SafeStage = inset(Stage, M)</text>
+
+  <rect x="228" y="168" width="436" height="436" class="guide" stroke="#d69a3a"/>
+  <text class="small" x="235" y="190">圆桌布局正方形 Q</text>
+  <circle cx="446" cy="386" r="161" fill="#14393b" stroke="#a88245" stroke-width="18"/>
+  <circle cx="446" cy="386" r="187" class="guide" stroke="#8fbce0"/>
+  <circle cx="446" cy="386" r="83" fill="#172f38" stroke="#d0b16f" stroke-width="2"/>
+  <text class="label" x="390" y="382">中央信息区</text>
+  <text class="small" x="402" y="405">Dc = 0.38Q</text>
+
+  <g aria-label="八个玩家座位">
+    <g transform="translate(446 573)"><circle class="seat" r="25"/><rect class="name" x="-45" y="30" width="90" height="22" rx="4"/><text class="small" text-anchor="middle" y="5">自己</text></g>
+    <g transform="translate(314 518)"><circle class="seat" r="25"/><rect class="name" x="-45" y="30" width="90" height="22" rx="4"/></g>
+    <g transform="translate(259 386)"><circle class="seat" r="25"/><rect class="name" x="-45" y="30" width="90" height="22" rx="4"/></g>
+    <g transform="translate(314 254)"><circle class="seat" r="25"/><rect class="name" x="-45" y="30" width="90" height="22" rx="4"/></g>
+    <g transform="translate(446 199)"><circle class="seat" r="25"/><rect class="name" x="-45" y="30" width="90" height="22" rx="4"/></g>
+    <g transform="translate(578 254)"><circle class="seat" r="25"/><rect class="name" x="-45" y="30" width="90" height="22" rx="4"/></g>
+    <g transform="translate(633 386)"><circle class="seat" r="25"/><rect class="name" x="-45" y="30" width="90" height="22" rx="4"/></g>
+    <g transform="translate(578 518)"><circle class="seat" r="25"/><rect class="name" x="-45" y="30" width="90" height="22" rx="4"/></g>
+  </g>
+
+  <rect x="208" y="167" width="476" height="458" fill="none" stroke="#db7b84" stroke-width="2" stroke-dasharray="5 5"/>
+  <text class="small" x="690" y="620">B(Q)：完整占用包络</text>
+  <line x1="686" y1="614" x2="650" y2="600" stroke="#db7b84" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <line class="measure" x1="446" y1="386" x2="633" y2="386"/>
+  <text class="small" x="523" y="377">R = 0.43Q</text>
+  <line class="measure" x1="285" y1="420" x2="607" y2="420"/>
+  <text class="small" x="401" y="444">Dt = 0.74Q</text>
+</svg>

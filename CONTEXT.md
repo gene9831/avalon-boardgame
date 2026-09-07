@@ -97,3 +97,29 @@ _Avoid_: committed event, final action
 
 **Debug mode**: A read-only diagnostic view in the web page. It exposes connection and public game diagnostics, but it is not a game authority and never reveals the complete secret state.
 _Avoid_: admin mode, operator mode
+
+## Room interface layout
+
+**Horizontal room layout**: A room arrangement with one full-width top bar and a lower content region split into a round-table stage and a sidebar. It is selected from available geometry rather than from a device category.
+_Avoid_: PC layout, desktop layout
+
+**Round-table stage**: The rectangular region that presents the public table scene, including the round table and player seats, while excluding the top bar and sidebar.
+_Avoid_: game area, table
+
+**Round-table footprint**: The stable maximum visible footprint of the tabletop, player portraits, names, and outward status marks for the selected seat presentation tier. Layout constraints apply to this footprint rather than only to the circular tabletop, and ordinary game-state changes do not resize it.
+_Avoid_: table diameter, tabletop bounds
+
+**Round-table layout square**: The nominal square coordinate region used to size the tabletop and place player-seat centers around it. It is a reference geometry and may be smaller than the round-table footprint.
+_Avoid_: round-table footprint, table diameter
+
+**Tabletop**: The visible circular table surface inside the round-table layout square. Its diameter does not include player portraits, names, or status marks.
+_Avoid_: round table, round-table footprint
+
+**Player orbit**: The viewer-relative circle on which player-seat centers are placed. The current player's seat occupies the bottom position and the remaining seats follow room seat order clockwise.
+_Avoid_: seat ring, absolute seat positions
+
+**Phase sidebar**: The horizontal room layout region that presents the current phase's instructions and primary actions. Its layout reserves the maximum primary-action budget across supported phases, while lower-priority public history uses only the remaining space, so phase changes do not switch the room layout.
+_Avoid_: fixed device sidebar, activity drawer
+
+**Seat presentation tier**: One discrete, geometry-selected set of portrait, name, status-mark, spacing, and interaction-target sizes used by every player seat. It is selected from available round-table geometry rather than from a device category.
+_Avoid_: mobile seat, desktop seat, continuously scaled seat
