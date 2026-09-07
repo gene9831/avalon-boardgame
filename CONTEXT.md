@@ -100,10 +100,16 @@ _Avoid_: admin mode, operator mode
 
 ## Room interface layout
 
-**Horizontal room layout**: A room arrangement with one full-width top bar and a lower content region split into a round-table stage and a sidebar. It is selected from available geometry rather than from a device category.
+**Horizontal room layout**: A room arrangement selected from available geometry rather than from a device category. Its normal mode uses one full-width top bar above a round-table stage and phase sidebar; its low-height compact mode uses a left task rail, round-table stage, and phase sidebar in one row.
 _Avoid_: PC layout, desktop layout
 
-**Round-table stage**: The rectangular region that presents the public table scene, including the round table and player seats, while excluding the top bar and sidebar.
+**Compact horizontal layout**: The low-height mode of the horizontal room layout. It replaces the top bar with a left task rail so the round-table stage can use the full available height.
+_Avoid_: mobile landscape layout, phone layout
+
+**Task rail**: The compact horizontal layout region containing the return action and vertically grouped quest progress nodes.
+_Avoid_: compact top bar, task sidebar
+
+**Round-table stage**: The rectangular region that presents the public table scene, including the round table and player seats, while excluding the top bar or task rail and the phase sidebar.
 _Avoid_: game area, table
 
 **Round-table footprint**: The stable maximum visible footprint of the tabletop, player portraits, names, and outward status marks for the selected seat presentation tier. Layout constraints apply to this footprint rather than only to the circular tabletop, and ordinary game-state changes do not resize it.
@@ -115,7 +121,7 @@ _Avoid_: round-table footprint, table diameter
 **Tabletop**: The visible circular table surface inside the round-table layout square. Its diameter does not include player portraits, names, or status marks.
 _Avoid_: round table, round-table footprint
 
-**Player orbit**: The viewer-relative circle on which player-seat centers are placed. The current player's seat occupies the bottom position and the remaining seats follow room seat order clockwise.
+**Player orbit**: The viewer-relative path on which player-seat centers are placed. It is circular in the normal horizontal layout and stadium-shaped in the compact horizontal layout. The current player's seat occupies the bottom position and the remaining seats follow room seat order clockwise.
 _Avoid_: seat ring, absolute seat positions
 
 **Phase sidebar**: The horizontal room layout region that presents the current phase's instructions and primary actions. Its layout reserves the maximum primary-action budget across supported phases, while lower-priority public history uses only the remaining space, so phase changes do not switch the room layout.

@@ -8,11 +8,13 @@
 
 项目术语以 [`CONTEXT.md`](../../CONTEXT.md) 为准。本文使用其中定义的横向房间布局、圆桌舞台、圆桌布局正方形、圆形桌面、玩家中心轨道、圆桌占用包络、阶段侧栏和座位呈现档位。
 
+可在浏览器中打开[横屏响应式交互原型](./prototypes/avalon-landscape-responsive-lab.html)，通过预设尺寸或自定义宽高检查普通横版与紧凑横版布局。
+
 ## 2. 设计目标
 
 横向布局必须同时满足以下目标：
 
-1. 顶栏横跨可用宽度，主舞台和阶段侧栏位于顶栏下方。
+1. 普通横版使用横跨可用宽度的顶栏；低高度紧凑横版改用左侧任务轨道，为圆桌保留完整高度。
 2. 主要阶段操作无需页面滚动，也不依赖侧栏内部滚动才能完成。
 3. 圆桌尺寸由主舞台实际可用几何决定，不使用设备名称判断。
 4. 圆桌适配完整占用包络，而不只适配圆形桌面。
@@ -22,25 +24,31 @@
 
 ## 3. 几何总览
 
-![横向房间布局几何模型](./assets/horizontal-layout-model.svg)
+![普通横版房间布局几何模型](./assets/horizontal-layout-model.svg)
+
+上图展示普通横版；紧凑横版的三列矩形和胶囊玩家轨道由 6.4 节和 9.2 节定义。
 
 布局层级如下：
 
 ```text
 有效布局矩形
-├── 顶栏
-└── 内容矩形
+├── 普通横版
+│   ├── 顶栏
+│   └── 内容矩形
+│       ├── 圆桌舞台
+│       └── 阶段侧栏
+└── 紧凑横版
+    ├── 返回按钮与纵向任务轨道
     ├── 圆桌舞台
-    │   └── 安全舞台
-    │       └── 圆桌占用包络
-    │           ├── 圆桌布局正方形
-    │           ├── 圆形桌面
-    │           ├── 玩家中心轨道
-    │           ├── 玩家座位
-    │           └── 中央信息区
     └── 阶段侧栏
-        ├── 当前阶段主要操作
-        └── 最近记录
+
+圆桌舞台
+└── 安全舞台
+    └── 圆桌占用包络
+        ├── 圆形桌面
+        ├── 玩家中心轨道
+        ├── 玩家座位
+        └── 中央信息区
 ```
 
 ## 4. 坐标系和输入
@@ -55,22 +63,22 @@
 
 ### 4.2 输入
 
-| 符号 | 含义 |
+| 变量 | 含义 |
 | --- | --- |
-| `W`, `H` | 原始布局矩形的宽和高 |
-| `It`, `Ir`, `Ib`, `Il` | 上、右、下、左安全区 |
-| `N` | 玩家人数，取值 5–10 |
+| `layoutWidth`, `layoutHeight` | 原始布局矩形的宽和高 |
+| `insetTop`, `insetRight`, `insetBottom`, `insetLeft` | 上、右、下、左安全区 |
+| `playerCount` | 玩家人数，取值 5–10 |
 | `viewerSeatIndex` | 当前观察者的座位序号 |
-| `L`, `C`, `Rtop` | 顶栏左、中、右内容所需宽度 |
-| `Arequired` | 所有游戏阶段中最大的主要操作高度预算 |
+| `leftContentWidth`, `taskTrackWidth`, `rightContentWidth` | 普通顶栏左、中、右内容所需宽度 |
+| `requiredActionHeight` | 所有游戏阶段中最大的主要操作高度预算 |
 
 有效内容矩形为：
 
 ```text
-Xu = Il
-Yu = It
-Wu = W - Il - Ir
-Hu = H - It - Ib
+usableX = insetLeft
+usableY = insetTop
+usableWidth = layoutWidth - insetLeft - insetRight
+usableHeight = layoutHeight - insetTop - insetBottom
 ```
 
 背景允许延伸到原始矩形和安全区中；文字、交互控件、圆桌占用包络和阶段侧栏内容只能使用有效内容矩形。
@@ -83,17 +91,24 @@ Hu = H - It - Ib
 
 | 参数 | 默认值 | 含义 |
 | --- | ---: | --- |
-| `Hbreak` | 680 | 顶栏高度档位分界 |
-| `Tcompact` | 48 | 紧凑顶栏高度 |
-| `Tstandard` | 56 | 标准顶栏高度 |
-| `Pmin` | 288 | 阶段侧栏最小宽度 |
-| `Pmax` | 384 | 阶段侧栏最大宽度 |
-| `α` | 0.28 | 阶段侧栏目标宽度比例 |
-| `Mcompact` | 12 | 紧凑顶栏下的舞台安全边距 |
-| `Mstandard` | 16 | 标准顶栏下的舞台安全边距 |
-| `Gseat` | 8 | 玩家座位之间的最小间距 |
-| `Gcenter` | 12 | 玩家座位与中央信息区的最小间距 |
-| `Gtop` | 12 | 顶栏三区之间的最小间距 |
+| `compactLayoutHeightBreak` | 515 | 低于该布局高度时使用紧凑横版 |
+| `topBarHeightBreak` | 680 | 普通横版顶栏高度档位分界 |
+| `compactTopBarHeight` | 48 | 普通横版的紧凑顶栏高度 |
+| `standardTopBarHeight` | 56 | 普通横版的标准顶栏高度 |
+| `sidebarMinWidth` | 288 | 普通横版阶段侧栏最小宽度 |
+| `sidebarMaxWidth` | 384 | 普通横版阶段侧栏最大宽度 |
+| `sidebarRatio` | 0.28 | 阶段侧栏目标宽度比例 |
+| `compactTaskRailWidth` | 56 | 紧凑横版纵向任务轨道宽度 |
+| `compactSidebarNarrowBreak` | 720 | 紧凑阶段侧栏窄宽档位分界 |
+| `compactSidebarNarrowWidth` | 192 | 窄宽紧凑阶段侧栏宽度 |
+| `compactSidebarMinWidth` | 224 | 常规紧凑阶段侧栏最小宽度 |
+| `compactSidebarMaxWidth` | 288 | 常规紧凑阶段侧栏最大宽度 |
+| `compactTopBarStageMargin` | 12 | 普通横版使用 48 高顶栏时的舞台安全边距 |
+| `standardTopBarStageMargin` | 16 | 普通横版使用 56 高顶栏时的舞台安全边距 |
+| `compactLayoutStageMargin` | 8 | 紧凑横版的舞台安全边距 |
+| `seatGap` | 8 | 玩家座位之间的最小间距 |
+| `centerGap` | 12 | 玩家座位与中央信息区的最小间距 |
+| `topBarGap` | 12 | 普通顶栏三区之间的最小间距 |
 
 ### 5.2 圆桌参数
 
@@ -132,64 +147,126 @@ Dc = clamp(Dcmin, γQ, Dcmax)
 
 ## 6. 顶层布局算法
 
-### 6.1 顶栏高度
+### 6.1 横版模式
+
+横版内部只按有效高度选择模式，不按设备名称选择：
+
+```text
+layoutMode = layoutHeight < compactLayoutHeightBreak
+    ? compactLandscape
+    : normalLandscape
+```
+
+`layoutHeight = 515` 时进入普通横版。本文只定义横版内部模式；横屏是否可用仍由上层响应式模式选择器决定。
+
+### 6.2 普通横版顶栏高度
 
 顶栏使用离散档位，不进行无级缩放：
 
 ```text
-若 Hu < Hbreak：
-    T = Tcompact
-    M = Mcompact
+若 layoutHeight < topBarHeightBreak：
+    topBarHeight = compactTopBarHeight
+    stageMargin = compactTopBarStageMargin
 否则：
-    T = Tstandard
-    M = Mstandard
+    topBarHeight = standardTopBarHeight
+    stageMargin = standardTopBarStageMargin
 ```
 
 每个档位独立规定字体、图标、热区和间距。浏览器缩放、系统字号或产品级 UI 缩放负责用户级缩放；媒体布局不在两个顶栏档位之间插值。
 
-### 6.2 阶段侧栏和圆桌舞台
+### 6.3 普通横版矩形
 
 ```text
-P  = clamp(Pmin, αWu, Pmax)
-Hc = Hu - T
-Ws = Wu - P
-Hs = Hc
+sidebarWidth = clamp(sidebarMinWidth, sidebarRatio × usableWidth, sidebarMaxWidth)
+contentHeight = usableHeight - topBarHeight
+stageWidth = usableWidth - sidebarWidth
+stageHeight = contentHeight
 ```
 
 三个输出矩形为：
 
 ```text
-TopBar  = Rect(Xu,      Yu,     Wu, T)
-Stage   = Rect(Xu,      Yu + T, Ws, Hs)
-Sidebar = Rect(Xu + Ws, Yu + T, P,  Hs)
+TopBar  = Rect(usableX,              usableY,                usableWidth,  topBarHeight)
+Stage   = Rect(usableX,              usableY + topBarHeight, stageWidth,   stageHeight)
+Sidebar = Rect(usableX + stageWidth, usableY + topBarHeight, sidebarWidth, stageHeight)
 ```
 
 主舞台与阶段侧栏直接相邻。视觉分隔线可以覆盖二者边界，但不额外占用布局宽度。
 
-### 6.3 安全舞台
+### 6.4 紧凑横版矩形
+
+紧凑横版取消顶栏，从左到右依次放置纵向任务轨道、圆桌舞台和阶段侧栏：
 
 ```text
-SafeStage = inset(Stage, M, M, M, M)
+taskRailWidth = compactTaskRailWidth
+
+sidebarWidth = layoutWidth < compactSidebarNarrowBreak
+    ? compactSidebarNarrowWidth
+    : clamp(compactSidebarMinWidth, sidebarRatio × usableWidth, compactSidebarMaxWidth)
+
+stageWidth = usableWidth - taskRailWidth - sidebarWidth
+stageHeight = usableHeight
 ```
 
-`M` 是完整圆桌占用包络之外的最终净空。不得先给舞台增加会缩小布局内容区的内边距，再从圆桌尺寸中重复扣除 `M`。
-
-## 7. 顶栏内部算法
-
-顶栏分为左侧房间信息、中间任务轨道和右侧功能入口。为保证任务轨道相对整个顶栏真正居中，左右两侧使用相同的保护宽度：
+三个输出矩形为：
 
 ```text
-Sguard = max(L, Rtop)
-WcenterAvailable = Wu - 2Sguard - 2Gtop
+TaskRail = Rect(usableX,                              usableY, taskRailWidth, usableHeight)
+Stage    = Rect(usableX + taskRailWidth,              usableY, stageWidth,   stageHeight)
+Sidebar  = Rect(usableX + taskRailWidth + stageWidth, usableY, sidebarWidth, stageHeight)
 ```
 
-当 `WcenterAvailable < C` 时：
+`compactTaskRailWidth = 56` 已包含任务列表的左右内边距；舞台计算不得再次扣除这部分空间。阶段侧栏与舞台直接相邻，边界线不得额外占用布局宽度。
+
+### 6.5 安全舞台
+
+```text
+stageMargin = layoutMode == compactLandscape
+    ? compactLayoutStageMargin
+    : stageMarginForSelectedTopBar
+```
+
+```text
+SafeStage = inset(Stage, stageMargin, stageMargin, stageMargin, stageMargin)
+```
+
+`stageMargin` 是完整圆桌占用包络之外的最终净空。不得先给舞台增加会缩小布局内容区的内边距，再从圆桌尺寸中重复扣除 `stageMargin`。
+
+边框属于渲染细节。若实现使用会占据内部尺寸的边框，应先取得画布内容矩形，再把该内容矩形作为本文的原始布局矩形；通用模型中不直接出现 `-2px` 之类的边框修正。
+
+## 7. 顶栏和任务轨道内部算法
+
+### 7.1 普通横版顶栏
+
+本节只适用于普通横版。顶栏分为左侧房间信息、中间任务轨道和右侧功能入口。为保证任务轨道相对整个顶栏真正居中，左右两侧使用相同的保护宽度：
+
+```text
+guardWidth = max(leftContentWidth, rightContentWidth)
+availableTaskTrackWidth = usableWidth - 2 × guardWidth - 2 × topBarGap
+```
+
+当 `availableTaskTrackWidth < taskTrackWidth` 时：
 
 1. 若当前使用 56 高顶栏，切换到其紧凑内容组合。
 2. 隐藏左右区的次要说明文字，但保留房间、阶段和可访问名称。
 3. 再次计算仍不满足时，返回“横向布局不可行”。
 
 顶栏内容压缩不能改变顶栏高度档位，也不能覆盖中间任务轨道。
+
+### 7.2 紧凑横版任务轨道
+
+紧凑横版将返回按钮和五个任务放在宽度为 `compactTaskRailWidth` 的纵向轨道中：
+
+```text
+backAreaHeight = 44
+dividerHeight = 1
+taskButtonSize = 44
+taskGap = clamp(8, layoutHeight × 0.025, 12)
+taskGroupHeight = 5 × taskButtonSize + 4 × taskGap
+taskGroupOffsetY = (usableHeight - backAreaHeight - dividerHeight - taskGroupHeight) / 2
+```
+
+任务组在返回区以下的剩余高度内整体居中，不均匀分配全部剩余空间。任务列表宽度为 56，左右内边距各 4；44 宽任务热区因此左右各有 6 的轨道净空。任务人数和“双失败”规则最多两个次要图标，共用圆形任务节点底部的单行信息条；成功或失败仍使用节点颜色和右上角结果图标表达。
 
 ## 8. 阶段侧栏算法
 
@@ -198,12 +275,12 @@ WcenterAvailable = Wu - 2Sguard - 2Gtop
 设所有受支持阶段的主要操作预算为：
 
 ```text
-Arequired = max(
-  Ateam,
-  Avote,
-  Aquest,
-  Aassassination,
-  Aresult,
+requiredActionHeight = max(
+  teamActionHeight,
+  voteActionHeight,
+  questActionHeight,
+  assassinationActionHeight,
+  resultActionHeight,
   ...
 )
 ```
@@ -211,11 +288,11 @@ Arequired = max(
 侧栏高度分配为：
 
 ```text
-A = min(Hs, max(Amin, Arequired))
-Lhistory = Hs - A
+actionAreaHeight = min(stageHeight, max(minActionHeight, requiredActionHeight))
+historyHeight = stageHeight - actionAreaHeight
 ```
 
-如果 `Hs < Arequired`，按以下顺序降级：
+如果 `stageHeight < requiredActionHeight`，按以下顺序降级：
 
 1. 隐藏最近记录正文。
 2. 收起最近记录区域。
@@ -223,17 +300,17 @@ Lhistory = Hs - A
 4. 使用预设的紧凑操作间距。
 5. 若主要操作仍不能同时显示，返回“横向布局不可行”。
 
-投票、任务牌、刺杀确认和阶段主按钮不得依赖滚动才能完成。阶段变化不得改变 `Arequired`，因此不能在游戏中触发布局模式切换。
+投票、任务牌、刺杀确认和阶段主按钮不得依赖滚动才能完成。阶段变化不得改变 `requiredActionHeight`，因此不能在游戏中触发布局模式切换。
 
 ## 9. 圆桌坐标模型
 
-### 9.1 玩家位置
+### 9.1 普通横版玩家位置
 
 玩家座位以观察者为相对原点。对第 `i` 个玩家：
 
 ```text
-relativeIndex(i) = mod(seatIndex(i) - viewerSeatIndex, N)
-θi = π/2 + relativeIndex(i) × 2π/N
+relativeIndex(i) = mod(seatIndex(i) - viewerSeatIndex, playerCount)
+θi = π/2 + relativeIndex(i) × 2π/playerCount
 
 Pi.x = Cx + R cos(θi)
 Pi.y = Cy + R sin(θi)
@@ -241,7 +318,41 @@ Pi.y = Cy + R sin(θi)
 
 `Pi` 是头像中心，不是整个座位容器中心。当前玩家位于六点钟方向，其他玩家按房间座位顺序顺时针排列。头像、姓名和状态标记自身的旋转角始终为零。
 
-### 9.2 座位局部边界
+### 9.2 紧凑横版玩家位置
+
+紧凑横版使用水平胶囊形玩家轨道。它由上下两段直线和左右两个半圆组成，比椭圆更能利用低高度舞台的横向空间。尺寸为：
+
+```text
+seatWidth = clamp(72, layoutHeight × 0.213, 88)
+seatHeight = 0.825 × seatWidth
+avatarDiameter = clamp(38, layoutHeight × 0.107, 46)
+
+orbitWidth = max(
+    220,
+    min(layoutHeight × 0.88, stageWidth - seatWidth - 2 × compactLayoutStageMargin)
+)
+orbitHeight = min(layoutHeight × 0.656, orbitWidth)
+tableDiameter = min(layoutHeight × 0.544, orbitHeight × 0.83)
+```
+
+玩家沿胶囊周长等距排列：
+
+```text
+Pi = Stage.center + stadiumPoint(relativeIndex(i), playerCount, orbitWidth, orbitHeight)
+```
+
+`stadiumPoint` 表示从六点钟方向开始、按视觉顺时针沿胶囊周长等距取点。该函数只负责轨道取点，不改变头像、姓名或标记的屏幕方向。
+
+紧凑横版的保守占用包络为：
+
+```text
+footprintWidth = orbitWidth + seatWidth
+footprintHeight = orbitHeight + seatHeight
+```
+
+最终仍以所有实际 `SeatBounds` 与桌面边界的并集复验，保守包络不能替代碰撞检查。
+
+### 9.3 座位局部边界
 
 以头像中心 `(0, 0)` 为座位局部坐标原点。姓名牌位于头像下方，间距 `Gname = 4`；领袖标记位于头像上方，并与头像重叠自身高度的三分之一。任务成员、断线和投票结果标记不得突破姓名牌的左右边界。
 
@@ -269,7 +380,7 @@ SeatBounds(i, Q) = translate(PlayerLocalBounds, Pi(Q))
 
 包络按最大合法状态计算。领袖、任务成员、断线、投票结果或角色显示状态发生变化时，不重新计算座位边界。
 
-### 9.3 圆桌占用包络
+### 9.4 圆桌占用包络
 
 先以圆桌中心为 `(0, 0)` 构造候选几何：
 
@@ -280,13 +391,13 @@ B0(Q) = union(
   TabletopBounds(Q),
   SeatBounds(0, Q),
   ...,
-  SeatBounds(N - 1, Q)
+  SeatBounds(playerCount - 1, Q)
 )
 ```
 
 `B0(Q)` 是尚未平移的圆桌占用包络。圆桌布局正方形只是用于计算比例和玩家位置的参考坐标区，不代替实际包络。
 
-### 9.4 包络居中
+### 9.5 包络居中
 
 令 `center(Rect)` 返回矩形中心，则使完整包络居中的桌面圆心补偿为：
 
@@ -318,7 +429,7 @@ B(Q) ⊆ SafeStage
 Q ≤ Qcap
 ```
 
-因为 `B(Q)` 的宽高随 `Q` 单调增加，可以求得满足外部适配约束的最大值 `Qfit`。
+因为 `B(Q)` 的宽高随 `Q` 单调增加，可以求得满足外部适配约束的最大值 `fittingQ`。
 
 估算阶段可以使用：
 
@@ -333,19 +444,19 @@ Q ≈ min(Stage.width, Stage.height) - 安全预留
 弦长可以快速估算相邻玩家所需的最小轨道半径：
 
 ```text
-2R sin(π/N) ≥ A + Gseat
-Rrequired = (A + Gseat) / (2 sin(π/N))
-Qrequired ≈ Rrequired / κ
+2R sin(π/playerCount) ≥ adjacentSeatSpan + seatGap
+requiredRadius = (adjacentSeatSpan + seatGap) / (2 sin(π/playerCount))
+requiredQ ≈ requiredRadius / κ
 ```
 
-其中 `A` 是座位在相邻方向上的保守占用宽度。正式判断使用实际轴对齐矩形：
+其中 `adjacentSeatSpan` 是座位在相邻方向上的保守占用宽度。正式判断使用实际轴对齐矩形：
 
 ```text
 对任意 i ≠ j：
 
 intersection(
-  expand(SeatBounds(i), Gseat / 2),
-  expand(SeatBounds(j), Gseat / 2)
+  expand(SeatBounds(i), seatGap / 2),
+  expand(SeatBounds(j), seatGap / 2)
 ) = empty
 ```
 
@@ -354,34 +465,36 @@ intersection(
 对每个座位矩形，计算桌面中心到该矩形的最短距离：
 
 ```text
-distance(TableCenter, SeatBounds(i)) ≥ Dc/2 + Gcenter
+distance(TableCenter, SeatBounds(i)) ≥ Dc/2 + centerGap
 ```
 
 点到轴对齐矩形的距离可以写为：
 
 ```text
-dx = max(Rect.left - Px, 0, Px - Rect.right)
-dy = max(Rect.top  - Py, 0, Py - Rect.bottom)
+dx = max(Rect.left - TableCenter.x, 0, TableCenter.x - Rect.right)
+dy = max(Rect.top  - TableCenter.y, 0, TableCenter.y - Rect.bottom)
 distance = sqrt(dx² + dy²)
 ```
 
-这里 `P` 为桌面中心。该约束比统一径向延伸更准确，能够处理顶部玩家姓名向圆心延伸等非对称情况。
+该约束比统一径向延伸更准确，能够处理顶部玩家姓名向圆心延伸等非对称情况。
 
 ### 10.4 内部最小尺寸
 
-座位碰撞、中央信息区碰撞和圆心补偿共同确定当前呈现档位的最小可行值 `Qrequired`。这些约束随 `Q` 增大而由失败转为通过。
+座位碰撞、中央信息区碰撞和圆心补偿共同确定当前呈现档位的最小可行值 `requiredQ`。这些约束随 `Q` 增大而由失败转为通过。
 
-外部包络适配确定最大可行值 `Qfit`。它随 `Q` 增大而由通过转为失败。
+外部包络适配确定最大可行值 `fittingQ`。它随 `Q` 增大而由通过转为失败。
 
 一个档位可行，当且仅当：
 
 ```text
-max(Tier.Qmin, Qrequired)
+max(Tier.minQ, requiredQ)
 ≤
-min(Tier.Qmax, Qfit, Qcap)
+min(Tier.maxQ, fittingQ, Qcap)
 ```
 
 ## 11. 圆桌求解算法
+
+### 11.1 普通横版
 
 档位按“宽松 → 标准 → 紧凑”依次尝试。先保证信息可读，再在该档位内最大化圆桌。
 
@@ -406,25 +519,30 @@ for tier in [宽松, 标准, 紧凑]:
 
 规范只定义约束和最大化目标，不绑定求解技术。实现可以使用解析计算、单调区间二分或预计算表；连续解与理论最大值的误差不得超过 1 个逻辑单位。
 
+### 11.2 紧凑横版
+
+紧凑横版不使用圆形玩家轨道的 `Q` 求解器。它按 9.2 节公式直接计算 `seatWidth`、`orbitWidth` 和 `orbitHeight`，再执行以下约束：
+
+```text
+RoundTableFootprint ⊆ SafeStage
+所有 SeatBounds 互不重叠
+所有 SeatBounds 与中央信息区保持 centerGap
+```
+
+若约束失败，返回“横向布局不可行”，不得继续缩小到低于既定座位、头像或 44×44 交互热区的下限。
+
 ```mermaid
 flowchart TD
-    A[计算有效矩形] --> B[选择 48 或 56 顶栏]
-    B --> C[计算阶段侧栏和圆桌舞台]
-    C --> D{顶栏与侧栏可行?}
-    D -- 否 --> X[横向布局不可行]
-    D -- 是 --> E[生成安全舞台]
-    E --> F[尝试宽松座位档位]
-    F --> G{内部与外部约束存在交集?}
-    G -- 是 --> H[取该档位最大可行 Q]
-    G -- 否 --> I{还有更紧凑档位?}
-    I -- 是 --> J[尝试下一档]
-    J --> G
-    I -- 否 --> X
-    H --> K[安全取整]
-    K --> L{取整后复验通过?}
-    L -- 否 --> M[Q 减 1]
-    M --> K
-    L -- 是 --> N[输出布局]
+    A[计算有效矩形] --> B{布局高度小于 515?}
+    B -- 是 --> C[计算任务轨道、舞台和紧凑侧栏]
+    C --> D[计算胶囊玩家轨道]
+    B -- 否 --> E[选择 48 或 56 顶栏]
+    E --> F[计算舞台和普通侧栏]
+    F --> G[求最大可行 Q]
+    D --> H{最终几何复验通过?}
+    G --> H
+    H -- 否 --> X[横向布局不可行]
+    H -- 是 --> Y[输出布局]
 ```
 
 ## 12. 布局稳定性
@@ -432,7 +550,7 @@ flowchart TD
 圆桌几何只能由下列输入改变：
 
 ```text
-W, H, I, N, viewerSeatIndex, seat presentation tier
+layoutWidth, layoutHeight, safeInsets, playerCount, viewerSeatIndex, seatTier
 ```
 
 其中 `viewerSeatIndex` 只旋转座位映射，不改变 `Q`。以下状态不得改变圆桌尺寸或中心：
@@ -469,11 +587,11 @@ Qrender = max { q ∈ integers | q ≤ Qcontinuous 且 RoundedLayout(q) 可行 }
 横向布局只有在以下条件全部满足时才可用：
 
 ```text
-Wu > 0 且 Hu > 0
-顶栏三区满足最小内容宽度
-P ≥ Pmin
-Hs ≥ Arequired
-至少一个座位呈现档位存在可行 Q
+usableWidth > 0 且 usableHeight > 0
+普通横版时，顶栏三区满足最小内容宽度
+sidebarWidth 满足当前横版模式的宽度公式
+stageHeight ≥ requiredActionHeight
+普通横版至少存在一个可行 Q；紧凑横版的胶囊轨道通过复验
 主要操作同时可见
 所有最终取整几何通过复验
 ```
@@ -498,7 +616,7 @@ reason ∈ {
 
 以下示例假设安全区均为 0，顶栏和阶段侧栏内容预算已满足。`Q*` 是连续求解值，括号内为安全取整后的 `Qrender`。包络尺寸为取整前结果，保留两位小数。
 
-| 可用尺寸 | 人数 | 顶栏 | 侧栏 `P` | 舞台 `Ws×Hs` | 档位 | `Q*`（最终） | `Dt` | `R` | 包络 `宽×高` | 圆心补偿 Y |
+| 可用尺寸 | 人数 | 顶栏 | `sidebarWidth` | `stageWidth × stageHeight` | 档位 | `Q*`（最终） | `Dt` | `R` | 包络 `宽×高` | 圆心补偿 Y |
 | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: |
 | 1250×605 | 5 | 48 | 350 | 900×557 | 标准 | 559.00（559） | 413.66 | 240.37 | 553.21×529.50 | -27.62 |
 | 1250×605 | 10 | 48 | 350 | 900×557 | 标准 | 509.69（509） | 377.17 | 219.17 | 512.88×533.00 | -4.67 |
@@ -513,6 +631,24 @@ reason ∈ {
 
 1250×605 的 10 人示例说明了完整包络算法与“舞台短边减一点边距”的关系：舞台高度为 557，安全舞台高度为 533，最终包络高度恰好受 533 限制；圆形桌面直径约为 377，而不是使用旧式 `557 - 208` 得到过小结果。
 
+紧凑横版的最小尺寸示例为：
+
+```text
+usableWidth = 667
+usableHeight = 375
+taskRailWidth = 56
+sidebarWidth = 192
+stageWidth = 667 - 56 - 192 = 419
+stageHeight = 375
+
+seatWidth = 79.875
+orbitWidth = min(330, 419 - 79.875 - 16) = 323.125
+footprintWidth = 323.125 + 79.875 = 403
+horizontalClearance = (419 - 403) / 2 = 8
+```
+
+如果具体实现的画布边框占据内容尺寸，应先把边框从原始布局矩形中扣除，再代入本例。当前预览使用左右各 1 的内部边框，因此其 `usableWidth = 665`、`stageWidth = 417`、`orbitWidth = 321.125`、`footprintWidth = 401`，最终左右净空仍各为 8。
+
 ## 16. 诊断显示
 
 规范图和布局调试模式应能独立显示以下边界：
@@ -520,12 +656,13 @@ reason ∈ {
 - 原始布局矩形。
 - 有效布局矩形。
 - 顶栏、主舞台和阶段侧栏矩形。
+- 紧凑横版的任务轨道矩形。
 - 安全舞台。
 - 圆桌布局正方形 `Q`。
 - 圆形桌面 `Dt`。
-- 玩家中心轨道 `R`。
+- 普通横版的圆形玩家轨道 `R` 或紧凑横版的胶囊玩家轨道。
 - 每个玩家的 `SeatBounds`。
-- 完整圆桌占用包络 `B(Q)`。
+- 普通横版的完整圆桌占用包络 `B(Q)` 或紧凑横版的 `RoundTableFootprint`。
 
 这些边界用于解释和验算模型。正式游戏 UI 默认不显示；只有设计或调试模式可以开启。
 
@@ -539,17 +676,21 @@ reason ∈ {
 1440×900
 1920×1080
 1024×768
+932×430
+852×393
+844×390
+667×375
 ```
 
 每个尺寸分别验证 5 人和 10 人，并检查：
 
-1. 顶栏档位、阶段侧栏宽度和主舞台矩形符合公式。
+1. 横版模式、顶栏或任务轨道、阶段侧栏宽度和主舞台矩形符合公式。
 2. 当前玩家位于六点钟方向，座位顺序为视觉顺时针。
-3. `Q` 不超过 640，座位呈现档位符合 `Q` 范围。
+3. 普通横版的 `Q` 不超过 640 并符合座位呈现档位；紧凑横版的胶囊轨道尺寸符合公式。
 4. 完整包络位于安全舞台内。
-5. 玩家座位之间的间距不少于 `Gseat`。
-6. 玩家座位与中央信息区的间距不少于 `Gcenter`。
-7. 桌面圆心补偿不超过 `0.06Q`。
+5. 玩家座位之间的间距不少于 `seatGap`。
+6. 玩家座位与中央信息区的间距不少于 `centerGap`。
+7. 普通横版的桌面圆心补偿不超过 `0.06Q`；紧凑横版的完整包络保持居中并位于安全舞台内。
 8. 所有玩家内容保持屏幕正向。
 9. 最小交互热区符合所选档位。
 10. 阶段和状态切换不改变圆桌尺寸与中心。

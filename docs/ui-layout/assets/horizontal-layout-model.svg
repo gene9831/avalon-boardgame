@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
-  <title id="title">Avalon 横向房间布局几何模型</title>
-  <desc id="desc">顶栏横跨顶部，主舞台与阶段侧栏位于下方。主舞台内显示安全矩形、圆桌布局正方形、圆形桌面、玩家轨道、座位和完整占用包络。</desc>
+  <title id="title">Avalon 普通横版房间布局几何模型</title>
+  <desc id="desc">普通横版中，顶栏横跨顶部，主舞台与阶段侧栏位于下方。主舞台内显示安全矩形、圆桌布局正方形、圆形桌面、玩家轨道、座位和完整占用包络。</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#d6c39a"/>
@@ -17,26 +17,26 @@
 
   <rect width="1200" height="720" fill="#0b111b"/>
   <rect x="20" y="20" width="1160" height="680" rx="4" fill="#101821" stroke="#67798a" stroke-width="2"/>
-  <text class="small" x="34" y="45">有效布局矩形（Wu × Hu）</text>
+  <text class="small" x="34" y="45">有效布局矩形（usableWidth × usableHeight）</text>
 
   <rect x="36" y="56" width="1128" height="64" fill="#17212e" stroke="#8fbce0" stroke-width="2"/>
   <text class="label" x="54" y="94">左侧房间信息</text>
   <text class="label" x="516" y="94">任务轨道</text>
   <text class="label" x="986" y="94">右侧入口</text>
-  <text class="small" x="1105" y="146">T</text>
+  <text class="small" x="1060" y="146">topBarHeight</text>
   <line class="measure" x1="1140" y1="58" x2="1140" y2="118"/>
 
   <rect x="36" y="120" width="818" height="564" fill="#0d2028" stroke="#6cb5d9" stroke-width="3"/>
   <text class="label" x="52" y="151">圆桌舞台 Stage</text>
   <rect x="854" y="120" width="310" height="564" fill="#17212e" stroke="#a88245" stroke-width="3"/>
-  <text class="label" x="876" y="154">阶段侧栏 P</text>
+  <text class="label" x="876" y="154">阶段侧栏 sidebarWidth</text>
   <rect x="876" y="177" width="266" height="310" rx="8" fill="#223140"/>
   <text class="small" x="895" y="210">当前阶段主要操作</text>
   <rect x="876" y="509" width="266" height="151" rx="8" fill="#121b25"/>
   <text class="small" x="895" y="541">剩余空间：最近记录</text>
 
   <rect x="54" y="138" width="782" height="528" class="guide" stroke="#8fbce0"/>
-  <text class="small" x="63" y="658">SafeStage = inset(Stage, M)</text>
+  <text class="small" x="63" y="658">SafeStage = inset(Stage, stageMargin)</text>
 
   <rect x="228" y="168" width="436" height="436" class="guide" stroke="#d69a3a"/>
   <text class="small" x="235" y="190">圆桌布局正方形 Q</text>
