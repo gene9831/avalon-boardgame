@@ -6,9 +6,11 @@
 
 “横向布局”表示布局模式已经由上层响应式模式选择器选定；本文不规定何时从其他布局切换到横向布局。当前 Web 界面尚未完整采用本文的常驻阶段侧栏，因此本文是目标规范，不是现状说明。
 
-项目术语以 [`CONTEXT.md`](../../CONTEXT.md) 为准。本文使用其中定义的横向房间布局、圆桌舞台、圆桌布局正方形、圆形桌面、玩家中心轨道、圆桌占用包络、阶段侧栏和座位呈现档位。
+项目术语以 [`CONTEXT.md`](../../CONTEXT.md) 为准。本文使用其中定义的横向房间布局、圆桌舞台、圆桌布局基准框、桌面、玩家中心轨道、圆桌占用包络、阶段侧栏和座位呈现档位。
 
-可在浏览器中打开[横屏响应式交互原型](./prototypes/avalon-landscape-responsive-lab.html)，通过预设尺寸或自定义宽高检查普通横版与紧凑横版布局。
+可在浏览器中打开[统一横竖屏交互原型](./prototypes/avalon-landscape-responsive-lab.html)，通过预设尺寸、自定义宽高或旋转按钮检查普通横版、紧凑横版与竖版布局。
+
+竖向模式的三段结构、紧凑/普通两档固定区域和内部座位呈现档位由[竖向布局规范](./vertical-layout.md)定义；两种方向共用同一个交互原型。
 
 ## 2. 设计目标
 
@@ -114,32 +116,36 @@ usableHeight = layoutHeight - insetTop - insetBottom
 
 | 参数 | 默认值 | 含义 |
 | --- | ---: | --- |
-| `Qcap` | 640 | 圆桌布局正方形边长上限 |
-| `ρ` | 0.74 | 圆形桌面直径相对 `Q` 的比例 |
-| `κ` | 0.43 | 玩家轨道半径相对 `Q` 的比例 |
-| `Dcmin` | 152 | 中央信息区最小直径 |
-| `Dcmax` | 256 | 中央信息区最大直径 |
-| `γ` | 0.38 | 中央信息区直径相对 `Q` 的目标比例 |
-| `Ocap` | 0.06 | 桌面圆心相对安全舞台中心的最大补偿比例 |
+| `roundTableFrameWidthCap` | 640 | 圆形布局基准框边长上限 |
+| `tabletopDiameterScale` | 0.74 | 圆形桌面直径相对基准框宽度的比例 |
+| `playerOrbitRadiusScale` | 0.43 | 玩家轨道半径相对基准框宽度的比例 |
+| `centerPanelDiameterMin` | 152 | 中央信息区最小直径 |
+| `centerPanelDiameterMax` | 256 | 中央信息区最大直径 |
+| `centerPanelDiameterScale` | 0.38 | 中央信息区直径相对基准框宽度的目标比例 |
+| `tabletopCenterOffsetScaleCap` | 0.06 | 桌面圆心相对安全舞台中心的最大补偿比例 |
 
 其中：
 
 ```text
-Dt = ρQ
-R  = κQ
-Dc = clamp(Dcmin, γQ, Dcmax)
+tabletopDiameter = tabletopDiameterScale × roundTableFrameWidth
+playerOrbitRadius = playerOrbitRadiusScale × roundTableFrameWidth
+centerPanelDiameter = clamp(
+    centerPanelDiameterMin,
+    centerPanelDiameterScale × roundTableFrameWidth,
+    centerPanelDiameterMax
+)
 ```
 
 ### 5.3 座位呈现档位
 
 | 参数 | 紧凑 | 标准 | 宽松 |
 | --- | ---: | ---: | ---: |
-| `Q` 范围 | 0–439 | 440–559 | 560–640 |
-| 头像直径 `Aavatar` | 40 | 48 | 56 |
-| 姓名牌最大宽度 `Wname` | 80 | 96 | 112 |
-| 姓名牌高度 `Hname` | 22 | 24 | 26 |
+| `roundTableFrameWidth` 范围 | 0–439 | 440–559 | 560–640 |
+| 头像直径 `avatarDiameter` | 40 | 48 | 56 |
+| 姓名牌最大宽度 `nameWidth` | 80 | 96 | 112 |
+| 姓名牌高度 `nameHeight` | 22 | 24 | 26 |
 | 姓名字号 | 12 | 13 | 14 |
-| 领袖标记上限 `Hleader` | 24 | 28 | 32 |
+| 领袖标记上限 `leaderCrownHeight` | 24 | 28 | 32 |
 | 其他状态标记 | 16 | 20 | 24 |
 | 最小交互热区 | 44 | 48 | 56 |
 
@@ -310,13 +316,18 @@ historyHeight = stageHeight - actionAreaHeight
 
 ```text
 relativeIndex(i) = mod(seatIndex(i) - viewerSeatIndex, playerCount)
-θi = π/2 + relativeIndex(i) × 2π/playerCount
+playerSeatAngle(i) = π/2 + relativeIndex(i) × 2π/playerCount
 
-Pi.x = Cx + R cos(θi)
-Pi.y = Cy + R sin(θi)
+playerSeatCenter(i).x =
+    tabletopCenter.x
+    + playerOrbitRadius × cos(playerSeatAngle(i))
+
+playerSeatCenter(i).y =
+    tabletopCenter.y
+    + playerOrbitRadius × sin(playerSeatAngle(i))
 ```
 
-`Pi` 是头像中心，不是整个座位容器中心。当前玩家位于六点钟方向，其他玩家按房间座位顺序顺时针排列。头像、姓名和状态标记自身的旋转角始终为零。
+`playerSeatCenter` 是头像中心，不是整个座位容器中心。当前玩家位于六点钟方向，其他玩家按房间座位顺序顺时针排列。头像、姓名和状态标记自身的旋转角始终为零。
 
 ### 9.2 紧凑横版玩家位置
 
@@ -338,7 +349,9 @@ tableDiameter = min(layoutHeight × 0.544, orbitHeight × 0.83)
 玩家沿胶囊周长等距排列：
 
 ```text
-Pi = Stage.center + stadiumPoint(relativeIndex(i), playerCount, orbitWidth, orbitHeight)
+playerSeatCenter(i) =
+    stageCenter
+    + stadiumPoint(relativeIndex(i), playerCount, orbitWidth, orbitHeight)
 ```
 
 `stadiumPoint` 表示从六点钟方向开始、按视觉顺时针沿胶囊周长等距取点。该函数只负责轨道取点，不改变头像、姓名或标记的屏幕方向。
@@ -350,33 +363,39 @@ footprintWidth = orbitWidth + seatWidth
 footprintHeight = orbitHeight + seatHeight
 ```
 
-最终仍以所有实际 `SeatBounds` 与桌面边界的并集复验，保守包络不能替代碰撞检查。
+最终仍以所有实际 `PlayerSeatBounds` 与桌面边界的并集复验，保守包络不能替代碰撞检查。
 
 ### 9.3 座位局部边界
 
-以头像中心 `(0, 0)` 为座位局部坐标原点。姓名牌位于头像下方，间距 `Gname = 4`；领袖标记位于头像上方，并与头像重叠自身高度的三分之一。任务成员、断线和投票结果标记不得突破姓名牌的左右边界。
+以头像中心 `(0, 0)` 为座位局部坐标原点。姓名牌位于头像下方，间距 `nameGap = 4`；领袖标记位于头像上方，并与头像重叠自身高度的三分之一。任务成员、断线和投票结果标记不得突破姓名牌的左右边界。
 
 所选呈现档位的最坏情况局部边界为：
 
 ```text
-Eleft   = Wname / 2
-Eright  = Wname / 2
-Etop    = Aavatar / 2 + 2Hleader / 3
-Ebottom = Aavatar / 2 + Gname + Hname
+seatLeftExtent = nameWidth / 2
+seatRightExtent = nameWidth / 2
+seatTopExtent = avatarDiameter / 2 + 2 × leaderCrownHeight / 3
+seatBottomExtent = avatarDiameter / 2 + nameGap + nameHeight
 
-PlayerLocalBounds = Rect(
-  -Eleft,
-  -Etop,
-  Eleft + Eright,
-  Etop + Ebottom
+PlayerSeatLocalBounds = Rect(
+    -seatLeftExtent,
+    -seatTopExtent,
+    seatLeftExtent + seatRightExtent,
+    seatTopExtent + seatBottomExtent
 )
 ```
 
 第 `i` 个座位的边界为：
 
 ```text
-SeatBounds(i, Q) = translate(PlayerLocalBounds, Pi(Q))
+PlayerSeatBounds(i, roundTableFrameWidth) =
+    translate(
+        PlayerSeatLocalBounds,
+        playerSeatCenter(i, roundTableFrameWidth)
+    )
 ```
+
+`PlayerSeatBounds` 是稳定的最坏合法状态边界。每个座位都预留完整领袖皇冠和状态标记空间，即使当前未显示这些标记；领袖轮换、任务成员选择和连接状态变化不得改变座位几何。诊断线、碰撞检查和圆桌占用包络必须引用同一边界。
 
 包络按最大合法状态计算。领袖、任务成员、断线、投票结果或角色显示状态发生变化时，不重新计算座位边界。
 
@@ -385,39 +404,52 @@ SeatBounds(i, Q) = translate(PlayerLocalBounds, Pi(Q))
 先以圆桌中心为 `(0, 0)` 构造候选几何：
 
 ```text
-TabletopBounds(Q) = Rect(-Dt/2, -Dt/2, Dt, Dt)
+TabletopBounds(roundTableFrameWidth) = Rect(
+    -tabletopDiameter / 2,
+    -tabletopDiameter / 2,
+    tabletopDiameter,
+    tabletopDiameter
+)
 
-B0(Q) = union(
-  TabletopBounds(Q),
-  SeatBounds(0, Q),
-  ...,
-  SeatBounds(playerCount - 1, Q)
+UnshiftedRoundTableFootprint(roundTableFrameWidth) = union(
+    TabletopBounds(roundTableFrameWidth),
+    PlayerSeatBounds(0, roundTableFrameWidth),
+    ...,
+    PlayerSeatBounds(playerCount - 1, roundTableFrameWidth)
 )
 ```
 
-`B0(Q)` 是尚未平移的圆桌占用包络。圆桌布局正方形只是用于计算比例和玩家位置的参考坐标区，不代替实际包络。
+`UnshiftedRoundTableFootprint` 是尚未平移的圆桌占用包络。圆桌布局基准框只是用于计算比例和玩家位置的参考坐标区，不代替实际包络；在普通横版中它是正方形。
 
 ### 9.5 包络居中
 
 令 `center(Rect)` 返回矩形中心，则使完整包络居中的桌面圆心补偿为：
 
 ```text
-Offset(Q) = center(SafeStage) - center(B0(Q))
+tabletopCenterOffset(roundTableFrameWidth) =
+    center(SafeStage)
+    - center(UnshiftedRoundTableFootprint(roundTableFrameWidth))
 ```
 
 必须满足：
 
 ```text
-abs(Offset.x) ≤ Ocap × Q
-abs(Offset.y) ≤ Ocap × Q
+abs(tabletopCenterOffset.x)
+    ≤ tabletopCenterOffsetScaleCap × roundTableFrameWidth
+
+abs(tabletopCenterOffset.y)
+    ≤ tabletopCenterOffsetScaleCap × roundTableFrameWidth
 ```
 
-默认 `Ocap = 0.06`。这一上限能够容纳 5–10 人因奇偶座位分布和下置姓名牌产生的自然偏移；若超过上限，应调整呈现档位或标签结构，而不是继续移动桌面。
+默认 `tabletopCenterOffsetScaleCap = 0.06`。这一上限能够容纳 5–10 人因奇偶座位分布和下置姓名牌产生的自然偏移；若超过上限，应调整呈现档位或标签结构，而不是继续移动桌面。
 
 平移后的包络为：
 
 ```text
-B(Q) = translate(B0(Q), Offset(Q))
+RoundTableFootprint(roundTableFrameWidth) = translate(
+    UnshiftedRoundTableFootprint(roundTableFrameWidth),
+    tabletopCenterOffset(roundTableFrameWidth)
+)
 ```
 
 ## 10. 圆桌约束
@@ -425,16 +457,18 @@ B(Q) = translate(B0(Q), Offset(Q))
 ### 10.1 外部适配约束
 
 ```text
-B(Q) ⊆ SafeStage
-Q ≤ Qcap
+RoundTableFootprint(roundTableFrameWidth) ⊆ SafeStage
+roundTableFrameWidth ≤ roundTableFrameWidthCap
 ```
 
-因为 `B(Q)` 的宽高随 `Q` 单调增加，可以求得满足外部适配约束的最大值 `fittingQ`。
+因为 `RoundTableFootprint` 的宽高随 `roundTableFrameWidth` 单调增加，可以求得满足外部适配约束的最大值 `fittingRoundTableFrameWidth`。
 
 估算阶段可以使用：
 
 ```text
-Q ≈ min(Stage.width, Stage.height) - 安全预留
+roundTableFrameWidth ≈
+    min(stageWidth, stageHeight)
+    - safetyAllowance
 ```
 
 但正式结果必须使用完整包络。安全预留只出现一次，不能同时存在于舞台内边距和圆桌尺寸公式中。
@@ -444,52 +478,95 @@ Q ≈ min(Stage.width, Stage.height) - 安全预留
 弦长可以快速估算相邻玩家所需的最小轨道半径：
 
 ```text
-2R sin(π/playerCount) ≥ adjacentSeatSpan + seatGap
-requiredRadius = (adjacentSeatSpan + seatGap) / (2 sin(π/playerCount))
-requiredQ ≈ requiredRadius / κ
+2 × playerOrbitRadius × sin(π / playerCount)
+    ≥ adjacentSeatSpan + seatGap
+
+requiredPlayerOrbitRadius =
+    (adjacentSeatSpan + seatGap)
+    / (2 × sin(π / playerCount))
+
+requiredRoundTableFrameWidth ≈
+    requiredPlayerOrbitRadius / playerOrbitRadiusScale
 ```
 
-其中 `adjacentSeatSpan` 是座位在相邻方向上的保守占用宽度。正式判断使用实际轴对齐矩形：
+其中 `adjacentSeatSpan` 是座位在相邻方向上的保守占用宽度。正式判断使用实际轴对齐矩形。先定义两个边界的横向和纵向分离量：
 
 ```text
-对任意 i ≠ j：
+horizontalBoundarySeparation =
+    max(
+        secondBounds.left - firstBounds.right,
+        firstBounds.left - secondBounds.right
+    )
 
-intersection(
-  expand(SeatBounds(i), seatGap / 2),
-  expand(SeatBounds(j), seatGap / 2)
-) = empty
+verticalBoundarySeparation =
+    max(
+        secondBounds.top - firstBounds.bottom,
+        firstBounds.top - secondBounds.bottom
+    )
+
+adjacentBoundaryGap =
+    max(
+        horizontalBoundarySeparation,
+        verticalBoundarySeparation
+    )
 ```
+
+因此任意两个玩家座位的正式约束为：
+
+```text
+adjacentBoundaryGap(
+    PlayerSeatBounds(firstPlayer),
+    PlayerSeatBounds(secondPlayer)
+) ≥ seatGap
+```
+
+这与“横向或纵向至少一个方向具有完整间距”的轴对齐碰撞语义等价。竖向跑道使用同一度量优化视觉间距；普通横版和紧凑横版仍可按既定等轨道间隔放置玩家中心。
 
 ### 10.3 中央信息区碰撞
 
 对每个座位矩形，计算桌面中心到该矩形的最短距离：
 
 ```text
-distance(TableCenter, SeatBounds(i)) ≥ Dc/2 + centerGap
+distance(tabletopCenter, PlayerSeatBounds(i))
+    ≥ centerPanelDiameter / 2 + centerGap
 ```
 
 点到轴对齐矩形的距离可以写为：
 
 ```text
-dx = max(Rect.left - TableCenter.x, 0, TableCenter.x - Rect.right)
-dy = max(Rect.top  - TableCenter.y, 0, TableCenter.y - Rect.bottom)
-distance = sqrt(dx² + dy²)
+horizontalDistance = max(
+    playerSeatBounds.left - tabletopCenter.x,
+    0,
+    tabletopCenter.x - playerSeatBounds.right
+)
+
+verticalDistance = max(
+    playerSeatBounds.top - tabletopCenter.y,
+    0,
+    tabletopCenter.y - playerSeatBounds.bottom
+)
+
+tabletopDistance = sqrt(horizontalDistance² + verticalDistance²)
 ```
 
 该约束比统一径向延伸更准确，能够处理顶部玩家姓名向圆心延伸等非对称情况。
 
 ### 10.4 内部最小尺寸
 
-座位碰撞、中央信息区碰撞和圆心补偿共同确定当前呈现档位的最小可行值 `requiredQ`。这些约束随 `Q` 增大而由失败转为通过。
+座位碰撞、中央信息区碰撞和圆心补偿共同确定当前呈现档位的最小可行值 `requiredRoundTableFrameWidth`。这些约束随 `roundTableFrameWidth` 增大而由失败转为通过。
 
-外部包络适配确定最大可行值 `fittingQ`。它随 `Q` 增大而由通过转为失败。
+外部包络适配确定最大可行值 `fittingRoundTableFrameWidth`。它随 `roundTableFrameWidth` 增大而由通过转为失败。
 
 一个档位可行，当且仅当：
 
 ```text
-max(Tier.minQ, requiredQ)
+max(tierMinimumRoundTableFrameWidth, requiredRoundTableFrameWidth)
 ≤
-min(Tier.maxQ, fittingQ, Qcap)
+min(
+    tierMaximumRoundTableFrameWidth,
+    fittingRoundTableFrameWidth,
+    roundTableFrameWidthCap
+)
 ```
 
 ## 11. 圆桌求解算法
@@ -500,19 +577,28 @@ min(Tier.maxQ, fittingQ, Qcap)
 
 ```text
 for tier in [宽松, 标准, 紧凑]:
-    qLower = max(tier.minQ, 求内部约束的最小可行 Q)
-    qUpper = min(tier.maxQ, Qcap, 求外部适配的最大可行 Q)
+    candidateMinimumFrameWidth = max(
+        tierMinimumRoundTableFrameWidth,
+        求内部约束的最小可行 roundTableFrameWidth
+    )
+    candidateMaximumFrameWidth = min(
+        tierMaximumRoundTableFrameWidth,
+        roundTableFrameWidthCap,
+        求外部适配的最大可行 roundTableFrameWidth
+    )
 
-    if qLower ≤ qUpper:
-        Qcontinuous = qUpper
-        Qrender = 安全向下取整(Qcontinuous)
+    if candidateMinimumFrameWidth ≤ candidateMaximumFrameWidth:
+        continuousRoundTableFrameWidth = candidateMaximumFrameWidth
+        renderedRoundTableFrameWidth =
+            安全向下取整(continuousRoundTableFrameWidth)
         构造并取整全部渲染几何
 
         while 取整后的几何不满足全部约束:
-            Qrender = Qrender - 1
+            renderedRoundTableFrameWidth =
+                renderedRoundTableFrameWidth - 1
             重新构造渲染几何
 
-        返回该档位和 Qrender
+        返回该档位和 renderedRoundTableFrameWidth
 
 返回“横向布局不可行”
 ```
@@ -521,12 +607,12 @@ for tier in [宽松, 标准, 紧凑]:
 
 ### 11.2 紧凑横版
 
-紧凑横版不使用圆形玩家轨道的 `Q` 求解器。它按 9.2 节公式直接计算 `seatWidth`、`orbitWidth` 和 `orbitHeight`，再执行以下约束：
+紧凑横版不使用圆形玩家轨道的 `roundTableFrameWidth` 求解器。它按 9.2 节公式直接计算 `seatWidth`、`orbitWidth` 和 `orbitHeight`，再执行以下约束：
 
 ```text
 RoundTableFootprint ⊆ SafeStage
-所有 SeatBounds 互不重叠
-所有 SeatBounds 与中央信息区保持 centerGap
+所有 PlayerSeatBounds 互不重叠
+所有 PlayerSeatBounds 与中央信息区保持 centerGap
 ```
 
 若约束失败，返回“横向布局不可行”，不得继续缩小到低于既定座位、头像或 44×44 交互热区的下限。
@@ -538,7 +624,7 @@ flowchart TD
     C --> D[计算胶囊玩家轨道]
     B -- 否 --> E[选择 48 或 56 顶栏]
     E --> F[计算舞台和普通侧栏]
-    F --> G[求最大可行 Q]
+    F --> G[求最大可行圆桌基准框宽度]
     D --> H{最终几何复验通过?}
     G --> H
     H -- 否 --> X[横向布局不可行]
@@ -553,7 +639,7 @@ flowchart TD
 layoutWidth, layoutHeight, safeInsets, playerCount, viewerSeatIndex, seatTier
 ```
 
-其中 `viewerSeatIndex` 只旋转座位映射，不改变 `Q`。以下状态不得改变圆桌尺寸或中心：
+其中 `viewerSeatIndex` 只旋转座位映射，不改变 `roundTableFrameWidth`。以下状态不得改变圆桌尺寸或中心：
 
 - 游戏阶段。
 - 领袖变更。
@@ -576,10 +662,14 @@ layoutWidth, layoutHeight, safeInsets, playerCount, viewerSeatIndex, seatTier
 - 取整后重新执行包含、座位碰撞、中央碰撞和补偿上限检查。
 - 若复验失败，将相关尺寸向安全方向调整 1 个逻辑单位并再次验证。
 
-形式上，最终 `Q` 是不超过连续解的最大离散可行值：
+形式上，最终的 `renderedRoundTableFrameWidth` 是不超过连续解的最大离散可行值：
 
 ```text
-Qrender = max { q ∈ integers | q ≤ Qcontinuous 且 RoundedLayout(q) 可行 }
+renderedRoundTableFrameWidth = max {
+    candidateFrameWidth ∈ integers
+    | candidateFrameWidth ≤ continuousRoundTableFrameWidth
+    且 RoundedLayout(candidateFrameWidth) 可行
+}
 ```
 
 ## 14. 横向布局可行性
@@ -591,7 +681,7 @@ usableWidth > 0 且 usableHeight > 0
 普通横版时，顶栏三区满足最小内容宽度
 sidebarWidth 满足当前横版模式的宽度公式
 stageHeight ≥ requiredActionHeight
-普通横版至少存在一个可行 Q；紧凑横版的胶囊轨道通过复验
+普通横版至少存在一个可行 roundTableFrameWidth；紧凑横版的胶囊轨道通过复验
 主要操作同时可见
 所有最终取整几何通过复验
 ```
@@ -614,9 +704,9 @@ reason ∈ {
 
 ## 15. 计算示例
 
-以下示例假设安全区均为 0，顶栏和阶段侧栏内容预算已满足。`Q*` 是连续求解值，括号内为安全取整后的 `Qrender`。包络尺寸为取整前结果，保留两位小数。
+以下示例假设安全区均为 0，顶栏和阶段侧栏内容预算已满足。`continuousRoundTableFrameWidth` 是连续求解值，括号内为安全取整后的 `renderedRoundTableFrameWidth`。包络尺寸为取整前结果，保留两位小数。
 
-| 可用尺寸 | 人数 | 顶栏 | `sidebarWidth` | `stageWidth × stageHeight` | 档位 | `Q*`（最终） | `Dt` | `R` | 包络 `宽×高` | 圆心补偿 Y |
+| 可用尺寸 | 人数 | 顶栏 | `sidebarWidth` | `stageWidth × stageHeight` | 档位 | 基准框宽度（最终） | 桌面直径 | 玩家轨道半径 | 包络 `宽×高` | 圆心补偿 Y |
 | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: |
 | 1250×605 | 5 | 48 | 350 | 900×557 | 标准 | 559.00（559） | 413.66 | 240.37 | 553.21×529.50 | -27.62 |
 | 1250×605 | 10 | 48 | 350 | 900×557 | 标准 | 509.69（509） | 377.17 | 219.17 | 512.88×533.00 | -4.67 |
@@ -658,11 +748,11 @@ horizontalClearance = (419 - 403) / 2 = 8
 - 顶栏、主舞台和阶段侧栏矩形。
 - 紧凑横版的任务轨道矩形。
 - 安全舞台。
-- 圆桌布局正方形 `Q`。
-- 圆形桌面 `Dt`。
-- 普通横版的圆形玩家轨道 `R` 或紧凑横版的胶囊玩家轨道。
-- 每个玩家的 `SeatBounds`。
-- 普通横版的完整圆桌占用包络 `B(Q)` 或紧凑横版的 `RoundTableFootprint`。
+- 圆桌布局基准框。
+- 圆形桌面 `tabletopDiameter`。
+- 普通横版的圆形玩家轨道 `playerOrbitRadius` 或紧凑横版的胶囊玩家轨道。
+- 每个玩家包含领袖皇冠预留的 `PlayerSeatBounds`。
+- 普通横版或紧凑横版的完整 `RoundTableFootprint`。
 
 这些边界用于解释和验算模型。正式游戏 UI 默认不显示；只有设计或调试模式可以开启。
 
@@ -686,11 +776,11 @@ horizontalClearance = (419 - 403) / 2 = 8
 
 1. 横版模式、顶栏或任务轨道、阶段侧栏宽度和主舞台矩形符合公式。
 2. 当前玩家位于六点钟方向，座位顺序为视觉顺时针。
-3. 普通横版的 `Q` 不超过 640 并符合座位呈现档位；紧凑横版的胶囊轨道尺寸符合公式。
+3. 普通横版的 `roundTableFrameWidth` 不超过 640 并符合座位呈现档位；紧凑横版的胶囊轨道尺寸符合公式。
 4. 完整包络位于安全舞台内。
 5. 玩家座位之间的间距不少于 `seatGap`。
 6. 玩家座位与中央信息区的间距不少于 `centerGap`。
-7. 普通横版的桌面圆心补偿不超过 `0.06Q`；紧凑横版的完整包络保持居中并位于安全舞台内。
+7. 普通横版的桌面圆心补偿不超过 `0.06 × roundTableFrameWidth`；紧凑横版的完整包络保持居中并位于安全舞台内。
 8. 所有玩家内容保持屏幕正向。
 9. 最小交互热区符合所选档位。
 10. 阶段和状态切换不改变圆桌尺寸与中心。
@@ -701,9 +791,9 @@ horizontalClearance = (419 - 403) / 2 = 8
 
 当前 Web 已经具备以下相同基础：
 
-- 圆桌布局正方形最大边长为 640。
-- 圆形桌面直径约为 `0.74Q`。
-- 玩家中心轨道半径约为 `0.43Q`。
+- 圆形布局基准框最大边长为 640。
+- 圆形桌面直径约为 `0.74 × roundTableFrameWidth`。
+- 玩家中心轨道半径约为 `0.43 × roundTableFrameWidth`。
 - 当前玩家固定在底部，其他玩家顺时针排列。
 - 圆桌、头像和姓名具有响应式约束和浏览器几何回归测试。
 
