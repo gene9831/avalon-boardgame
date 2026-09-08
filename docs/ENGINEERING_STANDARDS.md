@@ -7,6 +7,7 @@
 本规范适用于：
 
 - `apps/web` 中的 React UI、路由、浏览器身份和本地重连状态；
+- `apps/ui-layout-lab` 中的无框架响应式布局实验室与纯几何求解器；
 - `apps/server` 中的 boardgame.io 服务、Lobby API、Socket、会话校验、房间生命周期和持久化；
 - `packages/game` 中的共享游戏规则核心、公开类型和 `playerView`；
 - `packages/test-support` 与 `tests/e2e` 中的测试支持和端到端测试；
@@ -168,6 +169,7 @@ const request = parseJoinRoomRequest(payload)
 | `packages/game` | 规则核心、公共类型、`playerView` | browser-safe 依赖 | PostgreSQL、Socket.IO、服务端配置、UI |
 | `apps/server` | 服务权威、Lobby/API、凭证、房间生命周期、持久化 | `packages/game`、Node/server 依赖 | 浏览器 UI |
 | `apps/web` | React UI、路由、浏览器身份、本地重连状态 | `packages/game` 的公开导出、过滤后状态 | 权威规则、凭证授权、安全过滤 |
+| `apps/ui-layout-lab` | 目标房间布局的纯几何、独立预览和浏览器回归 | Vite、Tailwind、DOM-free 本地布局模块 | 游戏服务、权威规则、正式 Web 运行时状态 |
 | `packages/test-support` | 可复用测试支持 | 被测包的公开或明确测试接口 | 生产运行时逻辑 |
 | `tests/e2e` | 用户流程与跨进程验收 | 已运行的公开界面和测试支持 | 游戏规则的第二实现 |
 | `infra/postgres` | 数据库部署配置 | PostgreSQL/Docker 配置 | 应用运行时逻辑 |
@@ -451,6 +453,7 @@ await client.query('SELECT * FROM matches WHERE match_id = $1', [matchID])
 | `apps/server` 非数据库路径 | `pnpm --filter @avalon/server test`；`pnpm --filter @avalon/server typecheck` |
 | PostgreSQL adapter/重连 | 上述 Server 检查 + `pnpm test:postgres`；报告实际数据库环境 |
 | `apps/web` 逻辑/UI | `pnpm --filter @avalon/web test`；按需 `pnpm --filter @avalon/web build` |
+| `apps/ui-layout-lab` | 包级 Vitest、typecheck、lint、build；关键设备流程追加包级 Playwright |
 | 跨应用或 workspace 配置 | `pnpm test`、`pnpm build`、`pnpm lint`、`pnpm typecheck` |
 | 关键浏览器流程 | `pnpm test:e2e`；需要矩阵时使用 `pnpm test:e2e:matrix` |
 
