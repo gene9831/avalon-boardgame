@@ -131,13 +131,12 @@ export function renderRoomLayout(
       </div>
       ${gapLines}
       ${seats}
-    <footer class="phase-panel" style="${rectStyles(result.regions.phasePanel)}">
-      <div class="phase-content">
-        <div class="phase-header"><div><small>领袖行动</small><strong>选择任务队员</strong></div>
+    <div class="phase-panel" style="${rectStyles(result.regions.phasePanel)}"></div>
+    <footer class="phase-content">
+        <div class="phase-header" style="${rectStyles(result.regions.phaseHeader)}"><div class="phase-title"><small>领袖行动</small><strong>选择任务队员</strong></div>
           <nav aria-label="房间工具"><button>身份</button><button>记录</button><button>帮助</button></nav>
         </div>
-        <div class="phase-middle"><button class="selected">青岚</button><button>松石</button></div>
-        <div class="phase-action"><button>确认队伍 · 2/4</button></div>
-      </div>
+        <div class="phase-middle" style="${rectStyles(result.regions.phaseMiddle)}"><button class="selected">青岚</button><button>松石</button></div>
+        <div class="phase-action" style="${rectStyles(result.regions.phaseAction)}"><button>确认队伍 · 2/4</button></div>
     </footer>`
 }

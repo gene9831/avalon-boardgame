@@ -14,6 +14,15 @@ test('uses the actual mobile viewport and keeps device controls concise', async 
   await expect(canvas).toHaveCSS('height', '844px')
   await expect(canvas.locator('.crown')).toHaveCount(1)
 
+  const phaseSectionHeights = await page
+    .locator('.phase-header, .phase-middle, .phase-action')
+    .evaluateAll((sections) => sections.map((section) => section.getBoundingClientRect().height))
+  expect(phaseSectionHeights).toEqual([48, 56, 64])
+  const phaseTitleHeight = await page
+    .locator('.phase-title')
+    .evaluate((title) => title.getBoundingClientRect().height)
+  expect(phaseTitleHeight).toBeLessThanOrEqual(24)
+
   await page.getByRole('button', { name: '打开布局设置' }).click()
   await expect(page.getByRole('dialog', { name: '预览设置' })).toBeVisible()
   await expect(page.locator('.simulation-fields')).toBeHidden()

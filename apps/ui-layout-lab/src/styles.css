@@ -76,17 +76,18 @@ button { cursor: pointer; }
 .status-marker { position: absolute; right: -1px; bottom: -1px; border: 2px solid #0b1824; border-radius: 50%; background: #68d4a3; }
 .player-name { z-index: 4; display: grid; place-items: center; color: #d9e0e7; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .phase-panel { z-index: 8; border-top: 1px solid rgba(202,169,91,.2); background: linear-gradient(180deg, #111d2b, #0b141f); }
-.phase-content { width: min(100%,560px); height: 100%; margin: auto; }
-.phase-header { height: 29%; display: flex; align-items: center; justify-content: space-between; padding-left: 16px; border-bottom: 1px solid rgba(148,163,184,.12); }
-.phase-header > div { display: flex; flex-direction: column; }
+.phase-content { position: static; display: contents; }
+.phase-header, .phase-middle, .phase-action { position: absolute; z-index: 9; }
+.phase-header { display: flex; align-items: center; justify-content: space-between; padding-left: 16px; border-bottom: 1px solid rgba(148,163,184,.12); }
+.phase-title { display: flex; min-width: 0; align-items: baseline; gap: 8px; overflow: hidden; white-space: nowrap; }
 .phase-header small { color: #b99a53; font-size: 12px; letter-spacing: .08em; }
-.phase-header strong { margin-top: 2px; font-family: ui-serif, Georgia, serif; font-size: 15px; }
+.phase-header strong { overflow: hidden; font-family: ui-serif, Georgia, serif; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
 .phase-header nav { display: flex; height: 100%; }
 .phase-header nav button { width: 48px; min-height: 44px; border: 0; color: #9ba9b8; background: transparent; font-size: 12px; }
-.phase-middle { height: 33%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center; padding: 4px 16px; }
+.phase-middle { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center; padding: 4px 16px; }
 .phase-middle button { height: 44px; border: 1px solid #405166; border-radius: 9px; color: #aebac8; background: #132233; font-size: 12px; }
 .phase-middle button.selected { border-color: #c8a858; color: #edd684; background: rgba(167,133,54,.14); }
-.phase-action { height: 38%; display: grid; align-items: center; padding: 5px 16px 8px; }
+.phase-action { display: grid; align-items: center; padding: 5px 16px 8px; }
 .phase-action button { height: 44px; border: 1px solid #d5b961; border-radius: 10px; color: #17202a; background: linear-gradient(180deg,#edd681,#c7a34f); font-size: 13px; font-weight: 800; }
 .room-canvas[data-show-geometry] .safe-stage { opacity: 1; border: 1px dashed rgba(75,208,178,.54); }
 .room-canvas[data-show-geometry] .round-table-frame { opacity: 1; border: 1px dashed rgba(242,181,70,.52); }

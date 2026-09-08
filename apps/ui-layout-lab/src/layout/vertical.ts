@@ -32,6 +32,9 @@ type VerticalStage = Readonly<{
   variant: 'compact' | 'normal'
   topBarHeight: number
   phasePanelHeight: number
+  phaseHeaderHeight: number
+  phaseMiddleHeight: number
+  phaseActionHeight: number
   stageMargin: number
   stageWidth: number
   stageHeight: number
@@ -71,6 +74,7 @@ const TABLETOP_WIDTH_SCALE = 0.74
 const TABLETOP_CENTER_OFFSET_SCALE_CAP = 0.06
 const CENTER_PANEL_GAP = 12
 const NAME_GAP = 4
+const PHASE_CONTENT_WIDTH_CAP = 560
 
 const SEAT_TIERS: readonly SeatTier[] = [
   {
@@ -424,13 +428,19 @@ function createCandidate(
 function createVerticalStage(input: LayoutInput): VerticalStage {
   const isCompact = input.height < 800
   const topBarHeight = isCompact ? 48 : 56
-  const phasePanelHeight = isCompact ? 152 : 168
+  const phaseHeaderHeight = isCompact ? 44 : 48
+  const phaseMiddleHeight = isCompact ? 52 : 56
+  const phaseActionHeight = isCompact ? 56 : 64
+  const phasePanelHeight = phaseHeaderHeight + phaseMiddleHeight + phaseActionHeight
   const stageMargin = isCompact ? 8 : 12
   const stageHeight = input.height - topBarHeight - phasePanelHeight
   return {
     variant: isCompact ? 'compact' : 'normal',
     topBarHeight,
     phasePanelHeight,
+    phaseHeaderHeight,
+    phaseMiddleHeight,
+    phaseActionHeight,
     stageMargin,
     stageWidth: input.width,
     stageHeight,
@@ -486,6 +496,9 @@ function buildReadyLayout(
   stage: VerticalStage,
   candidate: VerticalCandidate,
 ): VerticalRoomLayout | null {
+  const phasePanelY = input.height - stage.phasePanelHeight
+  const phaseContentWidth = Math.min(input.width, PHASE_CONTENT_WIDTH_CAP)
+  const phaseContentX = (input.width - phaseContentWidth) / 2
   const regions = {
     topBar: createRect(0, 0, input.width, stage.topBarHeight),
     stage: createRect(0, stage.topBarHeight, stage.stageWidth, stage.stageHeight),
@@ -497,9 +510,33 @@ function buildReadyLayout(
     ),
     phasePanel: createRect(
       0,
-      input.height - stage.phasePanelHeight,
+      phasePanelY,
       input.width,
       stage.phasePanelHeight,
+    ),
+    phaseContent: createRect(
+      phaseContentX,
+      phasePanelY,
+      phaseContentWidth,
+      stage.phasePanelHeight,
+    ),
+    phaseHeader: createRect(
+      phaseContentX,
+      phasePanelY,
+      phaseContentWidth,
+      stage.phaseHeaderHeight,
+    ),
+    phaseMiddle: createRect(
+      phaseContentX,
+      phasePanelY + stage.phaseHeaderHeight,
+      phaseContentWidth,
+      stage.phaseMiddleHeight,
+    ),
+    phaseAction: createRect(
+      phaseContentX,
+      phasePanelY + stage.phaseHeaderHeight + stage.phaseMiddleHeight,
+      phaseContentWidth,
+      stage.phaseActionHeight,
     ),
   }
   const footprintOffsetY = (

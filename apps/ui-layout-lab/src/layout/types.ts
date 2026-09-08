@@ -72,6 +72,10 @@ export type VerticalRoomLayout = Readonly<{
     stage: Rect
     safeStage: Rect
     phasePanel: Rect
+    phaseContent: Rect
+    phaseHeader: Rect
+    phaseMiddle: Rect
+    phaseAction: Rect
   }>
   roundTable: RoundTableLayout
   playerSeats: readonly PlayerSeatLayout[]

@@ -30,7 +30,7 @@ solveRoomLayout({ width, height, playerCount })
 
 函数根据宽高选择方向，调用方不传 `horizontal` 或 `vertical`。当前迁移切片完成竖向布局；横向输入返回 `horizontal-strategy-pending`，并继续由旧静态原型作为对齐参考。
 
-成功结果包含顶栏、舞台、阶段面板、桌面、玩家轨道和每个座位的 `playerSeatBounds`、`avatarRect`、`nameRect`、`avatarTopClearance`。皇冠尺寸和状态标记不是求解器输入或输出；渲染器可在顶部预留空间内放置皇冠，并由头像圆心和半径派生状态标记。
+成功结果包含顶栏、舞台、阶段面板及其三个固定高度子矩形、桌面、玩家轨道和每个座位的 `playerSeatBounds`、`avatarRect`、`nameRect`、`avatarTopClearance`。皇冠尺寸和状态标记不是求解器输入或输出；渲染器可在顶部预留空间内放置皇冠，并由头像圆心和半径派生状态标记。
 
 ## 验证
 

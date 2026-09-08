@@ -42,6 +42,35 @@ function numericValues(value: unknown): number[] {
 
 describe('vertical room layout', () => {
   it.each([
+    {
+      width: 375,
+      height: 667,
+      expected: {
+        phaseContent: { x: 0, y: 515, width: 375, height: 152 },
+        phaseHeader: { x: 0, y: 515, width: 375, height: 44 },
+        phaseMiddle: { x: 0, y: 559, width: 375, height: 52 },
+        phaseAction: { x: 0, y: 611, width: 375, height: 56 },
+      },
+    },
+    {
+      width: 390,
+      height: 844,
+      expected: {
+        phaseContent: { x: 0, y: 676, width: 390, height: 168 },
+        phaseHeader: { x: 0, y: 676, width: 390, height: 48 },
+        phaseMiddle: { x: 0, y: 724, width: 390, height: 56 },
+        phaseAction: { x: 0, y: 780, width: 390, height: 64 },
+      },
+    },
+  ])(
+    'returns integer phase-section rectangles at $width×$height',
+    ({ width, height, expected }) => {
+      const layout = expectReady(width, height, 10)
+      expect(layout.regions).toMatchObject(expected)
+    },
+  )
+
+  it.each([
     { width: 375, height: 667, avatarDiameter: 40, shape: 'stadium' },
     { width: 390, height: 844, avatarDiameter: 48, shape: 'stadium' },
     { width: 430, height: 932, avatarDiameter: 56, shape: 'stadium' },
