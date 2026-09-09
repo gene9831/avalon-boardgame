@@ -87,10 +87,25 @@ test('uses the actual mobile viewport and keeps device controls concise', async 
     .evaluate((title) => title.getBoundingClientRect().height)
   expect(phaseTitleHeight).toBeLessThanOrEqual(24)
 
+  const layoutBeforeSettingsOpen = await page.evaluate(() => ({
+    shellTop: document.querySelector('.lab-shell')!.getBoundingClientRect().top,
+    workbenchHeight: document.querySelector('.preview-workbench')!.getBoundingClientRect().height,
+    scrollY: window.scrollY,
+  }))
   await page.getByRole('button', { name: '打开布局设置' }).click()
   const settingsTrigger = page.getByRole('button', { name: '打开布局设置' })
   const settingsDialog = page.getByRole('dialog', { name: '预览设置' })
   await expect(settingsDialog).toBeVisible()
+  const layoutAfterSettingsOpen = await page.evaluate(() => ({
+    shellTop: document.querySelector('.lab-shell')!.getBoundingClientRect().top,
+    workbenchHeight: document.querySelector('.preview-workbench')!.getBoundingClientRect().height,
+    scrollY: window.scrollY,
+    dialogPosition: getComputedStyle(document.querySelector('.settings-dialog')!).position,
+  }))
+  expect(layoutAfterSettingsOpen).toEqual({
+    ...layoutBeforeSettingsOpen,
+    dialogPosition: 'fixed',
+  })
   expect(await settingsDialog.evaluate((dialog) => dialog.matches(':modal'))).toBe(false)
   await expect(settingsTrigger).toBeFocused()
   await expect(settingsDialog.locator('[name="avatarSizeStep"]')).toHaveAttribute('min', '4')
