@@ -31,6 +31,12 @@ describe('layout lab URL state', () => {
       })
   })
 
+  it('falls back to the business avatar step for URL values below four pixels', () => {
+    expect(parseLabState('?avatarSizeStep=0')).toMatchObject({ avatarSizeStep: 8 })
+    expect(parseLabState('?avatarSizeStep=3')).toMatchObject({ avatarSizeStep: 8 })
+    expect(parseLabState('?avatarSizeStep=4')).toMatchObject({ avatarSizeStep: 4 })
+  })
+
   it('preserves simulated dimensions while device mode is active', () => {
     const query = serializeLabState({
       viewportMode: 'device',

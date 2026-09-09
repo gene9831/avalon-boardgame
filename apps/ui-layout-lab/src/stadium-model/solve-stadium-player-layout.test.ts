@@ -271,21 +271,26 @@ describe('solveStadiumPlayerLayout', () => {
 })
 
 describe('solveStadiumRectangleLayout', () => {
-  it('keeps fractional collision squares representable on the public centerline grid', () => {
+  it('conservatively envelopes fractional collision squares on the strict public grid', () => {
+    const requestedSize = 88.33333333333333
     const result = solveStadiumRectangleLayout({
       maxStageWidth: 386,
       maxStageHeight: 482,
       playerCount: 5,
-      playerRectangleSize: 88.33333333333333,
+      playerRectangleSize: requestedSize,
       minimumGap: 4,
     })
 
     expect(result.status).toBe('ready')
     if (result.status !== 'ready') throw new Error(result.reason)
-    expect(result.centerlineBounds.width * 100).toBeCloseTo(
-      Math.round(result.centerlineBounds.width * 100),
-      8,
-    )
+    const publicNumbers = JSON.stringify(result).match(/-?\d+(?:\.\d+)?/g)?.map(Number) ?? []
+    expect(publicNumbers.every((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7)).toBe(true)
+    for (const rectangle of result.playerRects) {
+      expect(rectangle.width * 50).toBeCloseTo(Math.round(rectangle.width * 50), 8)
+      expect(rectangle.height * 50).toBeCloseTo(Math.round(rectangle.height * 50), 8)
+      expect(rectangle.width).toBeGreaterThanOrEqual(requestedSize)
+      expect(rectangle.width - requestedSize).toBeLessThan(0.02)
+    }
     expect(Math.min(...result.adjacentBoundaryGaps)).toBeGreaterThanOrEqual(4 - 0.001)
   })
 

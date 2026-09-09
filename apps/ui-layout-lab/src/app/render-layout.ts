@@ -17,7 +17,7 @@ function rectStyles(rectangle: Rect): string {
 function renderBoundaryGapLine(firstBounds: Rect, secondBounds: Rect, gap: number): string {
   const segment = closestRectangleBoundarySegment(firstBounds, secondBounds)
   const angle = Math.atan2(segment.end.y - segment.start.y, segment.end.x - segment.start.x) * 180 / Math.PI
-  return `<span class="gap-line" style="left:${segment.start.x}px;top:${segment.start.y}px;width:${Math.max(1, segment.distance)}px;height:1px;transform:rotate(${angle}deg);transform-origin:left center" title="座位间距 ${gap}px"></span>`
+  return `<span class="gap-line" style="left:${segment.start.x}px;top:${segment.start.y}px;width:${segment.distance}px;height:1px;transform:rotate(${angle}deg);transform-origin:left center" title="座位间距 ${gap}px"></span>`
 }
 
 export function renderRoomShell(canvas: HTMLElement): RoomShellElements {

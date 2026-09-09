@@ -3,6 +3,7 @@ import {
   pointOnLeftHalfStadium,
   PUBLIC_UNIT,
   quantize,
+  quantizeUp,
   rectangleBoundaryGap,
   rectFromCenter,
   VALIDATION_TOLERANCE,
@@ -502,22 +503,29 @@ export function solveStadiumRectangleLayout(
 ): StadiumPlayerLayoutResult {
   if (!hasValidInput(input)) return unavailable('invalid-input')
 
+  // Public centers use the 0.01px grid.  An even-centipixel envelope keeps
+  // the half-size on that grid too, without understating a caller's rectangle.
+  const normalizedInput: StadiumRectangleLayoutInput = {
+    ...input,
+    playerRectangleSize: quantizeUp(input.playerRectangleSize / 2) * 2,
+  }
+
   const centerlineWidth = largestPublicGridCenterlineWidth(
-    input.maxStageWidth - input.playerRectangleSize,
+    normalizedInput.maxStageWidth - normalizedInput.playerRectangleSize,
   )
-  const maximumStraightLength = input.maxStageHeight - input.playerRectangleSize - centerlineWidth
+  const maximumStraightLength = normalizedInput.maxStageHeight - normalizedInput.playerRectangleSize - centerlineWidth
   if (centerlineWidth < 0 || maximumStraightLength < 0) return unavailable('no-fitting-layout')
 
-  const circle = solveAtStraightLength(input, centerlineWidth, 0, 'circle')
+  const circle = solveAtStraightLength(normalizedInput, centerlineWidth, 0, 'circle')
   if (circle !== null) return circle.ready
 
   const maximumTick = Math.floor((maximumStraightLength + VALIDATION_TOLERANCE) / PUBLIC_UNIT)
-  const lowerBound = firstInternallyFeasibleTick(input, centerlineWidth, maximumTick)
+  const lowerBound = firstInternallyFeasibleTick(normalizedInput, centerlineWidth, maximumTick)
   if (lowerBound === null) return unavailable('no-fitting-layout')
 
   for (let tick = lowerBound.tick; tick <= maximumTick; tick += 1) {
     const candidate = solveAtStraightLength(
-      input,
+      normalizedInput,
       centerlineWidth,
       tick * PUBLIC_UNIT,
       'stadium',

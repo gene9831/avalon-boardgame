@@ -31,13 +31,13 @@ solveRoundTableStageLayout({
   playerCount,
   gap, // 可选；玩家座位边界的最小间距，默认 8
   maxAvatarSize, // 可选；头像尺寸上限，默认且最大为 56，最小为 36
-  avatarSizeStep, // 可选；候选头像尺寸的递减步长，默认 8
+  avatarSizeStep, // 可选；候选头像尺寸的递减步长，默认 8，最小 4
 })
 ```
 
-函数根据舞台宽高选择几何策略，调用方不传 `horizontal` 或 `vertical`。舞台尺寸使用 CSS 逻辑像素，宽度范围为 `(0, 4096]`、高度范围为 `(0, 800]`；超出范围返回 `invalid-input`。高度上限覆盖当前最大的 744×776 舞台基线，并限制同步高舞台搜索的工作量。`gap` 对所有头像档位生效；省略时为 8，必须是大于等于 0 的有限数。头像从 `maxAvatarSize` 开始按 `avatarSizeStep` 递减，并始终把 36 作为最后候选；中间尺寸按现有四个档位插值得到其他座位参数。当前迁移切片完成高舞台策略；宽大于等于高的舞台返回 `wide-stage-strategy-pending`。
+函数根据舞台宽高选择几何策略，调用方不传 `horizontal` 或 `vertical`。舞台尺寸使用 CSS 逻辑像素，宽度范围为 `(0, 4096]`、高度范围为 `(0, 800]`；超出范围返回 `invalid-input`。高度上限覆盖当前最大的 744×776 舞台基线，并限制同步高舞台搜索的工作量。`gap` 对所有头像档位生效；省略时为 8，必须是大于等于 0 的有限数。头像从 `maxAvatarSize` 开始按 `avatarSizeStep` 递减，并始终把 36 作为最后候选；步长必须为至少 4 的有限数，中间尺寸按现有四个档位插值得到其他座位参数。当前迁移切片完成高舞台策略；宽大于等于高的舞台返回 `wide-stage-strategy-pending`。
 
-成功结果只包含舞台内部的形态、桌面、桌心，以及每个座位的 `playerSeatBounds`、`avatarRect`、`nameRect`、`avatarTopClearance`。返回坐标以舞台左上角为原点；完整可见包络在传入硬边界内居中。共享严格矩形核心接收业务碰撞尺寸 `max(seatWidth, avatarTopClearance + avatarDiameter + 4 + nameHeight)`，返回正方形座位包络；业务层在其中映射头像包装层、姓名和皇冠顶部预留。皇冠尺寸和动态状态标记不是求解器输入或输出；渲染器由头像圆心和半径派生状态标记。
+成功结果只包含舞台内部的形态、桌面、桌心，以及每个座位的 `playerSeatBounds`、`avatarRect`、`nameRect`、`avatarTopClearance`。返回坐标以舞台左上角为原点；完整可见包络在传入硬边界内居中。共享严格矩形核心接收业务碰撞尺寸 `max(seatWidth, avatarTopClearance + avatarDiameter + 4 + nameHeight)`，返回正方形座位包络；小数碰撞尺寸会保守向上包络到 0.02px 网格，保证公开几何仍在 0.01px 网格且不小于请求尺寸。业务层在其中映射头像包装层、姓名和皇冠顶部预留。皇冠尺寸和动态状态标记不是求解器输入或输出；渲染器由头像圆心和半径派生状态标记。
 
 高舞台复用严格矩形核心：先尝试圆形，圆形可行立即返回；否则选择满足全部两两欧氏边界 gap 的最短纵向跑道。偶数人数固定上下中轴座位，奇数人数固定底部中轴座位，其余座位按顺时针顺序并关于竖直中轴镜像。桌心与座位边界保留 12px；几何模式将它显示为圆形 `.center-panel-protection`。内部诊断包含 640px 上限的圆桌基准框、完整包络、`placementGuide`、跑道直线段、请求 gap、相邻座位的欧氏 gap 和桌面中心补偿；gap 线连接真实最近边界点。
 

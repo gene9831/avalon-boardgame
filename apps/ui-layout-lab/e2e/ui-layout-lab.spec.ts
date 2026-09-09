@@ -88,7 +88,28 @@ test('uses the actual mobile viewport and keeps device controls concise', async 
   expect(phaseTitleHeight).toBeLessThanOrEqual(24)
 
   await page.getByRole('button', { name: '打开布局设置' }).click()
-  await expect(page.getByRole('dialog', { name: '预览设置' })).toBeVisible()
+  const settingsTrigger = page.getByRole('button', { name: '打开布局设置' })
+  const settingsDialog = page.getByRole('dialog', { name: '预览设置' })
+  await expect(settingsDialog).toBeVisible()
+  expect(await settingsDialog.evaluate((dialog) => dialog.matches(':modal'))).toBe(false)
+  await expect(settingsTrigger).toBeFocused()
+  await expect(settingsDialog.locator('[name="avatarSizeStep"]')).toHaveAttribute('min', '4')
+  await expect(settingsDialog.locator('[name="avatarSizeStep"]')).toHaveAttribute('step', '4')
+  const stageInfoHitTest = await page.evaluate(() => {
+    const button = document.querySelector('.stage-info-trigger')!
+    const bounds = button.getBoundingClientRect()
+    return document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2)
+      ?.closest('.stage-info-trigger') !== null
+  })
+  expect(stageInfoHitTest).toBe(true)
+  const stageBounds = await page.locator('.round-table-stage').boundingBox()
+  if (stageBounds === null) throw new Error('Expected the round-table stage bounds')
+  await page.mouse.click(stageBounds.x + 4, stageBounds.y + 4)
+  await expect(settingsDialog).toBeHidden()
+  await settingsTrigger.click()
+  await page.keyboard.press('Escape')
+  await expect(settingsDialog).toBeHidden()
+  await settingsTrigger.click()
   await expect(page.getByText('100dvw × 100dvh')).toBeVisible()
   const backdropStyles = await page.locator('.settings-dialog').evaluate((dialog) => {
     const styles = getComputedStyle(dialog, '::backdrop')

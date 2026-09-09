@@ -34,7 +34,7 @@ solveRoundTableStageLayout({
 | `playerCount` | 玩家人数，整数 5–10 |
 | `gap` | 任意两个玩家座位边界之间的最小间距；可选，默认 8，必须是大于等于 0 的有限数 |
 | `maxAvatarSize` | 候选头像尺寸上限；可选，默认 56，范围 36–56 |
-| `avatarSizeStep` | 候选头像尺寸的递减步长；可选，默认 8，必须是正有限数 |
+| `avatarSizeStep` | 候选头像尺寸的递减步长；可选，默认 8，必须是大于等于 4 的有限数 |
 
 成功结果只包含可直接渲染的舞台内部几何：
 
@@ -78,7 +78,7 @@ stageBounds = Rect(0, 0, maxStageWidth, maxStageHeight)
 
 业务侧必须在调用前扣除安全区、顶栏、底栏和舞台外边距。求解器不再增加“安全舞台”内缩，也不设置 375×667 之类的视口下限。完整圆桌占用包络必须位于 `stageBounds` 内。
 
-所有公开坐标和尺寸量化到 0.01 逻辑像素；量化后必须重新验证包含和碰撞约束。
+所有公开坐标和尺寸量化到 0.01 逻辑像素；量化后必须重新验证包含和碰撞约束。严格矩形核心收到小数碰撞边长时，会向上包络到最小的偶数 centipixel（0.02px 网格），使矩形边长的一半及其 `x`/`y` 坐标仍位于 0.01px 网格，且永远不小于调用方请求的尺寸。
 
 ## 4. 座位呈现档位
 
@@ -88,7 +88,7 @@ stageBounds = Rect(0, 0, maxStageWidth, maxStageHeight)
 56 → 48 → 40 → 36
 ```
 
-例如 `maxAvatarSize = 52`、`avatarSizeStep = 8` 时，序列为 `52 → 44 → 36`。头像候选量化到 0.01 逻辑像素；小于 0.01 的正步长按可表达的 0.01 步长执行。
+例如 `maxAvatarSize = 52`、`avatarSizeStep = 8` 时，序列为 `52 → 44 → 36`。头像候选量化到 0.01 逻辑像素；步长必须至少为 4px。
 
 现有四档是其他座位参数的插值锚点：
 
@@ -176,21 +176,9 @@ maximumStadiumStraightLength = maxStageHeight
 
 ## 8. 求解与居中
 
-每个档位的最大基准框宽度为：
+每个档位把 `min(maxStageWidth, playerCollisionSize + 0.86 × 640)` 交给严格核心；核心在扣除碰撞包络后选择最大的偶数-centipixel 中心线宽度，并在舞台高度内搜索圆形或最短跑道。业务层将返回中心线宽度除以 `0.86` 得到内部圆桌基准框。
 
-```text
-maximumRoundTableFrameWidth = floor(min(
-    640,
-    (maxStageWidth - seatWidth) / 0.86,
-    (
-        maxStageHeight
-        - seatTopExtent
-        - seatBottomExtent
-    ) / 0.86
-))
-```
-
-圆形玩家按观察者相对座位序号等圆心角排列，`relativeSeatIndex = 0` 固定在六点钟方向，其余座位按房间座位顺序顺时针。
+`relativeSeatIndex = 0` 固定在六点钟方向。其余座位不是按等圆心角分布：核心沿中心线按达到目标矩形边界 gap 的第一个位置递推，随后关于竖直中轴镜像并保留视觉顺时针顺序。
 
 共享核心将座位中心严格放在圆形或跑道中心线上，使用确定性求解和 0.01px 量化后复核。头像尺寸仍是高于形态和跑道评分的第一优先级；同一组舞台与档位参数下，5–10 人的头像结果不得随人数增加而增大。
 
@@ -236,5 +224,5 @@ roundTableFootprintCenter.y = maxStageHeight / 2
 10. 宽舞台策略完成前明确返回 `wide-stage-strategy-pending`，不伪装成高舞台结果。
 11. 舞台宽度必须在 `(0, 4096]`、高度必须在 `(0, 800]`；超限、无穷值和非数字返回 `invalid-input`。800px 高度覆盖当前最大的 744×776 舞台基线，并限制同步高舞台搜索的工作量。
 12. `gap` 对全部头像档位统一生效；负数、无穷值和非数字返回 `invalid-input`。
-13. `maxAvatarSize` 超出 36–56，或 `avatarSizeStep` 不是正有限数时返回 `invalid-input`。
+13. `maxAvatarSize` 超出 36–56，或 `avatarSizeStep` 不是大于等于 4 的有限数时返回 `invalid-input`。
 14. 相同舞台和档位参数下，5–10 人的头像尺寸随人数增加保持不增。

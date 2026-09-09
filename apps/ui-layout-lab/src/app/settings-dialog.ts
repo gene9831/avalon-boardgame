@@ -39,7 +39,7 @@ export function createSettingsDialog(
         <label><span>玩家边界最小间距</span><input name="gap" type="number" min="0" step="0.1" inputmode="decimal"></label>
         <div class="avatar-tier-row">
           <label><span>最大头像尺寸</span><input name="maxAvatarSize" type="number" min="36" max="56" step="0.1" inputmode="decimal"></label>
-          <label><span>头像递减步长</span><input name="avatarSizeStep" type="number" min="0.1" step="0.1" inputmode="decimal"></label>
+          <label><span>头像递减步长</span><input name="avatarSizeStep" type="number" min="4" step="4" inputmode="decimal"></label>
         </div>
         <label class="switch-row"><span><b>显示几何边界</b><small>座位、安全区与轨道</small></span><input name="geometry" type="checkbox" role="switch"></label>
       </form>
@@ -76,11 +76,15 @@ export function createSettingsDialog(
   }
 
   trigger.addEventListener('click', () => {
-    dialog.showModal()
-    device.focus()
+    dialog.show()
+    trigger.focus()
   })
-  dialog.addEventListener('click', (event) => {
-    if (event.target === dialog) dialog.close()
+  document.addEventListener('pointerdown', (event) => {
+    if (!dialog.open || !(event.target instanceof Node)) return
+    if (event.target !== trigger && !dialog.contains(event.target)) dialog.close()
+  })
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && dialog.open) dialog.close()
   })
   dialog.addEventListener('close', () => trigger.focus())
   device.addEventListener('change', () => callbacks.onChange({

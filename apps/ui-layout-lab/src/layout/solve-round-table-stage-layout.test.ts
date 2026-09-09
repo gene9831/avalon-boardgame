@@ -218,6 +218,7 @@ describe('solveRoundTableStageLayout', () => {
       { maxAvatarSize: 35 },
       { maxAvatarSize: 57 },
       { avatarSizeStep: 0 },
+      { avatarSizeStep: 3 },
       { avatarSizeStep: Number.NaN },
     ]) {
       expect(solveRoundTableStageLayout({

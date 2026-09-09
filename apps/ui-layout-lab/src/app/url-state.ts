@@ -45,6 +45,12 @@ function finiteNonNegativeNumber(value: string | null, fallback: number): number
   return Number.isFinite(number) && number >= 0 ? number : fallback
 }
 
+function finiteNumberAtLeast(value: string | null, fallback: number, minimum: number): number {
+  if (value === null || value.trim() === '') return fallback
+  const number = Number(value)
+  return Number.isFinite(number) && number >= minimum ? number : fallback
+}
+
 export function parseLabState(search: string): LabState {
   const parameters = new URLSearchParams(search)
   const requestedPlayerCount = finitePositiveInteger(
@@ -71,9 +77,10 @@ export function parseLabState(search: string): LabState {
       parameters.get('maxAvatarSize'),
       DEFAULT_LAB_STATE.maxAvatarSize,
     ),
-    avatarSizeStep: finiteNonNegativeNumber(
+    avatarSizeStep: finiteNumberAtLeast(
       parameters.get('avatarSizeStep'),
       DEFAULT_LAB_STATE.avatarSizeStep,
+      4,
     ),
     showGeometry: parameters.get('geometry') === '1',
   }

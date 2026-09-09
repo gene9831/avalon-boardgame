@@ -181,7 +181,7 @@ totalAdjacentGapExcess = sum(adjacentGapExcess)
 
 ## 8. 数值精度
 
-内部计算使用高于公开结果的精度。所有公开坐标、尺寸和 gap 最终量化到 0.01 逻辑像素。
+内部计算使用高于公开结果的精度。所有公开坐标、尺寸和 gap 最终量化到 0.01 逻辑像素。核心若收到小数 `playerRectangleSize`，先向上包络为不小于请求值的最小偶数 centipixel（0.02px 网格）；这使矩形半边长、返回的 `x`/`y`、宽高全都保持在 0.01px 网格，扩张严格小于 0.02px。
 
 量化后重新验证：
 

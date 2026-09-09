@@ -22,7 +22,7 @@ function isValidInput(input: RoundTableStageLayoutInput): boolean {
     && maxAvatarSize >= MIN_AVATAR_SIZE
     && maxAvatarSize <= DEFAULT_MAX_AVATAR_SIZE
     && Number.isFinite(avatarSizeStep)
-    && avatarSizeStep > 0
+    && avatarSizeStep >= 4
 }
 
 export function solveRoundTableStageLayoutWithDiagnostics(
