@@ -42,6 +42,13 @@ function boundaryGap(first: Rect, second: Rect): number {
   return Math.round(Math.max(horizontalSeparation, verticalSeparation) * 100) / 100
 }
 
+function avatarCenter(seat: DetailedRoundTableStageLayout['playerSeats'][number]) {
+  return {
+    x: seat.avatarRect.x + seat.avatarRect.width / 2,
+    y: seat.avatarRect.y + seat.avatarRect.height / 2,
+  }
+}
+
 function numericValues(value: unknown): number[] {
   if (typeof value === 'number') return [value]
   if (Array.isArray(value)) return value.flatMap(numericValues)
@@ -132,6 +139,43 @@ describe('tall round-table stage layout', () => {
         expect(bottomAvatarCenter).toBeCloseTo(lowestAvatarCenter, 2)
       }
     },
+    10_000,
+  )
+
+  it.each([5, 6, 7, 8, 9, 10])(
+    'keeps the %i-player stadium vertically symmetric with the approved anchors',
+    (playerCount) => {
+      const result = solveRoundTableStageLayoutWithDiagnostics({
+        maxStageWidth: 386,
+        maxStageHeight: 482,
+        playerCount,
+        gap: 4,
+        maxAvatarSize: 56,
+        avatarSizeStep: 4,
+      })
+      expect(result.status).toBe('ready')
+      if (result.status !== 'ready') {
+        throw new Error(`Expected a ready layout, received ${result.reason}`)
+      }
+      expect(result.shape).toBe('stadium')
+
+      const tableCenterX = result.centerPanel.x + result.centerPanel.width / 2
+      const leftSeatCount = playerCount % 2 === 0
+        ? (playerCount - 2) / 2
+        : (playerCount - 1) / 2
+      expect(avatarCenter(result.playerSeats[0]).x).toBeCloseTo(tableCenterX, 2)
+
+      if (playerCount % 2 === 0) {
+        expect(avatarCenter(result.playerSeats[leftSeatCount + 1]).x)
+          .toBeCloseTo(tableCenterX, 2)
+      }
+      for (let leftSeatIndex = 1; leftSeatIndex <= leftSeatCount; leftSeatIndex += 1) {
+        const leftCenter = avatarCenter(result.playerSeats[leftSeatIndex])
+        const rightCenter = avatarCenter(result.playerSeats[playerCount - leftSeatIndex])
+        expect(leftCenter.y).toBeCloseTo(rightCenter.y, 2)
+        expect(leftCenter.x + rightCenter.x).toBeCloseTo(2 * tableCenterX, 2)
+      }
+    },
   )
 
   it('centers the complete visible footprint inside the maximum stage bounds', () => {
@@ -144,6 +188,35 @@ describe('tall round-table stage layout', () => {
     expect(footprint.y + footprint.height / 2).toBeCloseTo(maxStageHeight / 2, 2)
   })
 
+  it.each([
+    { playerCount: 5, maximumGapSpread: 82 },
+    { playerCount: 6, maximumGapSpread: 56 },
+  ])(
+    'distributes spare stadium perimeter for $playerCount players',
+    ({ playerCount, maximumGapSpread }) => {
+      const result = solveRoundTableStageLayoutWithDiagnostics({
+        maxStageWidth: 386,
+        maxStageHeight: 482,
+        playerCount,
+        gap: 4,
+        maxAvatarSize: 56,
+        avatarSizeStep: 4,
+      })
+      expect(result.status).toBe('ready')
+      if (result.status !== 'ready') {
+        throw new Error(`Expected a ready layout, received ${result.reason}`)
+      }
+
+      const adjacentGaps = result.playerSeats.map((seat, seatIndex) => boundaryGap(
+        seat.playerSeatBounds,
+        result.playerSeats[(seatIndex + 1) % result.playerSeats.length].playerSeatBounds,
+      ))
+      const boundaryGapSpread = Math.max(...adjacentGaps) - Math.min(...adjacentGaps)
+
+      expect(boundaryGapSpread).toBeLessThanOrEqual(maximumGapSpread)
+    },
+  )
+
   it('returns deterministic render-safe geometry with at most two decimal places', () => {
     const first = expectReady(366, 596, 10)
     const second = expectReady(366, 596, 10)
@@ -153,4 +226,5 @@ describe('tall round-table stage layout', () => {
       expect(Math.abs(value * 100 - Math.round(value * 100))).toBeLessThan(0.000_001)
     }
   })
+
 })

@@ -1,4 +1,5 @@
 import { solveTallRoundTableStageLayout } from './tall-stage'
+import { hasSupportedStageDimensions } from '../stage-dimensions'
 import type {
   DetailedRoundTableStageLayoutResult,
   RoundTableStageLayoutInput,
@@ -12,10 +13,7 @@ const DEFAULT_AVATAR_SIZE_STEP = 8
 function isValidInput(input: RoundTableStageLayoutInput): boolean {
   const maxAvatarSize = input.maxAvatarSize ?? DEFAULT_MAX_AVATAR_SIZE
   const avatarSizeStep = input.avatarSizeStep ?? DEFAULT_AVATAR_SIZE_STEP
-  return Number.isFinite(input.maxStageWidth)
-    && Number.isFinite(input.maxStageHeight)
-    && input.maxStageWidth > 0
-    && input.maxStageHeight > 0
+  return hasSupportedStageDimensions(input.maxStageWidth, input.maxStageHeight)
     && Number.isInteger(input.playerCount)
     && input.playerCount >= 5
     && input.playerCount <= 10

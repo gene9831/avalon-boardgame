@@ -139,7 +139,7 @@ export function renderRoundTableStage(
   canvas.dataset.tableShape = result.shape
   canvas.dataset.avatarSize = String(result.playerSeats[0]?.avatarRect.width ?? 0)
   canvas.dataset.stadiumStraightLength = String(
-    result.diagnostics.playerOrbit.stadiumStraightLength,
+    result.diagnostics.placementGuide.stadiumStraightLength,
   )
   canvas.dataset.centerAisleGap = String(result.diagnostics.centerAisleGap)
   const seats = result.playerSeats.map((seat, seatIndex) => {
@@ -182,7 +182,7 @@ export function renderRoundTableStage(
   stage.innerHTML = `
     <div class="round-table-frame" style="${rectStyles(result.diagnostics.roundTableFrame)}"></div>
     <div class="round-table-footprint" style="${rectStyles(result.diagnostics.roundTableFootprint)}"></div>
-    <div class="player-orbit ${result.shape}" style="${rectStyles(result.diagnostics.playerOrbit.bounds)}"></div>
+    <div class="placement-guide ${result.shape}" style="${rectStyles(result.diagnostics.placementGuide.bounds)}"></div>
     <div class="tabletop ${result.shape}" style="${rectStyles(result.tabletop)}"></div>
     <div class="center-panel" style="${rectStyles(result.centerPanel)}">
       <small>第 3 轮</small><strong>等待领袖组队</strong><span>需要 4 名队员</span>

@@ -18,7 +18,7 @@ describe('layout lab URL state', () => {
   })
 
   it('falls back when numeric values are invalid', () => {
-    expect(parseLabState('?viewport=unknown&width=-1&height=nope&players=11&geometry=4'))
+    expect(parseLabState('?viewport=unknown&width=4097&height=1025&players=11&geometry=4'))
       .toEqual({
         viewportMode: 'simulated',
         simulatedWidth: 390,

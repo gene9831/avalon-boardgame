@@ -1,5 +1,28 @@
 import { expect, test } from '@playwright/test'
 
+test('centers a bounded solver stage inside a taller device viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 1366 })
+  await page.goto('/?viewport=device&width=390&height=844&players=10&geometry=0')
+
+  const canvas = page.getByLabel('Avalon 房间布局预览')
+  await expect(canvas).toHaveAttribute('data-layout-status', 'ready')
+  await expect(canvas).toHaveAttribute('data-stage-width', '744')
+  await expect(canvas).toHaveAttribute('data-stage-height', '800')
+
+  const centers = await page.evaluate(() => {
+    const region = document.querySelector('.round-table-stage-region')!.getBoundingClientRect()
+    const stage = document.querySelector('.round-table-stage')!.getBoundingClientRect()
+    return {
+      regionX: region.x + region.width / 2,
+      regionY: region.y + region.height / 2,
+      stageX: stage.x + stage.width / 2,
+      stageY: stage.y + stage.height / 2,
+    }
+  })
+  expect(centers.stageX).toBeCloseTo(centers.regionX, 5)
+  expect(centers.stageY).toBeCloseTo(centers.regionY, 5)
+})
+
 test('uses the actual mobile viewport and keeps device controls concise', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('http://127.0.0.1:14175/?viewport=device&width=390&height=844&players=10&geometry=0')
@@ -84,6 +107,13 @@ test('uses the actual mobile viewport and keeps device controls concise', async 
   await expect(page.getByLabel('头像递减步长')).toHaveValue('8')
   await expect(page.getByText('显示几何边界')).toBeVisible()
 
+  const settingsFieldFontSizes = await page
+    .locator('.settings-form input[type="number"], .settings-form select')
+    .evaluateAll((fields) => fields.map((field) => (
+      Number.parseFloat(getComputedStyle(field).fontSize)
+    )))
+  expect(Math.min(...settingsFieldFontSizes)).toBeGreaterThanOrEqual(16)
+
   const buttonDimensions = await page.locator('button:visible').evaluateAll((buttons) => (
     buttons.map((button) => {
       const bounds = button.getBoundingClientRect()
@@ -117,8 +147,9 @@ test('renders returned diagnostics for the 430 by 932 baseline', async ({ page }
   await expect(canvas).toHaveAttribute('data-stage-height', '684')
   await expect(canvas.locator('.player-seat')).toHaveCount(10)
   await expect(canvas.locator('.round-table-footprint')).toHaveCount(1)
+  await expect(canvas.locator('.placement-guide')).toHaveCount(1)
   await expect(canvas.locator('.gap-line')).toHaveCount(10)
-  await expect(canvas.locator('.gap-line.center')).toHaveCount(2)
+  await expect(canvas.locator('.gap-line.standard')).toHaveCount(10)
   await expect(canvas).toHaveAttribute('data-show-geometry', '')
 })
 

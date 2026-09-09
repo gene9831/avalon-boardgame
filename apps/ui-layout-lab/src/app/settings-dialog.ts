@@ -1,4 +1,8 @@
 import type { LabState } from './url-state'
+import {
+  MAX_SIMULATED_VIEWPORT_HEIGHT,
+  MAX_SIMULATED_VIEWPORT_WIDTH,
+} from '../stage-dimensions'
 
 export type SettingsDialog = Readonly<{
   element: HTMLDialogElement
@@ -27,9 +31,9 @@ export function createSettingsDialog(
             <option value="390x844">iPhone 390 × 844</option><option value="375x667">紧凑 375 × 667</option>
             <option value="430x932">宽屏 430 × 932</option><option value="768x1024">平板 768 × 1024</option>
           </select></label>
-          <div class="dimension-row"><label><span>宽度</span><input name="width" type="number" min="1" inputmode="numeric"></label>
+          <div class="dimension-row"><label><span>宽度</span><input name="width" type="number" min="1" max="${MAX_SIMULATED_VIEWPORT_WIDTH}" inputmode="numeric"></label>
             <button name="rotate" type="button" aria-label="旋转宽高">⇄</button>
-            <label><span>高度</span><input name="height" type="number" min="1" inputmode="numeric"></label></div>
+            <label><span>高度</span><input name="height" type="number" min="1" max="${MAX_SIMULATED_VIEWPORT_HEIGHT}" inputmode="numeric"></label></div>
         </div>
         <label><span>玩家人数</span><select name="players">${[5, 6, 7, 8, 9, 10].map((count) => `<option>${count}</option>`).join('')}</select></label>
         <label><span>玩家边界最小间距</span><input name="gap" type="number" min="0" step="0.1" inputmode="decimal"></label>

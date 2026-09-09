@@ -324,6 +324,280 @@ function buildCenteredSideSeatStadiumGeometry(
   }
 }
 
+type SafeBandGeometryCandidate = Readonly<{
+  geometry: StadiumGeometry
+  leftPoints: readonly Point[]
+  boundaryGapRange: number
+  boundaryGapDeviation: number
+  footprintArea: number
+}>
+
+type PartialSafeBandPlacement = Readonly<{
+  leftPoints: readonly Point[]
+  roundedBoundaryGaps: readonly number[]
+}>
+
+function compareNumberArrays(
+  first: readonly number[],
+  second: readonly number[],
+): number {
+  for (let index = 0; index < Math.min(first.length, second.length); index += 1) {
+    if (first[index] !== second[index]) return first[index] - second[index]
+  }
+  return first.length - second.length
+}
+
+function compareSafeBandGeometryCandidates(
+  first: SafeBandGeometryCandidate,
+  second: SafeBandGeometryCandidate,
+): number {
+  return first.boundaryGapRange - second.boundaryGapRange
+    || first.boundaryGapDeviation - second.boundaryGapDeviation
+    || first.footprintArea - second.footprintArea
+    || compareNumberArrays(
+      first.leftPoints.flatMap((point) => [point.y, point.x]),
+      second.leftPoints.flatMap((point) => [point.y, point.x]),
+    )
+}
+
+function buildSafeBandStadiumGeometry(
+  playerCount: number,
+  playerOrbitWidth: number,
+  stadiumStraightLength: number,
+  tier: ResolvedSeatTier,
+  roundTableFrameWidth: number,
+  centerPanelDiameter: number,
+  maxStageWidth: number,
+): StadiumGeometry | null {
+  const leftSeatCount = playerCount % 2 === 0
+    ? (playerCount - 2) / 2
+    : (playerCount - 1) / 2
+  const hasTopSeat = playerCount % 2 === 0
+  const playerOrbitRadius = playerOrbitWidth / 2
+  const anchorCenterY = stadiumStraightLength / 2 + playerOrbitRadius
+  const bottomPoint = { x: 0, y: anchorCenterY }
+  const topPoint = { x: 0, y: -anchorCenterY }
+  const maximumHorizontalCenterOffset = (maxStageWidth - tier.seatWidth) / 2
+  const minimumHorizontalCenterOffset = (tier.seatWidth + tier.seatGap) / 2
+
+  const buildPoints = (leftPoints: readonly Point[]): readonly Point[] => {
+    const mirroredPoints = leftPoints
+      .slice()
+      .reverse()
+      .map((point) => ({ x: -point.x, y: point.y }))
+    return hasTopSeat
+      ? [bottomPoint, ...leftPoints, topPoint, ...mirroredPoints]
+      : [bottomPoint, ...leftPoints, ...mirroredPoints]
+  }
+
+  const evaluateLeftPoints = (
+    leftPoints: readonly Point[],
+  ): SafeBandGeometryCandidate | null => {
+    if (leftPoints.length !== leftSeatCount) return null
+    const points = buildPoints(leftPoints)
+    if (!seatPointsFit(points, tier, centerPanelDiameter)) return null
+
+    const seatBounds = points.map((point) => measurePlayerSeatBounds(point, tier))
+    const roundedBoundaryGaps = seatBounds.map((bounds, seatIndex) => Math.round(
+      adjacentBoundaryGap(bounds, seatBounds[(seatIndex + 1) % seatBounds.length]),
+    ))
+    const minimumBoundaryGap = Math.min(...roundedBoundaryGaps)
+    const maximumBoundaryGap = Math.max(...roundedBoundaryGaps)
+    const averageBoundaryGap = roundedBoundaryGaps.reduce((sum, gap) => sum + gap, 0)
+      / roundedBoundaryGaps.length
+    const boundaryGapDeviation = roundedBoundaryGaps.reduce((sum, gap) => (
+      sum + Math.abs(gap - averageBoundaryGap)
+    ), 0)
+    const tabletopWidth = TABLETOP_WIDTH_SCALE * roundTableFrameWidth
+    const tabletopHeight = tabletopWidth + stadiumStraightLength
+    const tabletop = createRect(
+      -tabletopWidth / 2,
+      -tabletopHeight / 2,
+      tabletopWidth,
+      tabletopHeight,
+    )
+    const footprint = unionRects([tabletop, ...seatBounds])
+    const halfOrbitLength = Math.PI * playerOrbitWidth / 2 + stadiumStraightLength
+    const averageInterval = 2 * halfOrbitLength / playerCount
+    const equalArcDeviation = leftPoints.reduce((sum, point, index) => {
+      const referencePoint = verticalStadiumHalfPoint(
+        averageInterval * (index + 1),
+        playerOrbitWidth,
+        stadiumStraightLength,
+      )
+      return sum + Math.hypot(point.x - referencePoint.x, point.y - referencePoint.y)
+    }, 0)
+    return {
+      leftPoints,
+      boundaryGapRange: maximumBoundaryGap - minimumBoundaryGap,
+      boundaryGapDeviation,
+      footprintArea: footprint.width * footprint.height,
+      geometry: {
+        points,
+        centerAisleGap: 0,
+        centerAislePairs: [],
+        tabletopCenterOffsetY: 0,
+        equalArcDeviation,
+      },
+    }
+  }
+
+  const gridValues = (
+    minimum: number,
+    maximum: number,
+    step: number,
+  ): readonly number[] => {
+    const values: number[] = []
+    for (
+      let value = Math.ceil(minimum / step) * step;
+      value <= maximum;
+      value += step
+    ) values.push(value)
+    return values
+  }
+
+  const verticalOffsets = gridValues(
+    Math.ceil(-anchorCenterY + 1),
+    Math.floor(anchorCenterY - 1),
+    4,
+  ).slice().reverse()
+  const safePoints = verticalOffsets.flatMap((y) => {
+    const seatBoundsAtCenter = measurePlayerSeatBounds({ x: 0, y }, tier)
+    const verticalDistance = Math.max(
+      seatBoundsAtCenter.y,
+      0,
+      -(seatBoundsAtCenter.y + seatBoundsAtCenter.height),
+    )
+    const protectedCenterRadius = centerPanelDiameter / 2 + CENTER_PANEL_GAP
+    const requiredHorizontalDistance = verticalDistance >= protectedCenterRadius
+      ? 0
+      : Math.sqrt(protectedCenterRadius ** 2 - verticalDistance ** 2)
+    const minimumOffsetAtY = Math.max(
+      minimumHorizontalCenterOffset,
+      tier.seatWidth / 2 + requiredHorizontalDistance,
+    )
+    if (minimumOffsetAtY > maximumHorizontalCenterOffset) return []
+
+    const minimumOffset = Math.ceil(minimumOffsetAtY / 4) * 4
+    const maximumOffset = Math.floor(maximumHorizontalCenterOffset / 4) * 4
+    const middleOffset = Math.round((minimumOffset + maximumOffset) / 8) * 4
+    return [...new Set([minimumOffset, middleOffset, maximumOffset])]
+      .filter((offset) => (
+        offset >= minimumOffsetAtY && offset <= maximumHorizontalCenterOffset
+      ))
+      .map((offset) => ({ x: -offset, y }))
+  })
+
+  const partialPlacementScore = (placement: PartialSafeBandPlacement): readonly number[] => {
+    const minimumGap = Math.min(...placement.roundedBoundaryGaps)
+    const maximumGap = Math.max(...placement.roundedBoundaryGaps)
+    const averageGap = placement.roundedBoundaryGaps.reduce((sum, gap) => sum + gap, 0)
+      / placement.roundedBoundaryGaps.length
+    const deviation = placement.roundedBoundaryGaps.reduce((sum, gap) => (
+      sum + Math.abs(gap - averageGap)
+    ), 0)
+    return [maximumGap - minimumGap, deviation]
+  }
+
+  let placements: readonly PartialSafeBandPlacement[] = [{
+    leftPoints: [],
+    roundedBoundaryGaps: [],
+  }]
+  let bestCandidate: SafeBandGeometryCandidate | null = null
+  for (let seatIndex = 0; seatIndex < leftSeatCount; seatIndex += 1) {
+    const expandedPlacements: PartialSafeBandPlacement[] = []
+    for (const placement of placements) {
+      const previousPoint = placement.leftPoints.at(-1) ?? bottomPoint
+      const previousBounds = measurePlayerSeatBounds(previousPoint, tier)
+      for (const point of safePoints) {
+        if (point.y >= previousPoint.y) continue
+        const leftPoints = [...placement.leftPoints, point]
+        const partialPoints = buildPoints(leftPoints)
+        if (!seatPointsFit(partialPoints, tier, centerPanelDiameter)) continue
+        if (seatIndex === leftSeatCount - 1) {
+          const candidate = evaluateLeftPoints(leftPoints)
+          if (
+            candidate !== null
+            && (bestCandidate === null
+              || compareSafeBandGeometryCandidates(candidate, bestCandidate) < 0)
+          ) bestCandidate = candidate
+          continue
+        }
+        expandedPlacements.push({
+          leftPoints,
+          roundedBoundaryGaps: [
+            ...placement.roundedBoundaryGaps,
+            Math.round(adjacentBoundaryGap(
+              previousBounds,
+              measurePlayerSeatBounds(point, tier),
+            )),
+          ],
+        })
+      }
+    }
+
+    if (seatIndex === leftSeatCount - 1) break
+
+    const bestByGapRange = new Map<string, PartialSafeBandPlacement[]>()
+    for (const placement of expandedPlacements) {
+      const scoreKey = [
+        Math.min(...placement.roundedBoundaryGaps),
+        Math.max(...placement.roundedBoundaryGaps),
+      ].join('-')
+      const bucket = bestByGapRange.get(scoreKey) ?? []
+      bucket.push(placement)
+      bucket.sort((first, second) => compareNumberArrays(
+        first.leftPoints.flatMap((point) => [point.y, point.x]),
+        second.leftPoints.flatMap((point) => [point.y, point.x]),
+      ))
+      bestByGapRange.set(scoreKey, bucket.slice(0, 4))
+    }
+    placements = [...bestByGapRange.values()].flat()
+      .sort((first, second) => (
+        compareNumberArrays(partialPlacementScore(first), partialPlacementScore(second))
+        || compareNumberArrays(
+          first.leftPoints.flatMap((point) => [point.y, point.x]),
+          second.leftPoints.flatMap((point) => [point.y, point.x]),
+        )
+      ))
+      .slice(0, 128)
+    if (placements.length === 0) return null
+  }
+
+  if (bestCandidate === null) return null
+
+  for (let pass = 0; pass < 2; pass += 1) {
+    for (let seatIndex = 0; seatIndex < leftSeatCount; seatIndex += 1) {
+      const localCandidates: SafeBandGeometryCandidate[] = [bestCandidate]
+      const originalPoint = bestCandidate.leftPoints[seatIndex]
+      for (let horizontalDelta = -4; horizontalDelta <= 4; horizontalDelta += 1) {
+        for (let verticalDelta = -4; verticalDelta <= 4; verticalDelta += 1) {
+          const point = {
+            x: originalPoint.x + horizontalDelta,
+            y: originalPoint.y + verticalDelta,
+          }
+          if (
+            -point.x < minimumHorizontalCenterOffset
+            || -point.x > maximumHorizontalCenterOffset
+          ) continue
+          const leftPoints = bestCandidate.leftPoints.map((currentPoint, index) => (
+            index === seatIndex ? point : currentPoint
+          ))
+          if (leftPoints.some((currentPoint, index) => (
+            index > 0 && currentPoint.y >= leftPoints[index - 1].y
+          ))) continue
+          const candidate = evaluateLeftPoints(leftPoints)
+          if (candidate !== null) localCandidates.push(candidate)
+        }
+      }
+      localCandidates.sort(compareSafeBandGeometryCandidates)
+      bestCandidate = localCandidates[0]
+    }
+  }
+
+  return bestCandidate.geometry
+}
+
 function buildStadiumGeometry(
   playerCount: number,
   playerOrbitWidth: number,
@@ -331,11 +605,25 @@ function buildStadiumGeometry(
   tier: ResolvedSeatTier,
   roundTableFrameWidth: number,
   centerPanelDiameter: number,
+  maxStageWidth: number,
 ): StadiumGeometry | null {
   const halfOrbitLength = Math.PI * playerOrbitWidth / 2 + stadiumStraightLength
   const sideSeatCount = Math.floor((playerCount - 1) / 2)
   const hasTopSeat = playerCount % 2 === 0
   const candidates: StadiumGeometry[] = []
+
+  if (sideSeatCount >= 2) {
+    const safeBandGeometry = buildSafeBandStadiumGeometry(
+      playerCount,
+      playerOrbitWidth,
+      stadiumStraightLength,
+      tier,
+      roundTableFrameWidth,
+      centerPanelDiameter,
+      maxStageWidth,
+    )
+    if (safeBandGeometry !== null) return safeBandGeometry
+  }
 
   if (sideSeatCount % 2 === 1) {
     return buildCenteredSideSeatStadiumGeometry(
@@ -499,7 +787,13 @@ function buildStadiumGeometry(
     first.centerAisleGap - second.centerAisleGap
     || first.equalArcDeviation - second.equalArcDeviation
   ))
-  return candidates[0] ?? null
+  const fallbackGeometry = candidates[0]
+  if (fallbackGeometry === undefined) return null
+  return {
+    ...fallbackGeometry,
+    centerAisleGap: 0,
+    centerAislePairs: [],
+  }
 }
 
 function createCandidate(
@@ -665,7 +959,7 @@ function buildReadyLayout(
     candidate.roundTableFrameWidth,
     candidate.roundTableFrameWidth + candidate.stadiumStraightLength,
   )
-  const playerOrbit = {
+  const placementGuide = {
     bounds: createRect(
       playerOrbitCenter.x - candidate.playerOrbitWidth / 2,
       playerOrbitCenter.y - candidate.playerOrbitHeight / 2,
@@ -705,7 +999,7 @@ function buildReadyLayout(
     diagnostics: {
       roundTableFrame,
       roundTableFootprint,
-      playerOrbit,
+      placementGuide,
       seatGap: candidate.tier.seatGap,
       centerAisleGap: quantize(candidate.centerAisleGap),
       standardBoundaryGaps,
@@ -749,27 +1043,34 @@ function validatesRenderedLayout(
 
   const { centerAisleGaps, centerAislePairs } = layout.diagnostics
   if (layout.shape === 'stadium') {
-    const tabletopCenterY = layout.tabletop.y + layout.tabletop.height / 2
-    if (centerAislePairs.length === 0) {
-      if (centerAisleGaps.length !== 0) return false
-      const centerAlignedSeatCount = playerSeats.filter((seat) => (
-        Math.abs(
-          seat.avatarRect.y + seat.avatarRect.height / 2 - tabletopCenterY,
-        ) <= 0.02
-      )).length
-      if (centerAlignedSeatCount !== 2) return false
-      return true
+    if (centerAislePairs.length !== 0 || centerAisleGaps.length !== 0) return false
+    const avatarCenter = (seat: PlayerSeatLayout): Point => ({
+      x: seat.avatarRect.x + seat.avatarRect.width / 2,
+      y: seat.avatarRect.y + seat.avatarRect.height / 2,
+    })
+    const bottomCenter = avatarCenter(playerSeats[0])
+    if (Math.abs(bottomCenter.x - tabletopCenter.x) > 0.02) return false
+    if (bottomCenter.y < Math.max(...playerSeats.map((seat) => avatarCenter(seat).y))) {
+      return false
     }
 
-    if (centerAislePairs.length !== 2 || centerAisleGaps.length !== 2) return false
-    if (Math.abs(centerAisleGaps[0] - centerAisleGaps[1]) > 0.02) return false
-    for (const [firstSeatIndex, secondSeatIndex] of centerAislePairs) {
-      const firstBounds = playerSeats[firstSeatIndex].playerSeatBounds
-      const secondBounds = playerSeats[secondSeatIndex].playerSeatBounds
-      const lowerBounds = firstBounds.y > secondBounds.y ? firstBounds : secondBounds
-      const upperBounds = firstBounds.y > secondBounds.y ? secondBounds : firstBounds
-      const aisleMidpoint = (lowerBounds.y + upperBounds.y + upperBounds.height) / 2
-      if (Math.abs(aisleMidpoint - tabletopCenterY) > 0.02) return false
+    const leftSeatCount = input.playerCount % 2 === 0
+      ? (input.playerCount - 2) / 2
+      : (input.playerCount - 1) / 2
+    if (input.playerCount % 2 === 0) {
+      const topCenter = avatarCenter(playerSeats[leftSeatCount + 1])
+      if (Math.abs(topCenter.x - tabletopCenter.x) > 0.02) return false
+      if (topCenter.y > Math.min(...playerSeats.map((seat) => avatarCenter(seat).y))) {
+        return false
+      }
+    }
+    for (let leftSeatIndex = 1; leftSeatIndex <= leftSeatCount; leftSeatIndex += 1) {
+      const leftCenter = avatarCenter(playerSeats[leftSeatIndex])
+      const rightCenter = avatarCenter(playerSeats[input.playerCount - leftSeatIndex])
+      if (Math.abs(leftCenter.y - rightCenter.y) > 0.02) return false
+      if (Math.abs(leftCenter.x + rightCenter.x - 2 * tabletopCenter.x) > 0.02) {
+        return false
+      }
     }
   }
   return true
@@ -811,17 +1112,43 @@ function solveTier(
   )
   if (maximumStraightLength < 1) return null
 
+  const layoutSpacingScore = (
+    layout: DetailedRoundTableStageLayout,
+  ): readonly number[] => {
+    const roundedBoundaryGaps = [
+      ...layout.diagnostics.standardBoundaryGaps,
+      ...layout.diagnostics.centerAisleGaps,
+    ].map(Math.round)
+    const minimumBoundaryGap = Math.min(...roundedBoundaryGaps)
+    const maximumBoundaryGap = Math.max(...roundedBoundaryGaps)
+    const averageBoundaryGap = roundedBoundaryGaps.reduce((sum, gap) => sum + gap, 0)
+      / roundedBoundaryGaps.length
+    const boundaryGapDeviation = roundedBoundaryGaps.reduce((sum, gap) => (
+      sum + Math.abs(gap - averageBoundaryGap)
+    ), 0)
+    return [
+      maximumBoundaryGap - minimumBoundaryGap,
+      boundaryGapDeviation,
+      layout.diagnostics.roundTableFootprint.width
+        * layout.diagnostics.roundTableFootprint.height,
+      layout.diagnostics.placementGuide.stadiumStraightLength,
+      ...layout.playerSeats.flatMap((seat) => [seat.avatarRect.y, seat.avatarRect.x]),
+    ]
+  }
   const layouts: DetailedRoundTableStageLayout[] = []
-  for (
-    let stadiumStraightLength = 1;
-    stadiumStraightLength <= maximumStraightLength;
-    stadiumStraightLength += 1
-  ) {
-    const centerPanelDiameter = clamp(
-      tier.centerPanelDiameterMin,
-      0.38 * roundTableFrameWidth,
-      tier.centerPanelDiameterMax,
-    )
+  const triedStraightLengths = new Set<number>()
+  const centerPanelDiameter = clamp(
+    tier.centerPanelDiameterMin,
+    0.38 * roundTableFrameWidth,
+    tier.centerPanelDiameterMax,
+  )
+  const tryStraightLength = (stadiumStraightLength: number): void => {
+    if (
+      stadiumStraightLength < 1
+      || stadiumStraightLength > maximumStraightLength
+      || triedStraightLengths.has(stadiumStraightLength)
+    ) return
+    triedStraightLengths.add(stadiumStraightLength)
     const stadiumGeometry = buildStadiumGeometry(
       input.playerCount,
       playerOrbitWidth,
@@ -829,8 +1156,9 @@ function solveTier(
       tier,
       roundTableFrameWidth,
       centerPanelDiameter,
+      input.maxStageWidth,
     )
-    if (stadiumGeometry === null) continue
+    if (stadiumGeometry === null) return
     const candidate = createCandidate(
       input,
       tier,
@@ -839,15 +1167,33 @@ function solveTier(
       stadiumStraightLength,
       stadiumGeometry,
     )
-    if (candidate === null) continue
+    if (candidate === null) return
     const layout = buildReadyLayout(input, candidate)
     if (layout !== null) layouts.push(layout)
   }
-  layouts.sort((first, second) => (
-    first.diagnostics.centerAisleGap - second.diagnostics.centerAisleGap
-    || first.diagnostics.playerOrbit.stadiumStraightLength
-      - second.diagnostics.playerOrbit.stadiumStraightLength
+  for (
+    let stadiumStraightLength = 1;
+    stadiumStraightLength <= maximumStraightLength;
+    stadiumStraightLength += 4
+  ) tryStraightLength(stadiumStraightLength)
+  tryStraightLength(maximumStraightLength)
+
+  layouts.sort((first, second) => compareNumberArrays(
+    layoutSpacingScore(first),
+    layoutSpacingScore(second),
   ))
+  const bestCoarseStraightLength = layouts[0]?.diagnostics.placementGuide.stadiumStraightLength
+  if (bestCoarseStraightLength !== undefined) {
+    for (
+      let stadiumStraightLength = bestCoarseStraightLength - 3;
+      stadiumStraightLength <= bestCoarseStraightLength + 3;
+      stadiumStraightLength += 1
+    ) tryStraightLength(stadiumStraightLength)
+    layouts.sort((first, second) => compareNumberArrays(
+      layoutSpacingScore(first),
+      layoutSpacingScore(second),
+    ))
+  }
   return layouts[0] ?? null
 }
 

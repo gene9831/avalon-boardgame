@@ -1,3 +1,8 @@
+import {
+  MAX_SIMULATED_VIEWPORT_HEIGHT,
+  MAX_SIMULATED_VIEWPORT_WIDTH,
+} from '../stage-dimensions'
+
 export type ViewportMode = 'device' | 'simulated'
 
 export type LabState = Readonly<{
@@ -22,10 +27,16 @@ export const DEFAULT_LAB_STATE: LabState = {
   showGeometry: false,
 }
 
-function finitePositiveInteger(value: string | null, fallback: number): number {
+function finitePositiveInteger(
+  value: string | null,
+  fallback: number,
+  maximum = Number.POSITIVE_INFINITY,
+): number {
   if (value === null || value.trim() === '') return fallback
   const number = Number(value)
-  return Number.isInteger(number) && number > 0 ? number : fallback
+  return Number.isInteger(number) && number > 0 && number <= maximum
+    ? number
+    : fallback
 }
 
 function finiteNonNegativeNumber(value: string | null, fallback: number): number {
@@ -45,10 +56,12 @@ export function parseLabState(search: string): LabState {
     simulatedWidth: finitePositiveInteger(
       parameters.get('width'),
       DEFAULT_LAB_STATE.simulatedWidth,
+      MAX_SIMULATED_VIEWPORT_WIDTH,
     ),
     simulatedHeight: finitePositiveInteger(
       parameters.get('height'),
       DEFAULT_LAB_STATE.simulatedHeight,
+      MAX_SIMULATED_VIEWPORT_HEIGHT,
     ),
     playerCount: requestedPlayerCount >= 5 && requestedPlayerCount <= 10
       ? requestedPlayerCount

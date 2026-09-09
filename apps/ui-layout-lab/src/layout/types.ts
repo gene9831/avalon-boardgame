@@ -51,7 +51,7 @@ export type RoundTableStageLayoutResult =
   | RoundTableStageLayout
   | RoundTableStageLayoutUnavailable
 
-export type PlayerOrbitDiagnostics = Readonly<{
+export type PlacementGuideDiagnostics = Readonly<{
   bounds: Rect
   stadiumStraightLength: number
 }>
@@ -59,7 +59,7 @@ export type PlayerOrbitDiagnostics = Readonly<{
 export type RoundTableStageDiagnostics = Readonly<{
   roundTableFrame: Rect
   roundTableFootprint: Rect
-  playerOrbit: PlayerOrbitDiagnostics
+  placementGuide: PlacementGuideDiagnostics
   seatGap: number
   centerAisleGap: number
   standardBoundaryGaps: readonly number[]

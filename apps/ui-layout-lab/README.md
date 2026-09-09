@@ -18,7 +18,7 @@ pnpm dev:ui-layout
 ?viewport=device&width=390&height=844&players=10&gap=8&maxAvatarSize=56&avatarSizeStep=8&geometry=1
 ```
 
-设备模式仍保留 `width` 和 `height`，以便切回模拟模式时恢复之前的尺寸。
+设备模式仍保留 `width` 和 `height`，以便切回模拟模式时恢复之前的尺寸。模拟视口宽度上限为 4096、高度上限为 1024；它们是业务外壳尺寸，外壳扣除顶栏、底栏和边距后传给舞台求解器。
 
 ## 布局接口
 
@@ -35,13 +35,31 @@ solveRoundTableStageLayout({
 })
 ```
 
-函数根据舞台宽高选择几何策略，调用方不传 `horizontal` 或 `vertical`。`gap` 对所有头像档位生效；省略时为 8，必须是大于等于 0 的有限数。头像从 `maxAvatarSize` 开始按 `avatarSizeStep` 递减，并始终把 36 作为最后候选；中间尺寸按现有四个档位插值得到其他座位参数。当前迁移切片完成高舞台策略；宽大于等于高的舞台返回 `wide-stage-strategy-pending`，并继续由旧静态原型作为对齐参考。
+函数根据舞台宽高选择几何策略，调用方不传 `horizontal` 或 `vertical`。舞台尺寸使用 CSS 逻辑像素，宽度范围为 `(0, 4096]`、高度范围为 `(0, 800]`；超出范围返回 `invalid-input`。高度上限覆盖当前最大的 744×776 舞台基线，并限制同步高舞台搜索的工作量。`gap` 对所有头像档位生效；省略时为 8，必须是大于等于 0 的有限数。头像从 `maxAvatarSize` 开始按 `avatarSizeStep` 递减，并始终把 36 作为最后候选；中间尺寸按现有四个档位插值得到其他座位参数。当前迁移切片完成高舞台策略；宽大于等于高的舞台返回 `wide-stage-strategy-pending`，并继续由旧静态原型作为对齐参考。
 
 成功结果只包含舞台内部的形态、桌面、桌心，以及每个座位的 `playerSeatBounds`、`avatarRect`、`nameRect`、`avatarTopClearance`。返回坐标以舞台左上角为原点；完整可见包络在传入硬边界内居中。皇冠尺寸和状态标记不是求解器输入或输出；渲染器可在头像顶部预留空间内放置皇冠，并由头像圆心和半径派生状态标记。
 
-实验室页面本身是 API 的业务调用示例：设置面板可以修改玩家座位边界的最小间距、最大头像尺寸和头像递减步长，并把它们保存在 URL 中；面板打开时不增加背景蒙层或模糊。底部内容固定为 `48 + 56 + 56 = 160`，另加 `max(8px, env(safe-area-inset-bottom))` 的底部留白；页面通过 `ResizeObserver` 测量实际舞台内容盒后重新求解。
+高舞台跑道使用竖直轴对称的座位安全带：偶数人数固定上下中轴座位，奇数人数固定底部中轴座位，其余座位按实际 `playerSeatBounds` 的相邻间距尽量均匀分布。内部几何诊断将虚线框称为 `placementGuide`；它只是搜索与绘制参考，不要求头像中心位于该线条上。
+
+实验室页面本身是 API 的业务调用示例：设置面板可以修改玩家座位边界的最小间距、最大头像尺寸和头像递减步长，并把它们保存在 URL 中；面板打开时不增加背景蒙层或模糊。底部内容固定为 `48 + 56 + 56 = 160`，另加 `max(8px, env(safe-area-inset-bottom))` 的底部留白。业务舞台区域大于当前高舞台策略的工作盒时，页面在其中居中放置最大 `744×800` 的求解盒；`ResizeObserver` 测量该盒的实际尺寸后重新求解，因此 1024×1366 等高设备视口不会把超限高度直接传给纯函数。
 
 完整算法与职责边界见[圆桌舞台布局规范](../../docs/ui-layout/round-table-stage-layout.md)和[竖向房间业务外壳规范](../../docs/ui-layout/vertical-layout.md)。
+
+独立的严格跑道中心线数学模型见[跑道玩家矩形布局模型](../../docs/ui-layout/stadium-player-layout-model.md)。该模型在单独页面中验证固定头像尺寸、最短跑道和矩形欧氏边界距离，第一阶段不替换房间预览使用的求解器。
+
+## 跑道玩家矩形模型
+
+本机访问 `http://localhost:4175/stadium-layout-lab.html`；移动设备使用同一路径访问终端显示的 LAN 地址。这个页面只显示数学舞台，不包含 Avalon 顶栏、桌面、桌心或底部操作栏。
+
+纯函数 `solveStadiumPlayerLayout` 接收 `maxStageWidth`、`maxStageHeight`、`playerCount`、`avatarSize` 和 `minimumGap`。舞台使用 CSS 逻辑像素，宽度范围为 `(0, 4096]`、高度范围为 `(0, 800]`。默认值依次为 386、482、5、56 和 4；头像尺寸固定，不会自动降档。页面的完整默认 URL 为：
+
+```text
+/stadium-layout-lab.html?maxStageWidth=386&maxStageHeight=482&players=5&avatarSize=56&minimumGap=4&diagnostics=1
+```
+
+设置面板为非模态浮层，不使用背景蒙层。有效参数会实时求解并规范化到 URL；输入暂时无效时保留上一帧和上一组有效 URL。诊断开关控制完整占用边界，以及相邻玩家矩形最近边界点之间的 gap 线和数值。
+
+该模型的求解层位于 `src/stadium-model/`，不依赖 DOM。它是独立验证入口，尚未替换或接入 `solveRoundTableStageLayout`。
 
 ## 验证
 

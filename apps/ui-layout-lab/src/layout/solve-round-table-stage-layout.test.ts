@@ -39,6 +39,16 @@ describe('solveRoundTableStageLayout', () => {
       maxStageHeight: 596,
       playerCount: 10,
     })).toEqual({ status: 'unavailable', reason: 'invalid-input' })
+    expect(solveRoundTableStageLayout({
+      maxStageWidth: 4_096.01,
+      maxStageHeight: 596,
+      playerCount: 10,
+    })).toEqual({ status: 'unavailable', reason: 'invalid-input' })
+    expect(solveRoundTableStageLayout({
+      maxStageWidth: 386,
+      maxStageHeight: 800.01,
+      playerCount: 10,
+    })).toEqual({ status: 'unavailable', reason: 'invalid-input' })
   })
 
   it('reports the pending wide-stage strategy without an orientation input', () => {
@@ -109,6 +119,49 @@ describe('solveRoundTableStageLayout', () => {
     expect(result.shape).toBe('stadium')
     expect(result.playerSeats[0].avatarRect.width).toBe(52)
   })
+
+  it.each([5, 6])(
+    'keeps the maximum avatar size for %i players on the 402×714 device stage',
+    (playerCount) => {
+      const result = solveRoundTableStageLayout({
+        maxStageWidth: 386,
+        maxStageHeight: 482,
+        playerCount,
+        gap: 4,
+        maxAvatarSize: 56,
+        avatarSizeStep: 4,
+      })
+
+      expect(result.status).toBe('ready')
+      if (result.status !== 'ready') {
+        throw new Error(`Expected a ready layout, received ${result.reason}`)
+      }
+      expect(result.shape).toBe('stadium')
+      expect(result.playerSeats[0].avatarRect.width).toBe(56)
+    },
+  )
+
+  it('never increases the avatar size when another player is added', () => {
+    const avatarSizes = [5, 6, 7, 8, 9, 10].map((playerCount) => {
+      const result = solveRoundTableStageLayout({
+        maxStageWidth: 386,
+        maxStageHeight: 482,
+        playerCount,
+        gap: 4,
+        maxAvatarSize: 56,
+        avatarSizeStep: 4,
+      })
+      expect(result.status).toBe('ready')
+      if (result.status !== 'ready') {
+        throw new Error(`Expected a ready layout, received ${result.reason}`)
+      }
+      return result.playerSeats[0].avatarRect.width
+    })
+
+    for (let playerIndex = 1; playerIndex < avatarSizes.length; playerIndex += 1) {
+      expect(avatarSizes[playerIndex]).toBeLessThanOrEqual(avatarSizes[playerIndex - 1])
+    }
+  }, 10_000)
 
   it('rejects an invalid player-seat boundary gap', () => {
     expect(solveRoundTableStageLayout({
