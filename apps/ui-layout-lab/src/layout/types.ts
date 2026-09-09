@@ -61,10 +61,7 @@ export type RoundTableStageDiagnostics = Readonly<{
   roundTableFootprint: Rect
   placementGuide: PlacementGuideDiagnostics
   seatGap: number
-  centerAisleGap: number
-  standardBoundaryGaps: readonly number[]
-  centerAisleGaps: readonly number[]
-  centerAislePairs: readonly (readonly [number, number])[]
+  adjacentBoundaryGaps: readonly number[]
   tabletopCenterOffsetY: number
 }>
 

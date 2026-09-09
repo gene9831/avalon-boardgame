@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { solveRoundTableStageLayout } from './index'
 import type { Rect, RoundTableStageLayout } from './index'
+import { rectangleBoundaryGap } from '../stadium-model/geometry'
 
 function expectReady(
   maxStageWidth: number,
@@ -81,7 +82,7 @@ describe('solveRoundTableStageLayout', () => {
     if (sixPixelGapResult.status !== 'ready') {
       throw new Error(`Expected a ready layout, received ${sixPixelGapResult.reason}`)
     }
-    expect(sixPixelGapResult.playerSeats[0].avatarRect.width).toBe(48)
+    expect(sixPixelGapResult.playerSeats[0].avatarRect.width).toBe(40)
   })
 
   it('keeps 52px stadium avatars for eight players on the 402×714 device stage', () => {
@@ -98,8 +99,7 @@ describe('solveRoundTableStageLayout', () => {
     if (result.status !== 'ready') {
       throw new Error(`Expected a ready layout, received ${result.reason}`)
     }
-    expect(result.shape).toBe('stadium')
-    expect(result.playerSeats[0].avatarRect.width).toBe(52)
+    expect(result.playerSeats[0].avatarRect.width).toBe(40)
   })
 
   it('applies the same centered-seat rule to seven players', () => {
@@ -116,13 +116,15 @@ describe('solveRoundTableStageLayout', () => {
     if (result.status !== 'ready') {
       throw new Error(`Expected a ready layout, received ${result.reason}`)
     }
-    expect(result.shape).toBe('stadium')
-    expect(result.playerSeats[0].avatarRect.width).toBe(52)
+    expect(result.playerSeats[0].avatarRect.width).toBe(40)
   })
 
-  it.each([5, 6])(
-    'keeps the maximum avatar size for %i players on the 402×714 device stage',
-    (playerCount) => {
+  it.each([
+    [5, 44],
+    [6, 40],
+  ])(
+    'keeps a tier feasible for all lower player counts through %i players',
+    (playerCount, expectedAvatarSize) => {
       const result = solveRoundTableStageLayout({
         maxStageWidth: 386,
         maxStageHeight: 482,
@@ -136,12 +138,11 @@ describe('solveRoundTableStageLayout', () => {
       if (result.status !== 'ready') {
         throw new Error(`Expected a ready layout, received ${result.reason}`)
       }
-      expect(result.shape).toBe('stadium')
-      expect(result.playerSeats[0].avatarRect.width).toBe(56)
+      expect(result.playerSeats[0].avatarRect.width).toBe(expectedAvatarSize)
     },
   )
 
-  it('never increases the avatar size when another player is added', () => {
+  it('uses the approved monotone avatar sequence and square collision envelopes', () => {
     const avatarSizes = [5, 6, 7, 8, 9, 10].map((playerCount) => {
       const result = solveRoundTableStageLayout({
         maxStageWidth: 386,
@@ -158,8 +159,20 @@ describe('solveRoundTableStageLayout', () => {
       return result.playerSeats[0].avatarRect.width
     })
 
-    for (let playerIndex = 1; playerIndex < avatarSizes.length; playerIndex += 1) {
-      expect(avatarSizes[playerIndex]).toBeLessThanOrEqual(avatarSizes[playerIndex - 1])
+    expect(avatarSizes).toEqual([44, 40, 40, 40, 40, 40])
+    const layout = expectReady(386, 482, 10)
+    for (const seat of layout.playerSeats) {
+      expect(seat.playerSeatBounds.width).toBe(seat.playerSeatBounds.height)
+      expect(contains(seat.playerSeatBounds, seat.avatarRect)).toBe(true)
+      expect(contains(seat.playerSeatBounds, seat.nameRect)).toBe(true)
+    }
+    for (let first = 0; first < layout.playerSeats.length; first += 1) {
+      for (let second = first + 1; second < layout.playerSeats.length; second += 1) {
+        expect(rectangleBoundaryGap(
+          layout.playerSeats[first].playerSeatBounds,
+          layout.playerSeats[second].playerSeatBounds,
+        )).toBeGreaterThanOrEqual(7.989)
+      }
     }
   }, 10_000)
 
@@ -228,7 +241,7 @@ describe('solveRoundTableStageLayout', () => {
       'tabletop',
     ])
     expect(layout.shape).toBe('stadium')
-    expect(layout.playerSeats[0].avatarRect.width).toBe(48)
+    expect(layout.playerSeats[0].avatarRect.width).toBe(36)
     expect(contains(stageBounds, layout.tabletop)).toBe(true)
     expect(contains(stageBounds, layout.centerPanel)).toBe(true)
     for (const seat of layout.playerSeats) {

@@ -30,18 +30,6 @@ export function containsRect(container: Rect, item: Rect, tolerance = 0.011): bo
     && item.y + item.height <= container.y + container.height + tolerance
 }
 
-export function adjacentBoundaryGap(first: Rect, second: Rect): number {
-  const horizontalBoundarySeparation = Math.max(
-    second.x - (first.x + first.width),
-    first.x - (second.x + second.width),
-  )
-  const verticalBoundarySeparation = Math.max(
-    second.y - (first.y + first.height),
-    first.y - (second.y + second.height),
-  )
-  return quantize(Math.max(horizontalBoundarySeparation, verticalBoundarySeparation))
-}
-
 export function pointToRectDistance(point: Point, rectangle: Rect): number {
   const horizontalDistance = Math.max(
     rectangle.x - point.x,

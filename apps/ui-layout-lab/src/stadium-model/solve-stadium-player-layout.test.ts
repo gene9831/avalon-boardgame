@@ -271,6 +271,24 @@ describe('solveStadiumPlayerLayout', () => {
 })
 
 describe('solveStadiumRectangleLayout', () => {
+  it('keeps fractional collision squares representable on the public centerline grid', () => {
+    const result = solveStadiumRectangleLayout({
+      maxStageWidth: 386,
+      maxStageHeight: 482,
+      playerCount: 5,
+      playerRectangleSize: 88.33333333333333,
+      minimumGap: 4,
+    })
+
+    expect(result.status).toBe('ready')
+    if (result.status !== 'ready') throw new Error(result.reason)
+    expect(result.centerlineBounds.width * 100).toBeCloseTo(
+      Math.round(result.centerlineBounds.width * 100),
+      8,
+    )
+    expect(Math.min(...result.adjacentBoundaryGaps)).toBeGreaterThanOrEqual(4 - 0.001)
+  })
+
   it.each([0, -1, Number.NaN])('rejects invalid rectangle size %#', (playerRectangleSize) => {
     expect(solveStadiumRectangleLayout({
       maxStageWidth: 386,

@@ -1,5 +1,6 @@
 import type { Rect } from '../layout'
 import type { DetailedRoundTableStageLayoutResult } from '../layout/types'
+import { closestRectangleBoundarySegment } from '../stadium-model/geometry'
 
 const PLAYER_NAMES = ['你', '青岚', '松石', '山雀', '长夜', '银杏', '渡鸦', '晨星', '白榆', '雾岛']
 
@@ -13,43 +14,10 @@ function rectStyles(rectangle: Rect): string {
   return `left:${rectangle.x}px;top:${rectangle.y}px;width:${rectangle.width}px;height:${rectangle.height}px`
 }
 
-function renderBoundaryGapLine(
-  firstBounds: Rect,
-  secondBounds: Rect,
-  kind: 'standard' | 'center',
-  gap: number,
-): string {
-  const firstCenter = {
-    x: firstBounds.x + firstBounds.width / 2,
-    y: firstBounds.y + firstBounds.height / 2,
-  }
-  const secondCenter = {
-    x: secondBounds.x + secondBounds.width / 2,
-    y: secondBounds.y + secondBounds.height / 2,
-  }
-  const horizontalSeparation = Math.max(
-    secondBounds.x - (firstBounds.x + firstBounds.width),
-    firstBounds.x - (secondBounds.x + secondBounds.width),
-  )
-  const verticalSeparation = Math.max(
-    secondBounds.y - (firstBounds.y + firstBounds.height),
-    firstBounds.y - (secondBounds.y + secondBounds.height),
-  )
-  const isHorizontal = horizontalSeparation >= verticalSeparation
-  const lineRectangle = isHorizontal
-    ? {
-        x: Math.min(firstBounds.x + firstBounds.width, secondBounds.x + secondBounds.width),
-        y: (firstCenter.y + secondCenter.y) / 2,
-        width: Math.max(1, horizontalSeparation),
-        height: 1,
-      }
-    : {
-        x: (firstCenter.x + secondCenter.x) / 2,
-        y: Math.min(firstBounds.y + firstBounds.height, secondBounds.y + secondBounds.height),
-        width: 1,
-        height: Math.max(1, verticalSeparation),
-      }
-  return `<span class="gap-line ${kind}" style="${rectStyles(lineRectangle)}" title="${kind === 'center' ? '桌心通道' : '座位间距'} ${gap}px"></span>`
+function renderBoundaryGapLine(firstBounds: Rect, secondBounds: Rect, gap: number): string {
+  const segment = closestRectangleBoundarySegment(firstBounds, secondBounds)
+  const angle = Math.atan2(segment.end.y - segment.start.y, segment.end.x - segment.start.x) * 180 / Math.PI
+  return `<span class="gap-line" style="left:${segment.start.x}px;top:${segment.start.y}px;width:${Math.max(1, segment.distance)}px;height:1px;transform:rotate(${angle}deg);transform-origin:left center" title="座位间距 ${gap}px"></span>`
 }
 
 export function renderRoomShell(canvas: HTMLElement): RoomShellElements {
@@ -126,7 +94,6 @@ export function renderRoundTableStage(
     delete canvas.dataset.tableShape
     delete canvas.dataset.avatarSize
     delete canvas.dataset.stadiumStraightLength
-    delete canvas.dataset.centerAisleGap
     stage.innerHTML = `
       <section class="layout-unavailable" aria-live="polite">
         <p class="text-xs uppercase tracking-[0.28em] text-amber-300/70">Layout unavailable</p>
@@ -141,7 +108,6 @@ export function renderRoundTableStage(
   canvas.dataset.stadiumStraightLength = String(
     result.diagnostics.placementGuide.stadiumStraightLength,
   )
-  canvas.dataset.centerAisleGap = String(result.diagnostics.centerAisleGap)
   const seats = result.playerSeats.map((seat, seatIndex) => {
     const crownFontSize = Math.max(13, Math.round(seat.avatarRect.width * 0.3))
     const statusSize = Math.max(10, Math.round(seat.avatarRect.width * 0.24))
@@ -157,25 +123,12 @@ export function renderRoundTableStage(
       </div>
       <span class="player-name" style="${rectStyles(seat.nameRect)}">${PLAYER_NAMES[seatIndex]}</span>`
   }).join('')
-  const centerAislePairKeys = new Set(result.diagnostics.centerAislePairs.map((pair) => (
-    pair.slice().sort((first, second) => first - second).join('-')
-  )))
-  let standardGapIndex = 0
-  let centerGapIndex = 0
   const gapLines = result.playerSeats.map((seat, seatIndex) => {
     const otherSeatIndex = (seatIndex + 1) % result.playerSeats.length
-    const pairKey = [seatIndex, otherSeatIndex]
-      .sort((first, second) => first - second)
-      .join('-')
-    const isCenterAisle = centerAislePairKeys.has(pairKey)
-    const gap = isCenterAisle
-      ? result.diagnostics.centerAisleGaps[centerGapIndex++]
-      : result.diagnostics.standardBoundaryGaps[standardGapIndex++]
     return renderBoundaryGapLine(
       seat.playerSeatBounds,
       result.playerSeats[otherSeatIndex].playerSeatBounds,
-      isCenterAisle ? 'center' : 'standard',
-      gap,
+      result.diagnostics.adjacentBoundaryGaps[seatIndex],
     )
   }).join('')
 
@@ -184,6 +137,7 @@ export function renderRoundTableStage(
     <div class="round-table-footprint" style="${rectStyles(result.diagnostics.roundTableFootprint)}"></div>
     <div class="placement-guide ${result.shape}" style="${rectStyles(result.diagnostics.placementGuide.bounds)}"></div>
     <div class="tabletop ${result.shape}" style="${rectStyles(result.tabletop)}"></div>
+    <div class="center-panel-protection" style="left:${result.centerPanel.x - 12}px;top:${result.centerPanel.y - 12}px;width:${result.centerPanel.width + 24}px;height:${result.centerPanel.height + 24}px"></div>
     <div class="center-panel" style="${rectStyles(result.centerPanel)}">
       <small>第 3 轮</small><strong>等待领袖组队</strong><span>需要 4 名队员</span>
     </div>

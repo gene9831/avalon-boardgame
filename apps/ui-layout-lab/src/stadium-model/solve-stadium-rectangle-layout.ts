@@ -40,6 +40,12 @@ function unavailable(reason: 'invalid-input' | 'no-fitting-layout'): StadiumPlay
   return { status: 'unavailable', reason }
 }
 
+function largestPublicGridCenterlineWidth(availableWidth: number): number {
+  let centipixels = Math.floor(availableWidth / PUBLIC_UNIT + VALIDATION_TOLERANCE)
+  if (centipixels % 2 !== 0) centipixels -= 1
+  return centipixels * PUBLIC_UNIT
+}
+
 function hasValidInput(input: StadiumRectangleLayoutInput): boolean {
   return hasSupportedStageDimensions(input.maxStageWidth, input.maxStageHeight)
     && Number.isInteger(input.playerCount)
@@ -496,7 +502,9 @@ export function solveStadiumRectangleLayout(
 ): StadiumPlayerLayoutResult {
   if (!hasValidInput(input)) return unavailable('invalid-input')
 
-  const centerlineWidth = input.maxStageWidth - input.playerRectangleSize
+  const centerlineWidth = largestPublicGridCenterlineWidth(
+    input.maxStageWidth - input.playerRectangleSize,
+  )
   const maximumStraightLength = input.maxStageHeight - input.playerRectangleSize - centerlineWidth
   if (centerlineWidth < 0 || maximumStraightLength < 0) return unavailable('no-fitting-layout')
 
