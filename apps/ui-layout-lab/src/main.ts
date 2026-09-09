@@ -95,9 +95,10 @@ function renderStage(): void {
   })
   renderRoundTableStage(canvas, roomShell.stage, result, state.showGeometry)
   const size = effectiveSize()
+  const sizeSummary = `${size.width} × ${size.height} · 舞台 ${stageSize.width} × ${stageSize.height}`
   readout.value = result.status === 'ready'
-    ? `${size.width} × ${size.height} · ${state.playerCount} 人 · 头像 ${result.playerSeats[0]?.avatarRect.width ?? 0}px · ${result.shape === 'stadium' ? `跑道 · 直线 ${result.diagnostics.placementGuide.stadiumStraightLength}px` : '圆形'}`
-    : `${size.width} × ${size.height} · ${result.reason}`
+    ? `${sizeSummary} · ${state.playerCount} 人 · 头像 ${result.playerSeats[0]?.avatarRect.width ?? 0}px · ${result.shape === 'stadium' ? `跑道 · 直线 ${result.diagnostics.placementGuide.stadiumStraightLength}px` : '圆形'}`
+    : `${sizeSummary} · ${result.reason}`
 }
 
 const settings = createSettingsDialog(app, state, {

@@ -61,6 +61,7 @@ test('uses the actual mobile viewport and keeps device controls concise', async 
   const hideInfoButton = page.getByRole('button', { name: '隐藏布局信息' })
   await expect(hideInfoButton).toHaveAttribute('aria-expanded', 'true')
   await expect(readout).toBeVisible()
+  await expect(readout).toContainText('390 × 844 · 舞台 366 × 596')
   await expect(readout).toContainText('头像 36px')
 
   await hideInfoButton.click()
@@ -288,7 +289,7 @@ test('lets the preview control the avatar ceiling and decrement step', async ({ 
   const canvas = page.getByLabel('Avalon 房间布局预览')
   await expect(canvas).toHaveAttribute('data-avatar-size', '36')
   await expect(page.locator('.layout-readout')).toHaveText(
-    '402 × 714 · 10 人 · 头像 36px · 圆形',
+    '402 × 714 · 舞台 386 × 482 · 10 人 · 头像 36px · 圆形',
   )
 
   await page.getByRole('button', { name: '打开布局设置' }).click()
