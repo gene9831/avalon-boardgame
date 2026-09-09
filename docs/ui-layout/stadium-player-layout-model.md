@@ -2,11 +2,11 @@
 
 ## 1. 状态与范围
 
-本文定义一个独立、DOM-free 的纵向跑道玩家布局数学模型。它用于验证“固定头像尺寸时，如何在最短的圆形或纵向跑道中心线上均匀放置 5–10 个玩家矩形”。
+本文定义共享、DOM-free 的纵向跑道玩家布局严格矩形核心。它解决“固定碰撞尺寸时，如何在圆形或最短纵向跑道中心线上放置 5–10 个玩家正方形”。`solveRoundTableStageLayout` 的高舞台适配层复用该核心；`/stadium-layout-lab.html` 则保留为固定头像尺寸的数学工作台。
 
-第一阶段只实现纯函数和独立实验页面，不替换现有 `solveRoundTableStageLayout`，也不改变房间原型。现有业务布局继续负责桌面、桌心、姓名、皇冠、状态标记、顶栏和底栏；待本模型在实验页面通过人工验收后，再单独设计接入方式。
+核心不负责业务外壳、桌面、桌心、姓名、皇冠或状态标记。业务层把头像、姓名和皇冠顶部预留折算为一个正方形碰撞尺寸，再将核心结果映射为 `playerSeatBounds`、`avatarRect` 和 `nameRect`。
 
-本文中的玩家矩形是基础数学包络，不等同于 `CONTEXT.md` 中包含头像、姓名和装饰预留的 **Player seat bounds**。因此本实验不新增领域术语或 ADR。
+在独立工作台中，玩家矩形是 `2 × avatarSize` 的数学包络；在业务适配层中，同一核心接收 `max(seatWidth, avatarTopClearance + avatarDiameter + 4 + nameHeight)`，其返回正方形就是稳定的 **Player seat bounds**。
 
 ## 2. 公共输入
 
@@ -103,7 +103,7 @@ rectangleBoundaryGap = hypot(
 rectangleBoundaryGap >= minimumGap
 ```
 
-均匀度评分只使用视觉顺序中相邻的玩家矩形，包括最后一个与当前玩家之间的闭环间距。
+全部玩家矩形两两满足硬约束；均匀度评分才只使用视觉顺序中相邻的矩形，包括最后一个与当前玩家之间的闭环间距。
 
 ## 5. 座位顺序与对称
 
@@ -257,7 +257,7 @@ minimumGap = 4
 
 ## 11. 文件边界
 
-第一阶段计划新增：
+实现边界：
 
 ```text
 apps/ui-layout-lab/
@@ -272,7 +272,7 @@ apps/ui-layout-lab/
     stadium-model.css
 ```
 
-Vite 配置显式包含 `index.html` 和 `stadium-layout-lab.html` 两个生产构建入口。新模型不导入 DOM、房间外壳或现有 `tall-stage.ts`。
+Vite 配置显式包含 `index.html` 和 `stadium-layout-lab.html` 两个生产构建入口。核心不导入 DOM 或房间外壳；`tall-stage.ts` 是其业务适配层。
 
 ## 12. 验收与验证
 
@@ -289,4 +289,4 @@ Vite 配置显式包含 `index.html` 和 `stadium-layout-lab.html` 两个生产�
 
 不保留求根迭代次数或机器墙钟耗时断言。开发阶段记录 5–10 人常见输入的人工基准，目标是单次同步求解明显低于一帧，但机器相关耗时不成为稳定 API 契约。
 
-第一阶段验收终点是独立数学页面。是否替换或复用当前房间求解器，属于后续独立设计决策。
+代表性业务适配结果以圆桌舞台规范为准：10 人 `359×435 → 36px 跑道`、`366×596 → 36px 跑道`、`406×684 → 40px 跑道`、`744×776 → 56px 圆形`；`386×482`、`gap=4`、`maxAvatarSize=56`、`avatarSizeStep=4` 的 5–10 人为 `[44, 40, 40, 40, 40, 40]`。全部两两欧氏 gap、12px 桌心保护、包络包含、严格圆形优先/最短跑道及单调档位可行性取代早期视觉基线。

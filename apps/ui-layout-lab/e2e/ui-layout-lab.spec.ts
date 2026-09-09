@@ -30,7 +30,7 @@ test('uses the actual mobile viewport and keeps device controls concise', async 
   const canvas = page.getByLabel('Avalon 房间布局预览')
   await expect(canvas).toHaveAttribute('data-layout-status', 'ready')
   await expect(canvas).toHaveAttribute('data-table-shape', 'stadium')
-  await expect(canvas).toHaveAttribute('data-avatar-size', '48')
+  await expect(canvas).toHaveAttribute('data-avatar-size', '36')
   await expect(canvas).toHaveAttribute('data-canvas-width', '390')
   await expect(canvas).toHaveAttribute('data-canvas-height', '844')
   await expect(canvas).toHaveAttribute('data-stage-width', '366')
@@ -61,7 +61,7 @@ test('uses the actual mobile viewport and keeps device controls concise', async 
   const hideInfoButton = page.getByRole('button', { name: '隐藏布局信息' })
   await expect(hideInfoButton).toHaveAttribute('aria-expanded', 'true')
   await expect(readout).toBeVisible()
-  await expect(readout).toContainText('头像 48px')
+  await expect(readout).toContainText('头像 36px')
 
   await hideInfoButton.click()
   await expect(page.getByRole('button', { name: '显示布局信息' })).toHaveAttribute('aria-expanded', 'false')
@@ -133,24 +133,78 @@ test('restores remembered simulated dimensions after leaving device mode', async
   await expect(page.getByLabel('宽度')).toHaveValue('430')
   await expect(page.getByLabel('高度')).toHaveValue('932')
   await expect(page).toHaveURL(/viewport=simulated&width=430&height=932&players=10&gap=8&maxAvatarSize=56&avatarSizeStep=8&geometry=0/)
-  await expect(page.getByLabel('Avalon 房间布局预览')).toHaveAttribute('data-avatar-size', '56')
+  await expect(page.getByLabel('Avalon 房间布局预览')).toHaveAttribute('data-avatar-size', '40')
 })
 
-test('renders returned diagnostics for the 430 by 932 baseline', async ({ page }) => {
+test('renders Euclidean geometry diagnostics for the 430 by 932 baseline', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 1000 })
   await page.goto('http://127.0.0.1:14175/?viewport=simulated&width=430&height=932&players=10&geometry=1')
 
   const canvas = page.getByLabel('Avalon 房间布局预览')
-  await expect(canvas).toHaveAttribute('data-avatar-size', '56')
+  await expect(canvas).toHaveAttribute('data-avatar-size', '40')
   await expect(canvas).toHaveAttribute('data-table-shape', 'stadium')
   await expect(canvas).toHaveAttribute('data-stage-width', '406')
   await expect(canvas).toHaveAttribute('data-stage-height', '684')
   await expect(canvas.locator('.player-seat')).toHaveCount(10)
   await expect(canvas.locator('.round-table-footprint')).toHaveCount(1)
   await expect(canvas.locator('.placement-guide')).toHaveCount(1)
+  await expect(canvas.locator('.center-panel-protection')).toHaveCount(1)
   await expect(canvas.locator('.gap-line')).toHaveCount(10)
-  await expect(canvas.locator('.gap-line.standard')).toHaveCount(10)
   await expect(canvas).toHaveAttribute('data-show-geometry', '')
+
+  const firstGap = canvas.locator('.gap-line').first()
+  await expect(firstGap).toHaveAttribute('style', /transform:rotate\(/)
+  await expect(firstGap).toHaveAttribute('title', /座位间距 \d+(?:\.\d+)?px/)
+})
+
+test('draws a diagonal Euclidean gap segment on the circular layout', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 1100 })
+  await page.goto('http://127.0.0.1:14175/?viewport=simulated&width=768&height=1024&players=5&geometry=1')
+
+  const diagonalGap = await page.locator('.gap-line').evaluateAll((lines) => lines
+    .map((line) => ({ style: line.getAttribute('style'), title: line.getAttribute('title') }))
+    .find(({ style }) => {
+      const angle = style?.match(/rotate\((-?\d+(?:\.\d+)?)deg\)/)?.[1]
+      return angle !== undefined && Math.abs(Number(angle) % 90) > 0.01
+    }))
+  expect(diagonalGap?.style).toContain('transform:rotate(')
+  expect(diagonalGap?.title).toMatch(/座位间距 \d+(?:\.\d+)?px/)
+})
+
+const confirmedBusinessViewports = [
+  [{ width: 375, height: 667 }, { stageWidth: 359, stageHeight: 435, avatarSize: 36, shape: 'stadium' }],
+  [{ width: 390, height: 844 }, { stageWidth: 366, stageHeight: 596, avatarSize: 36, shape: 'stadium' }],
+  [{ width: 430, height: 932 }, { stageWidth: 406, stageHeight: 684, avatarSize: 40, shape: 'stadium' }],
+  [{ width: 768, height: 1024 }, { stageWidth: 744, stageHeight: 776, avatarSize: 56, shape: 'circle' }],
+ ] as const
+
+for (const [viewport, expected] of confirmedBusinessViewports) {
+  test(`resolves the confirmed ${viewport.width} by ${viewport.height} business viewport`, async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 1100 })
+    await page.goto(`http://127.0.0.1:14175/?viewport=simulated&width=${viewport.width}&height=${viewport.height}&players=10&geometry=0`)
+
+    const canvas = page.getByLabel('Avalon 房间布局预览')
+    await expect(canvas).toHaveAttribute('data-stage-width', String(expected.stageWidth))
+    await expect(canvas).toHaveAttribute('data-stage-height', String(expected.stageHeight))
+    await expect(canvas).toHaveAttribute('data-avatar-size', String(expected.avatarSize))
+    await expect(canvas).toHaveAttribute('data-table-shape', expected.shape)
+  })
+}
+
+test('keeps the confirmed monotone avatar tiers for 5 to 10 players', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 800 })
+  const avatarSizes: number[] = []
+
+  for (const [playerCount, expectedAvatarSize] of [
+    [5, 44], [6, 40], [7, 40], [8, 40], [9, 40], [10, 40],
+  ]) {
+    await page.goto(`http://127.0.0.1:14175/?viewport=simulated&width=402&height=714&players=${playerCount}&gap=4&maxAvatarSize=56&avatarSizeStep=4&geometry=0`)
+    const avatarSize = Number(await page.getByLabel('Avalon 房间布局预览').getAttribute('data-avatar-size'))
+    expect(avatarSize).toBe(expectedAvatarSize)
+    avatarSizes.push(avatarSize)
+  }
+
+  expect(avatarSizes.every((size, index) => index === 0 || size <= avatarSizes[index - 1]!)).toBe(true)
 })
 
 test('keeps settings available when wide-stage strategy is pending', async ({ page }) => {
@@ -172,7 +226,7 @@ test('lets the preview lower the player-seat gap at 402 by 714', async ({ page }
   const canvas = page.getByLabel('Avalon 房间布局预览')
   await expect(canvas).toHaveAttribute('data-stage-width', '386')
   await expect(canvas).toHaveAttribute('data-stage-height', '482')
-  await expect(canvas).toHaveAttribute('data-avatar-size', '48')
+  await expect(canvas).toHaveAttribute('data-avatar-size', '40')
 
   await page.getByRole('button', { name: '打开布局设置' }).click()
   const gapInput = page.getByLabel('玩家边界最小间距')
@@ -191,7 +245,7 @@ test('lets the preview control the avatar ceiling and decrement step', async ({ 
   const canvas = page.getByLabel('Avalon 房间布局预览')
   await expect(canvas).toHaveAttribute('data-avatar-size', '36')
   await expect(page.locator('.layout-readout')).toHaveText(
-    '402 × 714 · 10 人 · 头像 36px · 跑道 · 直线 1px',
+    '402 × 714 · 10 人 · 头像 36px · 圆形',
   )
 
   await page.getByRole('button', { name: '打开布局设置' }).click()

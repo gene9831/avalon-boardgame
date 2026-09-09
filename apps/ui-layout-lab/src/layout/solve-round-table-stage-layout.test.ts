@@ -85,7 +85,7 @@ describe('solveRoundTableStageLayout', () => {
     expect(sixPixelGapResult.playerSeats[0].avatarRect.width).toBe(40)
   })
 
-  it('keeps 52px stadium avatars for eight players on the 402×714 device stage', () => {
+  it('keeps 40px stadium avatars for eight players on the 402×714 device stage', () => {
     const result = solveRoundTableStageLayout({
       maxStageWidth: 386,
       maxStageHeight: 482,

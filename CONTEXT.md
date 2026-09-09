@@ -136,11 +136,8 @@ _Avoid_: phase drawer, bottom sheet, mobile action panel
 **Seat presentation tier**: One discrete, geometry-selected set of portrait, name, status-mark, spacing, and interaction-target sizes used by every player seat. It is selected from available round-table geometry rather than from a device category.
 _Avoid_: mobile seat, desktop seat, continuously scaled seat
 
-**Player seat bounds**: The stable axis-aligned boundary reserved for one player seat at a selected presentation tier. It includes the portrait, name, interaction target, and the maximum legal crown and status-mark extents for every seat, whether or not those marks are currently visible, so ordinary game-state changes never move the layout.
+**Player seat bounds**: The stable square boundary reserved for one player seat at a selected presentation tier. It includes the avatar, name, interaction target, and crown-top reserve, while excluding dynamic status marks; ordinary game-state changes therefore never move the layout.
 _Avoid_: current seat contents, portrait bounds
 
-**Adjacent boundary gap**: The active horizontal or vertical separation between two adjacent player seat bounds. The round-table-stage caller supplies its minimum value, with 8 logical pixels as the default for every seat presentation tier. It is measured from the rendered boundaries rather than from player-orbit arc length, allowing a stadium orbit to look evenly spaced when seat centers are not equidistant.
+**Player seat gap**: The minimum Euclidean shortest boundary distance between any two stable square player-seat bounds. The round-table-stage caller supplies it, with 8 logical pixels as the default for every presentation tier.
 _Avoid_: center-to-center gap, equal arc spacing
-
-**Center aisle gap**: The larger, left-right symmetric separation between the player seat bounds immediately above and below the tabletop center in a vertical stadium layout. It reserves the minimum clear passage required by the central information area and is distinct from the ordinary adjacent boundary gap.
-_Avoid_: missing seat, arbitrary large gap
