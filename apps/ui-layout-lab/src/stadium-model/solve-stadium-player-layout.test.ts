@@ -10,6 +10,7 @@ import {
   rectFromCenter,
 } from './geometry'
 import { solveStadiumPlayerLayout } from './solve-stadium-player-layout'
+import { solveStadiumRectangleLayout } from './solve-stadium-rectangle-layout'
 
 describe('stadium rectangle geometry', () => {
   it.each([
@@ -109,6 +110,22 @@ describe('stadium rectangle geometry', () => {
 })
 
 describe('solveStadiumPlayerLayout', () => {
+  it('reuses rectangle core with equivalent 2x avatar size', () => {
+    expect(solveStadiumRectangleLayout({
+      maxStageWidth: 386,
+      maxStageHeight: 482,
+      playerCount: 5,
+      playerRectangleSize: 112,
+      minimumGap: 4,
+    })).toEqual(solveStadiumPlayerLayout({
+      maxStageWidth: 386,
+      maxStageHeight: 482,
+      playerCount: 5,
+      avatarSize: 56,
+      minimumGap: 4,
+    }))
+  })
+
   function rectanglesHaveNoInteriorOverlap(
     first: { x: number; y: number; width: number; height: number },
     second: { x: number; y: number; width: number; height: number },
@@ -250,5 +267,42 @@ describe('solveStadiumPlayerLayout', () => {
     { maxStageWidth: 386, maxStageHeight: 385.99, playerCount: 5, avatarSize: 56, minimumGap: 4 },
   ])('reports legal but impossible stage envelopes as non-fitting', (input) => {
     expect(solveStadiumPlayerLayout(input)).toEqual({ status: 'unavailable', reason: 'no-fitting-layout' })
+  })
+})
+
+describe('solveStadiumRectangleLayout', () => {
+  it.each([0, -1, Number.NaN])('rejects invalid rectangle size %#', (playerRectangleSize) => {
+    expect(solveStadiumRectangleLayout({
+      maxStageWidth: 386,
+      maxStageHeight: 482,
+      playerCount: 5,
+      playerRectangleSize,
+      minimumGap: 4,
+    })).toEqual({ status: 'unavailable', reason: 'invalid-input' })
+  })
+
+  it('returns no-fitting-layout when stage is too small for large rectangles', () => {
+    expect(solveStadiumRectangleLayout({
+      maxStageWidth: 386,
+      maxStageHeight: 482,
+      playerCount: 5,
+      playerRectangleSize: 1000,
+      minimumGap: 4,
+    })).toEqual({ status: 'unavailable', reason: 'no-fitting-layout' })
+  })
+
+  it('returns ready layouts with exact player rectangles and minimum boundary gaps', () => {
+    const result = solveStadiumRectangleLayout({
+      maxStageWidth: 386,
+      maxStageHeight: 482,
+      playerCount: 5,
+      playerRectangleSize: 112,
+      minimumGap: 4,
+    })
+    expect(result.status).toBe('ready')
+    if (result.status !== 'ready') throw new Error(result.reason)
+    expect(result.playerRects).toHaveLength(5)
+    expect(result.adjacentBoundaryGaps).toHaveLength(5)
+    expect(Math.min(...result.adjacentBoundaryGaps)).toBeGreaterThanOrEqual(4 - 0.001)
   })
 })

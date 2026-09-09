@@ -24,6 +24,14 @@ export type StadiumPlayerLayoutInput = Readonly<{
   minimumGap: number
 }>
 
+export type StadiumRectangleLayoutInput = Readonly<{
+  maxStageWidth: number
+  maxStageHeight: number
+  playerCount: number
+  playerRectangleSize: number
+  minimumGap: number
+}>
+
 export type StadiumPlayerLayoutReady = Readonly<{
   status: 'ready'
   shape: 'circle' | 'stadium'
