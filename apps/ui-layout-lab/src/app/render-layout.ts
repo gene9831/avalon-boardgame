@@ -1,6 +1,13 @@
-import type { Rect, RoomLayoutResult } from '../layout'
+import type { Rect } from '../layout'
+import type { DetailedRoundTableStageLayoutResult } from '../layout/types'
 
 const PLAYER_NAMES = ['你', '青岚', '松石', '山雀', '长夜', '银杏', '渡鸦', '晨星', '白榆', '雾岛']
+
+export type RoomShellElements = Readonly<{
+  stage: HTMLElement
+  stageInfoButton: HTMLButtonElement
+  stageInfoReadout: HTMLOutputElement
+}>
 
 function rectStyles(rectangle: Rect): string {
   return `left:${rectangle.x}px;top:${rectangle.y}px;width:${rectangle.width}px;height:${rectangle.height}px`
@@ -45,12 +52,74 @@ function renderBoundaryGapLine(
   return `<span class="gap-line ${kind}" style="${rectStyles(lineRectangle)}" title="${kind === 'center' ? '桌心通道' : '座位间距'} ${gap}px"></span>`
 }
 
-export function renderRoomLayout(
+export function renderRoomShell(canvas: HTMLElement): RoomShellElements {
+  const taskTrack = [1, 2, 3, 4, 5].map((taskNumber) => `
+    <span class="task-node${taskNumber === 3 ? ' is-current' : ''}">
+      <b>${taskNumber}</b><small>${taskNumber === 4 ? '3·2' : taskNumber + 1}</small>
+    </span>`).join('')
+  canvas.innerHTML = `
+    <header class="room-topbar">
+      <button class="back-button" aria-label="返回">‹</button>
+      <button class="room-code" aria-label="复制房间号"><span>房间</span><b>7A3C9EF</b><i></i></button>
+      <div class="task-track" aria-label="任务进度">${taskTrack}</div>
+    </header>
+    <main class="round-table-stage-region">
+      <div class="stage-info">
+        <button
+          class="stage-info-trigger"
+          type="button"
+          aria-label="显示布局信息"
+          aria-controls="layout-readout"
+          aria-expanded="false"
+        >
+          <svg
+            class="lucide lucide-info"
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 16v-4"></path>
+            <path d="M12 8h.01"></path>
+          </svg>
+        </button>
+        <output id="layout-readout" class="layout-readout" aria-live="polite" hidden></output>
+      </div>
+      <div class="round-table-stage"></div>
+    </main>
+    <footer class="phase-panel">
+      <div class="phase-content">
+        <div class="phase-header"><div class="phase-title"><small>领袖行动</small><strong>选择任务队员</strong></div>
+          <nav aria-label="房间工具"><button>身份</button><button>记录</button><button>帮助</button></nav>
+        </div>
+        <div class="phase-middle"><button class="selected">青岚</button><button>松石</button></div>
+        <div class="phase-action"><button>确认队伍 · 2/4</button></div>
+      </div>
+      <div class="phase-bottom-clearance" aria-hidden="true"></div>
+    </footer>`
+  const stage = canvas.querySelector<HTMLElement>('.round-table-stage')
+  if (stage === null) throw new Error('Round-table stage was not rendered')
+  const stageInfoButton = canvas.querySelector<HTMLButtonElement>('.stage-info-trigger')
+  if (stageInfoButton === null) throw new Error('Stage info button was not rendered')
+  const stageInfoReadout = canvas.querySelector<HTMLOutputElement>('.layout-readout')
+  if (stageInfoReadout === null) throw new Error('Stage info readout was not rendered')
+  return { stage, stageInfoButton, stageInfoReadout }
+}
+
+export function renderRoundTableStage(
   canvas: HTMLElement,
-  result: RoomLayoutResult,
+  stage: HTMLElement,
+  result: DetailedRoundTableStageLayoutResult,
   showGeometry: boolean,
 ): void {
-  canvas.dataset.layoutMode = result.status === 'ready' ? result.mode : 'unavailable'
+  canvas.dataset.layoutStatus = result.status
   canvas.toggleAttribute('data-show-geometry', showGeometry)
 
   if (result.status === 'unavailable') {
@@ -58,25 +127,21 @@ export function renderRoomLayout(
     delete canvas.dataset.avatarSize
     delete canvas.dataset.stadiumStraightLength
     delete canvas.dataset.centerAisleGap
-    canvas.innerHTML = `
+    stage.innerHTML = `
       <section class="layout-unavailable" aria-live="polite">
         <p class="text-xs uppercase tracking-[0.28em] text-amber-300/70">Layout unavailable</p>
         <strong>${result.reason}</strong>
-        <span>当前切片只实现了竖向策略，设置仍可继续使用。</span>
+        <span>当前舞台空间暂时无法生成圆桌布局，房间工具仍可继续使用。</span>
       </section>`
     return
   }
 
-  canvas.dataset.tableShape = result.roundTable.shape
-  canvas.dataset.avatarSize = String(result.roundTable.avatarDiameter)
+  canvas.dataset.tableShape = result.shape
+  canvas.dataset.avatarSize = String(result.playerSeats[0]?.avatarRect.width ?? 0)
   canvas.dataset.stadiumStraightLength = String(
-    result.roundTable.playerOrbit.stadiumStraightLength,
+    result.diagnostics.playerOrbit.stadiumStraightLength,
   )
-  canvas.dataset.centerAisleGap = String(result.roundTable.centerAisleGap)
-  const taskTrack = [1, 2, 3, 4, 5].map((taskNumber) => `
-    <span class="task-node${taskNumber === 3 ? ' is-current' : ''}">
-      <b>${taskNumber}</b><small>${taskNumber === 4 ? '3·2' : taskNumber + 1}</small>
-    </span>`).join('')
+  canvas.dataset.centerAisleGap = String(result.diagnostics.centerAisleGap)
   const seats = result.playerSeats.map((seat, seatIndex) => {
     const crownFontSize = Math.max(13, Math.round(seat.avatarRect.width * 0.3))
     const statusSize = Math.max(10, Math.round(seat.avatarRect.width * 0.24))
@@ -114,29 +179,14 @@ export function renderRoomLayout(
     )
   }).join('')
 
-  canvas.innerHTML = `
-    <header class="room-topbar" style="${rectStyles(result.regions.topBar)}">
-      <button class="back-button" aria-label="返回">‹</button>
-      <button class="room-code" aria-label="复制房间号"><span>房间</span><b>7A3C9EF</b><i></i></button>
-      <div class="task-track" aria-label="任务进度">${taskTrack}</div>
-    </header>
-    <main class="round-table-stage" style="${rectStyles(result.regions.stage)}"></main>
-      <div class="safe-stage" style="${rectStyles(result.regions.safeStage)}"></div>
-      <div class="round-table-frame" style="${rectStyles(result.roundTable.frame)}"></div>
-      <div class="round-table-footprint" style="${rectStyles(result.roundTable.footprint)}"></div>
-      <div class="player-orbit ${result.roundTable.shape}" style="${rectStyles(result.roundTable.playerOrbit.bounds)}"></div>
-      <div class="tabletop ${result.roundTable.shape}" style="${rectStyles(result.roundTable.tabletop)}"></div>
-      <div class="center-panel" style="${rectStyles(result.roundTable.centerPanel)}">
-        <small>第 3 轮</small><strong>等待领袖组队</strong><span>需要 4 名队员</span>
-      </div>
-      ${gapLines}
-      ${seats}
-    <div class="phase-panel" style="${rectStyles(result.regions.phasePanel)}"></div>
-    <footer class="phase-content">
-        <div class="phase-header" style="${rectStyles(result.regions.phaseHeader)}"><div class="phase-title"><small>领袖行动</small><strong>选择任务队员</strong></div>
-          <nav aria-label="房间工具"><button>身份</button><button>记录</button><button>帮助</button></nav>
-        </div>
-        <div class="phase-middle" style="${rectStyles(result.regions.phaseMiddle)}"><button class="selected">青岚</button><button>松石</button></div>
-        <div class="phase-action" style="${rectStyles(result.regions.phaseAction)}"><button>确认队伍 · 2/4</button></div>
-    </footer>`
+  stage.innerHTML = `
+    <div class="round-table-frame" style="${rectStyles(result.diagnostics.roundTableFrame)}"></div>
+    <div class="round-table-footprint" style="${rectStyles(result.diagnostics.roundTableFootprint)}"></div>
+    <div class="player-orbit ${result.shape}" style="${rectStyles(result.diagnostics.playerOrbit.bounds)}"></div>
+    <div class="tabletop ${result.shape}" style="${rectStyles(result.tabletop)}"></div>
+    <div class="center-panel" style="${rectStyles(result.centerPanel)}">
+      <small>第 3 轮</small><strong>等待领袖组队</strong><span>需要 4 名队员</span>
+    </div>
+    ${gapLines}
+    ${seats}`
 }

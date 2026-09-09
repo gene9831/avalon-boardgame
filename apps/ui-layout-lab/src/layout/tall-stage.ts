@@ -9,37 +9,25 @@ import {
   unionRects,
 } from './geometry'
 import type {
-  LayoutInput,
-  LayoutUnavailable,
+  DetailedRoundTableStageLayout,
   PlayerSeatLayout,
   Point,
   Rect,
-  VerticalRoomLayout,
+  RoundTableStageLayoutInput,
+  RoundTableStageLayoutUnavailable,
 } from './types'
 
 type SeatTier = Readonly<{
-  name: '56px' | '48px' | '40px' | '36px'
   seatWidth: number
   avatarDiameter: number
   nameHeight: number
   avatarTopClearance: number
-  seatGap: number
   centerPanelDiameterMin: number
   centerPanelDiameterMax: number
 }>
 
-type VerticalStage = Readonly<{
-  variant: 'compact' | 'normal'
-  topBarHeight: number
-  phasePanelHeight: number
-  phaseHeaderHeight: number
-  phaseMiddleHeight: number
-  phaseActionHeight: number
-  stageMargin: number
-  stageWidth: number
-  stageHeight: number
-  safeStageWidth: number
-  safeStageHeight: number
+type ResolvedSeatTier = SeatTier & Readonly<{
+  seatGap: number
 }>
 
 type StadiumGeometry = Readonly<{
@@ -50,8 +38,8 @@ type StadiumGeometry = Readonly<{
   equalArcDeviation: number
 }>
 
-type VerticalCandidate = Readonly<{
-  tier: SeatTier
+type TallStageCandidate = Readonly<{
+  tier: ResolvedSeatTier
   shape: 'circle' | 'stadium'
   roundTableFrameWidth: number
   stadiumStraightLength: number
@@ -67,37 +55,83 @@ type VerticalCandidate = Readonly<{
   points: readonly Point[]
 }>
 
-const VERTICAL_MINIMUM_WIDTH = 375
-const VERTICAL_MINIMUM_HEIGHT = 667
 const PLAYER_ORBIT_WIDTH_SCALE = 0.86
 const TABLETOP_WIDTH_SCALE = 0.74
 const TABLETOP_CENTER_OFFSET_SCALE_CAP = 0.06
 const CENTER_PANEL_GAP = 12
 const NAME_GAP = 4
-const PHASE_CONTENT_WIDTH_CAP = 560
 
-const SEAT_TIERS: readonly SeatTier[] = [
+const MIN_AVATAR_SIZE = 36
+const SEAT_TIER_ANCHORS: readonly SeatTier[] = [
   {
-    name: '56px', seatWidth: 112, avatarDiameter: 56, nameHeight: 26,
-    avatarTopClearance: 64 / 3, seatGap: 8,
+    seatWidth: 112, avatarDiameter: 56, nameHeight: 26,
+    avatarTopClearance: 64 / 3,
     centerPanelDiameterMin: 152, centerPanelDiameterMax: 256,
   },
   {
-    name: '48px', seatWidth: 96, avatarDiameter: 48, nameHeight: 24,
-    avatarTopClearance: 56 / 3, seatGap: 8,
+    seatWidth: 96, avatarDiameter: 48, nameHeight: 24,
+    avatarTopClearance: 56 / 3,
     centerPanelDiameterMin: 152, centerPanelDiameterMax: 256,
   },
   {
-    name: '40px', seatWidth: 80, avatarDiameter: 40, nameHeight: 22,
-    avatarTopClearance: 16, seatGap: 8,
+    seatWidth: 80, avatarDiameter: 40, nameHeight: 22,
+    avatarTopClearance: 16,
     centerPanelDiameterMin: 152, centerPanelDiameterMax: 256,
   },
   {
-    name: '36px', seatWidth: 72, avatarDiameter: 36, nameHeight: 20,
-    avatarTopClearance: 12, seatGap: 6,
+    seatWidth: 72, avatarDiameter: 36, nameHeight: 20,
+    avatarTopClearance: 12,
     centerPanelDiameterMin: 136, centerPanelDiameterMax: 152,
   },
 ]
+
+function interpolateSeatTier(avatarDiameter: number): SeatTier {
+  const upperAnchorIndex = SEAT_TIER_ANCHORS.findIndex((anchor) => (
+    anchor.avatarDiameter <= avatarDiameter
+  ))
+  const lowerAnchor = SEAT_TIER_ANCHORS[upperAnchorIndex]
+  if (lowerAnchor.avatarDiameter === avatarDiameter || upperAnchorIndex === 0) {
+    return { ...lowerAnchor, avatarDiameter }
+  }
+  const upperAnchor = SEAT_TIER_ANCHORS[upperAnchorIndex - 1]
+  const interpolationRatio = (
+    avatarDiameter - lowerAnchor.avatarDiameter
+  ) / (upperAnchor.avatarDiameter - lowerAnchor.avatarDiameter)
+  const interpolate = (lowerValue: number, upperValue: number): number => (
+    lowerValue + (upperValue - lowerValue) * interpolationRatio
+  )
+  return {
+    avatarDiameter,
+    seatWidth: interpolate(lowerAnchor.seatWidth, upperAnchor.seatWidth),
+    nameHeight: interpolate(lowerAnchor.nameHeight, upperAnchor.nameHeight),
+    avatarTopClearance: interpolate(
+      lowerAnchor.avatarTopClearance,
+      upperAnchor.avatarTopClearance,
+    ),
+    centerPanelDiameterMin: interpolate(
+      lowerAnchor.centerPanelDiameterMin,
+      upperAnchor.centerPanelDiameterMin,
+    ),
+    centerPanelDiameterMax: interpolate(
+      lowerAnchor.centerPanelDiameterMax,
+      upperAnchor.centerPanelDiameterMax,
+    ),
+  }
+}
+
+function createSeatTiers(maxAvatarSize: number, avatarSizeStep: number): readonly SeatTier[] {
+  const quantizedStep = Math.max(0.01, quantize(avatarSizeStep))
+  const avatarSizes: number[] = []
+  for (
+    let avatarSize = quantize(maxAvatarSize);
+    avatarSize > MIN_AVATAR_SIZE;
+    avatarSize = quantize(avatarSize - quantizedStep)
+  ) {
+    avatarSizes.push(avatarSize)
+  }
+  avatarSizes.push(MIN_AVATAR_SIZE)
+  return avatarSizes.map(interpolateSeatTier)
+}
 
 function seatTopExtent(tier: SeatTier): number {
   return tier.avatarDiameter / 2 + tier.avatarTopClearance
@@ -118,7 +152,7 @@ function measurePlayerSeatBounds(point: Point, tier: SeatTier): Rect {
 
 function seatPointsFit(
   points: readonly Point[],
-  tier: SeatTier,
+  tier: ResolvedSeatTier,
   centerPanelDiameter: number,
   tabletopCenter: Point = { x: 0, y: 0 },
 ): boolean {
@@ -172,7 +206,7 @@ function packedOrbitDistance(input: Readonly<{
   limitDistance: number
   playerOrbitWidth: number
   stadiumStraightLength: number
-  tier: SeatTier
+  tier: ResolvedSeatTier
 }>): number | null {
   const anchorPoint = verticalStadiumHalfPoint(
     input.anchorDistance,
@@ -208,11 +242,93 @@ function packedOrbitDistance(input: Readonly<{
   return null
 }
 
+function buildCenteredSideSeatStadiumGeometry(
+  playerCount: number,
+  sideSeatCount: number,
+  hasTopSeat: boolean,
+  halfOrbitLength: number,
+  playerOrbitWidth: number,
+  stadiumStraightLength: number,
+  tier: ResolvedSeatTier,
+  centerPanelDiameter: number,
+): StadiumGeometry | null {
+  const centerDistance = halfOrbitLength / 2
+  const pairedSeatCount = (sideSeatCount - 1) / 2
+  const lowerDistancesDescending: number[] = []
+  let lowerAnchorDistance = centerDistance
+  for (let seatIndex = 0; seatIndex < pairedSeatCount; seatIndex += 1) {
+    const distance = packedOrbitDistance({
+      anchorDistance: lowerAnchorDistance,
+      direction: -1,
+      limitDistance: 0,
+      playerOrbitWidth,
+      stadiumStraightLength,
+      tier,
+    })
+    if (distance === null) return null
+    lowerDistancesDescending.push(distance)
+    lowerAnchorDistance = distance
+  }
+
+  const upperDistances: number[] = []
+  let upperAnchorDistance = centerDistance
+  for (let seatIndex = 0; seatIndex < pairedSeatCount; seatIndex += 1) {
+    const distance = packedOrbitDistance({
+      anchorDistance: upperAnchorDistance,
+      direction: 1,
+      limitDistance: halfOrbitLength,
+      playerOrbitWidth,
+      stadiumStraightLength,
+      tier,
+    })
+    if (distance === null) return null
+    upperDistances.push(distance)
+    upperAnchorDistance = distance
+  }
+
+  const leftDistances = [
+    ...lowerDistancesDescending.reverse(),
+    centerDistance,
+    ...upperDistances,
+  ]
+  const leftPoints = leftDistances.map((distance) => verticalStadiumHalfPoint(
+    distance,
+    playerOrbitWidth,
+    stadiumStraightLength,
+  ))
+  const playerOrbitRadius = playerOrbitWidth / 2
+  const bottomPoint = { x: 0, y: stadiumStraightLength / 2 + playerOrbitRadius }
+  const topPoint = { x: 0, y: -stadiumStraightLength / 2 - playerOrbitRadius }
+  const mirroredPoints = leftPoints
+    .slice()
+    .reverse()
+    .map((point) => ({ x: -point.x, y: point.y }))
+  const points = hasTopSeat
+    ? [bottomPoint, ...leftPoints, topPoint, ...mirroredPoints]
+    : [bottomPoint, ...leftPoints, ...mirroredPoints]
+  if (
+    points.length !== playerCount
+    || !seatPointsFit(points, tier, centerPanelDiameter)
+  ) return null
+
+  const averageInterval = 2 * halfOrbitLength / playerCount
+  const equalArcDeviation = leftDistances.reduce((sum, distance, index) => (
+    sum + Math.abs(distance - averageInterval * (index + 1))
+  ), 0)
+  return {
+    points,
+    centerAisleGap: 0,
+    centerAislePairs: [],
+    tabletopCenterOffsetY: 0,
+    equalArcDeviation,
+  }
+}
+
 function buildStadiumGeometry(
   playerCount: number,
   playerOrbitWidth: number,
   stadiumStraightLength: number,
-  tier: SeatTier,
+  tier: ResolvedSeatTier,
   roundTableFrameWidth: number,
   centerPanelDiameter: number,
 ): StadiumGeometry | null {
@@ -220,6 +336,19 @@ function buildStadiumGeometry(
   const sideSeatCount = Math.floor((playerCount - 1) / 2)
   const hasTopSeat = playerCount % 2 === 0
   const candidates: StadiumGeometry[] = []
+
+  if (sideSeatCount % 2 === 1) {
+    return buildCenteredSideSeatStadiumGeometry(
+      playerCount,
+      sideSeatCount,
+      hasTopSeat,
+      halfOrbitLength,
+      playerOrbitWidth,
+      stadiumStraightLength,
+      tier,
+      centerPanelDiameter,
+    )
+  }
 
   const findOddTopDistance = (): number | null => {
     const gapAtTravel = (travel: number): number => {
@@ -374,13 +503,13 @@ function buildStadiumGeometry(
 }
 
 function createCandidate(
-  input: LayoutInput,
-  tier: SeatTier,
+  input: RoundTableStageLayoutInput,
+  tier: ResolvedSeatTier,
   shape: 'circle' | 'stadium',
   roundTableFrameWidth: number,
   stadiumStraightLength: number,
   stadiumGeometry: StadiumGeometry | null = null,
-): VerticalCandidate | null {
+): TallStageCandidate | null {
   const playerOrbitWidth = PLAYER_ORBIT_WIDTH_SCALE * roundTableFrameWidth
   const playerOrbitHeight = playerOrbitWidth + stadiumStraightLength
   const centerPanelDiameter = clamp(
@@ -425,145 +554,127 @@ function createCandidate(
   }
 }
 
-function createVerticalStage(input: LayoutInput): VerticalStage {
-  const isCompact = input.height < 800
-  const topBarHeight = isCompact ? 48 : 56
-  const phaseHeaderHeight = isCompact ? 44 : 48
-  const phaseMiddleHeight = isCompact ? 52 : 56
-  const phaseActionHeight = isCompact ? 56 : 64
-  const phasePanelHeight = phaseHeaderHeight + phaseMiddleHeight + phaseActionHeight
-  const stageMargin = isCompact ? 8 : 12
-  const stageHeight = input.height - topBarHeight - phasePanelHeight
-  return {
-    variant: isCompact ? 'compact' : 'normal',
-    topBarHeight,
-    phasePanelHeight,
-    phaseHeaderHeight,
-    phaseMiddleHeight,
-    phaseActionHeight,
-    stageMargin,
-    stageWidth: input.width,
-    stageHeight,
-    safeStageWidth: input.width - 2 * stageMargin,
-    safeStageHeight: stageHeight - 2 * stageMargin,
-  }
-}
-
 function buildPlayerSeats(
-  stage: VerticalStage,
-  candidate: VerticalCandidate,
+  playerOrbitCenter: Point,
+  candidate: TallStageCandidate,
 ): readonly PlayerSeatLayout[] {
-  const footprintOffsetY = (
-    seatBottomExtent(candidate.tier) - seatTopExtent(candidate.tier)
-  ) / 2
-  const playerOrbitCenter = {
-    x: stage.stageWidth / 2,
-    y: stage.topBarHeight + stage.stageHeight / 2 - footprintOffsetY,
-  }
   return candidate.points.map((point, relativeSeatIndex) => {
     const avatarCenter = quantizePoint({
       x: playerOrbitCenter.x + point.x,
       y: playerOrbitCenter.y + point.y,
     })
     const avatarRadius = candidate.tier.avatarDiameter / 2
+    const avatarRect = createRect(
+      avatarCenter.x - avatarRadius,
+      avatarCenter.y - avatarRadius,
+      candidate.tier.avatarDiameter,
+      candidate.tier.avatarDiameter,
+    )
+    const nameRect = createRect(
+      avatarCenter.x - candidate.tier.seatWidth / 2,
+      avatarCenter.y + avatarRadius + NAME_GAP,
+      candidate.tier.seatWidth,
+      candidate.tier.nameHeight,
+    )
+    const playerSeatTop = quantize(avatarRect.y - candidate.tier.avatarTopClearance)
+    const playerSeatBottom = quantize(nameRect.y + nameRect.height)
     return {
       relativeSeatIndex,
       playerSeatBounds: createRect(
         avatarCenter.x - candidate.tier.seatWidth / 2,
-        avatarCenter.y - seatTopExtent(candidate.tier),
+        playerSeatTop,
         candidate.tier.seatWidth,
-        seatTopExtent(candidate.tier) + seatBottomExtent(candidate.tier),
+        playerSeatBottom - playerSeatTop,
       ),
-      avatarRect: createRect(
-        avatarCenter.x - avatarRadius,
-        avatarCenter.y - avatarRadius,
-        candidate.tier.avatarDiameter,
-        candidate.tier.avatarDiameter,
-      ),
-      nameRect: createRect(
-        avatarCenter.x - candidate.tier.seatWidth / 2,
-        avatarCenter.y + avatarRadius + NAME_GAP,
-        candidate.tier.seatWidth,
-        candidate.tier.nameHeight,
-      ),
+      avatarRect,
+      nameRect,
       avatarTopClearance: quantize(candidate.tier.avatarTopClearance),
     }
   })
 }
 
 function buildReadyLayout(
-  input: LayoutInput,
-  stage: VerticalStage,
-  candidate: VerticalCandidate,
-): VerticalRoomLayout | null {
-  const phasePanelY = input.height - stage.phasePanelHeight
-  const phaseContentWidth = Math.min(input.width, PHASE_CONTENT_WIDTH_CAP)
-  const phaseContentX = (input.width - phaseContentWidth) / 2
-  const regions = {
-    topBar: createRect(0, 0, input.width, stage.topBarHeight),
-    stage: createRect(0, stage.topBarHeight, stage.stageWidth, stage.stageHeight),
-    safeStage: createRect(
-      stage.stageMargin,
-      stage.topBarHeight + stage.stageMargin,
-      stage.safeStageWidth,
-      stage.safeStageHeight,
-    ),
-    phasePanel: createRect(
-      0,
-      phasePanelY,
-      input.width,
-      stage.phasePanelHeight,
-    ),
-    phaseContent: createRect(
-      phaseContentX,
-      phasePanelY,
-      phaseContentWidth,
-      stage.phasePanelHeight,
-    ),
-    phaseHeader: createRect(
-      phaseContentX,
-      phasePanelY,
-      phaseContentWidth,
-      stage.phaseHeaderHeight,
-    ),
-    phaseMiddle: createRect(
-      phaseContentX,
-      phasePanelY + stage.phaseHeaderHeight,
-      phaseContentWidth,
-      stage.phaseMiddleHeight,
-    ),
-    phaseAction: createRect(
-      phaseContentX,
-      phasePanelY + stage.phaseHeaderHeight + stage.phaseMiddleHeight,
-      phaseContentWidth,
-      stage.phaseActionHeight,
-    ),
-  }
+  input: RoundTableStageLayoutInput,
+  candidate: TallStageCandidate,
+): DetailedRoundTableStageLayout | null {
   const footprintOffsetY = (
     seatBottomExtent(candidate.tier) - seatTopExtent(candidate.tier)
   ) / 2
-  const playerOrbitCenter = {
-    x: stage.stageWidth / 2,
-    y: stage.topBarHeight + stage.stageHeight / 2 - footprintOffsetY,
+  const initialPlayerOrbitCenter = {
+    x: input.maxStageWidth / 2,
+    y: input.maxStageHeight / 2 - footprintOffsetY,
   }
-  const tabletopCenter = quantizePoint({
-    x: playerOrbitCenter.x,
-    y: playerOrbitCenter.y + candidate.tabletopCenterOffsetY,
+  const initialTabletopCenter = quantizePoint({
+    x: initialPlayerOrbitCenter.x,
+    y: initialPlayerOrbitCenter.y + candidate.tabletopCenterOffsetY,
   })
-  const playerSeats = buildPlayerSeats(stage, candidate)
-  const tabletop = createRect(
-    tabletopCenter.x - candidate.tabletopWidth / 2,
-    tabletopCenter.y - candidate.tabletopHeight / 2,
+  const initialPlayerSeats = buildPlayerSeats(initialPlayerOrbitCenter, candidate)
+  const initialTabletop = createRect(
+    initialTabletopCenter.x - candidate.tabletopWidth / 2,
+    initialTabletopCenter.y - candidate.tabletopHeight / 2,
     candidate.tabletopWidth,
     candidate.tabletopHeight,
   )
-  const centerPanel = createRect(
-    tabletopCenter.x - candidate.centerPanelDiameter / 2,
-    tabletopCenter.y - candidate.centerPanelDiameter / 2,
+  const initialCenterPanel = createRect(
+    initialTabletopCenter.x - candidate.centerPanelDiameter / 2,
+    initialTabletopCenter.y - candidate.centerPanelDiameter / 2,
     candidate.centerPanelDiameter,
     candidate.centerPanelDiameter,
   )
-  const footprint = unionRects([
+  const initialFootprint = unionRects([
+    initialTabletop,
+    ...initialPlayerSeats.map((seat) => seat.playerSeatBounds),
+  ])
+  const translateX = input.maxStageWidth / 2
+    - (initialFootprint.x + initialFootprint.width / 2)
+  const translateY = input.maxStageHeight / 2
+    - (initialFootprint.y + initialFootprint.height / 2)
+  const translateRect = (rectangle: Rect): Rect => createRect(
+    rectangle.x + translateX,
+    rectangle.y + translateY,
+    rectangle.width,
+    rectangle.height,
+  )
+  const playerOrbitCenter = quantizePoint({
+    x: initialPlayerOrbitCenter.x + translateX,
+    y: initialPlayerOrbitCenter.y + translateY,
+  })
+  const playerSeats = initialPlayerSeats.map((seat) => {
+    const avatarRect = translateRect(seat.avatarRect)
+    const nameRect = translateRect(seat.nameRect)
+    const playerSeatTop = quantize(avatarRect.y - seat.avatarTopClearance)
+    const playerSeatBottom = quantize(nameRect.y + nameRect.height)
+    return {
+      ...seat,
+      playerSeatBounds: createRect(
+        nameRect.x,
+        playerSeatTop,
+        nameRect.width,
+        playerSeatBottom - playerSeatTop,
+      ),
+      avatarRect,
+      nameRect,
+    }
+  })
+  const tabletop = translateRect(initialTabletop)
+  const centerPanel = translateRect(initialCenterPanel)
+  const roundTableFrame = createRect(
+    playerOrbitCenter.x - candidate.roundTableFrameWidth / 2,
+    playerOrbitCenter.y
+      - (candidate.roundTableFrameWidth + candidate.stadiumStraightLength) / 2,
+    candidate.roundTableFrameWidth,
+    candidate.roundTableFrameWidth + candidate.stadiumStraightLength,
+  )
+  const playerOrbit = {
+    bounds: createRect(
+      playerOrbitCenter.x - candidate.playerOrbitWidth / 2,
+      playerOrbitCenter.y - candidate.playerOrbitHeight / 2,
+      candidate.playerOrbitWidth,
+      candidate.playerOrbitHeight,
+    ),
+    stadiumStraightLength: candidate.stadiumStraightLength,
+  }
+  const roundTableFootprint = unionRects([
     tabletop,
     ...playerSeats.map((seat) => seat.playerSeatBounds),
   ])
@@ -585,82 +696,73 @@ function buildReadyLayout(
     else standardBoundaryGaps.push(gap)
   }
 
-  const readyLayout: VerticalRoomLayout = {
+  const readyLayout: DetailedRoundTableStageLayout = {
     status: 'ready',
-    mode: 'vertical',
-    variant: stage.variant,
-    width: quantize(input.width),
-    height: quantize(input.height),
-    regions,
-    roundTable: {
-      shape: candidate.shape,
-      seatTier: candidate.tier.name,
-      avatarDiameter: candidate.tier.avatarDiameter,
-      seatGap: candidate.tier.seatGap,
-      frame: createRect(
-        playerOrbitCenter.x - candidate.roundTableFrameWidth / 2,
-        playerOrbitCenter.y
-          - (candidate.roundTableFrameWidth + candidate.stadiumStraightLength) / 2,
-        candidate.roundTableFrameWidth,
-        candidate.roundTableFrameWidth + candidate.stadiumStraightLength,
-      ),
-      tabletop,
-      centerPanel,
-      playerOrbit: {
-        shape: candidate.shape,
-        bounds: createRect(
-          playerOrbitCenter.x - candidate.playerOrbitWidth / 2,
-          playerOrbitCenter.y - candidate.playerOrbitHeight / 2,
-          candidate.playerOrbitWidth,
-          candidate.playerOrbitHeight,
-        ),
-        stadiumStraightLength: candidate.stadiumStraightLength,
-      },
-      footprint,
-      centerAisleGap: quantize(candidate.centerAisleGap),
-    },
+    shape: candidate.shape,
+    tabletop,
+    centerPanel,
     playerSeats,
     diagnostics: {
+      roundTableFrame,
+      roundTableFootprint,
+      playerOrbit,
+      seatGap: candidate.tier.seatGap,
+      centerAisleGap: quantize(candidate.centerAisleGap),
       standardBoundaryGaps,
       centerAisleGaps,
       centerAislePairs: candidate.centerAislePairs,
       tabletopCenterOffsetY: quantize(candidate.tabletopCenterOffsetY),
     },
   }
-  return validatesRenderedLayout(readyLayout) ? readyLayout : null
+  return validatesRenderedLayout(input, readyLayout) ? readyLayout : null
 }
 
-function validatesRenderedLayout(layout: VerticalRoomLayout): boolean {
-  const { playerSeats, roundTable } = layout
-  if (!containsRect(layout.regions.safeStage, roundTable.footprint)) return false
+function validatesRenderedLayout(
+  input: RoundTableStageLayoutInput,
+  layout: DetailedRoundTableStageLayout,
+): boolean {
+  const { diagnostics, playerSeats } = layout
+  const stageBounds = createRect(0, 0, input.maxStageWidth, input.maxStageHeight)
+  if (!containsRect(stageBounds, diagnostics.roundTableFootprint)) return false
   const tabletopCenter = {
-    x: roundTable.centerPanel.x + roundTable.centerPanel.width / 2,
-    y: roundTable.centerPanel.y + roundTable.centerPanel.height / 2,
+    x: layout.centerPanel.x + layout.centerPanel.width / 2,
+    y: layout.centerPanel.y + layout.centerPanel.height / 2,
   }
 
   for (let seatIndex = 0; seatIndex < playerSeats.length; seatIndex += 1) {
     const seat = playerSeats[seatIndex]
-    if (!containsRect(layout.regions.safeStage, seat.playerSeatBounds)) return false
+    if (!containsRect(stageBounds, seat.playerSeatBounds)) return false
     if (!containsRect(seat.playerSeatBounds, seat.avatarRect)) return false
     if (!containsRect(seat.playerSeatBounds, seat.nameRect)) return false
     if (
       pointToRectDistance(tabletopCenter, seat.playerSeatBounds)
-      < roundTable.centerPanel.width / 2 + CENTER_PANEL_GAP - 0.011
+      < layout.centerPanel.width / 2 + CENTER_PANEL_GAP - 0.011
     ) return false
 
     for (let otherSeatIndex = seatIndex + 1; otherSeatIndex < playerSeats.length; otherSeatIndex += 1) {
       if (
         adjacentBoundaryGap(seat.playerSeatBounds, playerSeats[otherSeatIndex].playerSeatBounds)
-        < roundTable.seatGap - 0.011
+        < diagnostics.seatGap - 0.011
       ) return false
     }
   }
 
   const { centerAisleGaps, centerAislePairs } = layout.diagnostics
-  if (roundTable.shape === 'stadium') {
+  if (layout.shape === 'stadium') {
+    const tabletopCenterY = layout.tabletop.y + layout.tabletop.height / 2
+    if (centerAislePairs.length === 0) {
+      if (centerAisleGaps.length !== 0) return false
+      const centerAlignedSeatCount = playerSeats.filter((seat) => (
+        Math.abs(
+          seat.avatarRect.y + seat.avatarRect.height / 2 - tabletopCenterY,
+        ) <= 0.02
+      )).length
+      if (centerAlignedSeatCount !== 2) return false
+      return true
+    }
+
     if (centerAislePairs.length !== 2 || centerAisleGaps.length !== 2) return false
     if (Math.abs(centerAisleGaps[0] - centerAisleGaps[1]) > 0.02) return false
-    const tabletopCenterY = roundTable.tabletop.y + roundTable.tabletop.height / 2
     for (const [firstSeatIndex, secondSeatIndex] of centerAislePairs) {
       const firstBounds = playerSeats[firstSeatIndex].playerSeatBounds
       const secondBounds = playerSeats[secondSeatIndex].playerSeatBounds
@@ -674,15 +776,14 @@ function validatesRenderedLayout(layout: VerticalRoomLayout): boolean {
 }
 
 function solveTier(
-  input: LayoutInput,
-  stage: VerticalStage,
-  tier: SeatTier,
-): VerticalRoomLayout | null {
+  input: RoundTableStageLayoutInput,
+  tier: ResolvedSeatTier,
+): DetailedRoundTableStageLayout | null {
   const roundTableFrameWidth = Math.floor(Math.min(
     640,
-    (stage.safeStageWidth - tier.seatWidth) / PLAYER_ORBIT_WIDTH_SCALE,
+    (input.maxStageWidth - tier.seatWidth) / PLAYER_ORBIT_WIDTH_SCALE,
     (
-      stage.safeStageHeight
+      input.maxStageHeight
       - seatTopExtent(tier)
       - seatBottomExtent(tier)
     ) / PLAYER_ORBIT_WIDTH_SCALE,
@@ -697,20 +798,20 @@ function solveTier(
     0,
   )
   if (circleCandidate !== null) {
-    const circleLayout = buildReadyLayout(input, stage, circleCandidate)
+    const circleLayout = buildReadyLayout(input, circleCandidate)
     if (circleLayout !== null) return circleLayout
   }
 
   const playerOrbitWidth = PLAYER_ORBIT_WIDTH_SCALE * roundTableFrameWidth
   const maximumStraightLength = Math.floor(
-    stage.safeStageHeight
+    input.maxStageHeight
     - seatTopExtent(tier)
     - seatBottomExtent(tier)
     - playerOrbitWidth,
   )
   if (maximumStraightLength < 1) return null
 
-  const layouts: VerticalRoomLayout[] = []
+  const layouts: DetailedRoundTableStageLayout[] = []
   for (
     let stadiumStraightLength = 1;
     stadiumStraightLength <= maximumStraightLength;
@@ -739,28 +840,26 @@ function solveTier(
       stadiumGeometry,
     )
     if (candidate === null) continue
-    const layout = buildReadyLayout(input, stage, candidate)
+    const layout = buildReadyLayout(input, candidate)
     if (layout !== null) layouts.push(layout)
   }
   layouts.sort((first, second) => (
-    first.roundTable.centerAisleGap - second.roundTable.centerAisleGap
-    || first.roundTable.playerOrbit.stadiumStraightLength
-      - second.roundTable.playerOrbit.stadiumStraightLength
+    first.diagnostics.centerAisleGap - second.diagnostics.centerAisleGap
+    || first.diagnostics.playerOrbit.stadiumStraightLength
+      - second.diagnostics.playerOrbit.stadiumStraightLength
   ))
   return layouts[0] ?? null
 }
 
-export function solveVerticalRoomLayout(
-  input: LayoutInput,
-): VerticalRoomLayout | LayoutUnavailable {
-  if (input.width < VERTICAL_MINIMUM_WIDTH || input.height < VERTICAL_MINIMUM_HEIGHT) {
-    return { status: 'unavailable', reason: 'insufficient-viewport' }
-  }
-
-  const stage = createVerticalStage(input)
-  for (const tier of SEAT_TIERS) {
-    const layout = solveTier(input, stage, tier)
+export function solveTallRoundTableStageLayout(
+  input: RoundTableStageLayoutInput,
+  seatGap: number,
+  maxAvatarSize: number,
+  avatarSizeStep: number,
+): DetailedRoundTableStageLayout | RoundTableStageLayoutUnavailable {
+  for (const tier of createSeatTiers(maxAvatarSize, avatarSizeStep)) {
+    const layout = solveTier(input, { ...tier, seatGap })
     if (layout !== null) return layout
   }
-  return { status: 'unavailable', reason: 'no-fitting-vertical-tier' }
+  return { status: 'unavailable', reason: 'no-fitting-stage-layout' }
 }

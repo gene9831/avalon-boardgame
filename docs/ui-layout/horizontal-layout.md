@@ -2,7 +2,7 @@
 
 ## 1. 文档状态
 
-本文定义 Avalon 房间界面的目标横向布局，是不依赖具体编程语言、UI 框架或设备类别的规范模型。
+本文定义 Avalon 房间界面的目标横向业务外壳，以及尚待迁移的宽舞台几何策略。统一公共 API、坐标系、座位档位和高舞台算法以[圆桌舞台布局规范](./round-table-stage-layout.md)为准。
 
 “横向布局”表示布局模式已经由上层响应式模式选择器选定；本文不规定何时从其他布局切换到横向布局。当前 Web 界面尚未完整采用本文的常驻阶段侧栏，因此本文是目标规范，不是现状说明。
 
@@ -10,7 +10,7 @@
 
 可在浏览器中打开[统一横竖屏交互原型](./prototypes/avalon-landscape-responsive-lab.html)，通过预设尺寸、自定义宽高或旋转按钮检查普通横版、紧凑横版与竖版布局。
 
-竖向模式的三段结构、紧凑/普通两档固定区域和内部座位呈现档位由[竖向布局规范](./vertical-layout.md)定义；两种方向共用同一个交互原型。
+竖向模式的业务外壳由[竖向布局规范](./vertical-layout.md)定义。外壳先分配顶栏、任务轨道或阶段操作区域，再把扣除外部边距后的舞台内容盒交给统一圆桌舞台 API；两种方向不使用两个公共求解函数。
 
 ## 2. 设计目标
 
@@ -44,9 +44,10 @@
     ├── 圆桌舞台
     └── 阶段侧栏
 
-圆桌舞台
-└── 安全舞台
-    └── 圆桌占用包络
+圆桌舞台容器
+└── 舞台外边距
+    └── 圆桌舞台硬边界
+        └── 圆桌占用包络
         ├── 圆形桌面
         ├── 玩家中心轨道
         ├── 玩家座位
@@ -224,7 +225,7 @@ Sidebar  = Rect(usableX + taskRailWidth + stageWidth, usableY, sidebarWidth, sta
 
 `compactTaskRailWidth = 56` 已包含任务列表的左右内边距；舞台计算不得再次扣除这部分空间。阶段侧栏与舞台直接相邻，边界线不得额外占用布局宽度。
 
-### 6.5 安全舞台
+### 6.5 圆桌舞台硬边界
 
 ```text
 stageMargin = layoutMode == compactLandscape
@@ -233,10 +234,10 @@ stageMargin = layoutMode == compactLandscape
 ```
 
 ```text
-SafeStage = inset(Stage, stageMargin, stageMargin, stageMargin, stageMargin)
+RoundTableStage = inset(Stage, stageMargin, stageMargin, stageMargin, stageMargin)
 ```
 
-`stageMargin` 是完整圆桌占用包络之外的最终净空。不得先给舞台增加会缩小布局内容区的内边距，再从圆桌尺寸中重复扣除 `stageMargin`。
+`RoundTableStage.width` 和 `RoundTableStage.height` 分别作为统一 API 的 `maxStageWidth` 和 `maxStageHeight`。`stageMargin` 是完整圆桌占用包络之外由业务外壳提供的最终净空；圆桌求解器不得再次扣除它。
 
 边框属于渲染细节。若实现使用会占据内部尺寸的边框，应先取得画布内容矩形，再把该内容矩形作为本文的原始布局矩形；通用模型中不直接出现 `-2px` 之类的边框修正。
 
@@ -571,6 +572,8 @@ min(
 
 ## 11. 圆桌求解算法
 
+本节记录待迁移的宽舞台候选策略，不再定义独立的 `solveHorizontalRoundTable` 公共接口。迁移后仍由 `solveRoundTableStageLayout({ maxStageWidth, maxStageHeight, playerCount })` 根据舞台几何选择内部策略，并返回同一组舞台局部坐标。若本节与统一规范的公共契约冲突，以统一规范为准。
+
 ### 11.1 普通横版
 
 档位按“宽松 → 标准 → 紧凑”依次尝试。先保证信息可读，再在该档位内最大化圆桌。
@@ -610,7 +613,7 @@ for tier in [宽松, 标准, 紧凑]:
 紧凑横版不使用圆形玩家轨道的 `roundTableFrameWidth` 求解器。它按 9.2 节公式直接计算 `seatWidth`、`orbitWidth` 和 `orbitHeight`，再执行以下约束：
 
 ```text
-RoundTableFootprint ⊆ SafeStage
+RoundTableFootprint ⊆ RoundTableStage
 所有 PlayerSeatBounds 互不重叠
 所有 PlayerSeatBounds 与中央信息区保持 centerGap
 ```

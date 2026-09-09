@@ -112,10 +112,10 @@ _Avoid_: mobile layout, phone layout, portrait device layout
 **Task rail**: The compact horizontal layout region containing the return action and vertically grouped quest progress nodes.
 _Avoid_: compact top bar, task sidebar
 
-**Round-table stage**: The rectangular region that presents the public table scene, including the tabletop and player seats, while excluding the top bar or task rail and the surrounding phase controls.
+**Round-table stage**: The hard available rectangle allocated by the room shell for the public table scene after top bars, task rails, phase controls, safe-area insets, and exterior stage spacing have been handled. Its local coordinate origin is the top-left corner, and the complete round-table footprint must remain inside it.
 _Avoid_: game area, table
 
-**Round-table footprint**: The stable maximum visible footprint of the tabletop, player portraits, names, and outward status marks for the selected seat presentation tier. Layout constraints apply to this footprint rather than only to the circular tabletop, and ordinary game-state changes do not resize it.
+**Round-table footprint**: The stable union of the tabletop and all player-seat bounds for the selected seat presentation tier. Player-seat bounds include avatar-top clearance, portraits, and names; status marks are derived from avatar geometry and must remain within that stable space. Layout constraints and stage centering apply to this footprint rather than only to the tabletop, and ordinary game-state changes do not resize it.
 _Avoid_: table diameter, tabletop bounds
 
 **Round-table layout frame**: The nominal coordinate region used to size the tabletop and place player-seat centers. It is square for a circular player orbit and elongated along the straight segment for a stadium-shaped orbit; it remains smaller than the complete round-table footprint.
@@ -124,13 +124,13 @@ _Avoid_: round-table footprint, table bounds
 **Tabletop**: The visible table surface inside the round-table layout frame. It follows the selected circular or stadium shape and does not include player portraits, names, or status marks.
 _Avoid_: round table, round-table footprint
 
-**Player orbit**: The viewer-relative path on which player-seat centers are placed. It is circular in the normal horizontal layout and stadium-shaped in the compact horizontal layout; the vertical room layout tries both shapes within each seat presentation tier. The current player's seat occupies the bottom position and the remaining seats follow room seat order clockwise.
+**Player orbit**: The viewer-relative circular or stadium-shaped path on which avatar centers are placed. Its shape is selected from the available round-table-stage geometry rather than fixed by viewport orientation. Stadium seats may depart from equal arc spacing so their actual seat boundaries keep the required visual gap. The current player's seat occupies the bottom position and the remaining seats follow room seat order clockwise.
 _Avoid_: seat ring, absolute seat positions
 
 **Phase sidebar**: The horizontal room layout region that presents the current phase's instructions and primary actions. Its layout reserves the maximum primary-action budget across supported phases, while lower-priority public history uses only the remaining space, so phase changes do not switch the room layout.
 _Avoid_: fixed device sidebar, activity drawer
 
-**Fixed phase panel**: The bottom region of the vertical room layout that presents the current phase's summary, tools, and primary action. Its height is selected from discrete usable-height tiers and remains unchanged by ordinary phase content.
+**Fixed phase panel**: The bottom region of the vertical room layout that presents the current phase's summary, tools, and primary action. Its three content rows have fixed heights, with separate bottom safe-area clearance, and remain unchanged by ordinary phase content.
 _Avoid_: phase drawer, bottom sheet, mobile action panel
 
 **Seat presentation tier**: One discrete, geometry-selected set of portrait, name, status-mark, spacing, and interaction-target sizes used by every player seat. It is selected from available round-table geometry rather than from a device category.
@@ -139,7 +139,7 @@ _Avoid_: mobile seat, desktop seat, continuously scaled seat
 **Player seat bounds**: The stable axis-aligned boundary reserved for one player seat at a selected presentation tier. It includes the portrait, name, interaction target, and the maximum legal crown and status-mark extents for every seat, whether or not those marks are currently visible, so ordinary game-state changes never move the layout.
 _Avoid_: current seat contents, portrait bounds
 
-**Adjacent boundary gap**: The active horizontal or vertical separation between two adjacent player seat bounds. It is measured from the rendered boundaries rather than from player-orbit arc length, allowing a stadium orbit to look evenly spaced when seat centers are not equidistant.
+**Adjacent boundary gap**: The active horizontal or vertical separation between two adjacent player seat bounds. The round-table-stage caller supplies its minimum value, with 8 logical pixels as the default for every seat presentation tier. It is measured from the rendered boundaries rather than from player-orbit arc length, allowing a stadium orbit to look evenly spaced when seat centers are not equidistant.
 _Avoid_: center-to-center gap, equal arc spacing
 
 **Center aisle gap**: The larger, left-right symmetric separation between the player seat bounds immediately above and below the tabletop center in a vertical stadium layout. It reserves the minimum clear passage required by the central information area and is distinct from the ordinary adjacent boundary gap.

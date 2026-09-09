@@ -1,14 +1,11 @@
-export { solveRoomLayout } from './solve-room-layout'
+export { solveRoundTableStageLayout } from './solve-round-table-stage-layout'
 export type {
-  LayoutDiagnostics,
-  LayoutInput,
-  LayoutUnavailable,
-  LayoutUnavailableReason,
-  PlayerOrbitLayout,
   PlayerSeatLayout,
-  Point,
   Rect,
-  RoundTableLayout,
-  RoomLayoutResult,
-  VerticalRoomLayout,
+  RoundTableShape,
+  RoundTableStageLayout,
+  RoundTableStageLayoutInput,
+  RoundTableStageLayoutResult,
+  RoundTableStageLayoutUnavailable,
+  RoundTableStageLayoutUnavailableReason,
 } from './types'
