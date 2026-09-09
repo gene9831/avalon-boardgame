@@ -146,6 +146,13 @@ test('renders Euclidean geometry diagnostics for the 430 by 932 baseline', async
   await expect(canvas).toHaveAttribute('data-stage-width', '406')
   await expect(canvas).toHaveAttribute('data-stage-height', '684')
   await expect(canvas.locator('.player-seat')).toHaveCount(10)
+  const renderedSeatBounds = await canvas.locator('.player-seat').evaluateAll((seats) => seats.map((seat) => {
+    const bounds = seat.getBoundingClientRect()
+    return { width: bounds.width, height: bounds.height }
+  }))
+  for (const bounds of renderedSeatBounds) {
+    expect(Math.abs(bounds.width - bounds.height)).toBeLessThanOrEqual(0.1)
+  }
   await expect(canvas.locator('.round-table-footprint')).toHaveCount(1)
   await expect(canvas.locator('.placement-guide')).toHaveCount(1)
   await expect(canvas.locator('.center-panel-protection')).toHaveCount(1)
