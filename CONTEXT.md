@@ -97,3 +97,53 @@ _Avoid_: committed event, final action
 
 **Debug mode**: A read-only diagnostic view in the web page. It exposes connection and public game diagnostics, but it is not a game authority and never reveals the complete secret state.
 _Avoid_: admin mode, operator mode
+
+## Room interface layout
+
+**Horizontal room layout**: A room arrangement selected from business-canvas width and height rather than from a device category. Its normal mode uses one full-width top bar above a round-table stage and phase sidebar; its low-height compact mode uses a left task rail, round-table stage, and phase sidebar in one row. An infeasible horizontal stage keeps this shell and reports unavailable only inside the stage.
+_Avoid_: PC layout, desktop layout
+
+**Compact horizontal layout**: The low-height mode of the horizontal room layout. It replaces the top bar with a left task rail so the round-table stage can use the full available height.
+_Avoid_: mobile landscape layout, phone layout
+
+**Vertical room layout**: A three-band room arrangement selected when the business canvas is taller than it is wide. It places a combined room-and-quest top bar, round-table stage, and fixed phase panel in three stacked bands.
+_Avoid_: mobile layout, phone layout, portrait device layout
+
+**Task rail**: The compact horizontal layout region containing the return action and vertically grouped quest progress nodes.
+_Avoid_: compact top bar, task sidebar
+
+**Round-table stage**: The hard available rectangle allocated by the room shell for the public table scene after top bars, task rails, phase controls, safe-area insets, and exterior stage spacing have been handled. Its local coordinate origin is the top-left corner, and the complete round-table footprint must remain inside it.
+_Avoid_: game area, table
+
+**Round-table footprint**: The stable union of the tabletop and all player-seat bounds for the selected seat presentation tier. Player-seat bounds include avatar-top clearance, portraits, and names; status marks are derived from avatar geometry and must remain within that stable space. Layout constraints and stage centering apply to this footprint rather than only to the tabletop, and ordinary game-state changes do not resize it.
+_Avoid_: table diameter, tabletop bounds
+
+**Round-table layout frame**: The nominal coordinate region used to size the tabletop and place player-seat centers. It is square for a circular player orbit and elongated along the straight segment for a stadium-shaped orbit; it remains smaller than the complete round-table footprint.
+_Avoid_: round-table footprint, table bounds
+
+**Tabletop**: The visible table surface inside the round-table layout frame. It follows the selected circular or stadium shape and does not include player portraits, names, or status marks.
+_Avoid_: round table, round-table footprint
+
+**Player orbit**: The viewer-relative circular or stadium-shaped path on which avatar centers are placed. Its shape is selected from the available round-table-stage geometry rather than fixed by viewport orientation. Stadium seats may depart from equal arc spacing so their actual seat boundaries keep the required visual gap. The current player's seat occupies the bottom position and the remaining seats follow room seat order clockwise.
+_Avoid_: seat ring, absolute seat positions
+
+**Phase sidebar**: The horizontal room layout region that presents the current phase's instructions and primary actions. Its layout reserves the maximum primary-action budget across supported phases, while lower-priority public history uses only the remaining space, so phase changes do not switch the room layout.
+_Avoid_: fixed device sidebar, activity drawer
+
+**Fixed phase panel**: The bottom region of the vertical room layout that presents the current phase's summary, tools, and primary action. Its three content rows have fixed heights, with separate bottom safe-area clearance, and remain unchanged by ordinary phase content.
+_Avoid_: phase drawer, bottom sheet, mobile action panel
+
+**Seat presentation tier**: One discrete, geometry-selected set of portrait, name, status-mark, spacing, and interaction-target sizes used by every player seat. It is selected from available round-table geometry rather than from a device category.
+_Avoid_: mobile seat, desktop seat, continuously scaled seat
+
+**Player seat bounds**: The stable square boundary reserved for one player seat at a selected presentation tier. It includes the avatar, name, interaction target, and crown-top reserve, while excluding dynamic status marks; ordinary game-state changes therefore never move the layout.
+_Avoid_: current seat contents, portrait bounds
+
+**Player boundary circle**: The mathematical collision boundary centered on a player's avatar, with radius equal to the avatar diameter. Player names and other business presentation may extend outside this circle; the surrounding player-seat bounds remain the positioning box for those elements.
+_Avoid_: avatar circle, player-seat bounds
+
+**Player seat gap**: The minimum Euclidean shortest boundary distance between any two player boundary circles. The round-table-stage caller supplies it, with 8 logical pixels as the default for every presentation tier.
+_Avoid_: center-to-center gap, equal arc spacing
+
+**Center protection circle**: The circular exclusion zone concentric with the tabletop. The business round-table solver fixes the combined center-content-and-boundary radius at 80 logical pixels and passes it directly to the mathematical player-layout model.
+_Avoid_: center-panel margin, derived center padding
