@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { solveRoundTableStageLayoutWithDiagnostics } from './solve-round-table-stage-layout'
-import { rectangleBoundaryGap } from '../stadium-model/geometry'
+import { circleBoundaryGap, pointDistance } from '../stadium-model/geometry'
 import type {
   DetailedRoundTableStageLayout,
   Rect,
@@ -53,18 +53,18 @@ describe('tall round-table stage layout', () => {
       maxStageWidth: 359,
       maxStageHeight: 435,
       avatarDiameter: 36,
-      shape: 'stadium',
+      shape: 'circle',
     },
     {
       maxStageWidth: 366,
       maxStageHeight: 596,
-      avatarDiameter: 36,
+      avatarDiameter: 56,
       shape: 'stadium',
     },
     {
       maxStageWidth: 406,
       maxStageHeight: 684,
-      avatarDiameter: 40,
+      avatarDiameter: 56,
       shape: 'stadium',
     },
     {
@@ -99,8 +99,15 @@ describe('tall round-table stage layout', () => {
         expect(contains(stageBounds, diagnostics.roundTableFrame)).toBe(true)
         expect(contains(stageBounds, layout.tabletop)).toBe(true)
         expect(contains(stageBounds, layout.centerPanel)).toBe(true)
+        expect(diagnostics.centerProtectionCircle.radius).toBe(80)
         for (const seat of playerSeats) {
           expect(contains(stageBounds, seat.playerSeatBounds)).toBe(true)
+          expect(contains(stageBounds, {
+            x: seat.playerBoundaryCircle.center.x - seat.playerBoundaryCircle.radius,
+            y: seat.playerBoundaryCircle.center.y - seat.playerBoundaryCircle.radius,
+            width: 2 * seat.playerBoundaryCircle.radius,
+            height: 2 * seat.playerBoundaryCircle.radius,
+          })).toBe(true)
           expect(seat.playerSeatBounds.width).toBe(seat.playerSeatBounds.height)
           expect(contains(seat.playerSeatBounds, seat.avatarRect)).toBe(true)
           expect(contains(seat.playerSeatBounds, seat.nameRect)).toBe(true)
@@ -118,29 +125,20 @@ describe('tall round-table stage layout', () => {
             secondIndex < playerSeats.length;
             secondIndex += 1
           ) {
-            expect(rectangleBoundaryGap(
-              playerSeats[firstIndex].playerSeatBounds,
-              playerSeats[secondIndex].playerSeatBounds,
+            expect(circleBoundaryGap(
+              playerSeats[firstIndex].playerBoundaryCircle,
+              playerSeats[secondIndex].playerBoundaryCircle,
             )).toBeGreaterThanOrEqual(diagnostics.seatGap - 0.01)
           }
         }
 
-        const panelCenter = {
-          x: layout.centerPanel.x + layout.centerPanel.width / 2,
-          y: layout.centerPanel.y + layout.centerPanel.height / 2,
-        }
         for (const seat of playerSeats) {
-          const dx = Math.max(
-            seat.playerSeatBounds.x - panelCenter.x,
-            0,
-            panelCenter.x - (seat.playerSeatBounds.x + seat.playerSeatBounds.width),
-          )
-          const dy = Math.max(
-            seat.playerSeatBounds.y - panelCenter.y,
-            0,
-            panelCenter.y - (seat.playerSeatBounds.y + seat.playerSeatBounds.height),
-          )
-          expect(Math.hypot(dx, dy) - layout.centerPanel.width / 2).toBeGreaterThanOrEqual(11.989)
+          expect(
+            pointDistance(
+              diagnostics.centerProtectionCircle.center,
+              seat.playerBoundaryCircle.center,
+            ) - seat.playerBoundaryCircle.radius,
+          ).toBeGreaterThanOrEqual(79.989)
         }
 
         const bottomAvatarCenter = playerSeats[0].avatarRect.y
@@ -215,7 +213,7 @@ describe('tall round-table stage layout', () => {
 
       return result.playerSeats[0].avatarRect.width
     })
-    expect(avatarSizes).toEqual([44, 40, 40, 40, 40, 40])
+    expect(avatarSizes).toEqual([56, 56, 56, 56, 52, 48])
   })
 
   it('returns deterministic render-safe geometry with at most two decimal places', () => {

@@ -11,8 +11,8 @@ import {
 import type {
   Point,
   Rect,
-  StadiumPlayerLayoutReady,
-  StadiumPlayerLayoutResult,
+  StadiumRectangleLayoutReady,
+  StadiumRectangleLayoutResult,
   StadiumRectangleLayoutInput,
 } from './types'
 import { hasSupportedStageDimensions } from '../stage-dimensions'
@@ -34,10 +34,10 @@ type ReadyCandidate = Readonly<{
   straightLength: number
   targetGap: number
   pathPositions: readonly number[]
-  ready: StadiumPlayerLayoutReady
+  ready: StadiumRectangleLayoutReady
 }>
 
-function unavailable(reason: 'invalid-input' | 'no-fitting-layout'): StadiumPlayerLayoutResult {
+function unavailable(reason: 'invalid-input' | 'no-fitting-layout'): StadiumRectangleLayoutResult {
   return { status: 'unavailable', reason }
 }
 
@@ -252,7 +252,7 @@ function translateAndQuantize(
   targetGap: number,
   placement: FixedTrackPlacement,
   shape: 'circle' | 'stadium',
-): StadiumPlayerLayoutReady | null {
+): StadiumRectangleLayoutReady | null {
   const rectangleSize = input.playerRectangleSize
   const occupiedHeight = rectangleSize + centerlineWidth + straightLength
   const occupiedY = (input.maxStageHeight - occupiedHeight) / 2
@@ -294,7 +294,7 @@ function translateAndQuantize(
 
 function validatesPublicResult(
   input: StadiumRectangleLayoutInput,
-  ready: StadiumPlayerLayoutReady,
+  ready: StadiumRectangleLayoutReady,
 ): boolean {
   const stage: Rect = { x: 0, y: 0, width: input.maxStageWidth, height: input.maxStageHeight }
   if (!containsRect(stage, ready.occupiedBounds, VALIDATION_TOLERANCE)) return false
@@ -500,7 +500,7 @@ function firstInternallyFeasibleTick(
 
 export function solveStadiumRectangleLayout(
   input: StadiumRectangleLayoutInput,
-): StadiumPlayerLayoutResult {
+): StadiumRectangleLayoutResult {
   if (!hasValidInput(input)) return unavailable('invalid-input')
 
   // Public centers use the 0.01px grid.  An even-centipixel envelope keeps

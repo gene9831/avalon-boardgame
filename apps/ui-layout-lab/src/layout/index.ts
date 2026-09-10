@@ -1,5 +1,6 @@
 export { solveRoundTableStageLayout } from './solve-round-table-stage-layout'
 export type {
+  Circle,
   PlayerSeatLayout,
   Rect,
   RoundTableShape,

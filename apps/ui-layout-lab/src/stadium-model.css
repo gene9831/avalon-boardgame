@@ -5,6 +5,7 @@
 html, body, #app { width: 100%; min-height: 100%; margin: 0; }
 button, input { font: inherit; }
 button { cursor: pointer; min-width: 44px; min-height: 44px; }
+button > svg { width: 20px; height: 20px; vertical-align: middle; }
 button:focus-visible, input:focus-visible { outline: 3px solid #f2c96d; outline-offset: 2px; }
 .stadium-lab-shell { min-height: 100dvh; padding: 24px; background: radial-gradient(circle at 50% 40%, #1a3346, #08121e 65%); }
 .stadium-workbench { min-height: calc(100dvh - 48px); display: grid; place-items: center; overflow: auto; padding: 20px; }
@@ -12,12 +13,18 @@ button:focus-visible, input:focus-visible { outline: 3px solid #f2c96d; outline-
 .stadium-stage svg { max-width: 100%; max-height: calc(100dvh - 88px); width: auto; height: auto; filter: drop-shadow(0 18px 24px rgba(0,0,0,.35)); }
 .stage-boundary { fill: #0d2131; stroke: #f0cf75; stroke-width: 2; vector-effect: non-scaling-stroke; }
 .centerline { fill: none; stroke: #75c8eb; stroke-width: 2; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; }
-.player-rect { fill: rgba(223, 107, 142, .14); stroke: #f08aaa; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.player-boundary-circle { fill: rgba(223, 107, 142, .14); stroke: #f08aaa; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.center-protection-circle { fill: rgba(242, 201, 109, .08); stroke: #f2c96d; stroke-width: 1.5; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; }
+.maximum-center-protection-circle { fill: none; stroke: rgba(211, 234, 244, .62); stroke-width: 1.25; stroke-dasharray: 2 4; vector-effect: non-scaling-stroke; }
+.maximum-center-protection-diagnostic line { stroke: rgba(211, 234, 244, .62); stroke-width: 1; stroke-dasharray: 2 3; vector-effect: non-scaling-stroke; }
+.maximum-center-protection-diagnostic text { fill: rgba(226, 242, 249, .82); font-size: var(--diagnostic-font-size, 13px); text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: #07111c; stroke-width: var(--svg-text-stroke-width, 3px); }
 .avatar-circle { fill: #294b62; stroke: #d9ecf4; stroke-width: 2; vector-effect: non-scaling-stroke; }
 .seat-index { fill: #fff; font-size: var(--seat-font-size, 16px); font-weight: 800; text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: #07111c; stroke-width: var(--svg-text-stroke-width, 3px); }
 .occupied-bounds { fill: none; stroke: #bc8cec; stroke-width: 1.5; stroke-dasharray: 2 3; vector-effect: non-scaling-stroke; }
 .gap-diagnostic line { stroke: #f2c96d; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .gap-diagnostic text { fill: #fce4a5; font-size: var(--diagnostic-font-size, 13px); text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: #07111c; stroke-width: var(--svg-text-stroke-width, 3px); }
+.protection-diagnostic line { stroke: #8be0ba; stroke-width: 1.25; stroke-dasharray: 3 2; vector-effect: non-scaling-stroke; }
+.protection-diagnostic text { fill: #baf5d9; font-size: var(--diagnostic-font-size, 13px); text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: #07111c; stroke-width: var(--svg-text-stroke-width, 3px); }
 .stadium-unavailable { min-height: 260px; display: grid; place-content: center; gap: 10px; padding: 24px; border: 2px solid #f0cf75; background: #0d2131; text-align: center; }
 .stadium-unavailable strong { color: #f2c96d; font: 700 20px ui-monospace, monospace; }
 .stadium-unavailable span { color: #c3d2dc; }

@@ -1,6 +1,7 @@
 import './stadium-model.css'
 
-import { closestRectangleBoundarySegment } from './stadium-model/geometry'
+import { lucideIcon } from './app/lucide-icons'
+import { closestCircleBoundarySegment } from './stadium-model/geometry'
 import { solveStadiumPlayerLayout } from './stadium-model/solve-stadium-player-layout'
 import type { Rect, StadiumPlayerLayoutInput, StadiumPlayerLayoutResult } from './stadium-model/types'
 import { MAX_STAGE_HEIGHT, MAX_STAGE_WIDTH } from './stage-dimensions'
@@ -12,6 +13,7 @@ type DraftState = Readonly<{
   playerCount: string
   avatarSize: string
   minimumGap: string
+  centerProtectionRadius: string
   showDiagnostics: boolean
 }>
 
@@ -21,6 +23,7 @@ const DEFAULT_STATE: ValidState = {
   playerCount: 5,
   avatarSize: 56,
   minimumGap: 4,
+  centerProtectionRadius: 0,
   showDiagnostics: true,
 }
 
@@ -28,7 +31,7 @@ const app = document.querySelector<HTMLElement>('#app')!
 app.innerHTML = `
   <main class="stadium-lab-shell">
     <div class="stadium-workbench">
-      <div class="stadium-stage" aria-label="跑道玩家矩形布局画布"></div>
+      <div class="stadium-stage" aria-label="跑道玩家圆形布局画布"></div>
     </div>
     <button class="stadium-settings-trigger" type="button" aria-label="打开跑道布局设置" aria-expanded="false">设置</button>
   </main>`
@@ -44,13 +47,14 @@ panel.hidden = true
 panel.innerHTML = `
   <form class="stadium-settings-form">
     <header><div><p>布局参数</p><h2 id="stadium-settings-title">跑道布局设置</h2></div>
-      <button type="button" aria-label="关闭跑道布局设置">×</button></header>
+      <button type="button" aria-label="关闭跑道布局设置">${lucideIcon('x')}</button></header>
     <p class="stadium-input-error" role="status" aria-live="polite"></p>
     <label>舞台宽度 <input name="maxStageWidth" type="number" min="0.01" max="${MAX_STAGE_WIDTH}" inputmode="decimal" /></label>
     <label>舞台高度 <input name="maxStageHeight" type="number" min="0.01" max="${MAX_STAGE_HEIGHT}" inputmode="decimal" /></label>
     <fieldset><legend>玩家人数</legend><div class="stadium-player-buttons"></div></fieldset>
     <label>头像大小 <input name="avatarSize" type="number" inputmode="decimal" /></label>
     <label>最小 gap <input name="minimumGap" type="number" inputmode="decimal" /></label>
+    <label>桌心保护半径 <input name="centerProtectionRadius" type="number" min="0" inputmode="decimal" /></label>
     <label class="stadium-switch-row">显示诊断
       <input name="showDiagnostics" type="checkbox" role="switch" aria-label="显示诊断" />
     </label>
@@ -67,6 +71,7 @@ const inputs = {
   playerCount: panel.querySelector<HTMLInputElement>('[name="playerCount"]'),
   avatarSize: panel.querySelector<HTMLInputElement>('[name="avatarSize"]')!,
   minimumGap: panel.querySelector<HTMLInputElement>('[name="minimumGap"]')!,
+  centerProtectionRadius: panel.querySelector<HTMLInputElement>('[name="centerProtectionRadius"]')!,
 }
 const playerButtons = [5, 6, 7, 8, 9, 10].map((count) => {
   const button = document.createElement('button')
@@ -139,6 +144,11 @@ function stateFromUrl(search: string): ValidState {
     playerCount: players >= 5 && players <= 10 ? players : DEFAULT_STATE.playerCount,
     avatarSize: number('avatarSize', DEFAULT_STATE.avatarSize, Number.MIN_VALUE),
     minimumGap: number('minimumGap', DEFAULT_STATE.minimumGap, 0),
+    centerProtectionRadius: number(
+      'centerProtectionRadius',
+      DEFAULT_STATE.centerProtectionRadius ?? 0,
+      0,
+    ),
     showDiagnostics: params.get('diagnostics') === '0' ? false : DEFAULT_STATE.showDiagnostics,
   }
 }
@@ -147,7 +157,9 @@ function draftFromState(state: ValidState): DraftState {
   return {
     maxStageWidth: String(state.maxStageWidth), maxStageHeight: String(state.maxStageHeight),
     playerCount: String(state.playerCount), avatarSize: String(state.avatarSize),
-    minimumGap: String(state.minimumGap), showDiagnostics: state.showDiagnostics,
+    minimumGap: String(state.minimumGap),
+    centerProtectionRadius: String(state.centerProtectionRadius ?? 0),
+    showDiagnostics: state.showDiagnostics,
   }
 }
 
@@ -174,14 +186,17 @@ function parseDraft(draft: DraftState): { status: 'valid'; state: ValidState } |
   if (typeof avatar === 'string') return { status: 'invalid', message: avatar }
   const gap = validNumber(draft.minimumGap, '最小 gap', 0)
   if (typeof gap === 'string') return { status: 'invalid', message: gap }
-  return { status: 'valid', state: { maxStageWidth: width, maxStageHeight: height, playerCount: players, avatarSize: avatar, minimumGap: gap, showDiagnostics: draft.showDiagnostics } }
+  const protectionRadius = validNumber(draft.centerProtectionRadius, '桌心保护半径', 0)
+  if (typeof protectionRadius === 'string') return { status: 'invalid', message: protectionRadius }
+  return { status: 'valid', state: { maxStageWidth: width, maxStageHeight: height, playerCount: players, avatarSize: avatar, minimumGap: gap, centerProtectionRadius: protectionRadius, showDiagnostics: draft.showDiagnostics } }
 }
 
 function serialize(state: ValidState): string {
   const params = new URLSearchParams()
   params.set('maxStageWidth', String(state.maxStageWidth)); params.set('maxStageHeight', String(state.maxStageHeight))
   params.set('players', String(state.playerCount)); params.set('avatarSize', String(state.avatarSize))
-  params.set('minimumGap', String(state.minimumGap)); params.set('diagnostics', state.showDiagnostics ? '1' : '0')
+  params.set('minimumGap', String(state.minimumGap)); params.set('centerProtectionRadius', String(state.centerProtectionRadius ?? 0))
+  params.set('diagnostics', state.showDiagnostics ? '1' : '0')
   return `?${params.toString()}`
 }
 
@@ -235,24 +250,45 @@ function render(result: StadiumPlayerLayoutResult, state: ValidState): void {
   }
   stage.dataset.shape = result.shape
   stage.dataset.straightLength = String(result.stadiumStraightLength)
-  const diagnostics = state.showDiagnostics ? result.playerRects.map((rect, index) => {
-    const segment = closestRectangleBoundarySegment(rect, result.playerRects[(index + 1) % result.playerRects.length])
+  const diagnostics = state.showDiagnostics ? result.playerCircles.map((circle, index) => {
+    const segment = closestCircleBoundarySegment(circle, result.playerCircles[(index + 1) % result.playerCircles.length])
     return `<g class="gap-diagnostic"><line x1="${segment.start.x}" y1="${segment.start.y}" x2="${segment.end.x}" y2="${segment.end.y}" /><text x="${(segment.start.x + segment.end.x) / 2}" y="${(segment.start.y + segment.end.y) / 2}">${segment.distance.toFixed(2)}px</text></g>`
   }).join('') : ''
   const occupied = state.showDiagnostics ? `<rect class="occupied-bounds" ${rectAttributes(result.occupiedBounds)} />` : ''
-  const players = result.playerRects.map((rect, index) => {
-    const center = result.playerCenters[index]
-    return `<g class="player"><rect class="player-rect" ${rectAttributes(rect)} /><circle class="avatar-circle" cx="${center.x}" cy="${center.y}" r="${state.avatarSize / 2}" /><text class="seat-index" x="${center.x}" y="${center.y}">${index}</text></g>`
+  const protectionRadius = state.centerProtectionRadius ?? 0
+  const protectionCenter = {
+    x: result.centerlineBounds.x + result.centerlineBounds.width / 2,
+    y: result.centerlineBounds.y + result.centerlineBounds.height / 2,
+  }
+  const protectionCircle = protectionRadius > 0
+    ? `<circle class="center-protection-circle" cx="${protectionCenter.x}" cy="${protectionCenter.y}" r="${protectionRadius}" />`
+    : ''
+  const maximumProtectionCircle = state.showDiagnostics
+    ? `<g class="maximum-center-protection-diagnostic"><circle class="maximum-center-protection-circle" cx="${protectionCenter.x}" cy="${protectionCenter.y}" r="${result.maximumCenterProtectionRadius}" /><line x1="${protectionCenter.x}" y1="${protectionCenter.y}" x2="${protectionCenter.x + result.maximumCenterProtectionRadius}" y2="${protectionCenter.y}" /><text x="${protectionCenter.x + result.maximumCenterProtectionRadius / 2}" y="${protectionCenter.y - 9}">r=${result.maximumCenterProtectionRadius.toFixed(2)}px</text></g>`
+    : ''
+  const protectionDiagnostics = state.showDiagnostics && protectionRadius > 0
+    ? result.playerCircles.map((circle) => {
+        const segment = closestCircleBoundarySegment(
+          { center: protectionCenter, radius: protectionRadius },
+          circle,
+        )
+        return `<g class="protection-diagnostic"><line x1="${segment.start.x}" y1="${segment.start.y}" x2="${segment.end.x}" y2="${segment.end.y}" /><text x="${(segment.start.x + segment.end.x) / 2}" y="${(segment.start.y + segment.end.y) / 2}">${segment.distance.toFixed(2)}px</text></g>`
+      }).join('')
+    : ''
+  const players = result.playerCircles.map((circle, index) => {
+    const { center } = circle
+    return `<g class="player"><circle class="player-boundary-circle" cx="${center.x}" cy="${center.y}" r="${circle.radius}" /><circle class="avatar-circle" cx="${center.x}" cy="${center.y}" r="${state.avatarSize / 2}" /><text class="seat-index" x="${center.x}" y="${center.y}">${index}</text></g>`
   }).join('')
-  stage.innerHTML = `<svg width="${state.maxStageWidth}" height="${state.maxStageHeight}" viewBox="0 0 ${state.maxStageWidth} ${state.maxStageHeight}" role="img" aria-label="跑道玩家矩形布局">
+  stage.innerHTML = `<svg width="${state.maxStageWidth}" height="${state.maxStageHeight}" viewBox="0 0 ${state.maxStageWidth} ${state.maxStageHeight}" role="img" aria-label="跑道玩家圆形布局">
     <rect class="stage-boundary" x="0" y="0" width="${state.maxStageWidth}" height="${state.maxStageHeight}" />
-    ${centerlineMarkup(result.centerlineBounds)}${occupied}${diagnostics}${players}</svg>`
+    ${centerlineMarkup(result.centerlineBounds)}${occupied}${maximumProtectionCircle}${protectionCircle}${diagnostics}${protectionDiagnostics}${players}</svg>`
   observeTextScale()
 }
 
 function updateControls(): void {
   inputs.maxStageWidth.value = draftState.maxStageWidth; inputs.maxStageHeight.value = draftState.maxStageHeight
   inputs.avatarSize.value = draftState.avatarSize; inputs.minimumGap.value = draftState.minimumGap
+  inputs.centerProtectionRadius.value = draftState.centerProtectionRadius
   diagnosticsInput.checked = draftState.showDiagnostics
   for (const button of playerButtons) button.setAttribute('aria-pressed', String(button.dataset.playerCount === draftState.playerCount))
 }

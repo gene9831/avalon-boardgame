@@ -9,8 +9,18 @@ import {
   rectangleBoundaryGap,
   rectFromCenter,
 } from './geometry'
-import { solveStadiumPlayerLayout } from './solve-stadium-player-layout'
 import { solveStadiumRectangleLayout } from './solve-stadium-rectangle-layout'
+import type { StadiumPlayerLayoutInput } from './types'
+
+function solveLegacyAvatarRectangleLayout(input: StadiumPlayerLayoutInput) {
+  return solveStadiumRectangleLayout({
+    maxStageWidth: input.maxStageWidth,
+    maxStageHeight: input.maxStageHeight,
+    playerCount: input.playerCount,
+    playerRectangleSize: 2 * input.avatarSize,
+    minimumGap: input.minimumGap,
+  })
+}
 
 describe('stadium rectangle geometry', () => {
   it.each([
@@ -109,7 +119,7 @@ describe('stadium rectangle geometry', () => {
   })
 })
 
-describe('solveStadiumPlayerLayout', () => {
+describe('legacy avatar rectangle layout behavior', () => {
   it('reuses rectangle core with equivalent 2x avatar size', () => {
     expect(solveStadiumRectangleLayout({
       maxStageWidth: 386,
@@ -117,7 +127,7 @@ describe('solveStadiumPlayerLayout', () => {
       playerCount: 5,
       playerRectangleSize: 112,
       minimumGap: 4,
-    })).toEqual(solveStadiumPlayerLayout({
+    })).toEqual(solveLegacyAvatarRectangleLayout({
       maxStageWidth: 386,
       maxStageHeight: 482,
       playerCount: 5,
@@ -159,17 +169,17 @@ describe('solveStadiumPlayerLayout', () => {
     { maxStageWidth: 386, maxStageHeight: 482, playerCount: 5, avatarSize: 0, minimumGap: 4 },
     { maxStageWidth: 386, maxStageHeight: 482, playerCount: 5, avatarSize: 56, minimumGap: -0.01 },
   ])('rejects invalid input %#', (input) => {
-    expect(solveStadiumPlayerLayout(input)).toEqual({ status: 'unavailable', reason: 'invalid-input' })
+    expect(solveLegacyAvatarRectangleLayout(input)).toEqual({ status: 'unavailable', reason: 'invalid-input' })
   })
 
   it('treats a zero-width centerline as legal but non-fitting', () => {
-    expect(solveStadiumPlayerLayout({
+    expect(solveLegacyAvatarRectangleLayout({
       maxStageWidth: 112, maxStageHeight: 800, playerCount: 5, avatarSize: 56, minimumGap: 4,
     })).toEqual({ status: 'unavailable', reason: 'no-fitting-layout' })
   })
 
   it('places zero-gap players at first non-overlapping separations', () => {
-    const result = solveStadiumPlayerLayout({
+    const result = solveLegacyAvatarRectangleLayout({
       maxStageWidth: 386, maxStageHeight: 482, playerCount: 5, avatarSize: 56, minimumGap: 0,
     })
     expect(result.status).toBe('ready')
@@ -183,7 +193,7 @@ describe('solveStadiumPlayerLayout', () => {
 
   it.each([5, 6, 7, 8, 9, 10])('keeps %i players ordered, mirrored, and pairwise separated', (playerCount) => {
     const input = { maxStageWidth: 240, maxStageHeight: 800, playerCount, avatarSize: 56, minimumGap: 4 }
-    const result = solveStadiumPlayerLayout(input)
+    const result = solveLegacyAvatarRectangleLayout(input)
     expect(result.status).toBe('ready')
     if (result.status !== 'ready') throw new Error(result.reason)
 
@@ -214,7 +224,7 @@ describe('solveStadiumPlayerLayout', () => {
   })
 
   it('returns the maximum-width circle immediately when it fits', () => {
-    const result = solveStadiumPlayerLayout({
+    const result = solveLegacyAvatarRectangleLayout({
       maxStageWidth: 386, maxStageHeight: 482, playerCount: 5, avatarSize: 56, minimumGap: 4,
     })
     expect(result.status).toBe('ready')
@@ -237,11 +247,11 @@ describe('solveStadiumPlayerLayout', () => {
     [10, 692],
   ])('cannot shorten the selected %i-player tight stadium envelope by one centipixel', (playerCount, maxStageHeight) => {
     const input = { maxStageWidth: 240, maxStageHeight, playerCount, avatarSize: 56, minimumGap: 4 }
-    const result = solveStadiumPlayerLayout(input)
+    const result = solveLegacyAvatarRectangleLayout(input)
     expect(result.status).toBe('ready')
     if (result.status !== 'ready') throw new Error(result.reason)
     expect(result.shape).toBe('stadium')
-    expect(solveStadiumPlayerLayout({
+    expect(solveLegacyAvatarRectangleLayout({
       ...input,
       maxStageHeight: result.occupiedBounds.height - 0.01,
     })).toEqual({ status: 'unavailable', reason: 'no-fitting-layout' })
@@ -249,8 +259,8 @@ describe('solveStadiumPlayerLayout', () => {
 
   it('returns quantized, uniformly closed, deterministic geometry', () => {
     const input = { maxStageWidth: 240, maxStageHeight: 800, playerCount: 10, avatarSize: 56, minimumGap: 4 }
-    const first = solveStadiumPlayerLayout(input)
-    expect(solveStadiumPlayerLayout(input)).toEqual(first)
+    const first = solveLegacyAvatarRectangleLayout(input)
+    expect(solveLegacyAvatarRectangleLayout(input)).toEqual(first)
     expect(first.status).toBe('ready')
     if (first.status !== 'ready') throw new Error(first.reason)
     const numbers = JSON.stringify(first).match(/-?\d+(?:\.\d+)?/g)?.map(Number) ?? []
@@ -266,7 +276,7 @@ describe('solveStadiumPlayerLayout', () => {
     { maxStageWidth: 111.99, maxStageHeight: 800, playerCount: 5, avatarSize: 56, minimumGap: 4 },
     { maxStageWidth: 386, maxStageHeight: 385.99, playerCount: 5, avatarSize: 56, minimumGap: 4 },
   ])('reports legal but impossible stage envelopes as non-fitting', (input) => {
-    expect(solveStadiumPlayerLayout(input)).toEqual({ status: 'unavailable', reason: 'no-fitting-layout' })
+    expect(solveLegacyAvatarRectangleLayout(input)).toEqual({ status: 'unavailable', reason: 'no-fitting-layout' })
   })
 })
 

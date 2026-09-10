@@ -3,6 +3,7 @@ import {
   MAX_SIMULATED_VIEWPORT_HEIGHT,
   MAX_SIMULATED_VIEWPORT_WIDTH,
 } from '../stage-dimensions'
+import { lucideIcon } from './lucide-icons'
 
 export type SettingsDialog = Readonly<{
   element: HTMLDialogElement
@@ -21,10 +22,10 @@ export function createSettingsDialog(
 ): SettingsDialog {
   host.insertAdjacentHTML('beforeend', `
     <button class="settings-trigger fixed bottom-[max(16px,env(safe-area-inset-bottom))] right-[max(16px,env(safe-area-inset-right))] z-50 grid size-11 place-items-center rounded-full"
-      type="button" aria-label="打开布局设置" aria-haspopup="dialog">⚙</button>
+      type="button" aria-label="打开布局设置" aria-haspopup="dialog">${lucideIcon('settings')}</button>
     <dialog class="settings-dialog" aria-labelledby="settings-title">
       <form method="dialog" class="settings-form">
-        <header><div><p>LAYOUT LAB</p><h2 id="settings-title">预览设置</h2></div><button value="close" aria-label="关闭设置">×</button></header>
+        <header><div><p>LAYOUT LAB</p><h2 id="settings-title">预览设置</h2></div><button value="close" aria-label="关闭设置">${lucideIcon('x')}</button></header>
         <label class="switch-row"><span><b>使用设备尺寸</b><small>100dvw × 100dvh</small></span><input name="device" type="checkbox" role="switch"></label>
         <div class="simulation-fields">
           <label><span>设备预设</span><select name="preset">
@@ -32,11 +33,11 @@ export function createSettingsDialog(
             <option value="430x932">宽屏 430 × 932</option><option value="768x1024">平板 768 × 1024</option>
           </select></label>
           <div class="dimension-row"><label><span>宽度</span><input name="width" type="number" min="1" max="${MAX_SIMULATED_VIEWPORT_WIDTH}" inputmode="numeric"></label>
-            <button name="rotate" type="button" aria-label="旋转宽高">⇄</button>
+            <button name="rotate" type="button" aria-label="旋转宽高">${lucideIcon('rotate-cw')}</button>
             <label><span>高度</span><input name="height" type="number" min="1" max="${MAX_SIMULATED_VIEWPORT_HEIGHT}" inputmode="numeric"></label></div>
         </div>
         <label><span>玩家人数</span><select name="players">${[5, 6, 7, 8, 9, 10].map((count) => `<option>${count}</option>`).join('')}</select></label>
-        <label><span>玩家边界最小间距</span><input name="gap" type="number" min="0" step="0.1" inputmode="decimal"></label>
+        <label><span>玩家圆边界最小间距</span><input name="gap" type="number" min="0" step="0.1" inputmode="decimal"></label>
         <div class="avatar-tier-row">
           <label><span>最大头像尺寸</span><input name="maxAvatarSize" type="number" min="36" max="56" step="0.1" inputmode="decimal"></label>
           <label><span>头像递减步长</span><input name="avatarSizeStep" type="number" min="4" step="4" inputmode="decimal"></label>

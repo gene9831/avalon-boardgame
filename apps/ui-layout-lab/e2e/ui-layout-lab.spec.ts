@@ -30,7 +30,7 @@ test('uses the actual mobile viewport and keeps device controls concise', async 
   const canvas = page.getByLabel('Avalon 房间布局预览')
   await expect(canvas).toHaveAttribute('data-layout-status', 'ready')
   await expect(canvas).toHaveAttribute('data-table-shape', 'stadium')
-  await expect(canvas).toHaveAttribute('data-avatar-size', '36')
+  await expect(canvas).toHaveAttribute('data-avatar-size', '56')
   await expect(canvas).toHaveAttribute('data-canvas-width', '390')
   await expect(canvas).toHaveAttribute('data-canvas-height', '844')
   await expect(canvas).toHaveAttribute('data-stage-width', '366')
@@ -38,6 +38,19 @@ test('uses the actual mobile viewport and keeps device controls concise', async 
   await expect(canvas).toHaveCSS('width', '390px')
   await expect(canvas).toHaveCSS('height', '844px')
   await expect(canvas.locator('.crown')).toHaveCount(1)
+  await expect(canvas.locator('.crown svg.lucide-crown')).toHaveCount(1)
+  const tabletopIsAboveStageBackground = await canvas.locator('.tabletop').evaluate((element) => {
+    const bounds = element.getBoundingClientRect()
+    return document
+      .elementFromPoint(bounds.left + 4, bounds.top + bounds.height / 2)
+      ?.closest('.tabletop') === element
+  })
+  expect(tabletopIsAboveStageBackground).toBe(true)
+  await expect(page.getByRole('button', { name: '返回' }).locator('svg.lucide-chevron-left')).toBeVisible()
+  await expect(page.getByRole('button', { name: '身份' }).locator('svg.lucide-eye')).toBeVisible()
+  await expect(page.getByRole('button', { name: '记录' }).locator('svg.lucide-history')).toBeVisible()
+  await expect(page.getByRole('button', { name: '帮助' }).locator('svg.lucide-circle-help')).toBeVisible()
+  await expect(page.getByRole('button', { name: '打开布局设置' }).locator('svg.lucide-settings')).toBeVisible()
 
   const infoButton = page.getByRole('button', { name: '显示布局信息' })
   const readout = page.locator('.layout-readout')
@@ -62,7 +75,28 @@ test('uses the actual mobile viewport and keeps device controls concise', async 
   await expect(hideInfoButton).toHaveAttribute('aria-expanded', 'true')
   await expect(readout).toBeVisible()
   await expect(readout).toContainText('390 × 844 · 舞台 366 × 596')
-  await expect(readout).toContainText('头像 36px')
+  await expect(readout).toContainText('头像 56px')
+  const readoutPlacement = await page.evaluate(() => {
+    const buttonBounds = document.querySelector('.stage-info-trigger')!.getBoundingClientRect()
+    const readout = document.querySelector('.layout-readout')!
+    const readoutBounds = readout.getBoundingClientRect()
+    return {
+      buttonTop: buttonBounds.top,
+      readoutBottom: readoutBounds.bottom,
+      readoutHeight: readoutBounds.height,
+      whiteSpace: getComputedStyle(readout).whiteSpace,
+    }
+  })
+  expect(readoutPlacement.readoutBottom).toBeLessThanOrEqual(readoutPlacement.buttonTop)
+  expect(readoutPlacement.readoutHeight).toBeGreaterThan(24)
+  expect(readoutPlacement.whiteSpace).toBe('normal')
+  const readoutIsFrontmost = await readout.evaluate((element) => {
+    const bounds = element.getBoundingClientRect()
+    return document
+      .elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2)
+      ?.closest('.layout-readout') === element
+  })
+  expect(readoutIsFrontmost).toBe(true)
 
   await hideInfoButton.click()
   await expect(page.getByRole('button', { name: '显示布局信息' })).toHaveAttribute('aria-expanded', 'false')
@@ -97,6 +131,7 @@ test('uses the actual mobile viewport and keeps device controls concise', async 
   const settingsTrigger = page.getByRole('button', { name: '打开布局设置' })
   const settingsDialog = page.getByRole('dialog', { name: '预览设置' })
   await expect(settingsDialog).toBeVisible()
+  await expect(settingsDialog.getByRole('button', { name: '关闭设置' }).locator('svg.lucide-x')).toBeVisible()
   const layoutAfterSettingsOpen = await page.evaluate(() => ({
     shellTop: document.querySelector('.lab-shell')!.getBoundingClientRect().top,
     workbenchHeight: document.querySelector('.preview-workbench')!.getBoundingClientRect().height,
@@ -170,7 +205,7 @@ test('restores remembered simulated dimensions after leaving device mode', async
   await expect(page.getByLabel('宽度')).toHaveValue('430')
   await expect(page.getByLabel('高度')).toHaveValue('932')
   await expect(page).toHaveURL(/viewport=simulated&width=430&height=932&players=10&gap=8&maxAvatarSize=56&avatarSizeStep=8&geometry=0/)
-  await expect(page.getByLabel('Avalon 房间布局预览')).toHaveAttribute('data-avatar-size', '40')
+  await expect(page.getByLabel('Avalon 房间布局预览')).toHaveAttribute('data-avatar-size', '56')
 })
 
 test('renders Euclidean geometry diagnostics for the 430 by 932 baseline', async ({ page }) => {
@@ -178,7 +213,7 @@ test('renders Euclidean geometry diagnostics for the 430 by 932 baseline', async
   await page.goto('http://127.0.0.1:14175/?viewport=simulated&width=430&height=932&players=10&geometry=1')
 
   const canvas = page.getByLabel('Avalon 房间布局预览')
-  await expect(canvas).toHaveAttribute('data-avatar-size', '40')
+  await expect(canvas).toHaveAttribute('data-avatar-size', '56')
   await expect(canvas).toHaveAttribute('data-table-shape', 'stadium')
   await expect(canvas).toHaveAttribute('data-stage-width', '406')
   await expect(canvas).toHaveAttribute('data-stage-height', '684')
@@ -198,7 +233,7 @@ test('renders Euclidean geometry diagnostics for the 430 by 932 baseline', async
 
   const firstGap = canvas.locator('.gap-line').first()
   await expect(firstGap).toHaveAttribute('style', /transform:rotate\(/)
-  await expect(firstGap).toHaveAttribute('title', /座位间距 \d+(?:\.\d+)?px/)
+  await expect(firstGap).toHaveAttribute('title', /玩家圆边界间距 \d+(?:\.\d+)?px/)
 })
 
 test('draws a diagonal Euclidean gap segment on the circular layout', async ({ page }) => {
@@ -212,13 +247,13 @@ test('draws a diagonal Euclidean gap segment on the circular layout', async ({ p
       return angle !== undefined && Math.abs(Number(angle) % 90) > 0.01
     }))
   expect(diagonalGap?.style).toContain('transform:rotate(')
-  expect(diagonalGap?.title).toMatch(/座位间距 \d+(?:\.\d+)?px/)
+  expect(diagonalGap?.title).toMatch(/玩家圆边界间距 \d+(?:\.\d+)?px/)
 })
 
 const confirmedBusinessViewports = [
-  [{ width: 375, height: 667 }, { stageWidth: 359, stageHeight: 435, avatarSize: 36, shape: 'stadium' }],
-  [{ width: 390, height: 844 }, { stageWidth: 366, stageHeight: 596, avatarSize: 36, shape: 'stadium' }],
-  [{ width: 430, height: 932 }, { stageWidth: 406, stageHeight: 684, avatarSize: 40, shape: 'stadium' }],
+  [{ width: 375, height: 667 }, { stageWidth: 359, stageHeight: 435, avatarSize: 36, shape: 'circle' }],
+  [{ width: 390, height: 844 }, { stageWidth: 366, stageHeight: 596, avatarSize: 56, shape: 'stadium' }],
+  [{ width: 430, height: 932 }, { stageWidth: 406, stageHeight: 684, avatarSize: 56, shape: 'stadium' }],
   [{ width: 768, height: 1024 }, { stageWidth: 744, stageHeight: 776, avatarSize: 56, shape: 'circle' }],
  ] as const
 
@@ -240,9 +275,9 @@ test('keeps the confirmed monotone avatar tiers for 5 to 10 players', async ({ p
   const avatarSizes: number[] = []
 
   for (const [playerCount, expectedAvatarSize] of [
-    [5, 44], [6, 40], [7, 40], [8, 40], [9, 40], [10, 40],
+    [5, 56], [6, 56], [7, 56], [8, 56], [9, 48], [10, 48],
   ]) {
-    await page.goto(`http://127.0.0.1:14175/?viewport=simulated&width=402&height=714&players=${playerCount}&gap=4&maxAvatarSize=56&avatarSizeStep=4&geometry=0`)
+    await page.goto(`http://127.0.0.1:14175/?viewport=simulated&width=402&height=714&players=${playerCount}&gap=4&maxAvatarSize=56&avatarSizeStep=8&geometry=0`)
     const avatarSize = Number(await page.getByLabel('Avalon 房间布局预览').getAttribute('data-avatar-size'))
     expect(avatarSize).toBe(expectedAvatarSize)
     avatarSizes.push(avatarSize)
@@ -263,22 +298,22 @@ test('keeps settings available when wide-stage strategy is pending', async ({ pa
   await expect(page.getByRole('dialog', { name: '预览设置' })).toBeVisible()
 })
 
-test('lets the preview lower the player-seat gap at 402 by 714', async ({ page }) => {
+test('lets the preview lower the player-circle gap at 402 by 714', async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 800 })
   await page.goto('http://127.0.0.1:14175/?viewport=simulated&width=402&height=714&players=10&gap=6&geometry=0')
 
   const canvas = page.getByLabel('Avalon 房间布局预览')
   await expect(canvas).toHaveAttribute('data-stage-width', '386')
   await expect(canvas).toHaveAttribute('data-stage-height', '482')
-  await expect(canvas).toHaveAttribute('data-avatar-size', '40')
+  await expect(canvas).toHaveAttribute('data-avatar-size', '48')
 
   await page.getByRole('button', { name: '打开布局设置' }).click()
-  const gapInput = page.getByLabel('玩家边界最小间距')
+  const gapInput = page.getByLabel('玩家圆边界最小间距')
   await expect(gapInput).toHaveValue('6')
   await gapInput.fill('8')
   await gapInput.press('Tab')
 
-  await expect(canvas).toHaveAttribute('data-avatar-size', '40')
+  await expect(canvas).toHaveAttribute('data-avatar-size', '48')
   await expect(page).toHaveURL(/gap=8/)
 })
 

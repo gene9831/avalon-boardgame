@@ -139,5 +139,11 @@ _Avoid_: mobile seat, desktop seat, continuously scaled seat
 **Player seat bounds**: The stable square boundary reserved for one player seat at a selected presentation tier. It includes the avatar, name, interaction target, and crown-top reserve, while excluding dynamic status marks; ordinary game-state changes therefore never move the layout.
 _Avoid_: current seat contents, portrait bounds
 
-**Player seat gap**: The minimum Euclidean shortest boundary distance between any two stable square player-seat bounds. The round-table-stage caller supplies it, with 8 logical pixels as the default for every presentation tier.
+**Player boundary circle**: The mathematical collision boundary centered on a player's avatar, with radius equal to the avatar diameter. Player names and other business presentation may extend outside this circle; the surrounding player-seat bounds remain the positioning box for those elements.
+_Avoid_: avatar circle, player-seat bounds
+
+**Player seat gap**: The minimum Euclidean shortest boundary distance between any two player boundary circles. The round-table-stage caller supplies it, with 8 logical pixels as the default for every presentation tier.
 _Avoid_: center-to-center gap, equal arc spacing
+
+**Center protection circle**: The circular exclusion zone concentric with the tabletop. The business round-table solver fixes the combined center-content-and-boundary radius at 80 logical pixels and passes it directly to the mathematical player-layout model.
+_Avoid_: center-panel margin, derived center padding

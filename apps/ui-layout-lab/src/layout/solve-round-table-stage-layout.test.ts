@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { solveRoundTableStageLayout } from './index'
 import type { Rect, RoundTableStageLayout } from './index'
-import { rectangleBoundaryGap } from '../stadium-model/geometry'
+import { circleBoundaryGap } from '../stadium-model/geometry'
 
 function expectReady(
   maxStageWidth: number,
@@ -68,7 +68,7 @@ describe('solveRoundTableStageLayout', () => {
     })).toEqual({ status: 'unavailable', reason: 'no-fitting-stage-layout' })
   })
 
-  it('defaults the player-seat boundary gap to 8 and accepts a smaller caller gap', () => {
+  it('defaults the player-circle boundary gap to 8 and accepts a smaller caller gap', () => {
     const defaultGapLayout = expectReady(386, 482, 10)
     const sixPixelGapResult = solveRoundTableStageLayout({
       maxStageWidth: 386,
@@ -77,15 +77,15 @@ describe('solveRoundTableStageLayout', () => {
       gap: 6,
     })
 
-    expect(defaultGapLayout.playerSeats[0].avatarRect.width).toBe(40)
+    expect(defaultGapLayout.playerSeats[0].avatarRect.width).toBe(48)
     expect(sixPixelGapResult.status).toBe('ready')
     if (sixPixelGapResult.status !== 'ready') {
       throw new Error(`Expected a ready layout, received ${sixPixelGapResult.reason}`)
     }
-    expect(sixPixelGapResult.playerSeats[0].avatarRect.width).toBe(40)
+    expect(sixPixelGapResult.playerSeats[0].avatarRect.width).toBe(48)
   })
 
-  it('keeps 40px stadium avatars for eight players on the 402×714 device stage', () => {
+  it('keeps 56px avatars for eight players on the 386×482 stage', () => {
     const result = solveRoundTableStageLayout({
       maxStageWidth: 386,
       maxStageHeight: 482,
@@ -99,7 +99,7 @@ describe('solveRoundTableStageLayout', () => {
     if (result.status !== 'ready') {
       throw new Error(`Expected a ready layout, received ${result.reason}`)
     }
-    expect(result.playerSeats[0].avatarRect.width).toBe(40)
+    expect(result.playerSeats[0].avatarRect.width).toBe(56)
   })
 
   it('applies the same centered-seat rule to seven players', () => {
@@ -116,12 +116,12 @@ describe('solveRoundTableStageLayout', () => {
     if (result.status !== 'ready') {
       throw new Error(`Expected a ready layout, received ${result.reason}`)
     }
-    expect(result.playerSeats[0].avatarRect.width).toBe(40)
+    expect(result.playerSeats[0].avatarRect.width).toBe(56)
   })
 
   it.each([
-    [5, 44],
-    [6, 40],
+    [5, 56],
+    [6, 56],
   ])(
     'keeps a tier feasible for all lower player counts through %i players',
     (playerCount, expectedAvatarSize) => {
@@ -142,7 +142,7 @@ describe('solveRoundTableStageLayout', () => {
     },
   )
 
-  it('uses the approved monotone avatar sequence and square collision envelopes', () => {
+  it('uses circular player boundaries and the approved avatar sequence on the 386×482 stage', () => {
     const avatarSizes = [5, 6, 7, 8, 9, 10].map((playerCount) => {
       const result = solveRoundTableStageLayout({
         maxStageWidth: 386,
@@ -150,7 +150,6 @@ describe('solveRoundTableStageLayout', () => {
         playerCount,
         gap: 4,
         maxAvatarSize: 56,
-        avatarSizeStep: 4,
       })
       expect(result.status).toBe('ready')
       if (result.status !== 'ready') {
@@ -159,7 +158,7 @@ describe('solveRoundTableStageLayout', () => {
       return result.playerSeats[0].avatarRect.width
     })
 
-    expect(avatarSizes).toEqual([44, 40, 40, 40, 40, 40])
+    expect(avatarSizes).toEqual([56, 56, 56, 56, 48, 48])
     const layout = expectReady(386, 482, 10)
     for (const seat of layout.playerSeats) {
       expect(seat.playerSeatBounds.width).toBe(seat.playerSeatBounds.height)
@@ -168,9 +167,9 @@ describe('solveRoundTableStageLayout', () => {
     }
     for (let first = 0; first < layout.playerSeats.length; first += 1) {
       for (let second = first + 1; second < layout.playerSeats.length; second += 1) {
-        expect(rectangleBoundaryGap(
-          layout.playerSeats[first].playerSeatBounds,
-          layout.playerSeats[second].playerSeatBounds,
+        expect(circleBoundaryGap(
+          layout.playerSeats[first].playerBoundaryCircle,
+          layout.playerSeats[second].playerBoundaryCircle,
         )).toBeGreaterThanOrEqual(7.989)
       }
     }
@@ -242,7 +241,7 @@ describe('solveRoundTableStageLayout', () => {
       'tabletop',
     ])
     expect(layout.shape).toBe('stadium')
-    expect(layout.playerSeats[0].avatarRect.width).toBe(36)
+    expect(layout.playerSeats[0].avatarRect.width).toBe(56)
     expect(contains(stageBounds, layout.tabletop)).toBe(true)
     expect(contains(stageBounds, layout.centerPanel)).toBe(true)
     for (const seat of layout.playerSeats) {

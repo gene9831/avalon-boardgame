@@ -19,9 +19,15 @@ export type Rect = Readonly<{
   height: number
 }>
 
+export type Circle = Readonly<{
+  center: Point
+  radius: number
+}>
+
 export type PlayerSeatLayout = Readonly<{
   relativeSeatIndex: number
   playerSeatBounds: Rect
+  playerBoundaryCircle: Circle
   avatarRect: Rect
   nameRect: Rect
   avatarTopClearance: number
@@ -60,6 +66,7 @@ export type RoundTableStageDiagnostics = Readonly<{
   roundTableFrame: Rect
   roundTableFootprint: Rect
   placementGuide: PlacementGuideDiagnostics
+  centerProtectionCircle: Circle
   seatGap: number
   adjacentBoundaryGaps: readonly number[]
   tabletopCenterOffsetY: number
