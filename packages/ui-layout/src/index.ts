@@ -1,4 +1,10 @@
 export { solveRoundTableStageLayout } from './stage-layout/solve-round-table-stage-layout'
+export { resolveRoomShellMetrics } from './room-shell-metrics'
+export type {
+  RoomCanvasSize,
+  RoomShellMetrics,
+  RoomShellMode,
+} from './room-shell-metrics'
 export type {
   Circle,
   PlayerSeatLayout,

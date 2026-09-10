@@ -1,6 +1,10 @@
 import './styles.css'
 
 import {
+  resolveRoomShellMetrics,
+  type RoomShellMode,
+} from '@avalon/ui-layout'
+import {
   solveRoundTableStageLayoutWithDiagnostics,
   type DetailedRoundTableStageLayoutResult,
 } from '@avalon/ui-layout/diagnostics'
@@ -12,8 +16,6 @@ import {
 } from './app/render-layout'
 import {
   applyPreviewRoomShell,
-  resolvePreviewRoomShell,
-  type PreviewRoomShellMode,
 } from './app/preview-room-shell'
 import {
   parseLabState,
@@ -38,7 +40,7 @@ const previewFrame = app.querySelector<HTMLElement>('.preview-frame')!
 const canvas = app.querySelector<HTMLElement>('.room-canvas')!
 const roomShell = renderRoomShell(canvas)
 const readout = roomShell.stageInfoReadout
-const roomShellModeLabel: Record<PreviewRoomShellMode, string> = {
+const roomShellModeLabel: Record<RoomShellMode, string> = {
   vertical: '竖版',
   'compact-landscape': '紧凑横版',
   'normal-landscape': '普通横版',
@@ -88,12 +90,12 @@ function render(): void {
   canvas.dataset.canvasWidth = String(size.width)
   canvas.dataset.canvasHeight = String(size.height)
   updatePreviewScale(size)
-  const previewRoomShell = resolvePreviewRoomShell(size)
+  const previewRoomShell = resolveRoomShellMetrics(size)
   applyPreviewRoomShell(canvas, previewRoomShell)
   renderStage(previewRoomShell.mode)
 }
 
-function renderStage(mode: PreviewRoomShellMode = canvas.dataset.roomLayoutMode as PreviewRoomShellMode): void {
+function renderStage(mode: RoomShellMode = canvas.dataset.roomLayoutMode as RoomShellMode): void {
   const stageSize = {
     width: roomShell.stage.clientWidth,
     height: roomShell.stage.clientHeight,
