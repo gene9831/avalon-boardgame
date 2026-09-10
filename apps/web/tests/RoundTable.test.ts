@@ -29,4 +29,16 @@ describe('round table seats', () => {
       seatNumber: 2,
     })
   })
+
+  it('numbers seats relative to the current player for solver geometry', () => {
+    const seats = buildRoundTableSeats([], 5, '3')
+
+    expect(seats.map(({ playerID, relativeSeatIndex }) => ({ playerID, relativeSeatIndex }))).toEqual([
+      { playerID: '0', relativeSeatIndex: 2 },
+      { playerID: '1', relativeSeatIndex: 3 },
+      { playerID: '2', relativeSeatIndex: 4 },
+      { playerID: '3', relativeSeatIndex: 0 },
+      { playerID: '4', relativeSeatIndex: 1 },
+    ])
+  })
 })

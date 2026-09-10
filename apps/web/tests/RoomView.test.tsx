@@ -396,7 +396,7 @@ describe('RoomView viewport sizing', () => {
 })
 
 describe('RoomView playing layout', () => {
-  it('keeps the players around a round table with the quest board in its center', () => {
+  it('keeps the game shell stable while its round-table stage is being measured', () => {
     const html = renderRoomView({
       gameState: playingGameState(),
       room: {
@@ -414,7 +414,10 @@ describe('RoomView playing layout', () => {
     })
 
     expect(html).toContain('aria-label="阿瓦隆游戏圆桌"')
-    expect(html).toContain('aria-label="任务计分板"')
+    expect(html).toContain('data-stage-layout-status="measuring"')
+    expect(html).toContain('aria-label="五次任务进度"')
+    expect(html).toContain('data-room-shell-variant="game"')
+    expect(html).toContain('data-room-game-shell="true"')
     expect(html).not.toContain('>玩家座位<')
   })
 })

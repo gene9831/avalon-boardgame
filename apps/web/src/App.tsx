@@ -1221,6 +1221,7 @@ export function RoomView({
 
   return (
     <ImmersiveLobbyShell
+      variant="game"
       developmentControls={(
         <RoomDevTools
           matchID={room.matchID}
@@ -1317,13 +1318,18 @@ function useRoomLogEntries(
 function ImmersiveLobbyShell({
   children,
   developmentControls,
+  variant = 'framed',
 }: {
   children: ReactNode
   developmentControls: ReactNode
+  variant?: 'framed' | 'game'
 }) {
   return (
-    <main className="relative h-dvh overflow-hidden overscroll-none bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.16),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(34,211,238,0.14),_transparent_35%),#07111f] p-2 text-slate-200 sm:p-3 lg:p-4">
-      <div className="mx-auto h-full min-h-0 max-w-7xl">{children}</div>
+    <main
+      className={`relative h-dvh overflow-hidden overscroll-none bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.16),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(34,211,238,0.14),_transparent_35%),#07111f] text-slate-200 ${variant === 'game' ? 'p-0' : 'p-2 sm:p-3 lg:p-4'}`}
+      data-room-shell-variant={variant}
+    >
+      <div className={`h-full min-h-0 ${variant === 'game' ? 'w-full' : 'mx-auto max-w-7xl'}`}>{children}</div>
       {developmentControls}
     </main>
   )

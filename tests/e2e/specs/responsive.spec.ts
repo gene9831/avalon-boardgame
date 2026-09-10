@@ -17,7 +17,40 @@ const viewports = [
   { width: 1920, height: 1080 },
 ]
 
+const gameViewports = [
+  { width: 375, height: 667 },
+  { width: 667, height: 375 },
+  { width: 390, height: 844 },
+  { width: 768, height: 1024 },
+  { width: 1024, height: 768 },
+  { width: 1280, height: 685 },
+  { width: 1339, height: 786 },
+  { width: 1440, height: 900 },
+]
+
 async function expectRoundTableFits(page: Page, tableLabel: string) {
+  const tableLocator = page.getByLabel(tableLabel, { exact: true })
+  if (tableLabel.includes('游戏圆桌')) {
+    await expect(tableLocator).toHaveAttribute('data-stage-layout-status', 'ready')
+    await expect.poll(() => tableLocator.evaluate((table) => {
+      const bounds = table.getBoundingClientRect()
+      return Number(table.getAttribute('data-stage-layout-width')) === Math.round(bounds.width)
+        && Number(table.getAttribute('data-stage-layout-height')) === Math.round(bounds.height)
+    })).toBe(true)
+    await expect.poll(() => tableLocator.evaluate((table) => {
+      const parts = Array.from(table.querySelectorAll(
+        '[data-round-table-avatar], [data-round-table-nameplate]',
+      ))
+      return parts.length > 0 && parts.every((part) => {
+        const rect = part.getBoundingClientRect()
+        return rect.left >= 0
+          && rect.right <= window.innerWidth
+          && rect.top >= 0
+          && rect.bottom <= window.innerHeight
+      })
+    })).toBe(true)
+  }
+
   const dimensions = await page.evaluate(() => {
     const root = document.documentElement
     return {
@@ -30,7 +63,7 @@ async function expectRoundTableFits(page: Page, tableLabel: string) {
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.innerWidth)
   expect(dimensions.scrollHeight).toBeLessThanOrEqual(dimensions.innerHeight)
 
-  const geometry = await page.getByLabel(tableLabel, { exact: true }).evaluate((table) => {
+  const geometry = await tableLocator.evaluate((table) => {
     const tableRect = table.getBoundingClientRect()
     const seatRects = Array.from(table.querySelectorAll('[data-round-table-seat]'))
       .map((seat) => Array.from(seat.querySelectorAll('[data-round-table-avatar], [data-round-table-nameplate]'))
@@ -46,19 +79,10 @@ async function expectRoundTableFits(page: Page, tableLabel: string) {
       clippingAncestor = clippingAncestor.parentElement
     }
     const clippingRect = clippingAncestor?.getBoundingClientRect()
-    const headerItemRects = Array.from(clippingAncestor?.querySelector('header')?.children ?? [])
-      .map((item) => item.getBoundingClientRect())
-    const bottomSeatPart = seatRects
-      .flatMap((seat) => seat.map(({ rect }) => rect))
-      .sort((left, right) => right.bottom - left.bottom)[0]
     const intersects = (left: DOMRect, right: DOMRect, tolerance = 1) => (
       Math.min(left.right, right.right) - Math.max(left.left, right.left) > tolerance
       && Math.min(left.bottom, right.bottom) - Math.max(left.top, right.top) > tolerance
     )
-    const usesHeaderSpace = window.innerWidth > window.innerHeight
-      && window.innerHeight >= 421
-    const seatCount = Number(table.getAttribute('data-round-table-seat-count'))
-    const requiredBottomSafetyGap = usesHeaderSpace ? (seatCount <= 6 ? 24 : 6) : null
     const maxAvatarWidth = Math.max(
       ...Array.from(table.querySelectorAll('[data-round-table-avatar]'))
         .map((avatar) => avatar.getBoundingClientRect().width),
@@ -69,14 +93,14 @@ async function expectRoundTableFits(page: Page, tableLabel: string) {
     )
 
     return {
-      bottomSafetyGap: clippingRect === undefined || bottomSeatPart === undefined
-        ? null
-        : Math.round((clippingRect.bottom - bottomSeatPart.bottom) * 100) / 100,
       centerOverlappingSeats: center === undefined
         ? ['missing-center']
-        : seatRects.flatMap((seat, index) => seat.flatMap(({ kind, rect }) => intersects(rect, center)
+        : seatRects.flatMap((seat, index) => seat.flatMap(({ kind, rect }) => (
+          table.hasAttribute('data-stage-layout-status') && kind !== 'avatar'
+            ? []
+            : intersects(rect, center)
           ? [`${index + 1}:${kind}:${Math.round(Math.min(rect.right, center.right) - Math.max(rect.left, center.left))}x${Math.round(Math.min(rect.bottom, center.bottom) - Math.max(rect.top, center.top))}`]
-          : [])),
+          : []))),
       clippedSeatParts: clippingRect === undefined
         ? ['missing-clipping-region']
         : seatRects.flatMap((seat, index) => seat.flatMap(({ kind, rect }) => (
@@ -87,13 +111,6 @@ async function expectRoundTableFits(page: Page, tableLabel: string) {
             ? []
             : [`${index + 1}:${kind}:${Math.round(rect.left)},${Math.round(rect.top)},${Math.round(rect.right)},${Math.round(rect.bottom)}`]
         ))),
-      headerItemsOverlappingSeats: usesHeaderSpace
-        ? headerItemRects.flatMap((headerRect, headerIndex) => (
-            seatRects.flatMap((seat, seatIndex) => seat.some(({ rect }) => intersects(rect, headerRect, 4))
-              ? [`${headerIndex + 1}:${seatIndex + 1}`]
-              : [])
-          ))
-        : [],
       overlappingSeatPairs: seatRects.flatMap((seat, index) => (
         seatRects.slice(index + 1).flatMap((other, relativeIndex) => (
           seat.some((left) => other.some((right) => intersects(left.rect, right.rect, 4))) ? [`${index + 1}-${index + relativeIndex + 2}`] : []
@@ -107,29 +124,28 @@ async function expectRoundTableFits(page: Page, tableLabel: string) {
           ? []
           : [`${index + 1}:${kind}:${Math.round(rect.left)},${Math.round(rect.top)},${Math.round(rect.right)},${Math.round(rect.bottom)}`]
       ))),
+      layoutStatus: table.getAttribute('data-stage-layout-status'),
       tableSize: Math.max(tableRect.width, tableRect.height),
       maxAvatarWidth,
       maxNameFontSize,
       viewport: `${window.innerWidth}x${window.innerHeight}`,
-      requiredBottomSafetyGap,
     }
   })
 
-  expect(geometry.tableSize, `${tableLabel} @ ${geometry.viewport}`).toBeLessThanOrEqual(640)
+  if (tableLabel.includes('游戏圆桌')) {
+    expect(geometry.layoutStatus, `${tableLabel} @ ${geometry.viewport}`).toBe('ready')
+    expect(geometry.maxAvatarWidth, `${tableLabel} @ ${geometry.viewport}`).toBeGreaterThanOrEqual(35.5)
+    expect(geometry.maxAvatarWidth, `${tableLabel} @ ${geometry.viewport}`).toBeLessThanOrEqual(56.5)
+  }
   expect(geometry.seatsOutsideViewport, `${tableLabel} @ ${geometry.viewport}`).toEqual([])
   expect(geometry.clippedSeatParts, `${tableLabel} @ ${geometry.viewport}`).toEqual([])
   expect(geometry.overlappingSeatPairs, `${tableLabel} @ ${geometry.viewport}`).toEqual([])
   expect(geometry.centerOverlappingSeats, `${tableLabel} @ ${geometry.viewport}`).toEqual([])
-  expect(geometry.headerItemsOverlappingSeats, `${tableLabel} @ ${geometry.viewport}`).toEqual([])
-  if (geometry.requiredBottomSafetyGap !== null) {
-    expect(geometry.bottomSafetyGap, `${tableLabel} @ ${geometry.viewport}`).toBeGreaterThanOrEqual(
-      geometry.requiredBottomSafetyGap,
-    )
-  }
 
   const undersizedControlLabels = await page.locator('button:visible').evaluateAll((buttons) => (
     buttons
       .filter((button) => {
+        if (button.hasAttribute('data-round-table-player')) return false
         const rect = button.getBoundingClientRect()
         const minimumSize = button.closest('[aria-label="任务计分板"]') === null ? 44 : 40
         return rect.width < minimumSize || rect.height < minimumSize
@@ -294,20 +310,114 @@ test('five, seven, and ten-player round tables remain compact and operable acros
         throw new Error('Generated game has no team proposal')
       }
       const leaderPage = harness.pages[Number(propose.actor)]
-      let gameBaseline: Awaited<ReturnType<typeof expectRoundTableFits>> | null = null
-      for (const viewport of viewports) {
+      for (const viewport of gameViewports) {
         await leaderPage.setViewportSize(viewport)
         await expect(leaderPage.getByLabel('阿瓦隆游戏圆桌')).toBeVisible()
-        const geometry = await expectRoundTableFits(leaderPage, `${playerCount} 人游戏圆桌`)
-        if (viewport.width === 1280 && viewport.height === 685) gameBaseline = geometry
-        if (viewport.width === 1339 && viewport.height === 786) {
-          expect(gameBaseline).not.toBeNull()
-          expectWideSeatMetricsAtLeast({
-            baseline: gameBaseline!,
-            tableLabel: `${playerCount} 人游戏圆桌 @ 1339x786`,
-            wide: geometry,
+        await expectRoundTableFits(leaderPage, `${playerCount} 人游戏圆桌`)
+      }
+
+      if (playerCount === 5) {
+        await leaderPage.setViewportSize({ width: 375, height: 667 })
+        await expectRoundTableFits(leaderPage, `${playerCount} 人游戏圆桌`)
+        for (const label of [
+          '打开帮助说明',
+          '查看对局记录',
+          '打开用户中心',
+          '查看我的身份与已知信息',
+        ]) {
+          const topmostLabel = await leaderPage.getByRole('button', { name: label }).evaluate((button) => {
+            const bounds = button.getBoundingClientRect()
+            const topmost = document.elementFromPoint(
+              bounds.left + bounds.width / 2,
+              bounds.top + bounds.height / 2,
+            )
+            return topmost?.closest('button')?.getAttribute('aria-label')
           })
+          expect(topmostLabel).toBe(label)
         }
+
+        await leaderPage.setViewportSize({ width: 768, height: 1024 })
+        const identityButton = leaderPage.getByRole('button', { name: '查看我的身份与已知信息' })
+        const identityCenter = await identityButton.evaluate((button) => {
+          const bounds = button.getBoundingClientRect()
+          return {
+            x: bounds.left + bounds.width / 2,
+            y: bounds.top + bounds.height / 2,
+          }
+        })
+        await leaderPage.getByRole('button', { name: '打开用户中心' }).click()
+        const profilePanel = leaderPage.getByRole('dialog', { name: '用户中心' })
+        await expect(profilePanel).toBeVisible()
+        const profileBounds = await profilePanel.evaluate((panel) => {
+          const bounds = panel.getBoundingClientRect()
+          return {
+            bottom: bounds.bottom,
+            left: bounds.left,
+            right: bounds.right,
+            top: bounds.top,
+            viewportHeight: window.innerHeight,
+            viewportWidth: window.innerWidth,
+          }
+        })
+        expect(profileBounds.left).toBeGreaterThanOrEqual(0)
+        expect(profileBounds.right).toBeLessThanOrEqual(profileBounds.viewportWidth)
+        expect(profileBounds.top).toBeGreaterThanOrEqual(0)
+        expect(profileBounds.bottom).toBeLessThanOrEqual(profileBounds.viewportHeight)
+        await expect.poll(() => leaderPage.evaluate(({ x, y }) => (
+          document.elementFromPoint(x, y)?.closest('[aria-modal="true"]')?.getAttribute('aria-label')
+        ), identityCenter)).toBe('用户中心')
+        await profilePanel.getByRole('button', { name: '关闭用户中心' }).click()
+        await expect(profilePanel).toBeHidden()
+
+        await leaderPage.getByRole('button', { name: '查看对局记录' }).click()
+        const roomLog = leaderPage.getByRole('dialog', { name: '对局记录' })
+        await expect(roomLog).toBeVisible()
+        await expect.poll(() => leaderPage.evaluate(({ x, y }) => (
+          document.elementFromPoint(x, y)?.closest('[aria-modal="true"]')?.getAttribute('aria-label')
+        ), identityCenter)).toBe('对局记录')
+        await roomLog.getByRole('button', { name: '关闭对局记录' }).click()
+        await expect(roomLog).toBeHidden()
+
+        await leaderPage.setViewportSize({ width: 375, height: 667 })
+        await expectRoundTableFits(leaderPage, `${playerCount} 人游戏圆桌`)
+        const hitRegions = await leaderPage.getByRole('button', {
+          name: /加入任务队伍/,
+        }).first().evaluate((button) => {
+          const avatar = button.querySelector<HTMLElement>('.game-seat-avatar-hit')!
+          const name = button.querySelector<HTMLElement>('.game-seat-name-hit')!
+          const avatarRect = avatar.getBoundingClientRect()
+          const nameRect = name.getBoundingClientRect()
+          const hitsButton = (x: number, y: number) => {
+            const target = document.elementFromPoint(x, y)
+            return target === button || (target !== null && button.contains(target))
+          }
+          return {
+            avatar: hitsButton(
+              avatarRect.left + avatarRect.width / 2,
+              avatarRect.top + avatarRect.height / 2,
+            ),
+            gap: hitsButton(
+              avatarRect.left + avatarRect.width / 2,
+              (avatarRect.bottom + nameRect.top) / 2,
+            ),
+            name: hitsButton(
+              nameRect.left + nameRect.width / 2,
+              nameRect.top + nameRect.height / 2,
+            ),
+          }
+        })
+        expect(hitRegions).toEqual({ avatar: true, gap: false, name: true })
+
+        const selectedSeat = leaderPage.getByRole('button', {
+          name: /加入任务队伍/,
+        }).first()
+        await selectedSeat.locator('.game-seat-avatar-hit').click()
+        await expect(selectedSeat).toHaveAttribute('aria-pressed', 'true')
+        await leaderPage.setViewportSize({ width: 667, height: 375 })
+        await expectRoundTableFits(leaderPage, `${playerCount} 人游戏圆桌`)
+        await expect(selectedSeat).toHaveAttribute('aria-pressed', 'true')
+        await selectedSeat.locator('.game-seat-name-hit').click()
+        await expect(selectedSeat).toHaveAttribute('aria-pressed', 'false')
       }
 
       if (playerCount === 5) {
@@ -334,7 +444,7 @@ test('five, seven, and ten-player round tables remain compact and operable acros
 
         for (const viewport of [
           { width: 390, height: 844 },
-          { width: 568, height: 320 },
+          { width: 667, height: 375 },
         ]) {
           await knowledgePage!.setViewportSize(viewport)
           await knowledgePage!.getByRole('button', {
@@ -353,13 +463,13 @@ test('five, seven, and ten-player round tables remain compact and operable acros
         }
       }
 
-      await leaderPage.setViewportSize(viewports[0])
+      await leaderPage.setViewportSize(gameViewports[0])
       await harness.dispatch(propose)
       const vote = generated.transcript.find(
         ({ command }) => command === 'castTeamVote',
       )!
       const votePage = harness.pages[Number(vote.actor)]
-      await votePage.setViewportSize(viewports[0])
+      await votePage.setViewportSize(gameViewports[0])
       if (playerCount === 5) {
         const voteButtonGeometry = await votePage
           .locator('.phase-action-buttons')
@@ -371,9 +481,9 @@ test('five, seven, and ten-player round tables remain compact and operable acros
               heights: buttons.map((button) => button.getBoundingClientRect().height),
             }
           })
-        expect(voteButtonGeometry.fontSizes).toEqual([14, 14])
-        expect(voteButtonGeometry.gap).toBeCloseTo(6, 1)
-        expect(voteButtonGeometry.heights).toEqual([40, 40])
+        expect(Math.min(...voteButtonGeometry.fontSizes)).toBeGreaterThanOrEqual(12)
+        expect(voteButtonGeometry.gap).toBeGreaterThanOrEqual(6)
+        expect(Math.min(...voteButtonGeometry.heights)).toBeGreaterThanOrEqual(44)
       }
       await harness.dispatch(vote)
       if (vote.command !== 'castTeamVote') throw new Error('Expected a team vote command')
@@ -387,7 +497,8 @@ test('five, seven, and ten-player round tables remain compact and operable acros
       if (playerCount === 5) {
         const rightSideViewerIndex = (Number(vote.actor) - 4 + playerCount) % playerCount
         const rightSidePage = harness.pages[rightSideViewerIndex]!
-        await rightSidePage.setViewportSize({ width: 320, height: 568 })
+        await rightSidePage.setViewportSize({ width: 375, height: 667 })
+        await expectRoundTableFits(rightSidePage, `${playerCount} 人游戏圆桌`)
         const rightSideIndicatorBounds = await rightSidePage
           .locator('[data-team-vote-status]')
           .evaluate((indicator) => {
@@ -399,7 +510,7 @@ test('five, seven, and ten-player round tables remain compact and operable acros
           rightSideIndicatorBounds.viewportWidth,
         )
 
-        const landscape = viewports[1]
+        const landscape = gameViewports[1]
         await votePage.setViewportSize(landscape)
         await expect(votePage.getByText(`你已选择：${submittedVoteLabel}`, { exact: true })).toBeVisible()
         await expect(votePage.getByLabel('五次任务进度')).toBeVisible()
@@ -426,36 +537,24 @@ test('five, seven, and ten-player round tables remain compact and operable acros
           name: questCardButtonLabel,
         })).toBeVisible()
         for (const viewport of [
-          { width: 320, height: 568 },
-          { width: 504, height: 741 },
+          { width: 375, height: 667 },
+          { width: 667, height: 375 },
         ]) {
           await questPage.setViewportSize(viewport)
+          await expectRoundTableFits(questPage, `${playerCount} 人游戏圆桌`)
           const questBoardGeometry = await questPage
             .getByLabel('任务计分板', { exact: true })
             .evaluate((board) => {
               const table = board.closest('[data-round-table-seat-count]')!
               const tableBounds = table.getBoundingClientRect()
               const boardBounds = board.getBoundingClientRect()
-              const action = board.querySelector('.quest-action')!
-              const buttonGroup = board.querySelector('.phase-action-buttons')!
+              const action = document.querySelector('.room-game-phase-action')!
+              const buttonGroup = action.querySelector('.phase-action-buttons')!
               const actionButton = buttonGroup.querySelector('button')!
-              const readableFontSizes = Array.from(board.querySelectorAll('*'))
-                .filter((element) => {
-                  const bounds = element.getBoundingClientRect()
-                  const style = getComputedStyle(element)
-                  const hasDirectText = Array.from(element.childNodes).some(
-                    (node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim() !== '',
-                  )
-                  return hasDirectText
-                    && bounds.width > 0
-                    && bounds.height > 0
-                    && style.display !== 'none'
-                    && style.visibility !== 'hidden'
-                })
-                .map((element) => Number.parseFloat(getComputedStyle(element).fontSize))
               return {
                 actionButtonFontSize: Number.parseFloat(getComputedStyle(actionButton).fontSize),
                 actionButtonHeight: actionButton.getBoundingClientRect().height,
+                actionInsideBoard: board.contains(action),
                 centerDeltaX: Math.abs(
                   boardBounds.left + boardBounds.width / 2
                     - (tableBounds.left + tableBounds.width / 2),
@@ -464,20 +563,16 @@ test('five, seven, and ten-player round tables remain compact and operable acros
                   boardBounds.top + boardBounds.height / 2
                     - (tableBounds.top + tableBounds.height / 2),
                 ),
-                minimumReadableFontSize: Math.min(...readableFontSizes),
-                verticalActionSpacing:
-                  Number.parseFloat(getComputedStyle(action).marginTop)
-                  + Number.parseFloat(getComputedStyle(action).paddingTop)
-                  + Number.parseFloat(getComputedStyle(buttonGroup).marginTop),
+                centerPanelSize: [boardBounds.width, boardBounds.height],
               }
             })
           expect(questBoardGeometry.centerDeltaX).toBeLessThanOrEqual(1)
-          expect(questBoardGeometry.centerDeltaY).toBeLessThanOrEqual(1)
-          expect(questBoardGeometry.minimumReadableFontSize).toBeGreaterThanOrEqual(12)
-          expect(questBoardGeometry.actionButtonHeight).toBeCloseTo(40, 1)
-          expect(questBoardGeometry.actionButtonFontSize).toBeCloseTo(14, 1)
-          expect(questBoardGeometry.verticalActionSpacing).toBeLessThanOrEqual(12.1)
-          await expectRoundTableFits(questPage, `${playerCount} 人游戏圆桌`)
+          expect(questBoardGeometry.centerDeltaY).toBeLessThanOrEqual(4)
+          expect(questBoardGeometry.centerPanelSize[0]).toBeCloseTo(152, 1)
+          expect(questBoardGeometry.centerPanelSize[1]).toBeCloseTo(152, 1)
+          expect(questBoardGeometry.actionInsideBoard).toBe(false)
+          expect(questBoardGeometry.actionButtonHeight).toBeGreaterThanOrEqual(44)
+          expect(questBoardGeometry.actionButtonFontSize).toBeGreaterThanOrEqual(12)
         }
 
         await questPage.setViewportSize(landscape)

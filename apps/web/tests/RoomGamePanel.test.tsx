@@ -5,6 +5,13 @@ import type { AvalonPlayerView, QuestCard } from '@avalon/game'
 import { RoleCard } from '../src/RoleCard'
 import { RoomGamePanel } from '../src/RoomGamePanel'
 
+vi.mock('../src/useObservedContentSize', () => ({
+  useObservedContentSize: () => ({
+    ref: vi.fn(),
+    size: { width: 375, height: 667 },
+  }),
+}))
+
 const players = [
   { id: 0, name: 'Alice', isConnected: true },
   { id: 1, name: 'Bob', isConnected: true },
@@ -84,6 +91,42 @@ describe('RoomGamePanel operation log', () => {
     expect(html).toContain('aria-label="打开帮助说明"')
     expect(html).toContain('aria-label="查看对局记录"')
     expect(html).not.toContain('data-unread')
+  })
+})
+
+describe('RoomGamePanel responsive business shell', () => {
+  it('renders one stable set of game controls around a measured stage', () => {
+    const html = renderPanel({
+      activeStage: 'leader',
+      game: gameView({ proposedTeam: null }),
+      phase: 'teamProposal',
+    })
+
+    expect(html).toContain('data-room-game-shell="true"')
+    expect(html).toContain('data-room-layout-mode="vertical"')
+    expect(html).toContain('data-stage-layout-status="ready"')
+    expect(html.match(/data-room-game-slot="stage"/g)).toHaveLength(1)
+    expect(html.match(/data-room-game-slot="phase-middle"/g)).toHaveLength(1)
+    expect(html.match(/data-room-game-slot="phase-action"/g)).toHaveLength(1)
+    expect(html).toContain('data-profile-panel-placement="bottom-sheet"')
+    expect(html.match(/aria-label="打开帮助说明"/g)).toHaveLength(1)
+    expect(html.match(/aria-label="查看对局记录"/g)).toHaveLength(1)
+    expect(html.match(/aria-label="查看我的身份与已知信息"/g)).toHaveLength(1)
+    expect(html.match(/aria-label="确认队伍 0\/2"/g)).toHaveLength(1)
+  })
+
+  it('limits each pointer hit region to the visible avatar and name', () => {
+    const html = renderPanel({
+      activeStage: 'leader',
+      game: gameView({ proposedTeam: null }),
+      phase: 'teamProposal',
+    })
+
+    expect(html.match(/data-round-table-player="true"/g)).toHaveLength(5)
+    expect(html.match(/game-seat-button pointer-events-none/g)).toHaveLength(5)
+    expect(html.match(/game-seat-avatar-hit pointer-events-auto/g)).toHaveLength(5)
+    expect(html.match(/game-seat-name-hit pointer-events-auto/g)).toHaveLength(5)
+    expect(html).toContain('pointer-events-none absolute -top-')
   })
 })
 

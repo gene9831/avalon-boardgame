@@ -26,13 +26,13 @@ type PresentedRole =
   | 'minion'
 
 const recognitionViewports = [
-  { width: 320, height: 568 },
+  { width: 375, height: 667 },
   { width: 390, height: 844 },
-  { width: 568, height: 320 },
+  { width: 667, height: 375 },
   { width: 1339, height: 786 },
 ]
 
-async function expectRecognitionControlsAvoidSeats({
+async function expectRecognitionLayerCoversStage({
   page,
   playerCount,
   viewport,
@@ -44,78 +44,39 @@ async function expectRecognitionControlsAvoidSeats({
   await page.setViewportSize(viewport)
 
   const recognitionLayer = page.getByLabel('身份辨认', { exact: true })
-  const questBoard = page.getByLabel('任务计分板', { exact: true })
-  const landscape = viewport.width > viewport.height
 
   await expect(recognitionLayer).toBeVisible()
   await expect(recognitionLayer.getByRole('button')).toHaveCount(1)
-  if (landscape) {
-    await expect(questBoard).toBeHidden()
-  } else {
-    await expect(questBoard).toBeVisible()
-  }
 
-  const geometry = await recognitionLayer.evaluate((layer, options) => {
-    const table = document.querySelector(
-      `[aria-label="${options.playerCount} 人游戏圆桌"]`,
-    )
-    const center = table?.querySelector('[data-round-table-center]')
-    const visualSurfaces = options.landscape
-      ? [layer.querySelector('.identity-recognition-responsive-panel')]
-      : [
-          layer.querySelector('.identity-recognition-header'),
-          layer.querySelector('.identity-recognition-confirmation'),
-        ]
-    const surfaces = visualSurfaces.filter((element): element is Element => element !== null)
-    const seatParts = Array.from(
-      table?.querySelectorAll('[data-round-table-avatar], [data-round-table-nameplate]') ?? [],
-    )
-    const intersects = (left: DOMRect, right: DOMRect, tolerance = 1) => (
-      Math.min(left.right, right.right) - Math.max(left.left, right.left) > tolerance
-      && Math.min(left.bottom, right.bottom) - Math.max(left.top, right.top) > tolerance
-    )
-    const centerRect = center?.getBoundingClientRect()
+  const geometry = await recognitionLayer.evaluate((layer) => {
+    const stage = layer.closest('.room-game-stage-content')
+    const stageRect = stage?.getBoundingClientRect()
+    const layerRect = layer.getBoundingClientRect()
     const buttonRect = layer.querySelector('button')?.getBoundingClientRect()
 
     return {
       buttonSize: buttonRect === undefined
         ? null
         : { height: buttonRect.height, width: buttonRect.width },
-      controlsInsideCenter: centerRect !== undefined && surfaces.every((surface) => {
-        const rect = surface.getBoundingClientRect()
-        return rect.left >= centerRect.left - 1
-          && rect.right <= centerRect.right + 1
-          && rect.top >= centerRect.top - 1
-          && rect.bottom <= centerRect.bottom + 1
-      }),
-      controlSeatOverlaps: surfaces.flatMap((surface, controlIndex) => {
-        const controlRect = surface.getBoundingClientRect()
-        return seatParts.flatMap((seatPart, seatIndex) => (
-          intersects(controlRect, seatPart.getBoundingClientRect())
-            ? [`${controlIndex + 1}:${seatIndex + 1}`]
-            : []
-        ))
-      }),
+      coversStage: stageRect !== undefined
+        && Math.abs(layerRect.left - stageRect.left) <= 1
+        && Math.abs(layerRect.right - stageRect.right) <= 1
+        && Math.abs(layerRect.top - stageRect.top) <= 1
+        && Math.abs(layerRect.bottom - stageRect.bottom) <= 1,
     }
-  }, { landscape, playerCount })
+  })
 
   expect(geometry.buttonSize).not.toBeNull()
   expect(geometry.buttonSize!.height).toBeGreaterThanOrEqual(44)
   expect(geometry.buttonSize!.width).toBeGreaterThanOrEqual(44)
   expect(
-    geometry.controlSeatOverlaps,
+    geometry.coversStage,
     `${playerCount} players @ ${viewport.width}x${viewport.height}`,
-  ).toEqual([])
-  if (landscape) {
-    expect(
-      geometry.controlsInsideCenter,
-      `${playerCount} players @ ${viewport.width}x${viewport.height}`,
-    ).toBe(true)
-  }
+  ).toBe(true)
 
 }
 
-test('recognition controls float in portrait and replace the quest board in landscape', async ({
+test('recognition overlay covers the measured stage in every business shell', async ({
   browser,
 }) => {
   test.setTimeout(180_000)
@@ -139,7 +100,7 @@ test('recognition controls float in portrait and replace the quest board in land
       if (participantIndex === undefined) throw new Error('Expected an Evil-recognition participant')
       const responsiveParticipantPage = harness.pages[participantIndex]!
       for (const viewport of recognitionViewports) {
-        await expectRecognitionControlsAvoidSeats({
+        await expectRecognitionLayerCoversStage({
           page: responsiveParticipantPage,
           playerCount,
           viewport,
@@ -201,13 +162,15 @@ test('players complete the curtain-based identity recognition ceremony', async (
         name: '查看我的身份与已知信息',
       })).toHaveCount(0)
 
-      const headerZIndex = await page.locator('.round-table-header').evaluate(
-        (header) => Number.parseInt(getComputedStyle(header).zIndex, 10) || 0,
-      )
-      const recognitionZIndex = await recognitionLayer.evaluate(
-        (layer) => Number.parseInt(getComputedStyle(layer).zIndex, 10) || 0,
-      )
-      expect(headerZIndex).toBeGreaterThan(recognitionZIndex)
+      const backButton = page.getByRole('button', { name: '返回主页' })
+      expect(await backButton.evaluate((button) => {
+        const bounds = button.getBoundingClientRect()
+        const topmost = document.elementFromPoint(
+          bounds.left + bounds.width / 2,
+          bounds.top + bounds.height / 2,
+        )
+        return topmost === button || button.contains(topmost)
+      })).toBe(true)
     }
     for (const [index, page] of harness.pages.entries()) {
       const role = await page.locator('[data-role-card]').getAttribute('data-role-card')

@@ -14,6 +14,7 @@ export interface RoundTableSeat {
   isCurrentPlayer: boolean
   isOwner: boolean
   labelPlacement: 'bottom' | 'left' | 'right' | 'top'
+  relativeSeatIndex: number
   left: number
   top: number
 }
@@ -51,6 +52,7 @@ export function buildRoundTableSeats(
       connected: occupied && player?.isConnected === true,
       isCurrentPlayer: String(index) === viewerPlayerID,
       isOwner: String(index) === ownerPlayerID,
+      relativeSeatIndex: relativeIndex,
       labelPlacement: vertical > 0.5
         ? 'bottom'
         : vertical < -0.5

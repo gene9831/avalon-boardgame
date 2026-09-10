@@ -20,12 +20,14 @@ import { useModalLayer } from './use-modal-layer'
 export interface PlayerProfileControlProps {
   locked: boolean
   onSave: (profile: PlayerProfile) => void
+  panelPlacement?: 'bottom-sheet' | 'responsive'
   profile: PlayerProfile
 }
 
 export function PlayerProfileControl({
   locked,
   onSave,
+  panelPlacement = 'responsive',
   profile,
 }: PlayerProfileControlProps) {
   const [open, setOpen] = useState(false)
@@ -56,7 +58,7 @@ export function PlayerProfileControl({
   }
 
   return (
-    <div className="relative">
+    <div className="relative" data-profile-panel-placement={panelPlacement}>
       <button
         aria-expanded={open}
         aria-label="打开用户中心"
@@ -78,7 +80,7 @@ export function PlayerProfileControl({
         <>
           <button
             aria-label="关闭用户中心"
-            className="fixed inset-0 z-[109] cursor-default bg-slate-950/55 sm:bg-transparent"
+            className={`fixed inset-0 z-[109] cursor-default bg-slate-950/55 ${panelPlacement === 'responsive' ? 'sm:bg-transparent' : ''}`}
             onClick={close}
             type="button"
           />
@@ -97,6 +99,7 @@ export function PlayerProfileControl({
               setError(null)
             }}
             onSave={save}
+            placement={panelPlacement}
             panelRef={panelRef}
           />
         </>
@@ -114,6 +117,7 @@ export function PlayerProfilePanel({
   onNameChange,
   onRandomize,
   onSave,
+  placement = 'responsive',
   panelRef,
 }: {
   draft: PlayerProfile
@@ -124,13 +128,15 @@ export function PlayerProfilePanel({
   onNameChange: (name: string) => void
   onRandomize: () => void
   onSave: () => void
+  placement?: 'bottom-sheet' | 'responsive'
   panelRef?: Ref<HTMLElement>
 }) {
   return (
     <section
       aria-label="用户中心"
       aria-modal="true"
-      className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-[110] max-h-[calc(100dvh-1.5rem)] overflow-y-auto rounded-3xl border border-white/15 bg-slate-950/98 p-5 text-slate-200 shadow-2xl shadow-black/50 sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-[calc(100%+0.65rem)] sm:w-80"
+      className={`fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-[110] max-h-[calc(100dvh-1.5rem)] overflow-y-auto rounded-3xl border border-white/15 bg-slate-950/98 p-5 text-slate-200 shadow-2xl shadow-black/50 ${placement === 'responsive' ? 'sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-[calc(100%+0.65rem)] sm:w-80' : ''}`}
+      data-profile-panel-placement={placement}
       ref={panelRef}
       role="dialog"
     >
