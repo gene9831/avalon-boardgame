@@ -67,11 +67,12 @@ distance(roundTableCenter, playerCenter)
 
 ## 4. 跑道几何
 
-模型只生成圆形或纵向跑道，不根据舞台方向自动旋转。中心线使用扣除玩家圆直径后的最大公开宽度：
+模型只生成圆形或纵向跑道，不根据舞台方向旋转。舞台方向由宽高直接推导；中心线使用短边扣除玩家圆直径后的最大公开宽度，因此宽舞台会在中央复用同一竖向算法：
 
 ```text
 stadiumCenterlineWidth =
-  maxStageWidth - 2 × playerBoundaryRadius
+  min(maxStageWidth, maxStageHeight)
+  - 2 × playerBoundaryRadius
 
 stadiumCenterlineRadius = stadiumCenterlineWidth / 2
 ```
@@ -224,13 +225,13 @@ apps/ui-layout-lab/src/stadium-model/
   geometry.ts
   solve-stadium-circle-layout.ts
   solve-stadium-player-layout.ts
-  solve-stadium-rectangle-layout.ts
   types.ts
 ```
 
 - `solve-stadium-circle-layout.ts`：独立数学模型的新圆形核心。
 - `solve-stadium-player-layout.ts`：独立模型公开入口，只调用圆形核心。
-- `solve-stadium-rectangle-layout.ts`：已无业务消费者的旧矩形核心，暂时保留作迁移期对照。
+
+迁移期的旧矩形求解器及其专用测试、类型和几何函数已经删除，避免两套边界模型继续并存。
 
 ## 12. 永久回归
 

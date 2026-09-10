@@ -1,5 +1,127 @@
 import { expect, test } from '@playwright/test'
 
+test('preserves shell state while rotating', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 1000 })
+  await page.goto('http://127.0.0.1:14175/?viewport=simulated&width=390&height=844&players=10&geometry=0')
+
+  const canvas = page.getByLabel('Avalon 房间布局预览')
+  const infoTrigger = page.getByRole('button', { name: '显示布局信息' })
+  await infoTrigger.click()
+  await page.locator('.stage-info').evaluate((element) => {
+    Object.assign(element, { rotationIdentity: 'preserved-shell' })
+  })
+
+  await page.getByRole('button', { name: '打开布局设置' }).click()
+  const settingsDialog = page.getByRole('dialog', { name: '预览设置' })
+  const rotateButton = settingsDialog.getByRole('button', { name: '旋转宽高' })
+  await rotateButton.focus()
+  await rotateButton.click()
+
+  await expect(page).toHaveURL(/width=844&height=390/)
+  await expect(canvas).toHaveAttribute('data-room-layout-mode', 'compact-landscape')
+  await expect(settingsDialog).toBeVisible()
+  await expect(rotateButton).toBeFocused()
+  await expect(page.getByRole('button', { name: '隐藏布局信息' })).toHaveAttribute('aria-expanded', 'true')
+  expect(await page.locator('.stage-info').evaluate(
+    (element) => (element as HTMLElement & { rotationIdentity?: string }).rotationIdentity,
+  )).toBe('preserved-shell')
+  const readout = page.locator('.layout-readout')
+  await expect(readout).toContainText('业务：紧凑横版')
+  await expect(readout).toContainText('舞台：')
+  await expect(readout).toContainText('数学：')
+})
+
+test('landscape shell uses one compact grid for the short 667 by 375 room', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await page.goto('http://127.0.0.1:14175/?viewport=simulated&width=667&height=375&players=10&geometry=0')
+
+  const canvas = page.getByLabel('Avalon 房间布局预览')
+  await expect(canvas).toHaveAttribute('data-room-layout-mode', 'compact-landscape')
+  await expect(canvas).toHaveAttribute('data-layout-status', 'ready')
+  await expect(canvas).toHaveAttribute('data-stage-width', '403')
+  await expect(canvas).toHaveAttribute('data-stage-height', '359')
+
+  const placement = await page.evaluate(() => {
+    const bounds = (selector: string) => document.querySelector(selector)!.getBoundingClientRect()
+    const canvasBounds = bounds('.room-canvas')
+    const rail = bounds('.task-track')
+    const stage = bounds('.round-table-stage-region')
+    const phase = bounds('.phase-middle')
+    return {
+      railRight: rail.right,
+      stageLeft: stage.left,
+      stageRight: stage.right,
+      phaseLeft: phase.left,
+      stageTop: stage.top,
+      stageBottom: stage.bottom,
+      canvasTop: canvasBounds.top,
+      canvasBottom: canvasBounds.bottom,
+    }
+  })
+  expect(placement.railRight).toBeLessThanOrEqual(placement.stageLeft)
+  expect(placement.stageRight).toBeLessThanOrEqual(placement.phaseLeft)
+  expect(placement.stageTop).toBe(placement.canvasTop)
+  expect(placement.stageBottom).toBe(placement.canvasBottom)
+
+  const infoButton = page.getByRole('button', { name: '显示布局信息' })
+  await infoButton.click()
+  const readout = page.locator('.layout-readout')
+  await expect(readout).toBeVisible()
+  const infoPlacement = await page.evaluate(() => {
+    const bounds = (selector: string) => document.querySelector(selector)!.getBoundingClientRect()
+    const canvas = bounds('.room-canvas')
+    const button = bounds('.stage-info-trigger')
+    const readout = bounds('.layout-readout')
+    return {
+      canvasTop: canvas.top,
+      buttonTop: button.top,
+      readoutBottom: readout.bottom,
+      readoutTop: readout.top,
+    }
+  })
+  expect(infoPlacement.readoutBottom).toBeLessThanOrEqual(infoPlacement.buttonTop)
+  expect(infoPlacement.readoutTop).toBeGreaterThanOrEqual(infoPlacement.canvasTop)
+})
+
+test('landscape shell uses one normal grid for the 1024 by 768 room', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 1000 })
+  await page.goto('http://127.0.0.1:14175/?viewport=simulated&width=1024&height=768&players=10&geometry=0')
+
+  const canvas = page.getByLabel('Avalon 房间布局预览')
+  await expect(canvas).toHaveAttribute('data-room-layout-mode', 'normal-landscape')
+  await expect(canvas).toHaveAttribute('data-layout-status', 'ready')
+  await expect(canvas).toHaveAttribute('data-stage-width', '704')
+  await expect(canvas).toHaveAttribute('data-stage-height', '680')
+
+  const placement = await page.evaluate(() => {
+    const bounds = (selector: string) => document.querySelector(selector)!.getBoundingClientRect()
+    const stage = bounds('.round-table-stage-region')
+    const phase = bounds('.phase-middle')
+    return {
+      backBottom: bounds('.back-button').bottom,
+      roomBottom: bounds('.room-code').bottom,
+      taskBottom: bounds('.task-track').bottom,
+      toolsBottom: bounds('.room-tools').bottom,
+      stageTop: stage.top,
+      stageRight: stage.right,
+      phaseLeft: phase.left,
+    }
+  })
+  expect(placement.backBottom).toBeLessThanOrEqual(placement.stageTop)
+  expect(placement.roomBottom).toBeLessThanOrEqual(placement.stageTop)
+  expect(placement.taskBottom).toBeLessThanOrEqual(placement.stageTop)
+  expect(placement.toolsBottom).toBeLessThanOrEqual(placement.stageTop)
+  expect(placement.stageRight).toBeLessThanOrEqual(placement.phaseLeft)
+
+  const buttonDimensions = await canvas.locator('button:visible').evaluateAll((buttons) => (
+    buttons.map((button) => {
+      const bounds = button.getBoundingClientRect()
+      return { width: bounds.width, height: bounds.height }
+    })
+  ))
+  expect(buttonDimensions.every(({ width, height }) => width >= 44 && height >= 44)).toBe(true)
+})
+
 test('centers a bounded solver stage inside a taller device viewport', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 1366 })
   await page.goto('/?viewport=device&width=390&height=844&players=10&geometry=0')
@@ -74,7 +196,7 @@ test('uses the actual mobile viewport and keeps device controls concise', async 
   const hideInfoButton = page.getByRole('button', { name: '隐藏布局信息' })
   await expect(hideInfoButton).toHaveAttribute('aria-expanded', 'true')
   await expect(readout).toBeVisible()
-  await expect(readout).toContainText('390 × 844 · 舞台 366 × 596')
+  await expect(readout).toContainText('390 × 844 · 业务：竖版 · 舞台：366 × 596 · 数学：')
   await expect(readout).toContainText('头像 56px')
   const readoutPlacement = await page.evaluate(() => {
     const buttonBounds = document.querySelector('.stage-info-trigger')!.getBoundingClientRect()
@@ -193,6 +315,19 @@ test('uses the actual mobile viewport and keeps device controls concise', async 
     })
   ))
   expect(buttonDimensions.every(({ width, height }) => width >= 44 && height >= 44)).toBe(true)
+
+  const taskLabelOverflow = await canvas.locator('.task-node').evaluateAll((nodes) => (
+    nodes.map((node) => {
+      const nodeBounds = node.getBoundingClientRect()
+      const labelBounds = node.querySelector('small')!.getBoundingClientRect()
+      return {
+        isCurrent: node.classList.contains('is-current'),
+        belowHotspot: labelBounds.bottom - nodeBounds.bottom,
+      }
+    })
+  ))
+  expect(taskLabelOverflow.find(({ isCurrent }) => !isCurrent)?.belowHotspot).toBeCloseTo(1, 1)
+  expect(taskLabelOverflow.find(({ isCurrent }) => isCurrent)?.belowHotspot).toBeCloseTo(3, 1)
 })
 
 test('restores remembered simulated dimensions after leaving device mode', async ({ page }) => {
@@ -251,7 +386,7 @@ test('draws a diagonal Euclidean gap segment on the circular layout', async ({ p
 })
 
 const confirmedBusinessViewports = [
-  [{ width: 375, height: 667 }, { stageWidth: 359, stageHeight: 435, avatarSize: 36, shape: 'circle' }],
+  [{ width: 375, height: 667 }, { stageWidth: 359, stageHeight: 435, avatarSize: 40, shape: 'stadium' }],
   [{ width: 390, height: 844 }, { stageWidth: 366, stageHeight: 596, avatarSize: 56, shape: 'stadium' }],
   [{ width: 430, height: 932 }, { stageWidth: 406, stageHeight: 684, avatarSize: 56, shape: 'stadium' }],
   [{ width: 768, height: 1024 }, { stageWidth: 744, stageHeight: 776, avatarSize: 56, shape: 'circle' }],
@@ -286,18 +421,6 @@ test('keeps the confirmed monotone avatar tiers for 5 to 10 players', async ({ p
   expect(avatarSizes.every((size, index) => index === 0 || size <= avatarSizes[index - 1]!)).toBe(true)
 })
 
-test('keeps settings available when wide-stage strategy is pending', async ({ page }) => {
-  await page.setViewportSize({ width: 844, height: 390 })
-  await page.goto('http://127.0.0.1:14175/?viewport=device&players=10')
-
-  await expect(page.getByLabel('Avalon 房间布局预览')).toHaveAttribute('data-canvas-width', '844')
-  await expect(page.getByText('wide-stage-strategy-pending', { exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: '返回' })).toBeVisible()
-  await expect(page.getByRole('button', { name: '确认队伍 · 2/4' })).toBeVisible()
-  await page.getByRole('button', { name: '打开布局设置' }).click()
-  await expect(page.getByRole('dialog', { name: '预览设置' })).toBeVisible()
-})
-
 test('lets the preview lower the player-circle gap at 402 by 714', async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 800 })
   await page.goto('http://127.0.0.1:14175/?viewport=simulated&width=402&height=714&players=10&gap=6&geometry=0')
@@ -324,7 +447,7 @@ test('lets the preview control the avatar ceiling and decrement step', async ({ 
   const canvas = page.getByLabel('Avalon 房间布局预览')
   await expect(canvas).toHaveAttribute('data-avatar-size', '36')
   await expect(page.locator('.layout-readout')).toHaveText(
-    '402 × 714 · 舞台 386 × 482 · 10 人 · 头像 36px · 圆形',
+    '402 × 714 · 业务：竖版 · 舞台：386 × 482 · 数学：10 人 · 头像 36px · 圆形',
   )
 
   await page.getByRole('button', { name: '打开布局设置' }).click()

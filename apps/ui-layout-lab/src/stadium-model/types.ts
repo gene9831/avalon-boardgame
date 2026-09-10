@@ -30,14 +30,6 @@ export type StadiumPlayerLayoutInput = Readonly<{
   centerProtectionRadius?: number
 }>
 
-export type StadiumRectangleLayoutInput = Readonly<{
-  maxStageWidth: number
-  maxStageHeight: number
-  playerCount: number
-  playerRectangleSize: number
-  minimumGap: number
-}>
-
 export type StadiumPlayerLayoutReady = Readonly<{
   status: 'ready'
   shape: 'circle' | 'stadium'
@@ -50,18 +42,6 @@ export type StadiumPlayerLayoutReady = Readonly<{
   occupiedBounds: Rect
 }>
 
-export type StadiumRectangleLayoutReady = Readonly<{
-  status: 'ready'
-  shape: 'circle' | 'stadium'
-  centerlineBounds: Rect
-  stadiumStraightLength: number
-  targetGap: number
-  playerRects: readonly Rect[]
-  playerCenters: readonly Point[]
-  adjacentBoundaryGaps: readonly number[]
-  occupiedBounds: Rect
-}>
-
 export type StadiumPlayerLayoutUnavailable = Readonly<{
   status: 'unavailable'
   reason: 'invalid-input' | 'no-fitting-layout'
@@ -69,8 +49,4 @@ export type StadiumPlayerLayoutUnavailable = Readonly<{
 
 export type StadiumPlayerLayoutResult =
   | StadiumPlayerLayoutReady
-  | StadiumPlayerLayoutUnavailable
-
-export type StadiumRectangleLayoutResult =
-  | StadiumRectangleLayoutReady
   | StadiumPlayerLayoutUnavailable

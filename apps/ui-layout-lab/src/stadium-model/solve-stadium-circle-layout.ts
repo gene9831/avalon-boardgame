@@ -499,7 +499,7 @@ export function solveStadiumCircleLayout(
   if (!hasValidInput(rawInput)) return unavailable('invalid-input')
   const input = normalizeInput(rawInput)
   const centerlineWidth = largestPublicGridCenterlineWidth(
-    input.maxStageWidth - 2 * input.playerRadius,
+    Math.min(input.maxStageWidth, input.maxStageHeight) - 2 * input.playerRadius,
   )
   const maximumStraightLength = input.maxStageHeight - 2 * input.playerRadius - centerlineWidth
   if (centerlineWidth < 0 || maximumStraightLength < 0) return unavailable('no-fitting-layout')

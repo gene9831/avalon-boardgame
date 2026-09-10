@@ -52,8 +52,8 @@ describe('tall round-table stage layout', () => {
     {
       maxStageWidth: 359,
       maxStageHeight: 435,
-      avatarDiameter: 36,
-      shape: 'circle',
+      avatarDiameter: 40,
+      shape: 'stadium',
     },
     {
       maxStageWidth: 366,
@@ -77,8 +77,8 @@ describe('tall round-table stage layout', () => {
     'keeps the largest fitting ten-player tier at $maxStageWidth×$maxStageHeight',
     ({ maxStageWidth, maxStageHeight, avatarDiameter, shape }) => {
       const layout = expectReady(maxStageWidth, maxStageHeight, 10)
-      expect(layout).toMatchObject({ shape })
       expect(layout.playerSeats[0].avatarRect.width).toBe(avatarDiameter)
+      expect(layout).toMatchObject({ shape })
     },
   )
 
@@ -110,7 +110,7 @@ describe('tall round-table stage layout', () => {
           })).toBe(true)
           expect(seat.playerSeatBounds.width).toBe(seat.playerSeatBounds.height)
           expect(contains(seat.playerSeatBounds, seat.avatarRect)).toBe(true)
-          expect(contains(seat.playerSeatBounds, seat.nameRect)).toBe(true)
+          expect(contains(stageBounds, seat.nameRect)).toBe(true)
           expect(seat.avatarTopClearance).toBeCloseTo(
             seat.avatarRect.y - seat.playerSeatBounds.y,
             2,

@@ -100,13 +100,13 @@ _Avoid_: admin mode, operator mode
 
 ## Room interface layout
 
-**Horizontal room layout**: A room arrangement selected from available geometry rather than from a device category. Its normal mode uses one full-width top bar above a round-table stage and phase sidebar; its low-height compact mode uses a left task rail, round-table stage, and phase sidebar in one row.
+**Horizontal room layout**: A room arrangement selected from business-canvas width and height rather than from a device category. Its normal mode uses one full-width top bar above a round-table stage and phase sidebar; its low-height compact mode uses a left task rail, round-table stage, and phase sidebar in one row. An infeasible horizontal stage keeps this shell and reports unavailable only inside the stage.
 _Avoid_: PC layout, desktop layout
 
 **Compact horizontal layout**: The low-height mode of the horizontal room layout. It replaces the top bar with a left task rail so the round-table stage can use the full available height.
 _Avoid_: mobile landscape layout, phone layout
 
-**Vertical room layout**: A three-band room arrangement preferred when the usable geometry is taller than it is wide, and also available as a feasibility fallback when the horizontal arrangement cannot fit. It places a combined room-and-quest top bar, round-table stage, and fixed phase panel in three stacked bands.
+**Vertical room layout**: A three-band room arrangement selected when the business canvas is taller than it is wide. It places a combined room-and-quest top bar, round-table stage, and fixed phase panel in three stacked bands.
 _Avoid_: mobile layout, phone layout, portrait device layout
 
 **Task rail**: The compact horizontal layout region containing the return action and vertically grouped quest progress nodes.

@@ -32,10 +32,6 @@ export function solveRoundTableStageLayoutWithDiagnostics(
     return { status: 'unavailable', reason: 'invalid-input' }
   }
 
-  if (input.maxStageWidth >= input.maxStageHeight) {
-    return { status: 'unavailable', reason: 'wide-stage-strategy-pending' }
-  }
-
   return solveTallRoundTableStageLayout(
     input,
     input.gap ?? 8,

@@ -175,6 +175,24 @@ describe('solveStadiumPlayerLayout circular contract', () => {
     expect(result.status).toBe('ready')
   })
 
+  it('centers the vertical circle layout in a wider stage', () => {
+    const result = solveStadiumPlayerLayout({
+      maxStageWidth: 482,
+      maxStageHeight: 386,
+      playerCount: 5,
+      avatarSize: 40,
+      minimumGap: 4,
+      centerProtectionRadius: 0,
+    })
+
+    expect(result.status).toBe('ready')
+    if (result.status !== 'ready') throw new Error(result.reason)
+    expect(result.shape).toBe('circle')
+    expect(result.occupiedBounds).toEqual({ x: 48, y: 0, width: 386, height: 386 })
+    expect(result.centerlineBounds).toEqual({ x: 88, y: 40, width: 306, height: 306 })
+    expect(result.playerCircles[0]).toEqual({ center: { x: 241, y: 346 }, radius: 40 })
+  })
+
   it('uses the maximum-width circle immediately when it is feasible', () => {
     const result = solveStadiumPlayerLayout(defaultInput)
 

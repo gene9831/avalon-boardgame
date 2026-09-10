@@ -45,7 +45,6 @@ export type RoundTableStageLayout = Readonly<{
 
 export type RoundTableStageLayoutUnavailableReason =
   | 'invalid-input'
-  | 'wide-stage-strategy-pending'
   | 'no-fitting-stage-layout'
 
 export type RoundTableStageLayoutUnavailable = Readonly<{

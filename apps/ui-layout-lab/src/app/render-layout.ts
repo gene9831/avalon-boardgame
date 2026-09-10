@@ -50,7 +50,7 @@ export function renderRoomShell(canvas: HTMLElement): RoomShellElements {
     <footer class="phase-panel">
       <div class="phase-content">
         <div class="phase-header"><div class="phase-title"><small>领袖行动</small><strong>选择任务队员</strong></div>
-          <nav aria-label="房间工具">
+          <nav class="room-tools" aria-label="房间工具">
             <button type="button" aria-label="身份" title="身份">${lucideIcon('eye')}</button>
             <button type="button" aria-label="记录" title="记录">${lucideIcon('history')}</button>
             <button type="button" aria-label="帮助" title="帮助">${lucideIcon('circle-help')}</button>

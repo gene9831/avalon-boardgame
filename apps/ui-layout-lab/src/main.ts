@@ -8,6 +8,7 @@ import {
 import {
   applyPreviewRoomShell,
   resolvePreviewRoomShell,
+  type PreviewRoomShellMode,
 } from './app/preview-room-shell'
 import {
   parseLabState,
@@ -16,6 +17,7 @@ import {
 } from './app/url-state'
 import { createViewportAdapter, type ViewportSize } from './app/viewport-adapter'
 import { solveRoundTableStageLayoutWithDiagnostics } from './layout/solve-round-table-stage-layout'
+import type { DetailedRoundTableStageLayoutResult } from './layout/types'
 
 const app = document.querySelector<HTMLElement>('#app')!
 app.innerHTML = `
@@ -33,11 +35,21 @@ const previewFrame = app.querySelector<HTMLElement>('.preview-frame')!
 const canvas = app.querySelector<HTMLElement>('.room-canvas')!
 const roomShell = renderRoomShell(canvas)
 const readout = roomShell.stageInfoReadout
+const roomShellModeLabel: Record<PreviewRoomShellMode, string> = {
+  vertical: '竖版',
+  'compact-landscape': '紧凑横版',
+  'normal-landscape': '普通横版',
+}
 let state: LabState = parseLabState(window.location.search)
 let measuredDeviceSize: ViewportSize = {
   width: Math.round(window.innerWidth),
   height: Math.round(window.innerHeight),
 }
+let measuredStageSize = { width: 0, height: 0 }
+let cachedStageLayout: Readonly<{
+  key: string
+  result: DetailedRoundTableStageLayoutResult
+}> | null = null
 
 function effectiveSize(): ViewportSize {
   return state.viewportMode === 'device'
@@ -73,32 +85,48 @@ function render(): void {
   canvas.dataset.canvasWidth = String(size.width)
   canvas.dataset.canvasHeight = String(size.height)
   updatePreviewScale(size)
-  applyPreviewRoomShell(canvas, resolvePreviewRoomShell(size))
-  renderStage()
+  const previewRoomShell = resolvePreviewRoomShell(size)
+  applyPreviewRoomShell(canvas, previewRoomShell)
+  renderStage(previewRoomShell.mode)
 }
 
-function renderStage(): void {
+function renderStage(mode: PreviewRoomShellMode = canvas.dataset.roomLayoutMode as PreviewRoomShellMode): void {
   const stageSize = {
     width: roomShell.stage.clientWidth,
     height: roomShell.stage.clientHeight,
   }
   if (stageSize.width <= 0 || stageSize.height <= 0) return
+  const stageSizeChanged = stageSize.width !== measuredStageSize.width
+    || stageSize.height !== measuredStageSize.height
+  measuredStageSize = stageSize
   canvas.dataset.stageWidth = String(stageSize.width)
   canvas.dataset.stageHeight = String(stageSize.height)
-  const result = solveRoundTableStageLayoutWithDiagnostics({
+  const solverInput = {
     maxStageWidth: stageSize.width,
     maxStageHeight: stageSize.height,
     playerCount: state.playerCount,
     gap: state.gap,
     maxAvatarSize: state.maxAvatarSize,
     avatarSizeStep: state.avatarSizeStep,
-  })
+  }
+  const solverInputKey = [
+    solverInput.maxStageWidth,
+    solverInput.maxStageHeight,
+    solverInput.playerCount,
+    solverInput.gap,
+    solverInput.maxAvatarSize,
+    solverInput.avatarSizeStep,
+  ].join(':')
+  const result = !stageSizeChanged && cachedStageLayout?.key === solverInputKey
+    ? cachedStageLayout.result
+    : solveRoundTableStageLayoutWithDiagnostics(solverInput)
+  cachedStageLayout = { key: solverInputKey, result }
   renderRoundTableStage(canvas, roomShell.stage, result, state.showGeometry)
   const size = effectiveSize()
-  const sizeSummary = `${size.width} × ${size.height} · 舞台 ${stageSize.width} × ${stageSize.height}`
+  const contextSummary = `${size.width} × ${size.height} · 业务：${roomShellModeLabel[mode]} · 舞台：${stageSize.width} × ${stageSize.height}`
   readout.value = result.status === 'ready'
-    ? `${sizeSummary} · ${state.playerCount} 人 · 头像 ${result.playerSeats[0]?.avatarRect.width ?? 0}px · ${result.shape === 'stadium' ? `跑道 · 直线 ${result.diagnostics.placementGuide.stadiumStraightLength}px` : '圆形'}`
-    : `${sizeSummary} · ${result.reason}`
+    ? `${contextSummary} · 数学：${state.playerCount} 人 · 头像 ${result.playerSeats[0]?.avatarRect.width ?? 0}px · ${result.shape === 'stadium' ? `跑道 · 直线 ${result.diagnostics.placementGuide.stadiumStraightLength}px` : '圆形'}`
+    : `${contextSummary} · 数学：${result.reason}`
 }
 
 const settings = createSettingsDialog(app, state, {
@@ -138,19 +166,9 @@ const viewportAdapter = createViewportAdapter(canvas, (size) => {
 })
 
 let stageAnimationFrame = 0
-let measuredStageSize = { width: 0, height: 0 }
 const stageObserver = new ResizeObserver(() => {
   cancelAnimationFrame(stageAnimationFrame)
   stageAnimationFrame = requestAnimationFrame(() => {
-    const nextStageSize = {
-      width: roomShell.stage.clientWidth,
-      height: roomShell.stage.clientHeight,
-    }
-    if (
-      nextStageSize.width === measuredStageSize.width
-      && nextStageSize.height === measuredStageSize.height
-    ) return
-    measuredStageSize = nextStageSize
     renderStage()
   })
 })
