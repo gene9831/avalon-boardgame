@@ -1,5 +1,10 @@
 import './styles.css'
 
+import {
+  solveRoundTableStageLayoutWithDiagnostics,
+  type DetailedRoundTableStageLayoutResult,
+} from '@avalon/ui-layout/diagnostics'
+
 import { createSettingsDialog } from './app/settings-dialog'
 import {
   renderRoomShell,
@@ -16,8 +21,6 @@ import {
   type LabState,
 } from './app/url-state'
 import { createViewportAdapter, type ViewportSize } from './app/viewport-adapter'
-import { solveRoundTableStageLayoutWithDiagnostics } from './layout/solve-round-table-stage-layout'
-import type { DetailedRoundTableStageLayoutResult } from './layout/types'
 
 const app = document.querySelector<HTMLElement>('#app')!
 app.innerHTML = `

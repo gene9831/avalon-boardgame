@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { solveRoundTableStageLayout } from '../layout'
+import { solveRoundTableStageLayout } from '@avalon/ui-layout'
 import {
   applyPreviewRoomShell,
   resolvePreviewRoomShell,

@@ -1,4 +1,4 @@
-export { solveRoundTableStageLayout } from './solve-round-table-stage-layout'
+export { solveRoundTableStageLayout } from './stage-layout/solve-round-table-stage-layout'
 export type {
   Circle,
   PlayerSeatLayout,
@@ -9,4 +9,4 @@ export type {
   RoundTableStageLayoutResult,
   RoundTableStageLayoutUnavailable,
   RoundTableStageLayoutUnavailableReason,
-} from './types'
+} from './stage-layout/types'

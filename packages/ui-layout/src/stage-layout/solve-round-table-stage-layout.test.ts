@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { solveRoundTableStageLayout } from './index'
-import type { Rect, RoundTableStageLayout } from './index'
+import { solveRoundTableStageLayout } from '../index'
+import type { Rect, RoundTableStageLayout } from '../index'
 import { circleBoundaryGap } from '../stadium-model/geometry'
 import { solveRoundTableStageLayoutWithDiagnostics } from './solve-round-table-stage-layout'
 

@@ -1,6 +1,8 @@
-import type { Circle, Rect } from '../layout'
-import type { DetailedRoundTableStageLayoutResult } from '../layout/types'
-import { closestCircleBoundarySegment } from '../stadium-model/geometry'
+import type { Circle, Rect } from '@avalon/ui-layout'
+import {
+  closestCircleBoundarySegment,
+  type DetailedRoundTableStageLayoutResult,
+} from '@avalon/ui-layout/diagnostics'
 import { lucideIcon } from './lucide-icons'
 
 const PLAYER_NAMES = ['你', '青岚', '松石', '山雀', '长夜', '银杏', '渡鸦', '晨星', '白榆', '雾岛']
