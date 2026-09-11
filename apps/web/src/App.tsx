@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -128,6 +129,135 @@ export const BOARDGAME_CLIENT_DEBUG = false as const
 type AvalonRawClientState = NonNullable<ReturnType<AvalonClient['getState']>>
 type AvalonClientState = Omit<AvalonRawClientState, 'G'> & {
   G: AvalonPlayerView
+}
+
+type CurrentRoomRouteSnapshot<Client> = Readonly<{
+  client: Client | null
+  generation: number
+  matchID: string
+  session: RoomSession | null
+}>
+
+type RoomRouteOperation<Client> = Omit<CurrentRoomRouteSnapshot<Client>, 'client' | 'session'> & Readonly<{
+  client: Client
+  session: RoomSession
+  token: symbol
+}>
+
+type RoomStartOperation<Client> = RoomRouteOperation<Client> & Readonly<{
+  startGame: () => unknown
+}>
+
+type RoomSeatChangeOperation<Client> = RoomRouteOperation<Client> & Readonly<{
+  targetPlayerID: PlayerID
+}>
+
+type OperationRef<Operation> = { current: Operation | null }
+
+function isSameRoomRouteSession(
+  current: RoomSession | null,
+  expected: RoomSession,
+) {
+  return current?.matchID === expected.matchID &&
+    current.playerID === expected.playerID &&
+    current.credentials === expected.credentials &&
+    current.sessionID === expected.sessionID
+}
+
+function doesRoomRouteMatchOperation<Client, Operation extends RoomRouteOperation<Client>>(
+  current: CurrentRoomRouteSnapshot<Client>,
+  operation: Operation,
+) {
+  return current.generation === operation.generation &&
+    current.matchID === operation.matchID &&
+    current.client === operation.client &&
+    isSameRoomRouteSession(current.session, operation.session)
+}
+
+function isRoomRouteOperationCurrent<Client, Operation extends RoomRouteOperation<Client>>(
+  current: CurrentRoomRouteSnapshot<Client>,
+  operation: Operation,
+  operationRef: OperationRef<Operation>,
+) {
+  return operationRef.current?.token === operation.token &&
+    doesRoomRouteMatchOperation(current, operation)
+}
+
+// oxlint-disable-next-line react/only-export-components
+export async function executeRoomStartOperation<Client>({
+  getCurrentRoute,
+  onError,
+  onSettled,
+  operation,
+  operationRef,
+  prepareStart,
+}: {
+  getCurrentRoute: () => CurrentRoomRouteSnapshot<Client>
+  onError: (error: unknown) => void
+  onSettled: () => void
+  operation: RoomStartOperation<Client>
+  operationRef: OperationRef<RoomStartOperation<Client>>
+  prepareStart: () => Promise<unknown>
+}) {
+  try {
+    await prepareStart()
+    if (!isRoomRouteOperationCurrent(getCurrentRoute(), operation, operationRef)) return
+    operation.startGame()
+  } catch (error) {
+    if (isRoomRouteOperationCurrent(getCurrentRoute(), operation, operationRef)) {
+      onError(error)
+    }
+  } finally {
+    if (operationRef.current?.token === operation.token) {
+      const routeStillCurrent = doesRoomRouteMatchOperation(
+        getCurrentRoute(),
+        operation,
+      )
+      operationRef.current = null
+      if (routeStillCurrent) onSettled()
+    }
+  }
+}
+
+// oxlint-disable-next-line react/only-export-components
+export async function executeRoomSeatChangeOperation<Client>({
+  changeSeat: requestSeatChange,
+  getCurrentRoute,
+  onError,
+  onSession,
+  onSettled,
+  operation,
+  operationRef,
+}: {
+  changeSeat: () => Promise<RoomSession>
+  getCurrentRoute: () => CurrentRoomRouteSnapshot<Client>
+  onError: (error: unknown) => void
+  onSession: (session: RoomSession) => void
+  onSettled: () => void
+  operation: RoomSeatChangeOperation<Client>
+  operationRef: OperationRef<RoomSeatChangeOperation<Client>>
+}) {
+  try {
+    const nextSession = await requestSeatChange()
+    if (!isRoomRouteOperationCurrent(getCurrentRoute(), operation, operationRef)) return
+    onSession(nextSession)
+  } catch (error) {
+    if (isRoomRouteOperationCurrent(getCurrentRoute(), operation, operationRef)) {
+      onError(error)
+    }
+  } finally {
+    if (
+      operationRef.current?.token === operation.token &&
+      operationRef.current.targetPlayerID === operation.targetPlayerID
+    ) {
+      const routeStillCurrent = doesRoomRouteMatchOperation(
+        getCurrentRoute(),
+        operation,
+      )
+      operationRef.current = null
+      if (routeStillCurrent) onSettled()
+    }
+  }
 }
 
 function roomInvalidationNotice(error: unknown) {
@@ -509,7 +639,10 @@ function RoomRoute({
   const [roomExitDialogOpen, setRoomExitDialogOpen] = useState(false)
   const [roomExitBusy, setRoomExitBusy] = useState(false)
   const [seatChangeTargetID, setSeatChangeTargetID] = useState<PlayerID | null>(null)
-  const startPendingRef = useRef(false)
+  const startOperationRef = useRef<RoomStartOperation<AvalonClient> | null>(null)
+  const seatChangeOperationRef = useRef<RoomSeatChangeOperation<AvalonClient> | null>(null)
+  const currentMatchIDRef = useRef(matchID)
+  const currentRouteSessionRef = useRef<RoomSession | null>(null)
   const [startPending, setStartPending] = useState(false)
   const [seatTransitionRevision, setSeatTransitionRevision] = useState(0)
   const [, setSeatTransitionGuardRevision] = useState(0)
@@ -613,12 +746,23 @@ function RoomRoute({
     setGameState(null)
     setRoomExitDialogOpen(false)
     setRoomExitBusy(false)
-    setSeatChangeTargetID(null)
-    startPendingRef.current = false
-    setStartPending(false)
   }, [matchID])
 
   const routeSession = session?.matchID === matchID ? session : null
+  const getCurrentRoomRoute = () => ({
+    client: clientRef.current,
+    generation: routeGenerationRef.current,
+    matchID: currentMatchIDRef.current,
+    session: currentRouteSessionRef.current,
+  })
+  useLayoutEffect(() => {
+    currentMatchIDRef.current = matchID
+    currentRouteSessionRef.current = routeSession
+    startOperationRef.current = null
+    seatChangeOperationRef.current = null
+    setSeatChangeTargetID(null)
+    setStartPending(false)
+  }, [matchID, routeSession])
   const persistedSeatTransition = routeSession === null
     ? null
     : loadSeatTransition(matchID)
@@ -798,6 +942,10 @@ function RoomRoute({
 
     return () => {
       active = false
+      startOperationRef.current = null
+      seatChangeOperationRef.current = null
+      setSeatChangeTargetID(null)
+      setStartPending(false)
       if (isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) {
         routeGenerationRef.current += 1
       }
@@ -810,46 +958,84 @@ function RoomRoute({
   const handleStart = async () => {
     const targetPlayerCount = room === null ? null : getMatchPlayerCount(room)
     const occupiedCount = gameState?.G.lobby.occupiedPlayerIDs.length ?? 0
+    const sourceClient = clientRef.current
     if (
-      startPendingRef.current ||
+      startOperationRef.current !== null ||
       gameState?.isActive !== true ||
       gameState.isConnected !== true ||
       gameState.ctx.phase !== 'lobby' ||
       routeSession === null ||
+      sourceClient === null ||
       gameState.G.lobby.ownerPlayerID !== routeSession.playerID ||
       targetPlayerCount === null ||
       occupiedCount !== targetPlayerCount
     ) return
-    startPendingRef.current = true
-    setStartPending(true)
-    try {
-      await roomParticipation.prepareStart(matchID, routeSession.playerID, routeSession.credentials)
-      clientRef.current?.moves.startGame()
-    } catch (error) {
-      pushToast({ message: getStartErrorMessage(error), tone: 'error' })
-    } finally {
-      startPendingRef.current = false
-      setStartPending(false)
+    const operation: RoomStartOperation<AvalonClient> = {
+      client: sourceClient,
+      generation: routeGenerationRef.current,
+      matchID,
+      session: routeSession,
+      startGame: () => sourceClient.moves.startGame(),
+      token: Symbol('room-start'),
     }
+    startOperationRef.current = operation
+    setStartPending(true)
+    await executeRoomStartOperation({
+      getCurrentRoute: getCurrentRoomRoute,
+      onError: (error) => {
+        pushToast({ message: getStartErrorMessage(error), tone: 'error' })
+      },
+      onSettled: () => setStartPending(false),
+      operation,
+      operationRef: startOperationRef,
+      prepareStart: () => roomParticipation.prepareStart(
+        operation.matchID,
+        operation.session.playerID,
+        operation.session.credentials,
+      ),
+    })
   }
 
   const handleChangeSeat = async (targetPlayerID: PlayerID) => {
+    const sourceClient = clientRef.current
     if (
       routeSession === null ||
+      sourceClient === null ||
       gameState?.ctx.phase !== 'lobby' ||
       seatChangePending ||
+      seatChangeOperationRef.current !== null ||
       loadSeatTransition(routeSession.matchID) !== null ||
       targetPlayerID === routeSession.playerID
     ) return
-    setSeatChangeTargetID(targetPlayerID)
-    try {
-      const nextSession = await changeRoomSeat(roomParticipation, routeSession, targetPlayerID)
-      setSession(nextSession)
-    } catch (error) {
-      pushToast({ message: getSeatChangeErrorMessage(error), tone: 'error' })
-    } finally {
-      setSeatChangeTargetID(null)
+    const operation: RoomSeatChangeOperation<AvalonClient> = {
+      client: sourceClient,
+      generation: routeGenerationRef.current,
+      matchID,
+      session: routeSession,
+      targetPlayerID,
+      token: Symbol('room-seat-change'),
     }
+    seatChangeOperationRef.current = operation
+    setSeatChangeTargetID(targetPlayerID)
+    await executeRoomSeatChangeOperation({
+      changeSeat: () => changeRoomSeat(
+        roomParticipation,
+        operation.session,
+        operation.targetPlayerID,
+      ),
+      getCurrentRoute: getCurrentRoomRoute,
+      onError: (error) => {
+        pushToast({ message: getSeatChangeErrorMessage(error), tone: 'error' })
+      },
+      onSession: setSession,
+      onSettled: () => {
+        setSeatChangeTargetID((currentTarget) => (
+          currentTarget === operation.targetPlayerID ? null : currentTarget
+        ))
+      },
+      operation,
+      operationRef: seatChangeOperationRef,
+    })
   }
 
   const handleProposeTeam = (team: PlayerID[]) => {
@@ -1158,7 +1344,7 @@ export function RoomView({
   }, [beginManualReconnect, onReconnect])
   useEffect(() => {
     manualReconnectRequestedRef.current = false
-  }, [session.matchID, session.playerID])
+  }, [session.credentials, session.matchID, session.playerID])
   useEffect(() => {
     if (!connected || !manualReconnectRequestedRef.current) return
     manualReconnectRequestedRef.current = false

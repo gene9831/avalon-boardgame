@@ -2,10 +2,10 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import type { PlayerID } from '@avalon/game'
 import { describe, expect, it, vi } from 'vitest'
 
-import { canRequestRoomExit, getUpdatedRoomRouteSession, recoverRoomRouteSession, resolveRecoverySeatValidation, resolveRoomRouteSnapshotSession, shouldWakeRoomRouteForSeatTransitionChange, RoomAccessView, RoomView, type RoomViewProps } from '../src/App'
+import { canRequestRoomExit, executeRoomSeatChangeOperation, executeRoomStartOperation, getUpdatedRoomRouteSession, recoverRoomRouteSession, resolveRecoverySeatValidation, resolveRoomRouteSnapshotSession, shouldWakeRoomRouteForSeatTransitionChange, RoomAccessView, RoomView, type RoomViewProps } from '../src/App'
 import type { AvalonMatch } from '../src/lobby'
 import { RoomParticipationHttpError, type SeatTransitionReplayClient } from '../src/room-participation'
-import { beginSeatTransition, loadRoomSession, loadSeatTransition, markSeatTransitionUncertain, saveRoomSession, type RoomSessionStorage } from '../src/room-session'
+import { beginSeatTransition, loadRoomSession, loadSeatTransition, markSeatTransitionUncertain, saveRoomSession, type RoomSession, type RoomSessionStorage } from '../src/room-session'
 import { ToastProvider } from '../src/toast'
 
 const roomLayoutHarness = vi.hoisted(() => ({ measured: false }))
@@ -134,6 +134,14 @@ const rejectOccupiedTarget: SeatTransitionReplayClient = {
   },
 }
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
+}
+
 function playingGameState(): RoomViewProps['gameState'] {
   return {
     G: {
@@ -187,6 +195,225 @@ function lobbyGameState(): RoomViewProps['gameState'] {
   state.ctx.activePlayers = null
   return state
 }
+
+describe('RoomRoute async operation isolation', () => {
+  it.each(['generation', 'match', 'session', 'client'] as const)(
+    'requires the deferred start operation %s identity to remain current',
+    async (changedIdentity) => {
+      const sourceSession = {
+        credentials: 'credential-a', matchID: 'room-a', playerID: '0', playerName: 'Alice',
+      }
+      const sourceStart = vi.fn()
+      const sourceClient = { moves: { startGame: sourceStart } }
+      const operation = {
+        client: sourceClient, generation: 1, matchID: sourceSession.matchID,
+        session: sourceSession, startGame: sourceStart, token: Symbol('start-a'),
+      }
+      const operationRef = { current: operation }
+      let currentRoute = {
+        client: sourceClient,
+        generation: operation.generation,
+        matchID: operation.matchID,
+        session: sourceSession,
+      }
+      const pending = deferred<void>()
+      const onError = vi.fn()
+      const onSettled = vi.fn()
+      const request = executeRoomStartOperation({
+        getCurrentRoute: () => currentRoute,
+        onError,
+        onSettled,
+        operation,
+        operationRef,
+        prepareStart: () => pending.promise,
+      })
+
+      if (changedIdentity === 'generation') {
+        currentRoute = { ...currentRoute, generation: 2 }
+      } else if (changedIdentity === 'match') {
+        currentRoute = { ...currentRoute, matchID: 'room-b' }
+      } else if (changedIdentity === 'session') {
+        currentRoute = {
+          ...currentRoute,
+          session: { ...sourceSession, credentials: 'credential-rebound' },
+        }
+      } else {
+        currentRoute = {
+          ...currentRoute,
+          client: { moves: { startGame: vi.fn() } },
+        }
+      }
+      pending.resolve()
+      await request
+
+      expect(sourceStart).not.toHaveBeenCalled()
+      expect(onError).not.toHaveBeenCalled()
+      expect(onSettled).not.toHaveBeenCalled()
+      expect(operationRef.current).toBeNull()
+    },
+  )
+
+  it('does not let a deferred start completion act on or clear a newer room operation', async () => {
+    const sourceSession = {
+      credentials: 'credential-a', matchID: 'room-a', playerID: '0', playerName: 'Alice',
+    }
+    const nextSession = {
+      credentials: 'credential-b', matchID: 'room-b', playerID: '1', playerName: 'Bob',
+    }
+    const sourceStart = vi.fn()
+    const nextStart = vi.fn()
+    const sourceClient = { moves: { startGame: sourceStart } }
+    const nextClient = { moves: { startGame: nextStart } }
+    const sourceOperation = {
+      client: sourceClient, generation: 1, matchID: sourceSession.matchID,
+      session: sourceSession, startGame: sourceStart, token: Symbol('start-a'),
+    }
+    const nextOperation = {
+      client: nextClient, generation: 2, matchID: nextSession.matchID,
+      session: nextSession, startGame: nextStart, token: Symbol('start-b'),
+    }
+    const operationRef = { current: sourceOperation }
+    let currentRoute = {
+      client: sourceClient, generation: 1, matchID: sourceSession.matchID, session: sourceSession,
+    }
+    const pending = deferred<void>()
+    const sourceSettled = vi.fn()
+
+    const sourceRequest = executeRoomStartOperation({
+      getCurrentRoute: () => currentRoute,
+      onError: vi.fn(),
+      onSettled: sourceSettled,
+      operation: sourceOperation,
+      operationRef,
+      prepareStart: () => pending.promise,
+    })
+    currentRoute = {
+      client: nextClient, generation: 2, matchID: nextSession.matchID, session: nextSession,
+    }
+    operationRef.current = nextOperation
+    pending.resolve()
+    await sourceRequest
+
+    expect(sourceStart).not.toHaveBeenCalled()
+    expect(nextStart).not.toHaveBeenCalled()
+    expect(operationRef.current).toBe(nextOperation)
+    expect(sourceSettled).not.toHaveBeenCalled()
+
+    const nextSettled = vi.fn()
+    await executeRoomStartOperation({
+      getCurrentRoute: () => currentRoute,
+      onError: vi.fn(),
+      onSettled: nextSettled,
+      operation: nextOperation,
+      operationRef,
+      prepareStart: async () => undefined,
+    })
+    expect(nextStart).toHaveBeenCalledTimes(1)
+    expect(nextSettled).toHaveBeenCalledTimes(1)
+    expect(operationRef.current).toBeNull()
+  })
+
+  it('does not let a deferred seat completion update or clear a newer room operation', async () => {
+    const sourceSession = {
+      credentials: 'credential-a', matchID: 'room-a', playerID: '0', playerName: 'Alice',
+    }
+    const nextSession = {
+      credentials: 'credential-b', matchID: 'room-b', playerID: '1', playerName: 'Bob',
+    }
+    const sourceClient = { moves: { startGame: vi.fn() } }
+    const nextClient = { moves: { startGame: vi.fn() } }
+    const sourceOperation = {
+      client: sourceClient, generation: 1, matchID: sourceSession.matchID,
+      session: sourceSession, targetPlayerID: '3', token: Symbol('seat-a'),
+    }
+    const nextOperation = {
+      client: nextClient, generation: 2, matchID: nextSession.matchID,
+      session: nextSession, targetPlayerID: '4', token: Symbol('seat-b'),
+    }
+    const operationRef = { current: sourceOperation }
+    let currentRoute = {
+      client: sourceClient, generation: 1, matchID: sourceSession.matchID, session: sourceSession,
+    }
+    const pending = deferred<RoomSession>()
+    const setSession = vi.fn()
+    const sourceSettled = vi.fn()
+
+    const sourceRequest = executeRoomSeatChangeOperation({
+      changeSeat: () => pending.promise,
+      getCurrentRoute: () => currentRoute,
+      onError: vi.fn(),
+      onSession: setSession,
+      onSettled: sourceSettled,
+      operation: sourceOperation,
+      operationRef,
+    })
+    currentRoute = {
+      client: nextClient, generation: 2, matchID: nextSession.matchID, session: nextSession,
+    }
+    operationRef.current = nextOperation
+    pending.resolve({ ...sourceSession, playerID: '3' })
+    await sourceRequest
+
+    expect(setSession).not.toHaveBeenCalled()
+    expect(operationRef.current).toBe(nextOperation)
+    expect(sourceSettled).not.toHaveBeenCalled()
+
+    const nextSettled = vi.fn()
+    await executeRoomSeatChangeOperation({
+      changeSeat: async () => ({ ...nextSession, playerID: '4' }),
+      getCurrentRoute: () => currentRoute,
+      onError: vi.fn(),
+      onSession: setSession,
+      onSettled: nextSettled,
+      operation: nextOperation,
+      operationRef,
+    })
+    expect(setSession).toHaveBeenLastCalledWith({ ...nextSession, playerID: '4' })
+    expect(nextSettled).toHaveBeenCalledTimes(1)
+    expect(operationRef.current).toBeNull()
+  })
+
+  it('does not apply a deferred seat result after the exact route identity changes', async () => {
+    const sourceSession = {
+      credentials: 'credential-a', matchID: 'room-a', playerID: '0', playerName: 'Alice',
+    }
+    const nextSession = {
+      credentials: 'credential-b', matchID: 'room-b', playerID: '1', playerName: 'Bob',
+    }
+    const sourceClient = { moves: { startGame: vi.fn() } }
+    const nextClient = { moves: { startGame: vi.fn() } }
+    const operation = {
+      client: sourceClient, generation: 1, matchID: sourceSession.matchID,
+      session: sourceSession, targetPlayerID: '3', token: Symbol('seat-a'),
+    }
+    const operationRef = { current: operation }
+    let currentRoute = {
+      client: sourceClient, generation: 1, matchID: sourceSession.matchID, session: sourceSession,
+    }
+    const pending = deferred<RoomSession>()
+    const setSession = vi.fn()
+    const onSettled = vi.fn()
+    const request = executeRoomSeatChangeOperation({
+      changeSeat: () => pending.promise,
+      getCurrentRoute: () => currentRoute,
+      onError: vi.fn(),
+      onSession: setSession,
+      onSettled,
+      operation,
+      operationRef,
+    })
+
+    currentRoute = {
+      client: nextClient, generation: 2, matchID: nextSession.matchID, session: nextSession,
+    }
+    pending.resolve({ ...sourceSession, playerID: '3' })
+    await request
+
+    expect(setSession).not.toHaveBeenCalled()
+    expect(onSettled).not.toHaveBeenCalled()
+    expect(operationRef.current).toBeNull()
+  })
+})
 
 describe('RoomView connection state', () => {
   it('uses player-facing access and loading copy', () => {
