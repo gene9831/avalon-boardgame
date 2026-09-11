@@ -40,6 +40,16 @@ function occupiedPlayerIDs(room: AvalonMatch): string[] {
   return room.players.filter(({ name }) => name != null).map(({ id }) => String(id))
 }
 
+type LobbyPresentationState = Readonly<{
+  connected: boolean
+  manualReconnectAvailable: boolean
+  startPending: boolean
+}>
+
+type LobbyPresentationActions = Readonly<{
+  onReconnect: () => void
+}>
+
 export type BuildRoomScreenModelInput =
   | Readonly<{ kind: 'loading'; matchID: string; numPlayers: null }>
   | Readonly<{
@@ -55,8 +65,7 @@ export type BuildRoomScreenModelInput =
       roleKnowledgeOpen: boolean
       canStart: boolean
       roomExitBusy: boolean
-      connected: boolean
-    }>
+    } & LobbyPresentationState>
 
 function playerName(room: AvalonMatch, playerID: PlayerID | null): string {
   if (playerID === null) return '等待队长'
@@ -109,10 +118,17 @@ function buildPhase(
 ): RoomPhaseModel {
   const { game, room, currentPlayerID } = input
   const total = roomPlayerCount(room)
+  if (!input.connected) {
+    return {
+      kind: 'connectionRecovery',
+      title: '正在重新连接',
+      manualReconnectAvailable: input.manualReconnectAvailable,
+    }
+  }
   if (mode === 'lobby') {
     return {
       kind: 'lobby', title: '等待玩家', occupied: occupiedPlayerIDs(room).length, total,
-      isOwner: room.ownerPlayerID === currentPlayerID, canStart: input.canStart, busy: input.roomExitBusy,
+      isOwner: room.ownerPlayerID === currentPlayerID, canStart: input.canStart, startPending: input.startPending,
     }
   }
   if (mode === 'identityRecognition') {
@@ -195,7 +211,7 @@ export function buildRoomScreenModel(input: BuildRoomScreenModelInput): RoomScre
       center: { kind: 'loadingSummary', message: '正在准备游戏，请稍候。' },
       phase: { kind: 'loading', title: '正在进入房间', message: '正在同步房间状态。' },
       stageOverlay: { kind: 'none' },
-      utilities: { showProfile: false, showRoomExit: false, showIdentityKnowledge: false, roleKnowledgeOpen: false },
+      utilities: { variant: 'loading', showRoomExit: false, showIdentityKnowledge: false, roleKnowledgeOpen: false },
     }
   }
 
@@ -217,6 +233,7 @@ export function buildRoomScreenModel(input: BuildRoomScreenModelInput): RoomScre
     mode, matchID: input.matchID, numPlayers, connected: input.connected,
     players: buildRoomPlayers({
       players: input.room.players, numPlayers, currentPlayerID: input.currentPlayerID,
+      viewerConnected: input.connected,
       ownerPlayerID: input.room.ownerPlayerID, game: input.game,
       selectedTeam: input.selectedTeam, selectedTarget: input.selectedTarget,
       showKnownPlayerInfo:
@@ -231,17 +248,17 @@ export function buildRoomScreenModel(input: BuildRoomScreenModelInput): RoomScre
     phase: buildPhase(mode, input),
     stageOverlay: buildOverlay(mode, input.game),
     utilities: {
-      showProfile: mode === 'lobby', showRoomExit: mode === 'lobby',
+      variant: mode === 'lobby' ? 'lobby' : 'game',
+      showRoomExit: mode === 'lobby',
       showIdentityKnowledge: input.game.status === 'playing' && mode !== 'identityRecognition',
       roleKnowledgeOpen: input.roleKnowledgeOpen,
     },
   }
 }
 
-export interface UseRoomScreenControllerInput {
+export interface UseRoomScreenControllerInput extends LobbyPresentationState, LobbyPresentationActions {
   activeStage: string | undefined
   canStart: boolean
-  connected: boolean
   game: AvalonPlayerView | null
   matchID: string
   phase: string
@@ -289,8 +306,10 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
       activeStage: input.activeStage, currentPlayerID: input.currentPlayerID,
       selectedTeam, selectedTarget, roleKnowledgeOpen, canStart: input.canStart,
       roomExitBusy: input.roomExitBusy, connected: input.connected,
+      manualReconnectAvailable: input.manualReconnectAvailable,
+      startPending: input.startPending,
     })
-  }, [input.activeStage, input.canStart, input.connected, input.currentPlayerID, input.game, input.matchID, input.phase, input.room, input.roomExitBusy, roleKnowledgeOpen, selectedTarget, selectedTeam])
+  }, [input.activeStage, input.canStart, input.connected, input.currentPlayerID, input.game, input.manualReconnectAvailable, input.matchID, input.phase, input.room, input.roomExitBusy, input.startPending, roleKnowledgeOpen, selectedTarget, selectedTeam])
 
   const actions: RoomScreenActions = {
     onActivatePlayer: (playerID) => {
@@ -302,6 +321,7 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
       if (model.playerInteractionMode === 'selectAssassinationTarget') setSelectedTarget(playerID)
     },
     onStart: input.onStart,
+    onReconnect: input.onReconnect,
     onConfirmIdentityRecognition: input.onConfirmIdentityRecognition,
     onSubmitTeam: () => input.onProposeTeam(selectedTeam),
     onCastTeamVote: input.onCastTeamVote,

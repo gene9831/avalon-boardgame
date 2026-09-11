@@ -59,6 +59,8 @@ function readyInput(phase: string, overrides: Partial<AvalonPlayerView> = {}) {
     canStart: true,
     roomExitBusy: false,
     connected: true,
+    manualReconnectAvailable: false,
+    startPending: false,
   }
 }
 
@@ -106,6 +108,40 @@ describe('buildRoomScreenModel', () => {
     expect(model.mode).toBe('loading')
     expect(model.players).toEqual([])
     expect(model.questProgress.every((node) => node.teamSize === null)).toBe(true)
+  })
+
+  it('derives lobby ownership, fullness, and pending start without hidden data', () => {
+    const input = readyInput('lobby', { status: 'lobby' })
+    const model = buildRoomScreenModel({
+      ...input,
+      canStart: false,
+      startPending: true,
+      manualReconnectAvailable: false,
+    })
+
+    expect(model.phase).toEqual({
+      kind: 'lobby', title: '等待玩家', occupied: 5, total: 5,
+      isOwner: true, canStart: false, startPending: true,
+    })
+    expect(model.utilities).toMatchObject({ variant: 'lobby', showRoomExit: true })
+  })
+
+  it('uses a local recovery presentation and marks only the viewer locally disconnected', () => {
+    const input = readyInput('lobby', { status: 'lobby' })
+    const model = buildRoomScreenModel({
+      ...input,
+      connected: false,
+      manualReconnectAvailable: true,
+      startPending: false,
+    })
+
+    expect(model.mode).toBe('lobby')
+    expect(model.phase).toEqual({
+      kind: 'connectionRecovery',
+      title: '正在重新连接',
+      manualReconnectAvailable: true,
+    })
+    expect(model.players.find((player) => player.isCurrentPlayer)?.connected).toBe(false)
   })
 
   it('keeps the assassin\'s known evil teammates ineligible while role details are closed', () => {

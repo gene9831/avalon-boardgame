@@ -63,7 +63,8 @@ export type RoomCenterModel =
 
 export type RoomPhaseModel =
   | Readonly<{ kind: 'loading'; title: string; message: string }>
-  | Readonly<{ kind: 'lobby'; title: '等待玩家'; occupied: number; total: number; isOwner: boolean; canStart: boolean; busy: boolean }>
+  | Readonly<{ kind: 'lobby'; title: '等待玩家'; occupied: number; total: number; isOwner: boolean; canStart: boolean; startPending: boolean }>
+  | Readonly<{ kind: 'connectionRecovery'; title: '正在重新连接'; manualReconnectAvailable: boolean }>
   | Readonly<{ kind: 'identityRecognition'; title: '身份辨认'; confirmationLabel: string; confirmed: boolean; confirmedCount: number; participantCount: number; isParticipant: boolean }>
   | Readonly<{ kind: 'teamProposal'; title: '组建任务队伍'; requiredTeamSize: number; selectedCount: number; leaderName: string; canSubmit: boolean }>
   | Readonly<{ kind: 'teamVote'; title: '表决任务队伍'; proposedTeamNames: readonly string[]; submittedCount: number; total: number; submittedVote: TeamVote | null; canVote: boolean }>
@@ -74,6 +75,7 @@ export type RoomPhaseModel =
 export interface RoomScreenActions {
   onActivatePlayer(playerID: PlayerID): void
   onStart(): void
+  onReconnect(): void
   onConfirmIdentityRecognition(): void
   onSubmitTeam(): void
   onCastTeamVote(vote: TeamVote): void
@@ -92,7 +94,7 @@ export type RoomStageOverlayModel =
     }>
 
 export type RoomUtilityModel = Readonly<{
-  showProfile: boolean
+  variant: 'loading' | 'lobby' | 'game'
   showRoomExit: boolean
   showIdentityKnowledge: boolean
   roleKnowledgeOpen: boolean
@@ -116,6 +118,7 @@ export function buildRoomPlayers(input: Readonly<{
   players: readonly LobbyPlayer[]
   numPlayers: number
   currentPlayerID: PlayerID
+  viewerConnected: boolean
   ownerPlayerID: PlayerID | null
   game: AvalonPlayerView | null
   selectedTeam: readonly PlayerID[]
@@ -151,7 +154,11 @@ export function buildRoomPlayers(input: Readonly<{
       name: occupied ? lobbyPlayer.name! : '',
       avatarID: getSeatAvatarID(lobbyPlayer?.data, seatIndex),
       occupied,
-      connected: occupied && lobbyPlayer?.isConnected === true,
+      connected: occupied && (
+        isCurrentPlayer
+          ? input.viewerConnected && lobbyPlayer?.isConnected === true
+          : lobbyPlayer?.isConnected === true
+      ),
       isCurrentPlayer,
       isOwner: playerID === input.ownerPlayerID,
       isLeader: input.game?.leaderID === playerID,

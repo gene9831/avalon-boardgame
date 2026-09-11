@@ -18,6 +18,7 @@ const baseInput = {
   players,
   numPlayers: 5,
   currentPlayerID: '0',
+  viewerConnected: true,
   ownerPlayerID: '3',
   game: null,
   selectedTeam: [],
