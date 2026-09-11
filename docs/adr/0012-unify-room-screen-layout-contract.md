@@ -6,7 +6,7 @@ status: accepted
 
 `@avalon/ui-layout` remains browser-safe and owns the DOM-free round-table solver and the production `room-layout.css` structural contract. It must not import React, DOM APIs, game state, server code, credentials, or secrets.
 
-Production Web composes loading, waiting lobby, identity recognition, every game phase, and final results through one `RoomScreen` and `RoomLayout`. `RoomLayout` supplies semantic chrome, stage, and phase-panel slots. CSS container queries in `@avalon/ui-layout/room-layout.css`—not `ROOM_SHELL_CLASSES` or JavaScript mode selection—select vertical, compact-landscape, and normal-landscape shapes. `ResizeObserver` only measures the final stage content box for `solveRoundTableStageLayout`; it never chooses a business layout.
+Production Web composes loading, waiting lobby, identity recognition, every game phase, and final results through one `RoomScreen` and `RoomLayout`. `RoomLayout` supplies semantic chrome, stage, and phase-panel slots. CSS container queries in `@avalon/ui-layout/room-layout.css`—not `ROOM_SHELL_CLASSES` or JavaScript mode selection—select vertical, compact-landscape, and normal-landscape shapes. The stage region may be larger than the solver boundary; its centered measured stage content box is capped at 744×800 before `ResizeObserver` passes it to `solveRoundTableStageLayout`. `ResizeObserver` never chooses a business layout.
 
 The old `room-shell.css` export remains exclusively for the existing layout Lab until a separately approved Lab migration. It is not imported by production Web.
 

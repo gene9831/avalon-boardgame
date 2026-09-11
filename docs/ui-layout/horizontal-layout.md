@@ -2,7 +2,7 @@
 
 ## 当前生产契约
 
-生产 Web 通过 `RoomLayout` 与 `@avalon/ui-layout/room-layout.css` 的 CSS Container Query 选择横向形状；不使用 JavaScript 或旧 `ROOM_SHELL_CLASSES`。有效内容矩形先扣除安全区，圆桌求解器只接收实际 stage content box。`room-shell.css` 仅供现有 Layout Lab 使用，直到另行批准迁移。
+生产 Web 通过 `RoomLayout` 与 `@avalon/ui-layout/room-layout.css` 的 CSS Container Query 选择横向形状；不使用 JavaScript 或旧 `ROOM_SHELL_CLASSES`。有效内容矩形先扣除安全区，圆桌求解器只接收舞台区域中居中的实际 stage content box；该内容盒宽高最多为 744×800，即使舞台区域更大也不会把超出求解器安全上限的高度传入同步搜索。`room-shell.css` 仅供现有 Layout Lab 使用，直到另行批准迁移。
 
 紧凑横向使用 56px 左侧 chrome：返回按钮在顶部，五个任务节点垂直排列；普通横向改用 56px 顶部 chrome。舞台和阶段区均不使用页面滚动；阶段区始终保持语义 `heading`、`middle`、`action` 三槽，唯一的底部 state-changing action 放在 `action` 槽（重连恢复例外）。
 

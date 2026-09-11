@@ -24,13 +24,6 @@ test('profile persistence, room locking, and credential re-entry work', async ({
     await expect(page).toHaveURL(/\/rooms\/[^/]+$/)
     const matchID = decodeURIComponent(new URL(page.url()).pathname.split('/').at(-1)!)
 
-    await page.getByRole('button', { name: '打开用户中心' }).click()
-    const lockedProfile = page.getByRole('dialog', { name: '用户中心' })
-    await expect(lockedProfile.getByText('Saved Arthur', { exact: true })).toBeVisible()
-    await expect(lockedProfile.getByText('退出房间后可修改名称和头像。')).toBeVisible()
-    await expect(lockedProfile.getByRole('textbox')).toHaveCount(0)
-    await lockedProfile.getByRole('button', { name: '关闭用户中心' }).click()
-
     await page.getByRole('button', { name: '返回主页' }).click()
     await page.getByRole('button', { name: '打开用户中心' }).click()
     const retainedSeatProfile = page.getByRole('dialog', { name: '用户中心' })

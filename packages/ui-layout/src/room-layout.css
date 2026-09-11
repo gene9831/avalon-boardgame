@@ -114,6 +114,9 @@
   position: relative;
   width: 100%;
   height: 100%;
+  max-width: 744px;
+  max-height: 800px;
+  place-self: center;
   overflow: hidden;
 }
 

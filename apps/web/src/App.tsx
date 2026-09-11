@@ -960,7 +960,7 @@ function RoomRoute({
 
   const handleStart = async () => {
     const targetPlayerCount = room === null ? null : getMatchPlayerCount(room)
-    const occupiedCount = gameState?.G.lobby.occupiedPlayerIDs.length ?? 0
+    const occupiedCount = room === null ? 0 : getOccupiedPlayerIDs(room).length
     const sourceClient = clientRef.current
     if (
       startOperationRef.current !== null ||
@@ -969,7 +969,7 @@ function RoomRoute({
       gameState.ctx.phase !== 'lobby' ||
       routeSession === null ||
       sourceClient === null ||
-      gameState.G.lobby.ownerPlayerID !== routeSession.playerID ||
+      room?.ownerPlayerID !== routeSession.playerID ||
       targetPlayerCount === null ||
       occupiedCount !== targetPlayerCount
     ) return

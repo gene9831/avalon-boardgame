@@ -16,10 +16,23 @@ async function expectRoundTableFits(page: Page, tableLabel: string) {
   const tableLocator = page.getByLabel(tableLabel, { exact: true })
   await expect(tableLocator).toHaveAttribute('data-stage-layout-status', 'ready')
   await expect.poll(() => tableLocator.evaluate((table) => {
-    const bounds = table.getBoundingClientRect()
-    const stage = table.parentElement
-    return Number(stage?.getAttribute('data-stage-layout-width')) === Math.round(bounds.width)
-      && Number(stage?.getAttribute('data-stage-layout-height')) === Math.round(bounds.height)
+    const tableBounds = table.getBoundingClientRect()
+    const contentBounds = table.closest('.avalon-room-layout__stage-content')?.getBoundingClientRect()
+    if (
+      contentBounds === undefined
+      || Math.round(contentBounds.width) !== Math.round(tableBounds.width)
+      || Math.round(contentBounds.height) !== Math.round(tableBounds.height)
+    ) return false
+
+    return Array.from(
+      table.querySelectorAll('[data-round-table-avatar], [data-round-table-nameplate]'),
+    ).every((part) => {
+      const bounds = part.getBoundingClientRect()
+      return bounds.left >= contentBounds.left
+        && bounds.right <= contentBounds.right
+        && bounds.top >= contentBounds.top
+        && bounds.bottom <= contentBounds.bottom
+    })
   })).toBe(true)
 
   const dimensions = await page.evaluate(() => {
@@ -125,6 +138,41 @@ async function expectRoundTableFits(page: Page, tableLabel: string) {
 
   return geometry
 }
+
+test('caps and centers the production solver content box inside a tall landscape stage', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
+  const page = await context.newPage()
+
+  try {
+    await createRoom(page, 5, 'Capped Stage Owner')
+    const table = page.getByLabel('5 人游戏圆桌', { exact: true })
+    await expect(table).toHaveAttribute('data-stage-layout-status', 'ready')
+
+    const geometry = await page.locator('.avalon-room-layout__stage-content').evaluate((content) => {
+      const contentBounds = content.getBoundingClientRect()
+      const regionBounds = content.parentElement!.getBoundingClientRect()
+      return {
+        contentHeight: Math.round(contentBounds.height),
+        contentWidth: Math.round(contentBounds.width),
+        centeredHorizontally: Math.abs(
+          contentBounds.left + contentBounds.width / 2 - (regionBounds.left + regionBounds.width / 2),
+        ) <= 1,
+        centeredVertically: Math.abs(
+          contentBounds.top + contentBounds.height / 2 - (regionBounds.top + regionBounds.height / 2),
+        ) <= 1,
+      }
+    })
+
+    expect(geometry.contentWidth).toBeLessThanOrEqual(744)
+    expect(geometry.contentHeight).toBeLessThanOrEqual(800)
+    expect(geometry.centeredHorizontally).toBe(true)
+    expect(geometry.centeredVertically).toBe(true)
+  } finally {
+    await context.close()
+  }
+})
 
 test('the create-game configuration remains fully usable at narrow widths', async ({ page }) => {
   await page.goto('/')
@@ -309,16 +357,12 @@ test('five, seven, and ten-player rooms keep one measured shell across lobby and
             )
             return {
               height: Math.round(bounds.height),
-              heightAttribute: Number(stage.getAttribute('data-stage-layout-height')),
               renderedIndices,
               diagnosticIndices,
               text: stage.querySelector('.room-layout-diagnostics')?.textContent ?? '',
               width: Math.round(bounds.width),
-              widthAttribute: Number(stage.getAttribute('data-stage-layout-width')),
             }
           })
-        expect(diagnosticGeometry.widthAttribute).toBe(diagnosticGeometry.width)
-        expect(diagnosticGeometry.heightAttribute).toBe(diagnosticGeometry.height)
         expect(diagnosticGeometry.text).toContain(
           `stage ${diagnosticGeometry.width}×${diagnosticGeometry.height}`,
         )

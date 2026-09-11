@@ -13,7 +13,7 @@
 ├── 顶部 chrome：56px
 │   ├── 返回、房间号、五次任务进度
 ├── 舞台区域（8px；容器高至少 800px 时为 12px 内边距）
-│   └── 实测 stage content box → round-table solver
+│   └── 居中的实测 stage content box（最大 744×800）→ round-table solver
 └── 阶段区域
     ├── heading：阶段名称和工具栏
     ├── middle：说明、选择或私有反馈
@@ -21,6 +21,8 @@
 ```
 
 底部阶段区域的总预算是 160px 加上安全区补偿；没有阶段按钮时仍保留 action 槽，避免舞台因阶段变化跳动。所有公开操作热区至少 44px。安全区只由 `room-layout.css` 扣除一次。
+
+舞台区域可以大于求解器可接受的尺寸；其中的 `stage content box` 始终在区域中居中，宽高分别不超过 744px 与 800px。`ResizeObserver` 只测量这个受限内容盒，因此不会把超过纯求解器 800px 高度上限的区域尺寸传入同步搜索。
 
 ## 实测边界与验收
 
