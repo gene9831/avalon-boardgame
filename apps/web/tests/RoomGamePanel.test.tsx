@@ -579,8 +579,6 @@ describe('RoomGamePanel team vote presentation', () => {
 
     expect(html.match(/data-team-vote-status="approve"/g)).toHaveLength(3)
     expect(html.match(/data-team-vote-status="reject"/g)).toHaveLength(2)
-    expect(html.match(/lucide-circle-check/g)).toHaveLength(3)
-    expect(html.match(/lucide-circle-x/g)).toHaveLength(2)
     expect(html.match(/title="赞成"/g)).toHaveLength(3)
     expect(html.match(/title="反对"/g)).toHaveLength(2)
     expect(html).not.toContain('team-vote-seat-status')

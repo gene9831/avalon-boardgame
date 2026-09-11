@@ -23,6 +23,7 @@ import {
 import { IdentityRecognitionLayer } from './IdentityRecognitionLayer'
 import type { LobbyPlayer } from './lobby'
 import { QuestProgressTrack } from './QuestProgressTrack'
+import { buildQuestProgress } from './room-screen-model'
 import { RoleAvatar } from './RoleCard'
 import {
   canSubmitTeam,
@@ -203,7 +204,7 @@ export function RoomGamePanel({
       phaseMiddle={phasePanelContent.middle}
       phaseTitle={<p className="truncate text-sm font-semibold text-amber-100">{phaseLabel}</p>}
       phaseTools={roleKnowledgeControl}
-      questProgress={<QuestProgressTrack game={game} numPlayers={playerIDs.length} />}
+      questProgress={<QuestProgressTrack nodes={buildQuestProgress(playerIDs.length, game)} />}
       roomStatus={(
         <div className="min-w-0">
           <h1 className="truncate text-sm font-semibold text-white">房间 {matchID.slice(0, 7)}</h1>

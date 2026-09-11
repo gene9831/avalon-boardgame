@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { AvalonPlayerView } from '@avalon/game'
 
 import { QuestProgressTrack } from '../src/QuestProgressTrack'
+import { buildQuestProgress } from '../src/room-screen-model'
 import { RoundTableQuestSummary } from '../src/RoundTableQuestSummary'
 
 const game: AvalonPlayerView = {
@@ -44,12 +45,12 @@ const game: AvalonPlayerView = {
 describe('RoundTableQuestSummary', () => {
   it('keeps one quest-progress track available for shell repositioning', () => {
     const html = renderToStaticMarkup(
-      <QuestProgressTrack game={game} numPlayers={7} />,
+      <QuestProgressTrack nodes={buildQuestProgress(7, game)} />,
     )
 
     expect(html).toContain('aria-label="五次任务进度"')
     expect(html.match(/data-quest-index=/g)).toHaveLength(5)
-    expect(html).toContain('第 4 次任务需 2 张失败牌才会失败')
+    expect(html).toContain('第 4 次任务，4 人，需 2 张失败牌才会失败')
   })
 
   it('shows public result and rejection progress without duplicating the quest track', () => {
