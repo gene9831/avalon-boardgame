@@ -7,6 +7,7 @@ import type {
 } from '@avalon/game'
 
 import {
+  GAME_CLIENT_SETTINGS_KEY,
   loadGameClientSettings,
   saveGameClientSettings,
 } from './game-client-settings'
@@ -264,6 +265,15 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
   const phase = input.game === null ? 'loading' : input.game.status === 'lobby' ? 'lobby' : input.phase
 
   useEffect(() => setSelectedTeam([]), [input.game?.leaderID, input.game?.questIndex])
+  useEffect(() => {
+    const synchronizeRoleKnowledge = (event: StorageEvent) => {
+      if (event.key === GAME_CLIENT_SETTINGS_KEY) {
+        setRoleKnowledgeOpen(loadGameClientSettings().roleKnowledgeOpen)
+      }
+    }
+    window.addEventListener('storage', synchronizeRoleKnowledge)
+    return () => window.removeEventListener('storage', synchronizeRoleKnowledge)
+  }, [])
   useEffect(() => {
     if (phase !== 'assassination') setSelectedTarget(null)
   }, [phase])

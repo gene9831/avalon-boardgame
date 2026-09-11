@@ -94,7 +94,7 @@ export async function confirmRecognitionParticipants(
   for (const [index, page] of pages.entries()) {
     const layer = page.locator(`[data-identity-step="${step}"]`)
     await expect(layer).toBeVisible()
-    const confirmation = layer.getByRole('button', {
+    const confirmation = page.getByRole('button', {
       exact: true,
       name: confirmationLabel,
     })
@@ -205,8 +205,7 @@ export async function createBrowserReplayHarness(options: {
         const resultHeadings = await Promise.all(
           pages.map(async (page) => {
             const heading = page
-              .locator('p:visible')
-              .filter({ hasText: /^(正义|邪恶)阵营获胜$/ })
+              .getByText(/^(正义|邪恶)阵营获胜$/, { exact: true })
               .first()
             await expect(heading).toBeVisible()
             return (await heading.textContent()) ?? ''

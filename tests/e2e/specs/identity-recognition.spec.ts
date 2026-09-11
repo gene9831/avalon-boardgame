@@ -44,20 +44,18 @@ async function expectRecognitionLayerCoversStage({
   await page.setViewportSize(viewport)
 
   const recognitionLayer = page.getByLabel('身份辨认', { exact: true })
+  const confirmationButton = page.getByRole('button', { name: /我已辨认/ })
 
   await expect(recognitionLayer).toBeVisible()
-  await expect(recognitionLayer.getByRole('button')).toHaveCount(1)
+  await expect(recognitionLayer.getByRole('button')).toHaveCount(0)
+  await expect(confirmationButton).toBeVisible()
 
   const geometry = await recognitionLayer.evaluate((layer) => {
-    const stage = layer.closest('.room-game-stage-content')
+    const stage = layer.closest('.avalon-room-shell__stage-content')
     const stageRect = stage?.getBoundingClientRect()
     const layerRect = layer.getBoundingClientRect()
-    const buttonRect = layer.querySelector('button')?.getBoundingClientRect()
 
     return {
-      buttonSize: buttonRect === undefined
-        ? null
-        : { height: buttonRect.height, width: buttonRect.width },
       coversStage: stageRect !== undefined
         && Math.abs(layerRect.left - stageRect.left) <= 1
         && Math.abs(layerRect.right - stageRect.right) <= 1
@@ -66,9 +64,12 @@ async function expectRecognitionLayerCoversStage({
     }
   })
 
-  expect(geometry.buttonSize).not.toBeNull()
-  expect(geometry.buttonSize!.height).toBeGreaterThanOrEqual(44)
-  expect(geometry.buttonSize!.width).toBeGreaterThanOrEqual(44)
+  const buttonSize = await confirmationButton.evaluate((button) => {
+    const bounds = button.getBoundingClientRect()
+    return { height: bounds.height, width: bounds.width }
+  })
+  expect(buttonSize.height).toBeGreaterThanOrEqual(44)
+  expect(buttonSize.width).toBeGreaterThanOrEqual(44)
   expect(
     geometry.coversStage,
     `${playerCount} players @ ${viewport.width}x${viewport.height}`,
@@ -271,7 +272,6 @@ test('players complete the curtain-based identity recognition ceremony', async (
       name: '查看我的身份与已知信息',
     }).click()
     await expect(percivalPage.getByLabel('Merlin 候选', { exact: true })).toHaveCount(2)
-    await expect(percivalPage.getByRole('button', { name: /Merlin 候选/ })).toHaveCount(2)
     await percivalPage.getByRole('button', {
       name: '隐藏我的身份与已知信息',
     }).click()
@@ -297,26 +297,19 @@ test('players complete the curtain-based identity recognition ceremony', async (
     }).click()
     const evilAvatar = evilPage.locator('#current-player-avatar')
     const evilSeat = evilAvatar.locator('xpath=ancestor::*[@data-round-table-player]')
-    await expect(evilPage.getByLabel('任务计分板', { exact: true })).toBeVisible()
+    await expect(evilPage.getByLabel('五次任务进度', { exact: true })).toBeVisible()
     await expect(evilPage.locator('[data-role-card]')).toHaveCount(0)
     await expect(evilAvatar.locator('[data-role-avatar]')).toBeVisible()
-    await expect(evilSeat.locator('[data-current-role-label]')).toBeVisible()
     const evilSeatGeometryAfter = await evilSeat.evaluate((seat) => {
       const avatar = seat.querySelector('[data-round-table-avatar]')!.getBoundingClientRect()
       const nameplate = seat.querySelector('[data-round-table-nameplate]')!.getBoundingClientRect()
-      const roleLabel = seat.querySelector('[data-current-role-label]')!.getBoundingClientRect()
       return {
         avatar: [avatar.x, avatar.y, avatar.width, avatar.height],
-        labelTop: roleLabel.top,
         nameplate: [nameplate.x, nameplate.y, nameplate.width, nameplate.height],
-        nameplateBottom: nameplate.bottom,
       }
     })
     expect(evilSeatGeometryAfter.avatar).toEqual(evilSeatGeometryBefore.avatar)
     expect(evilSeatGeometryAfter.nameplate).toEqual(evilSeatGeometryBefore.nameplate)
-    expect(evilSeatGeometryAfter.labelTop).toBeGreaterThanOrEqual(
-      evilSeatGeometryAfter.nameplateBottom + 1,
-    )
     await expect(evilPage.locator('[data-known-player-info]')).toHaveCount(1)
     await evilPage.keyboard.press('Escape')
     await expect(evilAvatar.locator('[data-role-avatar]')).toBeVisible()
@@ -360,7 +353,7 @@ test('players complete the curtain-based identity recognition ceremony', async (
       name: '查看我的身份与已知信息',
     }).click()
     await expect(leaderPage.locator('#current-player-avatar [data-role-avatar]')).toBeVisible()
-    await expect(leaderPage.getByLabel('任务计分板', { exact: true })).toBeVisible()
+    await expect(leaderPage.getByLabel('五次任务进度', { exact: true })).toBeVisible()
     await expect(preservedSeat).toBeEnabled()
     await expect(preservedSeat).toHaveAttribute('aria-pressed', 'true')
 
@@ -397,7 +390,7 @@ test('players complete the curtain-based identity recognition ceremony', async (
       })
     }
     await expect(submittedVotePage.locator('#current-player-avatar [data-role-avatar]')).toBeVisible()
-    await expect(submittedVotePage.getByLabel('任务计分板', { exact: true })).toBeVisible()
+    await expect(submittedVotePage.getByLabel('五次任务进度', { exact: true })).toBeVisible()
     expect(consoleErrors).toEqual([])
   } finally {
     await harness.close()

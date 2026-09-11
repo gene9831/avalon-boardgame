@@ -67,12 +67,12 @@ function RoomSeatDecorations({ player }: { player: RoomPlayerModel }) {
         </span>
       )}
       {player.knownEvil && (
-        <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="known-evil">
+        <span aria-label="已知邪恶阵营" className="room-seat__decoration" data-known-player-info="evil" data-seat-decoration="known-evil">
           <ShieldAlert />
         </span>
       )}
       {player.knownMerlinCandidate && (
-        <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="merlin-candidate">
+        <span aria-label="Merlin 候选" className="room-seat__decoration" data-known-player-info="merlin-candidate" data-seat-decoration="merlin-candidate">
           <HelpCircle />
         </span>
       )}
@@ -147,6 +147,7 @@ export function RoomPlayerSeat({
         className="room-seat__avatar absolute"
         data-avatar-state={avatarState}
         data-connected={player.connected}
+        data-round-table-avatar="true"
         data-seat-pointer-target="avatar"
         id={player.isCurrentPlayer ? 'current-player-avatar' : undefined}
         style={avatarStyle}
@@ -157,6 +158,7 @@ export function RoomPlayerSeat({
       </span>
       <span
         className="room-seat__name absolute truncate"
+        data-round-table-nameplate="true"
         data-seat-pointer-target="name"
         style={nameStyle}
         title={`${player.seatNumber}. ${player.name || '空座位'}`}

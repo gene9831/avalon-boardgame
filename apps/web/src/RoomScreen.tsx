@@ -51,7 +51,12 @@ export function RoomScreen({ model, actions, diagnosticsMode, tools }: RoomScree
         <div className={ROOM_SHELL_CLASSES.utilities}><RoomUtilities model={model.utilities} tools={tools} /></div>
       </header>
       <main className={ROOM_SHELL_CLASSES.stageRegion} data-room-slot="stage">
-        <div className={ROOM_SHELL_CLASSES.stageContent} ref={stageRef}>
+        <div
+          className={ROOM_SHELL_CLASSES.stageContent}
+          data-stage-layout-height={snapshot.stageSize?.height}
+          data-stage-layout-width={snapshot.stageSize?.width}
+          ref={stageRef}
+        >
           {model.numPlayers === null ? (
             <section aria-label="房间加载舞台" className="room-stage grid size-full place-items-center" data-room-stage="true" data-stage-layout-status="measuring">{center}</section>
           ) : (
