@@ -7,6 +7,15 @@
   color: #e2e8f0;
 }
 
+.room-lobby-preview {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: #07111f;
+  color: #e2e8f0;
+}
+
 .room-lobby-preview-index {
   display: grid;
   min-height: 100dvh;

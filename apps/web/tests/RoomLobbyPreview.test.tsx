@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
@@ -16,6 +17,12 @@ function renderPreview(path: string) {
 }
 
 describe('RoomLobbyPreview', () => {
+  it('gives the demo root a definite viewport-sized room container', () => {
+    const css = readFileSync(new URL('../src/RoomLayoutPreview.css', import.meta.url), 'utf8')
+
+    expect(css).toMatch(/\.room-lobby-preview\s*\{[^}]*width:\s*100vw;[^}]*height:\s*100vh;[^}]*height:\s*100dvh;[^}]*overflow:\s*hidden;/s)
+  })
+
   it('lists the five lobby scenarios', () => {
     const html = renderPreview('/dev/room-layout/lobby')
 
