@@ -102,9 +102,8 @@ select {
   position: absolute;
   z-index: 70;
   top: 4px;
-  left: 50%;
+  right: 4px;
   max-width: calc(100% - 16px);
-  translate: -50% 0;
   padding: 3px 7px;
   border-radius: 6px;
   color: #bae6fd;
