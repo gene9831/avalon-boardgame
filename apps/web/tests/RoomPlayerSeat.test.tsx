@@ -89,9 +89,9 @@ describe('RoomPlayerSeat', () => {
     )
 
     expect(html).toContain('aria-label="移至 2 号空座位"')
-    expect(html).toContain('title="2. 空座位"')
-    expect(html).toContain('>2. 空座位</span>')
-    expect(html).toContain('data-connected="false"')
+    expect(html).toContain('data-seat-state="empty"')
+    expect(html).toContain('>2</span>')
+    expect(html).toContain('>空位</span>')
   })
 
   it('keeps long player names in the title and accessible name', () => {
@@ -107,6 +107,26 @@ describe('RoomPlayerSeat', () => {
     )
 
     expect(html).toContain('aria-label="选择 暮鸦贤者不会被截断于辅助文本 作为刺杀目标，队长"')
-    expect(html).toContain('title="1. 暮鸦贤者不会被截断于辅助文本"')
+    expect(html).toContain('title="暮鸦贤者不会被截断于辅助文本"')
+  })
+
+  it('shows only the selected empty destination as pending', () => {
+    const html = renderToStaticMarkup(<RoomPlayerSeat disabled={false} interactionMode="changeSeat" layout={layout} onActivate={vi.fn()} pending player={{ ...player, playerID: '1', seatNumber: 2, name: '', occupied: false, connected: false, isLeader: false }} />)
+    expect(html).toContain('data-seat-state="pending"')
+    expect(html).toContain('aria-label="正在移至 2 号空座位"')
+    expect(html).toContain('换座中')
+  })
+
+  it('keeps the disconnected badge readable outside the grayscale portrait image', () => {
+    const html = renderToStaticMarkup(<RoomPlayerSeat disabled={false} interactionMode="none" layout={layout} onActivate={vi.fn()} player={{ ...player, connected: false }} />)
+    expect(html).toContain('data-seat-portrait-connected="false"')
+    expect(html).toContain('data-seat-disconnected-badge="true"')
+    expect(html).toContain('>掉线<')
+  })
+
+  it('marks the viewer only in the accessible description', () => {
+    const html = renderToStaticMarkup(<RoomPlayerSeat disabled={false} interactionMode="none" layout={layout} onActivate={vi.fn()} player={{ ...player, isCurrentPlayer: true }} />)
+    expect(html).toContain('当前玩家')
+    expect(html).not.toContain('data-avatar-state="current-player"')
   })
 })

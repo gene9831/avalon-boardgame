@@ -6,6 +6,7 @@ import {
   Crown,
   HelpCircle,
   House,
+  LoaderCircle,
   ShieldAlert,
   UsersRound,
 } from 'lucide-react'
@@ -26,6 +27,7 @@ export interface RoomPlayerSeatProps {
   player: RoomPlayerModel
   disabled: boolean
   onActivate: (playerID: PlayerID) => void
+  pending?: boolean
 }
 
 function localRectStyle(rect: Rect, bounds: Rect): CSSProperties {
@@ -83,10 +85,11 @@ function RoomSeatDecorations({ player }: { player: RoomPlayerModel }) {
 function actionLabel(
   interactionMode: RoomPlayerInteractionMode,
   player: RoomPlayerModel,
+  pending: boolean,
 ): string {
   const name = player.name || `${player.seatNumber} 号空座位`
   if (interactionMode === 'changeSeat') {
-    return player.occupied ? `${player.seatNumber}. ${name}` : `移至 ${name}`
+    return player.occupied ? `${player.seatNumber}. ${name}` : pending ? `正在移至 ${name}` : `移至 ${name}`
   }
   if (interactionMode === 'selectTeam') return `选择 ${name} 加入任务队伍`
   if (interactionMode === 'selectAssassinationTarget') {
@@ -108,6 +111,7 @@ function playerStatuses(player: RoomPlayerModel): string[] {
     player.isLeader ? '队长' : null,
     player.isQuestMember ? '任务队员' : null,
     player.isOwner ? '房间拥有者' : null,
+    player.isCurrentPlayer ? '当前玩家' : null,
     player.occupied && !player.connected ? '已断线' : null,
     player.knownEvil ? '已知阵营信息：邪恶' : null,
     player.knownMerlinCandidate ? '梅林候选' : null,
@@ -122,10 +126,11 @@ export function RoomPlayerSeat({
   player,
   disabled,
   onActivate,
+  pending = false,
 }: RoomPlayerSeatProps) {
   const interactive = interactionMode !== 'none'
   const accessibleLabel = [
-    actionLabel(interactionMode, player),
+    actionLabel(interactionMode, player, pending),
     ...playerStatuses(player),
   ].join('，')
   const avatarStyle = localRectStyle(layout.avatarRect, layout.playerSeatBounds)
@@ -138,32 +143,29 @@ export function RoomPlayerSeat({
         ? 'quest-member'
         : player.knownEvil
           ? 'known-evil'
-          : player.isCurrentPlayer
-            ? 'current-player'
             : 'default'
   const content: ReactNode = (
     <>
-      <span
-        className="room-seat__avatar absolute"
-        data-avatar-state={avatarState}
-        data-connected={player.connected}
-        data-round-table-avatar="true"
-        data-seat-pointer-target="avatar"
-        id={player.isCurrentPlayer ? 'current-player-avatar' : undefined}
-        style={avatarStyle}
-      >
-        {player.visibleRole === null
-          ? <PlayerAvatar avatarID={player.avatarID} className="size-full object-contain p-[12%]" />
-          : <RoleAvatar className="size-full object-cover" role={player.visibleRole} />}
-      </span>
+      {player.occupied ? (
+        <span className="room-seat__avatar absolute" data-avatar-state={avatarState} data-round-table-avatar="true" data-seat-pointer-target="avatar" id={player.isCurrentPlayer ? 'current-player-avatar' : undefined} style={avatarStyle} data-seat-state="occupied">
+          <span className="room-seat__portrait" data-seat-portrait-connected={player.connected}>
+            {player.visibleRole === null ? <PlayerAvatar avatarID={player.avatarID} className="size-full object-contain p-[12%]" /> : <RoleAvatar className="size-full object-cover" role={player.visibleRole} />}
+          </span>
+          {!player.connected && <span className="room-seat__disconnected" data-seat-disconnected-badge="true">掉线</span>}
+        </span>
+      ) : (
+        <span className="room-seat__avatar room-seat__avatar--empty absolute" data-seat-state={pending ? 'pending' : 'empty'} data-round-table-avatar="true" data-seat-pointer-target="avatar" style={avatarStyle}>
+          {pending ? <LoaderCircle aria-hidden="true" className="size-5 animate-spin" /> : player.seatNumber}
+        </span>
+      )}
       <span
         className="room-seat__name absolute truncate"
         data-round-table-nameplate="true"
         data-seat-pointer-target="name"
         style={nameStyle}
-        title={`${player.seatNumber}. ${player.name || '空座位'}`}
+        title={player.occupied ? player.name : `${player.seatNumber} 号空座位`}
       >
-        {player.seatNumber}. {player.name || '空座位'}
+        {player.occupied ? player.name : pending ? '换座中' : '空位'}
       </span>
       <RoomSeatDecorations player={player} />
     </>
