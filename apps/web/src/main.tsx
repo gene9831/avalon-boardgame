@@ -1,7 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import '@avalon/ui-layout/room-layout.css'
-import '@avalon/ui-layout/room-shell.css'
+import '@fontsource/noto-serif-sc/600.css'
 import './index.css'
 import App from './App.tsx'
 

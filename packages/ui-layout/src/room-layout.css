@@ -17,44 +17,96 @@
   overflow: hidden;
   container: avalon-room-layout / size;
   isolation: isolate;
+  color: #f2f4f7;
+  background: #07111f;
 }
 
 .avalon-room-layout {
-  --room-layout-topbar-size: 48px;
   --room-layout-stage-margin: 8px;
   display: grid;
   width: 100%;
   height: 100%;
   min-width: 0;
   min-height: 0;
-  grid-template-areas:
-    'topbar'
-    'stage'
-    'phase';
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
   grid-template-rows:
-    var(--room-layout-topbar-size)
+    56px
     minmax(0, 1fr)
     calc(160px + var(--room-layout-phase-bottom-clearance));
   overflow: hidden;
 }
 
 .avalon-room-layout__topbar,
+.avalon-room-layout__primary-chrome,
+.avalon-room-layout__back,
+.avalon-room-layout__room-number,
+.avalon-room-layout__quest-progress,
 .avalon-room-layout__stage-region,
 .avalon-room-layout__stage-content,
+.avalon-room-layout__phase-region,
+.avalon-room-layout__phase,
+.avalon-room-layout__toolbar,
 .avalon-room-layout__phase-panel {
   min-width: 0;
   min-height: 0;
 }
 
 .avalon-room-layout__topbar {
-  grid-area: topbar;
+  grid-column: 1 / -1;
+  grid-row: 1;
+  pointer-events: none;
+}
+
+.avalon-room-layout__primary-chrome {
+  display: contents;
+}
+
+.avalon-room-layout__back,
+.avalon-room-layout__room-number,
+.avalon-room-layout__quest-progress,
+.avalon-room-layout__phase,
+.avalon-room-layout__toolbar {
+  position: relative;
+  z-index: 2;
+}
+
+.avalon-room-layout__back {
+  display: grid;
+  grid-column: 1;
+  grid-row: 1;
+  place-items: center;
+}
+
+.avalon-room-layout__room-number {
+  display: flex;
+  grid-column: 2;
+  grid-row: 1;
+  align-items: center;
+  padding-inline: 8px;
   overflow: hidden;
 }
 
+.avalon-room-layout__quest-progress {
+  display: grid;
+  width: max-content;
+  grid-column: 3;
+  grid-row: 1;
+  align-items: center;
+  padding-inline: 8px;
+}
+
+.avalon-room-layout__quest-progress .quest-progress-track {
+  width: max-content;
+  grid-template-columns: repeat(5, max-content);
+}
+
 .avalon-room-layout__stage-region {
-  grid-area: stage;
+  display: grid;
+  grid-column: 1 / -1;
+  grid-row: 2;
   padding: var(--room-layout-stage-margin);
+  place-items: stretch;
+  background: radial-gradient(circle at 50% 47%, #172a3b 0, #0b1927 56%, #07111f 100%);
   overflow: hidden;
 }
 
@@ -65,31 +117,140 @@
   overflow: hidden;
 }
 
-.avalon-room-layout__phase-panel {
-  grid-area: phase;
-  box-sizing: border-box;
+.avalon-room-layout__phase-region {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-row: 3;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-rows: max-content minmax(0, 1fr);
   padding-bottom: var(--room-layout-phase-bottom-clearance);
-  overflow: auto;
-  overscroll-behavior: contain;
+  overflow: hidden;
+}
+
+.avalon-room-layout__phase {
+  display: flex;
+  grid-column: 1;
+  grid-row: 1;
+  align-items: center;
+  padding: 8px 16px;
+  border-top: 1px solid rgb(202 169 91 / 20%);
+  background: linear-gradient(180deg, #111d2b, #0b141f);
+  overflow: hidden;
+}
+
+.avalon-room-layout__toolbar {
+  display: grid;
+  grid-column: 2;
+  grid-row: 1;
+  align-items: center;
+  padding-inline: 8px;
+  background: linear-gradient(180deg, #111d2b, #0b141f);
+}
+
+.avalon-room-layout__toolbar [data-room-toolbar-item='log'] {
+  display: none;
+}
+
+.avalon-room-layout__phase-panel {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  overflow: hidden;
+  background: linear-gradient(180deg, #111d2b, #0b141f);
 }
 
 @container avalon-room-layout (orientation: portrait) and (min-height: 800px) {
   .avalon-room-layout {
-    --room-layout-topbar-size: 56px;
     --room-layout-stage-margin: 12px;
   }
 }
 
-@container avalon-room-layout (orientation: landscape) and (height < 515px) {
+@container avalon-room-layout (orientation: landscape) {
   .avalon-room-layout {
     --room-layout-stage-margin: 8px;
     --room-layout-phase-size: 192px;
     --room-layout-phase-bottom-clearance: 0px;
-    grid-template-areas: 'topbar stage phase';
     grid-template-columns:
       56px minmax(0, 1fr)
       var(--room-layout-phase-size);
-    grid-template-rows: minmax(0, 1fr);
+    grid-template-rows: max-content minmax(0, 1fr);
+  }
+
+  .avalon-room-layout__topbar {
+    grid-column: 1;
+    grid-row: 1 / -1;
+  }
+
+  .avalon-room-layout__primary-chrome {
+    display: grid;
+    grid-column: 1;
+    grid-row: 1 / -1;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: max-content minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .avalon-room-layout__back {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .avalon-room-layout__quest-progress {
+    width: auto;
+    grid-column: 1;
+    grid-row: 2;
+    place-items: center;
+    padding: 4px 0;
+    overflow: hidden;
+  }
+
+  .avalon-room-layout__quest-progress .quest-progress-track {
+    width: max-content;
+    grid-template-columns: max-content;
+    grid-template-rows: repeat(5, max-content);
+  }
+
+  .avalon-room-layout__room-number {
+    grid-column: 3;
+    grid-row: 1;
+    padding: 8px 12px;
+  }
+
+  .avalon-room-layout__stage-region {
+    grid-column: 2;
+    grid-row: 1 / -1;
+  }
+
+  .avalon-room-layout__phase-region {
+    grid-column: 3;
+    grid-row: 2;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: max-content max-content minmax(0, 1fr);
+    padding-bottom: 0;
+  }
+
+  .avalon-room-layout__phase {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .avalon-room-layout__toolbar {
+    grid-column: 1;
+    grid-row: 2;
+    justify-content: start;
+    padding-inline: 4px;
+  }
+
+  .avalon-room-layout__toolbar .room-toolbar {
+    gap: 0;
+  }
+
+  .avalon-room-layout__toolbar [data-room-toolbar-item='log'] {
+    display: grid;
+  }
+
+  .avalon-room-layout__phase-panel {
+    grid-column: 1;
+    grid-row: 3;
   }
 }
 
@@ -99,23 +260,85 @@
   }
 }
 
-@container avalon-room-layout (orientation: landscape) and (height >= 515px) {
+@container avalon-room-layout (orientation: landscape) and (height >= 515px) and (width >= 720px) {
   .avalon-room-layout {
-    --room-layout-topbar-size: 48px;
     --room-layout-stage-margin: 12px;
     --room-layout-phase-size: clamp(288px, 28cqw, 384px);
     --room-layout-phase-bottom-clearance: 0px;
-    grid-template-areas:
-      'topbar topbar'
-      'stage phase';
-    grid-template-columns: minmax(0, 1fr) var(--room-layout-phase-size);
-    grid-template-rows: var(--room-layout-topbar-size) minmax(0, 1fr);
+    grid-template-columns:
+      max-content max-content minmax(0, 1fr)
+      var(--room-layout-phase-size);
+    grid-template-rows:
+      56px
+      max-content minmax(0, 1fr);
+  }
+
+  .avalon-room-layout__topbar {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .avalon-room-layout__primary-chrome {
+    display: contents;
+  }
+
+  .avalon-room-layout__back {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .avalon-room-layout__room-number {
+    grid-column: 2;
+    grid-row: 1;
+    padding: 0 8px;
+  }
+
+  .avalon-room-layout__quest-progress {
+    width: auto;
+    grid-column: 3;
+    grid-row: 1;
+    justify-items: center;
+    padding: 0 8px;
+  }
+
+  .avalon-room-layout__quest-progress .quest-progress-track {
+    grid-template-columns: repeat(5, max-content);
+    grid-template-rows: none;
+  }
+
+  .avalon-room-layout__stage-region {
+    grid-column: 1 / 4;
+    grid-row: 2 / -1;
+  }
+
+  .avalon-room-layout__phase-region {
+    display: contents;
+  }
+
+  .avalon-room-layout__phase {
+    grid-column: 4;
+    grid-row: 2;
+  }
+
+  .avalon-room-layout__toolbar {
+    grid-column: 4;
+    grid-row: 1;
+    justify-content: end;
+    padding-inline: 8px;
+  }
+
+  .avalon-room-layout__toolbar .room-toolbar {
+    gap: 4px;
+  }
+
+  .avalon-room-layout__phase-panel {
+    grid-column: 4;
+    grid-row: 3;
   }
 }
 
 @container avalon-room-layout (orientation: landscape) and (min-height: 680px) {
   .avalon-room-layout {
-    --room-layout-topbar-size: 56px;
     --room-layout-stage-margin: 16px;
   }
 }

@@ -8,7 +8,7 @@ const nodes: readonly QuestProgressNodeModel[] = [
   { questIndex: 0, teamSize: 2, failThreshold: 1, state: 'success' },
   { questIndex: 1, teamSize: 3, failThreshold: 1, state: 'current' },
   { questIndex: 2, teamSize: 2, failThreshold: 1, state: 'upcoming' },
-  { questIndex: 3, teamSize: 3, failThreshold: 1, state: 'failure' },
+  { questIndex: 3, teamSize: 3, failThreshold: 2, state: 'failure' },
   { questIndex: 4, teamSize: 3, failThreshold: 1, state: 'upcoming' },
 ]
 
@@ -19,7 +19,8 @@ describe('QuestProgressTrack', () => {
     expect(html.match(/data-quest-index=/g)).toHaveLength(5)
     expect(html).toContain('第 2 次任务，3 人，需 1 张失败牌才会失败，当前任务')
     expect(html).toContain('lucide-users-round')
-    expect(html).toContain('lucide-circle-x')
+    expect(html.match(/lucide-circle-x/g)).toHaveLength(1)
+    expect(html).toContain('>II<')
     expect(html).toContain('aria-current="step"')
   })
 

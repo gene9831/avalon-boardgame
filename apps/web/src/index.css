@@ -1,6 +1,11 @@
 @import "tailwindcss";
 
+@theme {
+  --font-avalon-serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif;
+}
+
 :root {
+  --quest-progress-node-size: calc(var(--spacing) * 11);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -25,53 +30,6 @@ button,
 input,
 select {
   font: inherit;
-}
-
-.avalon-room-shell {
-  color: #f2f4f7;
-  background: #07111f;
-}
-
-.avalon-room-shell__back,
-.avalon-room-shell__room-status,
-.avalon-room-shell__quest-progress,
-.avalon-room-shell__utilities,
-.avalon-room-shell__phase-title,
-.avalon-room-shell__phase-tools,
-.avalon-room-shell__phase-middle,
-.avalon-room-shell__phase-action,
-.avalon-room-shell__phase-clearance {
-  position: relative;
-  z-index: 40;
-}
-
-.avalon-room-shell__back {
-  display: grid;
-  place-items: center;
-}
-
-.avalon-room-shell__room-status {
-  display: flex;
-  align-items: center;
-  padding-inline: var(--room-topbar-padding);
-}
-
-.avalon-room-shell__quest-progress,
-.avalon-room-shell__utilities {
-  display: grid;
-  align-items: center;
-}
-
-.avalon-room-shell__stage-region {
-  background: radial-gradient(circle at 50% 47%, #172a3b 0, #0b1927 56%, #07111f 100%);
-}
-
-.avalon-room-shell__phase-title,
-.avalon-room-shell__phase-tools,
-.avalon-room-shell__phase-middle,
-.avalon-room-shell__phase-action,
-.avalon-room-shell__phase-clearance {
-  background: linear-gradient(180deg, #111d2b, #0b141f);
 }
 
 .room-stage__tabletop {
@@ -140,20 +98,6 @@ select {
 .room-seat:focus-visible .room-seat__avatar,
 .room-seat:focus-visible .room-seat__name { outline: 2px solid currentColor; outline-offset: 2px; }
 
-.room-utility-button,
-.room-utilities > button,
-.room-utilities > [data-player-profile] {
-  display: grid;
-  width: 44px;
-  height: 44px;
-  place-items: center;
-  border: 0;
-  color: #e2e8f0;
-  background: transparent;
-  box-shadow: none;
-}
-.room-utility-button svg { width: 20px; height: 20px; }
-
 .room-layout-diagnostics {
   position: absolute;
   z-index: 70;
@@ -174,90 +118,6 @@ select {
 .room-layout-geometry [data-layout-boundary='center-protection'] { stroke: #fbbf24; }
 .room-layout-geometry [data-layout-boundary='avatar'] { stroke: #fb7185; }
 .room-layout-geometry [data-layout-boundary='name'] { stroke: #c084fc; }
-
-.avalon-room-shell__quest-progress {
-  padding-right: var(--room-topbar-padding);
-}
-
-.quest-progress-track {
-  width: 100%;
-  gap: 1px;
-}
-
-.quest-progress-track > li {
-  min-width: 0;
-}
-
-.quest-progress-node {
-  width: 44px;
-  height: 44px;
-}
-
-.quest-progress-meta {
-  bottom: 2px;
-  min-height: 12px;
-  font-size: 12px;
-  line-height: 12px;
-  white-space: nowrap;
-}
-
-.avalon-room-shell__phase-title {
-  display: flex;
-  align-items: center;
-  padding-inline: 16px;
-  border-top: 1px solid rgb(202 169 91 / 20%);
-  pointer-events: none;
-}
-
-.avalon-room-shell__phase-middle,
-.avalon-room-shell__phase-action {
-  display: grid;
-  align-items: center;
-  width: min(100%, 560px);
-  justify-self: center;
-  padding-inline: 16px;
-}
-
-.avalon-room-shell__phase-middle {
-  padding-block: 4px;
-}
-
-.avalon-room-shell__phase-action {
-  padding-block: 6px;
-}
-
-.avalon-room-shell[data-room-layout-mode='compact-landscape']
-  .avalon-room-shell__quest-progress {
-  padding: 0;
-}
-
-.avalon-room-shell[data-room-layout-mode='compact-landscape']
-  .quest-progress-track {
-  grid-template-columns: 44px;
-  grid-template-rows: repeat(5, 44px);
-  align-content: center;
-}
-
-.avalon-room-shell[data-room-layout-mode='compact-landscape']
-  .avalon-room-shell__room-status,
-.avalon-room-shell[data-room-layout-mode='compact-landscape']
-  .avalon-room-shell__phase-title,
-.avalon-room-shell[data-room-layout-mode='compact-landscape']
-  .avalon-room-shell__phase-middle,
-.avalon-room-shell[data-room-layout-mode='compact-landscape']
-  .avalon-room-shell__phase-action {
-  padding-inline: 12px;
-}
-
-.avalon-room-shell[data-room-layout-mode='normal-landscape']
-  .avalon-room-shell__phase-title,
-.avalon-room-shell[data-room-layout-mode='normal-landscape']
-  .avalon-room-shell__phase-middle,
-.avalon-room-shell[data-room-layout-mode='normal-landscape']
-  .avalon-room-shell__phase-action {
-  width: 100%;
-  border-left: 1px solid rgb(202 169 91 / 18%);
-}
 
 .identity-curtain {
   transform-origin: top;

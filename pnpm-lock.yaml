@@ -84,6 +84,12 @@ importers:
       '@avalon/ui-layout':
         specifier: workspace:*
         version: link:../../packages/ui-layout
+      '@fontsource/almendra':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/noto-serif-sc':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.3(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12))
@@ -370,6 +376,12 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@fontsource/almendra@5.3.0':
+    resolution: {integrity: sha512-edtEANMc9SKccDhYmtcxmlrvzzjHTQ/enLiOgWc4ODQDjdMf6zfoUdwpBHPPw+0pekeI7PyBsP4JqjyviiIuGg==}
+
+  '@fontsource/noto-serif-sc@5.3.0':
+    resolution: {integrity: sha512-0/zaEFkidiWldE62rTeD74x8ygUsQvejiSNtO0LQxQk3qpaHnlMZ3w4C7yH80B4KTIg8VKeFP4oSgwWMchY9+g==}
 
   '@hapi/bourne@3.0.0':
     resolution: {integrity: sha512-Waj1cwPXJDucOib4a3bAISsKJVb15MKi9IvmTI/7ssVEm6sywXGjVJDhl6/umt1pK1ZS7PacXU3A1PmFKHEZ2w==}
@@ -2149,6 +2161,10 @@ snapshots:
 
   '@esbuild/win32-x64@0.28.2':
     optional: true
+
+  '@fontsource/almendra@5.3.0': {}
+
+  '@fontsource/noto-serif-sc@5.3.0': {}
 
   '@hapi/bourne@3.0.0': {}
 

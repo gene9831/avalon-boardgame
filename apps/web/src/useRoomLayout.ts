@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState, type RefCallback } from 'react'
 import {
-  resolveRoomShellMetrics,
   solveRoundTableStageLayout,
   type RoomCanvasSize,
-  type RoomShellMetrics,
   type RoundTableStageLayoutResult,
 } from '@avalon/ui-layout'
 import type {
@@ -20,7 +18,6 @@ export type RoomLayoutSnapshot = Readonly<{
   viewportSize: RoomCanvasSize | null
   canvasSize: RoomCanvasSize | null
   stageSize: RoomCanvasSize | null
-  shellMetrics: RoomShellMetrics | null
   stageLayout: RoundTableStageLayoutResult | null
   diagnostics: RoundTableStageDiagnostics | null
 }>
@@ -43,9 +40,6 @@ function supportsPlayerCount(playerCount: number | null): playerCount is number 
 export function resolveRoomLayoutSnapshot(
   input: ResolveRoomLayoutSnapshotInput,
 ): RoomLayoutSnapshot {
-  const shellMetrics = input.canvasSize === null
-    ? null
-    : resolveRoomShellMetrics(input.canvasSize)
   const stageLayout = input.detailedResult !== undefined
     ? input.detailedResult
     : input.stageSize === null || !supportsPlayerCount(input.playerCount)
@@ -60,7 +54,6 @@ export function resolveRoomLayoutSnapshot(
     viewportSize: input.viewportSize,
     canvasSize: input.canvasSize,
     stageSize: input.stageSize,
-    shellMetrics,
     stageLayout,
     diagnostics:
       input.detailedResult?.status === 'ready'

@@ -20,7 +20,7 @@ export function RoomLayoutDiagnostics({ mode, playerCount, safeArea, snapshot }:
   return (
     <>
       <output aria-live="polite" className="room-layout-diagnostics pointer-events-none">
-        {`viewport ${size(snapshot.viewportSize)} · safe ${safeArea.top}/${safeArea.right}/${safeArea.bottom}/${safeArea.left} · canvas ${size(snapshot.canvasSize)} · ${snapshot.shellMetrics?.mode ?? 'measuring'} · stage ${size(snapshot.stageSize)} · players ${playerCount ?? '未知'} · avatar ${avatarSize ?? '—'}px · ${ready?.shape ?? solverStatus}`}
+        {`viewport ${size(snapshot.viewportSize)} · safe ${safeArea.top}/${safeArea.right}/${safeArea.bottom}/${safeArea.left} · canvas ${size(snapshot.canvasSize)} · stage ${size(snapshot.stageSize)} · players ${playerCount ?? '未知'} · avatar ${avatarSize ?? '—'}px · ${ready?.shape ?? solverStatus}`}
       </output>
       {mode === 'geometry' && snapshot.diagnostics !== null && snapshot.stageSize !== null && ready !== null && (
         <svg aria-hidden="true" className="room-layout-geometry pointer-events-none" viewBox={`0 0 ${snapshot.stageSize.width} ${snapshot.stageSize.height}`}>

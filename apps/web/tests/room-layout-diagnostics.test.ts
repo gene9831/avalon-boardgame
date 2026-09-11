@@ -23,7 +23,7 @@ describe('room layout diagnostic URL state', () => {
 
   it('reads decimal safe-area pixels and normalizes invalid values', () => {
     const values: Record<string, string> = {
-      '--safe-area-top': '1.5px', '--safe-area-right': '', '--safe-area-bottom': '12.25px', '--safe-area-left': 'invalid',
+      '--room-layout-safe-top': '1.5px', '--room-layout-safe-right': '', '--room-layout-safe-bottom': '12.25px', '--room-layout-safe-left': 'invalid',
     }
     const readStyles = () => ({ getPropertyValue: (name: string) => values[name] }) as CSSStyleDeclaration
     expect(readRoomSafeAreaInsets({} as HTMLElement, readStyles)).toEqual({ top: 1.5, right: 0, bottom: 12.25, left: 0 })

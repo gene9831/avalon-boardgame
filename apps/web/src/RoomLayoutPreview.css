@@ -21,10 +21,6 @@
   letter-spacing: 0.08em;
 }
 
-.room-layout-preview__region--topbar {
-  background: rgb(56 189 248 / 12%);
-}
-
 .room-layout-preview__region--stage {
   background: rgb(52 211 153 / 10%);
 }
@@ -33,11 +29,22 @@
   background: rgb(251 191 36 / 11%);
 }
 
+.room-layout-preview .avalon-room-layout__topbar {
+  background: rgb(56 189 248 / 12%);
+  box-shadow: inset 0 0 0 1px rgb(125 211 252 / 18%);
+}
+
+.room-layout-preview .avalon-room-layout__phase-region,
+.room-layout-preview .avalon-room-layout__phase,
+.room-layout-preview .avalon-room-layout__phase-panel {
+  background: rgb(251 191 36 / 7%);
+}
+
 .room-layout-preview__diagnostics {
-  position: fixed;
+  position: absolute;
   z-index: 100;
-  top: calc(var(--room-layout-safe-top) + 8px);
-  right: calc(var(--room-layout-safe-right) + 8px);
+  top: 8px;
+  right: 8px;
   display: grid;
   justify-items: end;
   gap: 8px;
@@ -109,7 +116,7 @@
   display: inline;
 }
 
-@container avalon-room-layout (orientation: landscape) and (height < 515px) {
+@container avalon-room-layout (orientation: landscape) {
   .room-layout-preview__mode--vertical {
     display: none;
   }
@@ -117,14 +124,26 @@
   .room-layout-preview__mode--compact-landscape {
     display: inline;
   }
+
+  .room-layout-preview .avalon-room-layout__room-number {
+    background: rgb(251 191 36 / 7%);
+  }
 }
 
-@container avalon-room-layout (orientation: landscape) and (height >= 515px) {
+@container avalon-room-layout (orientation: landscape) and (height >= 515px) and (width >= 720px) {
   .room-layout-preview__mode--vertical {
+    display: none;
+  }
+
+  .room-layout-preview__mode--compact-landscape {
     display: none;
   }
 
   .room-layout-preview__mode--normal-landscape {
     display: inline;
+  }
+
+  .room-layout-preview .avalon-room-layout__room-number {
+    background: transparent;
   }
 }

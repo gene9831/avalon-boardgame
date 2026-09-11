@@ -36,7 +36,6 @@ describe('resolveRoomLayoutSnapshot', () => {
     expect(snapshot.viewportSize).toEqual({ width: 375, height: 667 })
     expect(snapshot.canvasSize).toEqual({ width: 375, height: 667 })
     expect(snapshot.stageSize).toEqual({ width: 359, height: 435 })
-    expect(snapshot.shellMetrics?.mode).toBe('vertical')
     expect(snapshot.stageLayout).toBe(detailedResult)
     expect(snapshot.diagnostics).toBe(detailedResult.diagnostics)
   })

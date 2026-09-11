@@ -6,7 +6,6 @@ import { RoomLayoutDiagnostics } from '../src/RoomLayoutDiagnostics'
 const snapshot: RoomLayoutSnapshot = {
   viewportSize: { width: 375, height: 667 }, canvasSize: { width: 375, height: 667 },
   stageSize: { width: 359, height: 435 },
-  shellMetrics: { mode: 'vertical', topBarHeight: 48, topBarPadding: 8, stageMargin: 8, taskRailWidth: 0, sidebarWidth: 0, phaseHeaderHeight: 48, phaseMiddleHeight: 56, phaseActionHeight: 56 },
   stageLayout: {
     status: 'ready', shape: 'circle', tabletop: { x: 20, y: 40, width: 319, height: 319 },
     centerPanel: { x: 103.5, y: 123.5, width: 152, height: 152 },
@@ -25,7 +24,6 @@ describe('RoomLayoutDiagnostics', () => {
     expect(html).toContain('viewport 375×667')
     expect(html).toContain('canvas 375×667')
     expect(html).toContain('stage 359×435')
-    expect(html).toContain('vertical')
     expect(html).toContain('avatar 48px')
     expect(html).toContain('circle')
     expect(html).toContain('aria-hidden="true"')

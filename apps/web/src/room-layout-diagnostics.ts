@@ -28,9 +28,9 @@ export function readRoomSafeAreaInsets(
 ): RoomSafeAreaInsets {
   const styles = readStyles(root)
   return {
-    top: cssPixels(styles.getPropertyValue('--safe-area-top')),
-    right: cssPixels(styles.getPropertyValue('--safe-area-right')),
-    bottom: cssPixels(styles.getPropertyValue('--safe-area-bottom')),
-    left: cssPixels(styles.getPropertyValue('--safe-area-left')),
+    top: cssPixels(styles.getPropertyValue('--room-layout-safe-top')),
+    right: cssPixels(styles.getPropertyValue('--room-layout-safe-right')),
+    bottom: cssPixels(styles.getPropertyValue('--room-layout-safe-bottom')),
+    left: cssPixels(styles.getPropertyValue('--room-layout-safe-left')),
   }
 }
