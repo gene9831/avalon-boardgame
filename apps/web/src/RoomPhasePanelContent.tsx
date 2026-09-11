@@ -10,10 +10,24 @@ export function RoomPhasePanelContent({ actions, model }: { actions: RoomScreenA
   const title = <h2 className="truncate text-sm font-semibold text-amber-100">{model.title}</h2>
   switch (model.kind) {
     case 'loading': return { title, middle: <p role="status">{model.message}</p>, action: null }
-    case 'lobby': return {
+    case 'lobby': {
+      const remaining = model.total - model.occupied
+      const middle = model.occupied === model.total
+        ? model.isOwner ? '所有玩家已入座，可以开始游戏' : '所有玩家已入座'
+        : model.isOwner ? `还差 ${remaining} 位玩家即可开始` : `还差 ${remaining} 位玩家`
+
+      return {
+        title,
+        middle: <p className="text-sm text-slate-300">{middle}</p>,
+        action: model.isOwner
+          ? <button className={primaryClass} disabled={!model.canStart || model.startPending} onClick={actions.onStart} type="button">{model.startPending ? '正在开始…' : '开始游戏'}</button>
+          : null,
+      }
+    }
+    case 'connectionRecovery': return {
       title,
-      middle: <p className="text-sm text-slate-300">{model.occupied} / {model.total} 位玩家已入席</p>,
-      action: model.isOwner ? <button className={primaryClass} disabled={!model.canStart || model.busy} onClick={actions.onStart} type="button">开始游戏</button> : <p className="text-center text-sm text-slate-300" role="status">等待房间创建者开始游戏</p>,
+      middle: <p className="text-sm text-slate-300">正在尝试恢复与房间的连接</p>,
+      action: model.manualReconnectAvailable ? <button className={primaryClass} onClick={actions.onReconnect} type="button">重新连接</button> : null,
     }
     case 'identityRecognition': return {
       title,

@@ -6,7 +6,7 @@ import type { RoomPhaseModel, RoomScreenActions } from '../src/room-screen-model
 
 const actions: RoomScreenActions = {
   onActivatePlayer: vi.fn(), onStart: vi.fn(), onConfirmIdentityRecognition: vi.fn(),
-  onSubmitTeam: vi.fn(), onCastTeamVote: vi.fn(), onPlayQuestCard: vi.fn(), onAssassinate: vi.fn(),
+  onReconnect: vi.fn(), onSubmitTeam: vi.fn(), onCastTeamVote: vi.fn(), onPlayQuestCard: vi.fn(), onAssassinate: vi.fn(),
 }
 
 function render(model: RoomPhaseModel) {
@@ -19,10 +19,36 @@ function render(model: RoomPhaseModel) {
 }
 
 describe('RoomPhasePanelContent', () => {
-  it('puts the lobby start action outside the center summary', () => {
-    const html = render({ kind: 'lobby', title: '等待玩家', occupied: 5, total: 5, isOwner: true, canStart: true, busy: false })
-    expect(html.action).toContain('>开始游戏<')
-    expect(html.middle).toContain('5 / 5')
+  it.each([
+    [{ isOwner: true, occupied: 3, total: 5 }, '还差 2 位玩家即可开始', '开始游戏', true],
+    [{ isOwner: true, occupied: 5, total: 5 }, '所有玩家已入座，可以开始游戏', '开始游戏', false],
+    [{ isOwner: false, occupied: 3, total: 5 }, '还差 2 位玩家', '', false],
+    [{ isOwner: false, occupied: 5, total: 5 }, '所有玩家已入座', '', false],
+  ] as const)('renders the approved lobby phase contract', (state, middleText, actionText, disabled) => {
+    const html = render({
+      kind: 'lobby', title: '等待玩家',
+      canStart: state.isOwner && state.occupied === state.total,
+      startPending: false,
+      ...state,
+    })
+
+    expect(html.middle).toContain(middleText)
+    expect(html.action).toContain(actionText)
+    expect(html.action.includes('disabled=""')).toBe(disabled)
+  })
+
+  it('moves manual reconnect into the bottom action slot only after the delay', () => {
+    const automatic = render({
+      kind: 'connectionRecovery', title: '正在重新连接',
+      manualReconnectAvailable: false,
+    })
+    const manual = render({
+      kind: 'connectionRecovery', title: '正在重新连接',
+      manualReconnectAvailable: true,
+    })
+
+    expect(automatic.action).toBe('')
+    expect(manual.action).toContain('>重新连接<')
   })
 
   it('renders recognition confirmation and progress in the phase panel', () => {
