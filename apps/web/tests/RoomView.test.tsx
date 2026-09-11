@@ -19,6 +19,7 @@ function renderRoomView(overrides: Partial<RoomViewProps> = {}) {
     onBackHome: vi.fn(),
     onCastTeamVote: vi.fn(),
     onConfirmIdentityRecognition: vi.fn(),
+    onChangeSeat: vi.fn(),
     onClearLocalSession: vi.fn(),
     onDeleteRoom: vi.fn(),
     onKickPlayer: vi.fn(),
@@ -387,7 +388,7 @@ describe('RoomView connection state', () => {
 describe('RoomView viewport sizing', () => {
   it('uses only the dynamic viewport height and suppresses room overscroll', () => {
     const html = renderRoomView()
-    const mainClasses = /<main class="([^"]+)"/.exec(html)?.[1]?.split(' ') ?? []
+    const mainClasses = /<div class="([^"]+)" data-room-shell-variant="game"/.exec(html)?.[1]?.split(' ') ?? []
 
     expect(mainClasses).toContain('h-dvh')
     expect(mainClasses).toContain('overscroll-none')
@@ -396,7 +397,7 @@ describe('RoomView viewport sizing', () => {
 })
 
 describe('RoomView playing layout', () => {
-  it('keeps the game shell stable while its round-table stage is being measured', () => {
+  it('keeps one room screen while its round-table stage is being measured', () => {
     const html = renderRoomView({
       gameState: playingGameState(),
       room: {
@@ -413,11 +414,39 @@ describe('RoomView playing layout', () => {
       },
     })
 
-    expect(html).toContain('aria-label="阿瓦隆游戏圆桌"')
+    expect(html).toContain('aria-label="5 人游戏圆桌"')
     expect(html).toContain('data-stage-layout-status="measuring"')
     expect(html).toContain('aria-label="五次任务进度"')
     expect(html).toContain('data-room-shell-variant="game"')
-    expect(html).toContain('data-room-game-shell="true"')
+    expect(html.match(/data-room-screen="true"/g)).toHaveLength(1)
+    expect(html.match(/data-room-stage="true"/g)).toHaveLength(1)
+    expect(html).toContain('data-room-mode="teamProposal"')
+    expect(html).not.toContain('data-room-game-shell')
     expect(html).not.toContain('>玩家座位<')
+  })
+
+  it('uses the same room screen for the waiting lobby', () => {
+    const state = playingGameState()!
+    state.G.status = 'lobby'
+    state.ctx.phase = 'lobby'
+    const html = renderRoomView({
+      gameState: state,
+      room: {
+        gameName: 'avalon', matchID: 'room-123', ownerPlayerID: '0',
+        occupiedPlayerIDs: ['0', '1', '2', '3', '4'],
+        players: [
+          { id: 0, name: 'Alice', isConnected: true }, { id: 1, name: 'Bob', isConnected: true },
+          { id: 2, name: 'Claire', isConnected: true }, { id: 3, name: 'Dylan', isConnected: true },
+          { id: 4, name: 'Eve', isConnected: true },
+        ],
+        roleConfiguration: { percivalMorgana: true }, setupData: { numPlayers: 5 },
+      },
+    })
+
+    expect(html.match(/data-room-screen="true"/g)).toHaveLength(1)
+    expect(html).toContain('data-room-mode="lobby"')
+    expect(html).toContain('>开始游戏<')
+    expect(html).toContain('aria-label="打开用户中心"')
+    expect(html).not.toContain('data-room-game-shell')
   })
 })

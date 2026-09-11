@@ -1,24 +1,25 @@
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { RoomScreen } from '../src/RoomScreen'
+import { buildRoomScreenModel } from '../src/room-screen-controller'
 
 describe('RoomScreen', () => {
   it('renders one measuring shell with one instance of every business slot', () => {
     const html = renderToStaticMarkup(
       <RoomScreen
-        back={<button>返回</button>}
+        actions={{
+          onActivatePlayer: vi.fn(), onStart: vi.fn(), onConfirmIdentityRecognition: vi.fn(),
+          onSubmitTeam: vi.fn(), onCastTeamVote: vi.fn(), onPlayQuestCard: vi.fn(), onAssassinate: vi.fn(),
+        }}
         diagnosticsMode="off"
-        mode="lobby"
-        phaseAction={<button>开始</button>}
-        phaseMiddle={<span>等待</span>}
-        phaseTitle={<h2>等待大厅</h2>}
-        phaseTools={<span>工具</span>}
-        playerCount={5}
-        questProgress={<span>任务</span>}
-        roomStatus={<span>房间 ABC1234</span>}
-        stage={() => <span>舞台</span>}
-        utilities={<span>帮助</span>}
+        model={buildRoomScreenModel({ kind: 'loading', matchID: 'ABC123456', numPlayers: null })}
+        tools={{
+          connected: false, isOwner: false, logEntries: [], manualReconnectAvailable: false,
+          onBackHome: vi.fn(), onOpenHelp: vi.fn(), onReconnect: vi.fn(), onRequestRoomExit: vi.fn(),
+          onSaveProfile: vi.fn(), onToggleRoleKnowledge: vi.fn(), profile: { avatarID: 'merlin', name: 'Alice' },
+          roomExitBlocked: false, roomExitBusy: false, seatChangePending: false,
+        }}
       />,
     )
 
@@ -26,7 +27,7 @@ describe('RoomScreen', () => {
     expect(html.match(/data-room-slot="stage"/g)).toHaveLength(1)
     expect(html.match(/data-room-slot="phase-middle"/g)).toHaveLength(1)
     expect(html.match(/data-room-slot="phase-action"/g)).toHaveLength(1)
-    expect(html).toContain('data-room-mode="lobby"')
+    expect(html).toContain('data-room-mode="loading"')
     expect(html).toContain('data-room-layout-mode="measuring"')
   })
 })

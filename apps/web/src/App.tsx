@@ -48,8 +48,8 @@ import { classifyJoinError } from './join-error'
 import { LobbyView } from './LobbyView'
 import { RoomDevTools } from './RoomDevTools'
 import { RoomExitDialog } from './RoomExitDialog'
-import { RoomGamePanel } from './RoomGamePanel'
-import { RoomLobbyPanel } from './RoomLobbyPanel'
+import { RoomScreen } from './RoomScreen'
+import { useRoomScreenController } from './room-screen-controller'
 import {
   dissolveRoom,
   changeRoomSeat,
@@ -1056,35 +1056,6 @@ export function RoomAccessView({
   )
 }
 
-function RoomLoadingContent({
-  matchID,
-  onBackHome,
-}: {
-  matchID: string
-  onBackHome: () => void
-}) {
-  return (
-    <section className="flex h-full min-h-0 items-center justify-center overflow-hidden rounded-3xl border border-white/10 bg-white/[0.06] p-4 shadow-2xl shadow-black/20 backdrop-blur sm:p-8">
-      <div className="w-full max-w-xl rounded-3xl border border-white/10 bg-slate-950/35 p-6 sm:p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-300">
-          房间 {matchID}
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">正在进入房间</h1>
-        <p className="text-sm leading-6 text-slate-300">
-          正在准备游戏，请稍候。
-        </p>
-        <button
-          className="mt-6 rounded-xl border border-white/15 px-4 py-3 font-semibold text-slate-200 transition hover:border-amber-300/60 hover:text-white"
-          onClick={onBackHome}
-          type="button"
-        >
-          返回主页
-        </button>
-      </div>
-    </section>
-  )
-}
-
 export interface RoomViewProps {
   gameState: AvalonClientState | null
   onAssassinate: (targetID: PlayerID) => void
@@ -1144,30 +1115,18 @@ export function RoomView({
     beginManualReconnect()
     onReconnect()
   }, [beginManualReconnect, onReconnect])
-
-  if (room === null || gameState === null) {
-    return (
-      <ImmersiveLobbyShell developmentControls={null}>
-        <RoomLoadingContent
-          matchID={session.matchID}
-          onBackHome={onBackHome}
-        />
-      </ImmersiveLobbyShell>
-    )
-  }
-
-  const numPlayers = getMatchPlayerCount(room)
-  const occupiedPlayerIDs = getOccupiedPlayerIDs(room)
-  const isFull = occupiedPlayerIDs.length === numPlayers
-  const phase = gameState?.ctx.phase
+  const numPlayers = room === null ? null : getMatchPlayerCount(room)
+  const occupiedPlayerIDs = room === null ? [] : getOccupiedPlayerIDs(room)
+  const isFull = numPlayers !== null && occupiedPlayerIDs.length === numPlayers
+  const phase = gameState?.ctx.phase ?? 'loading'
   const activeStage = gameState?.ctx.activePlayers?.[session.playerID]
   const canStart =
     connected &&
     gameState?.isActive === true &&
-    room.ownerPlayerID === session.playerID &&
+    room?.ownerPlayerID === session.playerID &&
     phase === 'lobby' &&
     isFull
-  const currentRoomPlayer = room.players.find(
+  const currentRoomPlayer = room?.players.find(
     ({ id }) => String(id) === session.playerID,
   )
   const roomProfile: PlayerProfile = {
@@ -1177,83 +1136,59 @@ export function RoomView({
     ),
     name: currentRoomPlayer?.name ?? session.playerName ?? profile.name,
   }
-
-  if (phase === 'lobby') {
-    return (
-      <ImmersiveLobbyShell
-        developmentControls={(
-          <RoomDevTools
-            matchID={room.matchID}
-            onClearLocalSession={onClearLocalSession}
-            onDeleteRoom={onDeleteRoom}
-            onKickPlayer={onKickPlayer}
-            phase={phase}
-            players={room.players}
-          />
-        )}
-      >
-        <RoomLobbyPanel
-          canStart={canStart}
-          connected={connected}
-          currentPlayerID={session.playerID}
-          manualReconnectAvailable={manualReconnectAvailable}
-          logEntries={logEntries}
-          matchID={room.matchID}
-          numPlayers={numPlayers}
-          occupiedPlayerIDs={occupiedPlayerIDs}
-          ownerPlayerID={room.ownerPlayerID}
-          onBackHome={onBackHome}
-          onChangeSeat={onChangeSeat}
-          onReconnect={handleManualReconnect}
-          onOpenHelp={() => onOpenHelp(numPlayers)}
-          onRequestRoomExit={onRequestRoomExit}
-          onStart={onStart}
-          onSaveProfile={onSaveProfile}
-          players={room.players}
-          profile={roomProfile}
-          roomExitBusy={roomExitBusy}
-          roomExitBlocked={roomExitBlocked}
-          seatChangePending={seatChangePending}
-        />
-      </ImmersiveLobbyShell>
-    )
-  }
+  const controller = useRoomScreenController({
+    activeStage,
+    canStart,
+    connected,
+    currentPlayerID: session.playerID,
+    game: gameState?.G ?? null,
+    matchID: session.matchID,
+    onAssassinate,
+    onCastTeamVote,
+    onChangeSeat,
+    onConfirmIdentityRecognition,
+    onPlayQuestCard,
+    onProposeTeam,
+    onStart,
+    phase,
+    room,
+    roomExitBusy,
+  })
 
   return (
     <ImmersiveLobbyShell
       variant="game"
       developmentControls={(
         <RoomDevTools
-          matchID={room.matchID}
+          matchID={session.matchID}
           onClearLocalSession={onClearLocalSession}
           onDeleteRoom={onDeleteRoom}
           onKickPlayer={onKickPlayer}
           phase={phase}
-          players={room.players}
+          players={room?.players ?? []}
         />
       )}
     >
-      <RoomGamePanel
-        activeStage={activeStage}
-        connected={connected}
-        game={gameState.G}
-        manualReconnectAvailable={manualReconnectAvailable}
-        logEntries={logEntries}
-        matchID={room.matchID}
-        onAssassinate={onAssassinate}
-        onBackHome={onBackHome}
-        onCastTeamVote={onCastTeamVote}
-        onConfirmIdentityRecognition={onConfirmIdentityRecognition}
-        onPlayQuestCard={onPlayQuestCard}
-        onProposeTeam={onProposeTeam}
-        onOpenHelp={() => onOpenHelp(numPlayers)}
-        onReconnect={handleManualReconnect}
-        onSaveProfile={onSaveProfile}
-        phase={phase ?? 'teamProposal'}
-        playerID={session.playerID}
-        players={room.players}
-        profile={roomProfile}
-        ownerPlayerID={room.ownerPlayerID}
+      <RoomScreen
+        actions={controller.actions}
+        diagnosticsMode="off"
+        model={controller.model}
+        tools={{
+          connected,
+          isOwner: room?.ownerPlayerID === session.playerID,
+          logEntries,
+          manualReconnectAvailable,
+          onBackHome,
+          onOpenHelp: () => onOpenHelp(numPlayers ?? 5),
+          onReconnect: handleManualReconnect,
+          onRequestRoomExit,
+          onSaveProfile,
+          onToggleRoleKnowledge: controller.toggleRoleKnowledge,
+          profile: roomProfile,
+          roomExitBlocked,
+          roomExitBusy,
+          seatChangePending,
+        }}
       />
     </ImmersiveLobbyShell>
   )
@@ -1324,14 +1259,15 @@ function ImmersiveLobbyShell({
   developmentControls: ReactNode
   variant?: 'framed' | 'game'
 }) {
+  const Root = variant === 'game' ? 'div' : 'main'
   return (
-    <main
+    <Root
       className={`relative h-dvh overflow-hidden overscroll-none bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.16),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(34,211,238,0.14),_transparent_35%),#07111f] text-slate-200 ${variant === 'game' ? 'p-0' : 'p-2 sm:p-3 lg:p-4'}`}
       data-room-shell-variant={variant}
     >
       <div className={`h-full min-h-0 ${variant === 'game' ? 'w-full' : 'mx-auto max-w-7xl'}`}>{children}</div>
       {developmentControls}
-    </main>
+    </Root>
   )
 }
 

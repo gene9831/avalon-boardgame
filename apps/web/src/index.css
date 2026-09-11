@@ -136,6 +136,20 @@ select {
 .room-seat:focus-visible .room-seat__avatar,
 .room-seat:focus-visible .room-seat__name { outline: 2px solid currentColor; outline-offset: 2px; }
 
+.room-utility-button,
+.room-utilities > button,
+.room-utilities > [data-player-profile] {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 0;
+  color: #e2e8f0;
+  background: transparent;
+  box-shadow: none;
+}
+.room-utility-button svg { width: 20px; height: 20px; }
+
 .room-game-shell {
   --room-topbar-height: 48px;
   --room-topbar-padding: 8px;

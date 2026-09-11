@@ -40,6 +40,7 @@ export function RoomStage({
         aria-label={ariaLabel}
         className="room-stage relative size-full isolate"
         data-round-table-seat-count={players.length}
+        data-room-stage="true"
         data-stage-layout-status={layout?.status ?? 'measuring'}
       >
         {layout?.status === 'unavailable' && (
@@ -62,6 +63,7 @@ export function RoomStage({
       aria-label={ariaLabel}
       className="room-stage relative size-full isolate"
       data-round-table-seat-count={players.length}
+      data-room-stage="true"
       data-round-table-shape={layout.shape}
       data-stage-layout-status="ready"
     >

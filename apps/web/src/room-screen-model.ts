@@ -1,7 +1,9 @@
 import {
   getPlayerCountConfig,
   type AvalonPlayerView,
+  type IdentityRecognitionStep,
   type PlayerID,
+  type QuestCard,
   type Role,
   type TeamVote,
 } from '@avalon/game'
@@ -52,6 +54,63 @@ export type QuestProgressNodeModel = Readonly<{
   failThreshold: number | null
   state: 'upcoming' | 'current' | 'success' | 'failure'
 }>
+
+export type RoomCenterModel =
+  | Readonly<{ kind: 'loadingSummary'; message: string }>
+  | Readonly<{ kind: 'lobbySummary'; occupied: number; total: number; ready: boolean }>
+  | Readonly<{ kind: 'questSummary'; questIndex: number; goodSuccesses: number; evilFailures: number; consecutiveRejectedTeams: number }>
+  | Readonly<{ kind: 'resultSummary'; winner: 'good' | 'evil'; reason: string }>
+
+export type RoomPhaseModel =
+  | Readonly<{ kind: 'loading'; title: string; message: string }>
+  | Readonly<{ kind: 'lobby'; title: '等待玩家'; occupied: number; total: number; isOwner: boolean; canStart: boolean; busy: boolean }>
+  | Readonly<{ kind: 'identityRecognition'; title: '身份辨认'; confirmationLabel: string; confirmed: boolean; confirmedCount: number; participantCount: number; isParticipant: boolean }>
+  | Readonly<{ kind: 'teamProposal'; title: '组建任务队伍'; requiredTeamSize: number; selectedCount: number; leaderName: string; canSubmit: boolean }>
+  | Readonly<{ kind: 'teamVote'; title: '表决任务队伍'; proposedTeamNames: readonly string[]; submittedCount: number; total: number; submittedVote: TeamVote | null; canVote: boolean }>
+  | Readonly<{ kind: 'quest'; title: '执行任务'; status: string; canPlaySuccess: boolean; canPlayFail: boolean }>
+  | Readonly<{ kind: 'assassination'; title: '刺杀阶段'; isAssassin: boolean; targetName: string | null; canSubmit: boolean }>
+  | Readonly<{ kind: 'finished'; title: '对局结束'; summary: string; rolesRevealed: boolean }>
+
+export interface RoomScreenActions {
+  onActivatePlayer(playerID: PlayerID): void
+  onStart(): void
+  onConfirmIdentityRecognition(): void
+  onSubmitTeam(): void
+  onCastTeamVote(vote: TeamVote): void
+  onPlayQuestCard(card: QuestCard): void
+  onAssassinate(): void
+}
+
+export type RoomStageOverlayModel =
+  | Readonly<{ kind: 'none' }>
+  | Readonly<{
+      kind: 'identityRecognition'
+      step: IdentityRecognitionStep
+      curtainState: 'closed' | 'lowered' | 'raised'
+      title: string
+      role: Role | null
+    }>
+
+export type RoomUtilityModel = Readonly<{
+  showProfile: boolean
+  showRoomExit: boolean
+  showIdentityKnowledge: boolean
+  roleKnowledgeOpen: boolean
+}>
+
+export interface RoomScreenModel {
+  mode: RoomScreenMode
+  matchID: string
+  numPlayers: number | null
+  connected: boolean
+  players: readonly RoomPlayerModel[]
+  playerInteractionMode: RoomPlayerInteractionMode
+  questProgress: readonly QuestProgressNodeModel[]
+  center: RoomCenterModel
+  phase: RoomPhaseModel
+  stageOverlay: RoomStageOverlayModel
+  utilities: RoomUtilityModel
+}
 
 export function buildRoomPlayers(input: Readonly<{
   players: readonly LobbyPlayer[]
@@ -105,7 +164,8 @@ export function buildRoomPlayers(input: Readonly<{
       knownMerlinCandidate:
         input.showKnownPlayerInfo &&
         input.game?.status !== 'finished' &&
-        input.game?.viewer.knownMerlinCandidatePlayerIDs.includes(playerID) === true,
+        input.game !== null &&
+        (input.game.viewer.knownMerlinCandidatePlayerIDs ?? []).includes(playerID),
       visibleRole: revealedRole ?? privateRole ?? null,
       voteStatus:
         settledVotes?.[playerID] ??
