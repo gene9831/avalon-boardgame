@@ -45,9 +45,9 @@ function VoteStatusIcon({ status }: { status: 'pending' | TeamVote }) {
   return <BadgeCheck />
 }
 
-function RoomOwnerDecoration() {
+function RoomOwnerIcon() {
   return (
-    <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="owner">
+    <span aria-hidden="true" className="room-seat__owner-icon" data-seat-decoration="owner">
       <House className="room-seat__owner-fill" />
       <House className="room-seat__owner-outline" />
     </span>
@@ -157,7 +157,6 @@ export function RoomPlayerSeat({
             {player.visibleRole === null ? <PlayerAvatar avatarID={player.avatarID} className="size-full object-contain p-[12%]" /> : <RoleAvatar className="size-full object-cover" role={player.visibleRole} />}
           </span>
           {!player.connected && <span className="room-seat__disconnected" data-seat-disconnected-badge="true">掉线</span>}
-          {player.isOwner && <RoomOwnerDecoration />}
         </span>
       ) : (
         <span className="room-seat__avatar room-seat__avatar--empty absolute" data-seat-state={pending ? 'pending' : 'empty'} data-round-table-avatar="true" data-seat-pointer-target="avatar" style={avatarStyle}>
@@ -165,13 +164,14 @@ export function RoomPlayerSeat({
         </span>
       )}
       <span
-        className="room-seat__name absolute truncate"
+        className="room-seat__name absolute"
         data-round-table-nameplate="true"
         data-seat-pointer-target="name"
         style={nameStyle}
         title={player.occupied ? player.name : `${player.seatNumber} 号空座位`}
       >
-        {player.occupied ? player.name : pending ? '换座中' : '空位'}
+        {player.isOwner && <RoomOwnerIcon />}
+        <span className="min-w-0 truncate">{player.occupied ? player.name : pending ? '换座中' : '空位'}</span>
       </span>
       <RoomSeatDecorations player={player} />
     </>

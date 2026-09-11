@@ -156,7 +156,7 @@ describe('RoomPlayerSeat', () => {
     expect(html).not.toContain('data-avatar-state="current-player"')
   })
 
-  it('anchors the room owner decoration inside the avatar', () => {
+  it('places the room owner icon before the player name', () => {
     const html = renderToStaticMarkup(
       <RoomPlayerSeat
         disabled
@@ -168,7 +168,7 @@ describe('RoomPlayerSeat', () => {
     )
 
     expect(html).toMatch(
-      /data-round-table-avatar="true"[^>]*>.*data-seat-decoration="owner".*<\/span><span class="room-seat__name/s,
+      /class="room-seat__name absolute"[^>]*>.*data-seat-decoration="owner".*Alice.*<\/span>/s,
     )
   })
 })
