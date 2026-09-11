@@ -27,6 +27,64 @@ select {
   font: inherit;
 }
 
+.avalon-room-shell {
+  color: #f2f4f7;
+  background: #07111f;
+}
+
+.avalon-room-shell__back,
+.avalon-room-shell__room-status,
+.avalon-room-shell__quest-progress,
+.avalon-room-shell__utilities,
+.avalon-room-shell__phase-title,
+.avalon-room-shell__phase-tools,
+.avalon-room-shell__phase-middle,
+.avalon-room-shell__phase-action,
+.avalon-room-shell__phase-clearance {
+  position: relative;
+  z-index: 40;
+}
+
+.avalon-room-shell__back {
+  display: grid;
+  place-items: center;
+}
+
+.avalon-room-shell__room-status {
+  display: flex;
+  align-items: center;
+  padding-inline: var(--room-topbar-padding);
+}
+
+.avalon-room-shell__quest-progress,
+.avalon-room-shell__utilities {
+  display: grid;
+  align-items: center;
+}
+
+.avalon-room-shell__stage-region {
+  background: radial-gradient(circle at 50% 47%, #172a3b 0, #0b1927 56%, #07111f 100%);
+}
+
+.avalon-room-shell__phase-title,
+.avalon-room-shell__phase-tools,
+.avalon-room-shell__phase-middle,
+.avalon-room-shell__phase-action,
+.avalon-room-shell__phase-clearance {
+  background: linear-gradient(180deg, #111d2b, #0b141f);
+}
+
+.room-stage__tabletop {
+  z-index: 0;
+  border: clamp(0.45rem, 1.6vw, 1.15rem) solid rgb(254 240 138 / 25%);
+  background: radial-gradient(circle at 45% 38%, rgb(53 79 65 / 98%), rgb(18 42 37 / 98%) 55%, rgb(8 22 27 / 98%) 100%);
+  box-shadow: 0 22px 65px rgb(0 0 0 / 50%), inset 0 0 0 2px rgb(251 191 36 / 16%), inset 0 0 70px rgb(0 0 0 / 42%);
+}
+
+.room-stage__center { z-index: 10; }
+.room-stage__players { z-index: 20; }
+.room-stage__unavailable { color: #fef3c7; }
+
 .room-game-shell {
   --room-topbar-height: 48px;
   --room-topbar-padding: 8px;
