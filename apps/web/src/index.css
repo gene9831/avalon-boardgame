@@ -49,7 +49,7 @@ select {
 .room-seat__avatar {
   display: grid;
   place-items: center;
-  overflow: hidden;
+  overflow: visible;
   border: 2px solid rgb(216 198 159 / 70%);
   border-radius: 9999px;
   background: #efe3c6;
