@@ -45,14 +45,17 @@ function VoteStatusIcon({ status }: { status: 'pending' | TeamVote }) {
   return <BadgeCheck />
 }
 
+function RoomOwnerDecoration() {
+  return (
+    <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="owner">
+      <House />
+    </span>
+  )
+}
+
 function RoomSeatDecorations({ player }: { player: RoomPlayerModel }) {
   return (
     <>
-      {player.isOwner && (
-        <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="owner">
-          <House />
-        </span>
-      )}
       {player.isLeader && (
         <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="leader">
           <Crown />
@@ -153,6 +156,7 @@ export function RoomPlayerSeat({
             {player.visibleRole === null ? <PlayerAvatar avatarID={player.avatarID} className="size-full object-contain p-[12%]" /> : <RoleAvatar className="size-full object-cover" role={player.visibleRole} />}
           </span>
           {!player.connected && <span className="room-seat__disconnected" data-seat-disconnected-badge="true">掉线</span>}
+          {player.isOwner && <RoomOwnerDecoration />}
         </span>
       ) : (
         <span className="room-seat__avatar room-seat__avatar--empty absolute" data-seat-state={pending ? 'pending' : 'empty'} data-round-table-avatar="true" data-seat-pointer-target="avatar" style={avatarStyle}>

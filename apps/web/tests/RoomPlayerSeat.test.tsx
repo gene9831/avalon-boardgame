@@ -155,4 +155,20 @@ describe('RoomPlayerSeat', () => {
     expect(html).toContain('当前玩家')
     expect(html).not.toContain('data-avatar-state="current-player"')
   })
+
+  it('anchors the room owner decoration inside the avatar', () => {
+    const html = renderToStaticMarkup(
+      <RoomPlayerSeat
+        disabled
+        interactionMode="none"
+        layout={layout}
+        onActivate={vi.fn()}
+        player={{ ...player, isOwner: true }}
+      />,
+    )
+
+    expect(html).toMatch(
+      /data-round-table-avatar="true"[^>]*>.*data-seat-decoration="owner".*<\/span><span class="room-seat__name/s,
+    )
+  })
 })

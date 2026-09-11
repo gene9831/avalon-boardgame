@@ -88,7 +88,7 @@ select {
   pointer-events: none;
 }
 .room-seat__decoration svg { width: 0.8rem; height: 0.8rem; }
-.room-seat__decoration[data-seat-decoration='owner'] { right: 1px; top: 1px; color: #cbd5e1; background: rgb(30 41 59 / 82%); }
+.room-seat__decoration[data-seat-decoration='owner'] { left: -0.25rem; top: -0.25rem; color: #cbd5e1; background: rgb(30 41 59 / 82%); }
 .room-seat__decoration[data-seat-decoration='leader'] { left: 50%; top: -0.75rem; color: #fcd34d; translate: -50% 0; }
 .room-seat__decoration[data-seat-decoration='vote'] { right: 0; bottom: 0; color: #e2e8f0; background: #0f172a; }
 .room-seat__decoration[data-seat-decoration='quest-member'] { right: 0; top: 0; color: #cffafe; background: #164e63; }
