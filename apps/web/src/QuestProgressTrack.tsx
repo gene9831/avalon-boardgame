@@ -28,7 +28,7 @@ export function QuestProgressTrack({ game, numPlayers }: QuestProgressTrackProps
           >
             <div
               aria-current={isCurrent ? 'step' : undefined}
-              className={`quest-progress-node mx-auto grid place-items-center rounded-full border text-xs font-bold ${result
+              className={`quest-progress-node relative mx-auto grid place-items-center rounded-full border text-xs font-bold ${result
                 ? result.succeeded
                   ? 'border-sky-200/70 bg-sky-400/25 text-sky-50'
                   : 'border-rose-200/70 bg-rose-500/25 text-rose-50'
@@ -36,18 +36,18 @@ export function QuestProgressTrack({ game, numPlayers }: QuestProgressTrackProps
                   ? 'border-amber-200/80 bg-amber-300/20 text-amber-50'
                   : 'border-white/15 bg-black/20 text-slate-300'}`}
             >
-              {result
-                ? result.succeeded
-                  ? <Check aria-hidden="true" className="size-1/2" strokeWidth={2.6} />
-                  : <X aria-hidden="true" className="size-1/2" strokeWidth={2.6} />
-                : questIndex + 1}
+              <span className="quest-progress-state -translate-y-1">
+                {result
+                  ? result.succeeded
+                    ? <Check aria-hidden="true" className="size-5" strokeWidth={2.6} />
+                    : <X aria-hidden="true" className="size-5" strokeWidth={2.6} />
+                  : questIndex + 1}
+              </span>
+              <span aria-hidden="true" className="quest-progress-meta absolute inset-x-0 bottom-0.5 flex items-center justify-center gap-0.5 font-semibold text-amber-50/85">
+                <span className="flex items-center"><UsersRound className="size-3" strokeWidth={2.2} /><span>{teamSize}</span></span>
+                <span className="flex items-center"><CircleX className="size-3 text-rose-200/90" strokeWidth={2.2} /><span>{failThreshold}</span></span>
+              </span>
             </div>
-            <span aria-hidden="true" className="quest-progress-meta mt-0.5 flex items-center justify-center gap-1 text-[0.55rem] font-semibold text-amber-50/75">
-              <UsersRound className="size-2.5" strokeWidth={2.2} />
-              <span>{teamSize}</span>
-              <CircleX className="size-2.5 text-rose-200/80" strokeWidth={2.2} />
-              <span>{failThreshold}</span>
-            </span>
           </li>
         )
       })}
