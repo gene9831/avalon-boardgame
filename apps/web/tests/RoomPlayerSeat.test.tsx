@@ -171,4 +171,21 @@ describe('RoomPlayerSeat', () => {
       /class="room-seat__name absolute"[^>]*>.*data-seat-decoration="owner".*Alice.*<\/span>/s,
     )
   })
+
+  it('assigns short, medium, and maximum nameplate width tiers', () => {
+    const renderNameplate = (name: string, isOwner = false) => renderToStaticMarkup(
+      <RoomPlayerSeat
+        disabled
+        interactionMode="none"
+        layout={layout}
+        onActivate={vi.fn()}
+        player={{ ...player, name, isOwner }}
+      />,
+    )
+
+    expect(renderNameplate('林 1')).toContain('data-nameplate-size="short" data-round-table-nameplate="true" data-seat-pointer-target="name" style="left:14px;top:64px;width:64px')
+    expect(renderNameplate('暮色森林 7')).toContain('data-nameplate-size="medium" data-round-table-nameplate="true" data-seat-pointer-target="name" style="left:2px;top:64px;width:88px')
+    expect(renderNameplate('阿瓦隆远征骑士 10')).toContain('data-nameplate-size="max" data-round-table-nameplate="true" data-seat-pointer-target="name" style="left:0;top:64px;width:92px')
+    expect(renderNameplate('银月 3', true)).toContain('data-nameplate-size="short" data-round-table-nameplate="true" data-seat-pointer-target="name" style="left:14px;top:64px;width:64px')
+  })
 })

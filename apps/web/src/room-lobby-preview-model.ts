@@ -56,7 +56,7 @@ export function applyLobbyPreviewReconnectCompletion(
 }
 
 const CURRENT_PLAYER_ID = '2' as PlayerID
-const PLAYER_NAMES = ['苍鹰', '雾林', '银月', '赤羽', '青岚', '暮色', '白鹿', '暮鸦', '荆棘', '霜塔']
+const PLAYER_NAMES = ['苍', '雾林守望者', '银', '来自卡美洛的无名骑士', '青岚', '暮色远征者', '白鹿', '暮鸦议会记录官', '荆棘', '霜塔守夜人']
 
 function isFullScenario(scenarioID: LobbyPreviewScenarioID) {
   return scenarioID === 'member-full' || scenarioID === 'owner-full' || scenarioID === 'current-player-disconnected'

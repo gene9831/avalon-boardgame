@@ -161,6 +161,12 @@
   background: linear-gradient(180deg, #111d2b, #0b141f);
 }
 
+@container avalon-room-layout (orientation: portrait) {
+  .avalon-room-layout__toolbar {
+    border-top: 1px solid rgb(202 169 91 / 20%);
+  }
+}
+
 @container avalon-room-layout (orientation: portrait) and (min-height: 800px) {
   .avalon-room-layout {
     --room-layout-stage-margin: 12px;

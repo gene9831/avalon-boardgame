@@ -39,6 +39,26 @@ function localRectStyle(rect: Rect, bounds: Rect): CSSProperties {
   }
 }
 
+type NameplateSize = 'short' | 'medium' | 'max'
+
+function nameplateSize(label: string, hasOwnerIcon: boolean): NameplateSize {
+  const visualLength = Array.from(label.replace(/\s/g, '')).length + (hasOwnerIcon ? 1 : 0)
+  if (visualLength <= 4) return 'short'
+  if (visualLength <= 7) return 'medium'
+  return 'max'
+}
+
+function localNameStyle(rect: Rect, bounds: Rect, size: NameplateSize): CSSProperties {
+  const targetWidth = size === 'short' ? 64 : size === 'medium' ? 88 : rect.width
+  const width = Math.min(targetWidth, rect.width)
+  return {
+    left: rect.x - bounds.x + (rect.width - width) / 2,
+    top: rect.y - bounds.y,
+    width,
+    height: rect.height,
+  }
+}
+
 function VoteStatusIcon({ status }: { status: 'pending' | TeamVote }) {
   if (status === 'approve') return <CircleCheck />
   if (status === 'reject') return <CircleX />
@@ -138,7 +158,9 @@ export function RoomPlayerSeat({
     ...playerStatuses(player),
   ].join('，')
   const avatarStyle = localRectStyle(layout.avatarRect, layout.playerSeatBounds)
-  const nameStyle = localRectStyle(layout.nameRect, layout.playerSeatBounds)
+  const visibleName = player.occupied ? player.name : pending ? '换座中' : '空位'
+  const nameSize = nameplateSize(visibleName, player.isOwner)
+  const nameStyle = localNameStyle(layout.nameRect, layout.playerSeatBounds, nameSize)
   const avatarState = player.isSelectedTarget
     ? 'target'
     : player.isSelected
@@ -164,13 +186,14 @@ export function RoomPlayerSeat({
       )}
       <span
         className="room-seat__name absolute"
+        data-nameplate-size={nameSize}
         data-round-table-nameplate="true"
         data-seat-pointer-target="name"
         style={nameStyle}
         title={player.occupied ? player.name : `${player.seatNumber} 号空座位`}
       >
         {player.isOwner && <RoomOwnerIcon />}
-        <span className="min-w-0 truncate">{player.occupied ? player.name : pending ? '换座中' : '空位'}</span>
+        <span className="min-w-0 truncate">{visibleName}</span>
       </span>
       <RoomSeatDecorations player={player} />
     </>
