@@ -42,18 +42,23 @@ export function RoomMoreMenu({ connected, entries, isOwner, onRequestRoomExit, r
 
   useEffect(() => {
     if (!menuOpen) return
-    const closeOnEscapeOrOutside = (event: KeyboardEvent | MouseEvent) => {
-      if (event instanceof KeyboardEvent) {
-        if (event.key !== 'Escape') return
-      } else if (containerRef.current?.contains(event.target as Node)) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
       setMenuOpen(false)
       triggerRef.current?.focus()
     }
-    document.addEventListener('keydown', closeOnEscapeOrOutside)
-    document.addEventListener('mousedown', closeOnEscapeOrOutside)
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (containerRef.current?.contains(event.target as Node)) return
+      setMenuOpen(false)
+      // `click` follows the target's native mousedown focus behavior. Do not
+      // prevent the outside target's action; only restore this menu's focus.
+      triggerRef.current?.focus()
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    document.addEventListener('click', closeOnOutsideClick)
     return () => {
-      document.removeEventListener('keydown', closeOnEscapeOrOutside)
-      document.removeEventListener('mousedown', closeOnEscapeOrOutside)
+      document.removeEventListener('keydown', closeOnEscape)
+      document.removeEventListener('click', closeOnOutsideClick)
     }
   }, [menuOpen])
 

@@ -69,7 +69,7 @@ describe('RoomLobbyPreview', () => {
     const html = renderPreview('/dev/room-layout/lobby/member-incomplete')
 
     expect(html).toContain('aria-label="打开开发预览控制"')
-    expect(html).toContain('aria-controls="room-lobby-preview-controls"')
+    expect(html).not.toContain('aria-controls="room-lobby-preview-controls"')
     expect(html).not.toContain('id="room-lobby-preview-controls"')
     expect(html).not.toContain('aria-label="关闭开发预览控制"')
     const source = readFileSync(new URL('../src/RoomLobbyPreview.tsx', import.meta.url), 'utf8')

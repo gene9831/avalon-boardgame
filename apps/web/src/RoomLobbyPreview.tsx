@@ -176,7 +176,7 @@ function LobbyPreviewScenario({ scenarioID }: { scenarioID: LobbyPreviewScenario
           <button onClick={resetDemo} type="button">重置预览</button>
         </aside>
       ) : (
-        <button aria-controls="room-lobby-preview-controls" aria-expanded={controlsOpen} aria-label="打开开发预览控制" className="room-lobby-preview__controls-trigger" onClick={() => setControlsOpen(true)} type="button">
+        <button aria-expanded={controlsOpen} aria-label="打开开发预览控制" className="room-lobby-preview__controls-trigger" onClick={() => setControlsOpen(true)} type="button">
           <SlidersHorizontal aria-hidden="true" size={20} />
         </button>
       )}
