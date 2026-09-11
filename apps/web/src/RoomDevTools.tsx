@@ -4,6 +4,7 @@ import { webConfig } from './config'
 import { createDevToolsClient } from './dev-tools'
 import { FloatingDevTools } from './FloatingDevTools'
 import type { LobbyPlayer } from './lobby'
+import { formatRoomID } from './room-id'
 import type { RoomLayoutDiagnosticsMode } from './useRoomLayout'
 import { useDevTools } from './use-dev-tools'
 
@@ -65,7 +66,7 @@ export function RoomDevTools({
       <button
         className="w-full rounded-xl border border-rose-300/30 px-4 py-3 font-semibold text-rose-200 transition hover:border-rose-300/70"
         onClick={() => {
-          if (window.confirm(`确定删除房间 ${matchID} 吗？`)) {
+          if (window.confirm(`确定删除房间 ${formatRoomID(matchID)} 吗？`)) {
             void run(() => onDeleteRoom(token))
           }
         }}

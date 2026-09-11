@@ -10,6 +10,7 @@ import { LobbyDevTools } from './LobbyDevTools'
 import { HelpTrigger } from './HelpTrigger'
 import { PlayerProfileControl } from './PlayerProfileControl'
 import type { PlayerProfile } from './player-profile'
+import { formatRoomID } from './room-id'
 import type { RoomSession } from './room-session'
 import {
   canJoinRoom,
@@ -132,7 +133,7 @@ export function LobbyView({
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="truncate font-mono text-sm font-semibold text-slate-100">房间 {room.matchID}</p>
+              <p className="truncate font-mono text-sm font-semibold text-slate-100">房间 {formatRoomID(room.matchID)}</p>
               <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${room.status === 'lobby' ? 'bg-amber-300/15 text-amber-200' : room.status === 'playing' ? 'bg-cyan-300/15 text-cyan-200' : 'bg-slate-700/70 text-slate-300'}`}>
                 {roomStatusLabel(room.status)}
               </span>

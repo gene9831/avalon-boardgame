@@ -11,6 +11,7 @@ import { RoomPlayerSeat } from './RoomPlayerSeat'
 import { RoomStage } from './RoomStage'
 import { RoomUtilities, type RoomUtilityTools } from './RoomUtilities'
 import { readRoomSafeAreaInsets, type RoomSafeAreaInsets } from './room-layout-diagnostics'
+import { formatRoomID } from './room-id'
 import type { RoomScreenActions, RoomScreenModel } from './room-screen-model'
 import { useRoomLayout, type RoomLayoutDiagnosticsMode } from './useRoomLayout'
 
@@ -46,7 +47,7 @@ export function RoomScreen({ model, actions, diagnosticsMode, tools }: RoomScree
     >
       <header className={ROOM_SHELL_CLASSES.topBar}>
         <div className={ROOM_SHELL_CLASSES.back}><button aria-label="返回主页" className="room-utility-button" onClick={tools.onBackHome} type="button"><ChevronLeft aria-hidden="true" /></button></div>
-        <div className={ROOM_SHELL_CLASSES.roomStatus}><h1 className="truncate text-sm font-semibold text-white">房间 {model.matchID.slice(0, 7)}</h1></div>
+        <div className={ROOM_SHELL_CLASSES.roomStatus}><h1 className="truncate text-sm font-semibold text-white">房间 {formatRoomID(model.matchID)}</h1></div>
         <div className={ROOM_SHELL_CLASSES.questProgress}><QuestProgressTrack nodes={model.questProgress} /></div>
         <div className={ROOM_SHELL_CLASSES.utilities}><RoomUtilities model={model.utilities} tools={tools} /></div>
       </header>

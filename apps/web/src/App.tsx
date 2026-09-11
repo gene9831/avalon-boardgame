@@ -48,6 +48,7 @@ import { classifyJoinError } from './join-error'
 import { LobbyView } from './LobbyView'
 import { RoomDevTools } from './RoomDevTools'
 import { RoomExitDialog } from './RoomExitDialog'
+import { formatRoomID } from './room-id'
 import { RoomScreen } from './RoomScreen'
 import { useRoomScreenController } from './room-screen-controller'
 import {
@@ -434,7 +435,7 @@ function LobbyRoute({
 
   const handleDeleteRoom = async (matchID: string) => {
     if (!devToolsEnabled || devToken.length === 0) return
-    if (!window.confirm(`确定删除房间 ${matchID} 吗？`)) return
+    if (!window.confirm(`确定删除房间 ${formatRoomID(matchID)} 吗？`)) return
 
     await runDevTool(async () => {
       await devTools.deleteRoom(matchID, devToken)
@@ -1043,7 +1044,7 @@ export function RoomAccessView({
   onBackHome: () => void
 }) {
   return (
-    <PageShell eyebrow={`房间 ${matchID}`} title="进入房间">
+    <PageShell eyebrow={`房间 ${formatRoomID(matchID)}`} title="进入房间">
       <section className="mx-auto max-w-xl rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8">
         <p className="text-sm leading-6 text-slate-300">
           你尚未加入这个房间。请返回房间列表，选择一个房间后加入。
