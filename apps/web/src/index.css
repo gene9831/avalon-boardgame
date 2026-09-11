@@ -114,6 +114,11 @@ select {
   z-index: 100;
 }
 
+.room-game-utilities button,
+.room-game-phase-tools button {
+  border: 0;
+}
+
 .room-game-phase-title {
   grid-column: 1 / 3;
   grid-row: 3;

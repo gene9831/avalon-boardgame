@@ -33,7 +33,6 @@ import {
   toggleTeamMember,
 } from './room-game'
 import { buildRoundTableSeats, type RoundTableSeat } from './RoundTable'
-import { PlayerProfileControl } from './PlayerProfileControl'
 import { PlayerAvatar } from './player-avatars'
 import type { PlayerProfile } from './player-profile'
 import { RoomGameShell } from './RoomGameShell'
@@ -81,11 +80,9 @@ export function RoomGamePanel({
   onPlayQuestCard,
   onProposeTeam,
   onReconnect,
-  onSaveProfile,
   phase,
   playerID,
   players,
-  profile,
   ownerPlayerID,
 }: RoomGamePanelProps) {
   const playerIDs = Object.keys(game.players).sort((left, right) => Number(left) - Number(right))
@@ -209,8 +206,7 @@ export function RoomGamePanel({
       questProgress={<QuestProgressTrack game={game} numPlayers={playerIDs.length} />}
       roomStatus={(
         <div className="min-w-0">
-          <p className="room-game-status-phase truncate text-[0.625rem] font-semibold tracking-[0.16em] text-amber-300">{phaseLabel}</p>
-          <h1 className="truncate text-sm font-semibold text-white">房间 {matchID}</h1>
+          <h1 className="truncate text-sm font-semibold text-white">房间 {matchID.slice(0, 7)}</h1>
         </div>
       )}
       stage={(
@@ -252,12 +248,6 @@ export function RoomGamePanel({
           <ConnectionRecoveryControl connected={connected} manualReconnectAvailable={manualReconnectAvailable} onReconnect={onReconnect} />
           <HelpTrigger onOpen={onOpenHelp} variant="icon" />
           <RoomLogControl entries={logEntries} />
-          <PlayerProfileControl
-            locked
-            onSave={onSaveProfile}
-            panelPlacement={layoutMetrics?.mode === 'vertical' ? 'bottom-sheet' : 'responsive'}
-            profile={profile}
-          />
         </div>
       )}
     />
