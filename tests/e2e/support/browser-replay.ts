@@ -70,7 +70,7 @@ export async function joinRoom(
 ) {
   await page.goto('/')
   await setPlayerProfileName(page, name)
-  const roomHeading = page.getByText(`房间 ${matchID}`, { exact: true })
+  const roomHeading = page.getByTitle(matchID, { exact: true })
   await expect(roomHeading).toBeVisible()
   const room = roomHeading.locator('xpath=ancestor::article')
   await room.getByRole('button', { name: '加入' }).click()

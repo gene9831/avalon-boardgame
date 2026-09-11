@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type {
+  AvalonResult,
   AvalonPlayerView,
   PlayerID,
   QuestCard,
@@ -72,6 +73,22 @@ function playerName(room: AvalonMatch, playerID: PlayerID | null): string {
   return room.players.find(({ id }) => String(id) === playerID)?.name ?? `玩家 ${Number(playerID) + 1}`
 }
 
+function finishedResultReason(room: AvalonMatch, result: AvalonResult): string {
+  if (result.reason === 'five_rejections') return '连续五次否决，邪恶阵营获胜'
+  if (result.reason === 'three_quests') {
+    return result.winner === 'good'
+      ? '正义阵营完成三次任务'
+      : '邪恶阵营破坏了三次任务'
+  }
+
+  const target = result.targetID === undefined
+    ? ''
+    : `：${playerName(room, result.targetID)}`
+  return result.winner === 'evil'
+    ? `刺客命中梅林${target}`
+    : `刺杀未命中梅林${target}`
+}
+
 function resolveMode(game: AvalonPlayerView, phase: string): RoomScreenMode {
   if (game.status === 'lobby') return 'lobby'
   if (game.status === 'finished') return 'finished'
@@ -96,12 +113,11 @@ function buildCenter(
     return { kind: 'lobbySummary', occupied, total, ready: occupied === total }
   }
   if (mode === 'finished' && game.result !== undefined) {
-    const reason = game.result.reason === 'five_rejections'
-      ? '连续五次否决，邪恶阵营获胜'
-      : game.result.reason === 'assassination'
-        ? '刺客完成刺杀'
-        : '正义阵营完成三次任务'
-    return { kind: 'resultSummary', winner: game.result.winner, reason }
+    return {
+      kind: 'resultSummary',
+      winner: game.result.winner,
+      reason: finishedResultReason(room, game.result),
+    }
   }
   return {
     kind: 'questSummary',
@@ -179,7 +195,9 @@ function buildPhase(
   }
   return {
     kind: 'finished', title: '对局结束',
-    summary: game.result?.winner === 'good' ? '正义阵营获胜' : '邪恶阵营获胜',
+    summary: game.result === undefined
+      ? '对局已结束'
+      : finishedResultReason(room, game.result),
     rolesRevealed: game.revealedRoles !== undefined,
   }
 }
@@ -233,6 +251,7 @@ export function buildRoomScreenModel(input: BuildRoomScreenModelInput): RoomScre
     mode, matchID: input.matchID, numPlayers, connected: input.connected,
     players: buildRoomPlayers({
       players: input.room.players, numPlayers, currentPlayerID: input.currentPlayerID,
+      phase: input.phase,
       viewerConnected: input.connected,
       ownerPlayerID: input.room.ownerPlayerID, game: input.game,
       selectedTeam: input.selectedTeam, selectedTarget: input.selectedTarget,

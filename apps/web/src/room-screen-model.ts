@@ -10,6 +10,7 @@ import {
 
 import type { LobbyPlayer } from './lobby'
 import type { PlayerAvatarID } from './player-profile'
+import { getDisplayedTeamVoteResult } from './room-game'
 import { getSeatAvatarID } from './seat-avatar'
 
 export type RoomScreenMode =
@@ -118,6 +119,7 @@ export function buildRoomPlayers(input: Readonly<{
   players: readonly LobbyPlayer[]
   numPlayers: number
   currentPlayerID: PlayerID
+  phase: string
   viewerConnected: boolean
   ownerPlayerID: PlayerID | null
   game: AvalonPlayerView | null
@@ -135,7 +137,9 @@ export function buildRoomPlayers(input: Readonly<{
     ...orderedPlayerIDs.slice(currentIndex),
     ...orderedPlayerIDs.slice(0, currentIndex),
   ]
-  const settledVotes = input.game?.voteHistory.at(-1)?.votes
+  const settledVotes = input.game === null
+    ? undefined
+    : getDisplayedTeamVoteResult(input.game, input.phase)?.votes
 
   return relativeOrder.map((playerID, relativeSeatIndex) => {
     const seatIndex = Number(playerID)

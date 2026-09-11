@@ -4,7 +4,7 @@ import { createRoom, setPlayerProfileName } from '../support/browser-replay'
 
 function roomCard(page: Page, matchID: string) {
   return page
-    .getByText(`房间 ${matchID}`, { exact: true })
+    .getByTitle(matchID, { exact: true })
     .locator('xpath=ancestor::article')
 }
 

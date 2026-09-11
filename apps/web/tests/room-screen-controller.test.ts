@@ -158,4 +158,39 @@ describe('buildRoomScreenModel', () => {
     expect(model.playerInteractionMode).toBe('selectAssassinationTarget')
     expect(model.players.find(({ playerID }) => playerID === '3')?.knownEvil).toBe(true)
   })
+
+  it.each([
+    [
+      'an Evil three-failed-quest victory',
+      { winner: 'evil', reason: 'three_quests' } as const,
+      '邪恶阵营破坏了三次任务',
+    ],
+    [
+      'a Good three-successful-quest legacy result',
+      { winner: 'good', reason: 'three_quests' } as const,
+      '正义阵营完成三次任务',
+    ],
+    [
+      'an assassination hit with the public target',
+      { winner: 'evil', reason: 'assassination', targetID: '1' } as const,
+      '刺客命中梅林：Bob',
+    ],
+    [
+      'an assassination miss with the public target',
+      { winner: 'good', reason: 'assassination', targetID: '2' } as const,
+      '刺杀未命中梅林：Claire',
+    ],
+  ])('summarizes %s without collapsing the settled outcome', (_label, result, summary) => {
+    const model = buildRoomScreenModel(readyInput('finished', {
+      status: 'finished',
+      result,
+    }))
+
+    expect(model.center).toEqual({
+      kind: 'resultSummary',
+      winner: result.winner,
+      reason: summary,
+    })
+    expect(model.phase).toMatchObject({ kind: 'finished', summary })
+  })
 })

@@ -129,6 +129,7 @@ export function RoomPlayerSeat({
   pending = false,
 }: RoomPlayerSeatProps) {
   const interactive = interactionMode !== 'none'
+  const canActivate = interactive && !disabled
   const accessibleLabel = [
     actionLabel(interactionMode, player, pending),
     ...playerStatuses(player),
@@ -177,7 +178,7 @@ export function RoomPlayerSeat({
     'data-round-table-player': 'true',
   } as const
 
-  return interactive ? (
+  return canActivate ? (
     <button
       {...commonProps}
       aria-pressed={interactionMode === 'selectTeam'

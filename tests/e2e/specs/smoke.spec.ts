@@ -77,7 +77,7 @@ test('creation enters the owner, seat zero is reusable, and concurrent joins fil
     const fullRoomPage = remainingPages[3]
     await fullRoomPage.goto('/')
     const fullRoomCard = fullRoomPage
-      .getByText(`房间 ${matchID}`, { exact: true })
+      .getByTitle(matchID, { exact: true })
       .locator('xpath=ancestor::article')
     await expect(fullRoomCard.getByText('5/5 人已入座', { exact: false })).toBeVisible()
     await expect(fullRoomCard.getByText('已满', { exact: true })).toBeVisible()

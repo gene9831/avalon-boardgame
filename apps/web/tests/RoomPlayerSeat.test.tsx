@@ -68,6 +68,32 @@ describe('RoomPlayerSeat', () => {
     expect(html).not.toContain('<button')
   })
 
+  it('keeps occupied lobby seats as noninteractive groups while an empty destination is actionable', () => {
+    const occupiedHtml = renderToStaticMarkup(
+      <RoomPlayerSeat
+        disabled
+        interactionMode="changeSeat"
+        layout={layout}
+        onActivate={vi.fn()}
+        player={player}
+      />,
+    )
+    const emptyHtml = renderToStaticMarkup(
+      <RoomPlayerSeat
+        disabled={false}
+        interactionMode="changeSeat"
+        layout={layout}
+        onActivate={vi.fn()}
+        player={{ ...player, playerID: '1', seatNumber: 2, name: '', occupied: false, connected: false, isLeader: false }}
+      />,
+    )
+
+    expect(occupiedHtml).toContain('role="group"')
+    expect(occupiedHtml).not.toContain('<button')
+    expect(emptyHtml).toContain('<button')
+    expect(emptyHtml).toContain('aria-label="移至 2 号空座位"')
+  })
+
   it('announces an empty lobby destination and preserves its full visual label', () => {
     const emptyPlayer = {
       ...player,

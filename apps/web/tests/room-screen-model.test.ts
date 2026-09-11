@@ -21,6 +21,7 @@ const baseInput = {
   viewerConnected: true,
   ownerPlayerID: '3',
   game: null,
+  phase: 'teamVote',
   selectedTeam: [],
   selectedTarget: null,
   showKnownPlayerInfo: false,
@@ -118,6 +119,37 @@ describe('room screen player model', () => {
     expect(result.find(({ playerID }) => playerID === '4')).toMatchObject({
       isSelected: true,
     })
+  })
+
+  it('shows only current vote submissions during a second active team vote', () => {
+    const result = buildRoomPlayers({
+      ...baseInput,
+      game: gameView({
+        questIndex: 0,
+        submittedTeamVotePlayerIDs: ['2'],
+        voteHistory: [{
+          questIndex: 0,
+          team: ['0', '1'],
+          votes: {
+            '0': 'approve',
+            '1': 'approve',
+            '2': 'reject',
+            '3': 'reject',
+            '4': 'reject',
+          },
+          approved: false,
+        }],
+      }),
+      phase: 'teamVote',
+    })
+
+    expect(result.map(({ playerID, voteStatus }) => [playerID, voteStatus])).toEqual([
+      ['0', null],
+      ['1', null],
+      ['2', 'pending'],
+      ['3', null],
+      ['4', null],
+    ])
   })
 })
 

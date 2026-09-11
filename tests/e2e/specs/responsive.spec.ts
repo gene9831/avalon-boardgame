@@ -12,11 +12,6 @@ const roomViewports = [
   { width: 1024, height: 768 },
 ]
 
-function expectedShellMode({ width, height }: { width: number; height: number }) {
-  if (width <= height) return 'vertical'
-  return height < 515 ? 'compact-landscape' : 'normal-landscape'
-}
-
 async function expectRoundTableFits(page: Page, tableLabel: string) {
   const tableLocator = page.getByLabel(tableLabel, { exact: true })
   await expect(tableLocator).toHaveAttribute('data-stage-layout-status', 'ready')
@@ -248,16 +243,13 @@ test('five, seven, and ten-player rooms keep one measured shell across lobby and
       await expect(roomScreen).toHaveCount(1)
       await expect(ownerPage.locator('[data-room-stage="true"]')).toHaveCount(1)
       await expect(roomScreen).toHaveAttribute('data-room-mode', 'lobby')
-      await expect(ownerPage.locator('h1')).toHaveText(
+      await expect(ownerPage.getByTitle(harness.matchID, { exact: true })).toHaveText(
         `房间 ${harness.matchID.slice(0, 7)}`,
       )
 
       for (const viewport of roomViewports) {
         await ownerPage.setViewportSize(viewport)
-        await expect(roomScreen).toHaveAttribute(
-          'data-room-layout-mode',
-          expectedShellMode(viewport),
-        )
+        await expect(ownerPage.locator('.avalon-room-layout__stage-content')).toHaveCount(1)
         await expectRoundTableFits(ownerPage, tableLabel)
 
         const questNodes = ownerPage
@@ -304,7 +296,7 @@ test('five, seven, and ten-player rooms keep one measured shell across lobby and
         await expect(ownerPage.locator('.room-layout-diagnostics')).toBeVisible()
         await expect(ownerPage.locator('.room-layout-geometry')).toBeVisible()
         const diagnosticGeometry = await ownerPage
-          .locator('.avalon-room-shell__stage-content')
+          .locator('.avalon-room-layout__stage-content')
           .evaluate((stage) => {
             const bounds = stage.getBoundingClientRect()
             const renderedIndices = Array.from(
@@ -407,10 +399,7 @@ test('five, seven, and ten-player rooms keep one measured shell across lobby and
         ).toContainText('已选 1 /')
 
         await leaderPage.setViewportSize({ width: 667, height: 375 })
-        await expect(leaderScreen).toHaveAttribute(
-          'data-room-layout-mode',
-          'compact-landscape',
-        )
+        await expect(leaderPage.locator('.avalon-room-layout__stage-content')).toHaveCount(1)
         await expect(selectableSeat).toHaveAttribute('aria-pressed', 'true')
         await expectRoundTableFits(leaderPage, tableLabel)
 

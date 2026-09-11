@@ -51,7 +51,7 @@ async function expectRecognitionLayerCoversStage({
   await expect(confirmationButton).toBeVisible()
 
   const geometry = await recognitionLayer.evaluate((layer) => {
-    const stage = layer.closest('.avalon-room-shell__stage-content')
+    const stage = layer.closest('.avalon-room-layout__stage-content')
     const stageRect = stage?.getBoundingClientRect()
     const layerRect = layer.getBoundingClientRect()
 
