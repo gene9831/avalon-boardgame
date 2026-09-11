@@ -48,7 +48,8 @@ function VoteStatusIcon({ status }: { status: 'pending' | TeamVote }) {
 function RoomOwnerDecoration() {
   return (
     <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="owner">
-      <House />
+      <House className="room-seat__owner-fill" />
+      <House className="room-seat__owner-outline" />
     </span>
   )
 }
