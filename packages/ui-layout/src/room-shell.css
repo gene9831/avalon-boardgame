@@ -44,10 +44,10 @@
 }
 
 .avalon-room-shell__stage-region {
+  position: relative;
   display: grid;
   place-items: center;
   padding: var(--round-table-stage-margin);
-  overflow: hidden;
 }
 
 .avalon-room-shell__stage-content {

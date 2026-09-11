@@ -1,6 +1,8 @@
+import '@avalon/ui-layout/room-shell.css'
 import './styles.css'
 
 import {
+  ROOM_SHELL_CLASSES,
   resolveRoomShellMetrics,
   type RoomShellMode,
 } from '@avalon/ui-layout'
@@ -29,7 +31,7 @@ app.innerHTML = `
   <div class="lab-shell" data-viewport-mode="simulated">
     <div class="preview-workbench">
       <div class="preview-frame">
-        <div class="room-canvas" aria-label="Avalon 房间布局预览"></div>
+        <div class="${ROOM_SHELL_CLASSES.root}" aria-label="Avalon 房间布局预览"></div>
       </div>
     </div>
   </div>`
@@ -37,7 +39,7 @@ app.innerHTML = `
 const shell = app.querySelector<HTMLElement>('.lab-shell')!
 const workbench = app.querySelector<HTMLElement>('.preview-workbench')!
 const previewFrame = app.querySelector<HTMLElement>('.preview-frame')!
-const canvas = app.querySelector<HTMLElement>('.room-canvas')!
+const canvas = app.querySelector<HTMLElement>(`.${ROOM_SHELL_CLASSES.root}`)!
 const roomShell = renderRoomShell(canvas)
 const readout = roomShell.stageInfoReadout
 const roomShellModeLabel: Record<RoomShellMode, string> = {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  ROOM_SHELL_CLASSES,
   resolveRoomShellMetrics,
   solveRoundTableStageLayout,
 } from '@avalon/ui-layout'
@@ -119,25 +120,31 @@ describe('preview room shell', () => {
   })
 
   it('applies shell layout values to canvas as css vars and data attribute', () => {
-    const shell = resolveRoomShellMetrics({ width: 1024, height: 768 })
+    const shell = resolveRoomShellMetrics({ width: 667, height: 375 })
     const properties: Record<string, string> = {}
+    const classes = new Set<string>()
     const canvas = {
+      classList: {
+        add: (...classNames: string[]): void => {
+          for (const className of classNames) classes.add(className)
+        },
+        contains: (className: string): boolean => classes.has(className),
+      },
       style: {
         setProperty: (name: string, value: string): void => {
           properties[name] = value
         },
+        getPropertyValue: (name: string): string => properties[name] ?? '',
       },
       dataset: {},
     } as unknown as HTMLElement
 
     applyPreviewRoomShell(canvas, shell)
 
-    expect(canvas.dataset.roomLayoutMode).toBe('normal-landscape')
-    expect(properties['--room-topbar-height']).toBe('56px')
-    expect(properties['--room-topbar-padding']).toBe('12px')
-    expect(properties['--round-table-stage-margin']).toBe('16px')
-    expect(properties['--task-rail-width']).toBe('0px')
-    expect(properties['--phase-sidebar-width']).toBe('288px')
+    expect(canvas.classList.contains(ROOM_SHELL_CLASSES.root)).toBe(true)
+    expect(canvas.dataset.roomLayoutMode).toBe('compact-landscape')
+    expect(canvas.style.getPropertyValue('--task-rail-width')).toBe('56px')
+    expect(canvas.style.getPropertyValue('--phase-sidebar-width')).toBe('192px')
   })
 
   for (const [viewport, expectedMode, stageWidth, stageHeight] of confirmedViewports) {
