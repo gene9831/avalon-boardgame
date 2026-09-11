@@ -28,12 +28,16 @@ function isOwnerScenario(scenarioID: LobbyPreviewScenarioID) {
   return scenarioID === 'owner-incomplete' || scenarioID === 'owner-full'
 }
 
-function createPlayers(playerCount: number, full: boolean): LobbyPlayer[] {
+function createPlayers(playerCount: number, scenarioID: LobbyPreviewScenarioID): LobbyPlayer[] {
+  const full = isFullScenario(scenarioID)
   const occupiedCount = full ? playerCount : playerCount - 2
+  const disconnectedPlayerID = scenarioID === 'member-incomplete' || scenarioID === 'owner-incomplete'
+    ? 1
+    : scenarioID === 'current-player-disconnected' ? 2 : null
   return Array.from({ length: playerCount }, (_, id) => ({
     id,
     name: id < occupiedCount ? `${PLAYER_NAMES[id]} ${id + 1}` : undefined,
-    isConnected: id < occupiedCount && id !== 1,
+    isConnected: id < occupiedCount && id !== disconnectedPlayerID,
   }))
 }
 
@@ -74,7 +78,7 @@ export function buildLobbyPreviewState(input: Readonly<{
   canStart: boolean
 }> {
   const full = isFullScenario(input.scenarioID)
-  const players = createPlayers(input.playerCount, full)
+  const players = createPlayers(input.playerCount, input.scenarioID)
   const ownerPlayerID = isOwnerScenario(input.scenarioID) ? CURRENT_PLAYER_ID : '0'
   const room: AvalonMatch = {
     gameName: 'avalon',

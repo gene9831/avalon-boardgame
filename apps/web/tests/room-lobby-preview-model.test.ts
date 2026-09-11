@@ -27,4 +27,23 @@ describe('buildLobbyPreviewState', () => {
     expect(preview.connected).toBe(false)
     expect(preview.manualReconnectAvailable).toBe(true)
   })
+
+  it.each([
+    ['member-incomplete', ['1']],
+    ['owner-incomplete', ['1']],
+    ['member-full', []],
+    ['owner-full', []],
+    ['current-player-disconnected', ['2']],
+  ] as const)('uses the intended disconnected seats for %s', (scenarioID, expectedPlayerIDs) => {
+    const preview = buildLobbyPreviewState({
+      scenarioID, playerCount: 5,
+      reconnectMode: 'automatic', seatChangeTargetID: null, startPending: false,
+    })
+
+    const disconnectedPlayerIDs = preview.room.players
+      .filter((player) => player.name != null && player.isConnected === false)
+      .map((player) => String(player.id))
+
+    expect(disconnectedPlayerIDs).toEqual(expectedPlayerIDs)
+  })
 })
