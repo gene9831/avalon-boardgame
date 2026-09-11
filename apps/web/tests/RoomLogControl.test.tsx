@@ -1,7 +1,9 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
-import { RoomLogControl, RoomLogPanel } from '../src/RoomLogControl'
+import { createRef } from 'react'
+
+import { RoomLogControl, RoomLogDialog, RoomLogPanel } from '../src/RoomLogControl'
 
 const entries = [
   {
@@ -45,5 +47,13 @@ describe('RoomLogControl', () => {
   it('renders the canonical empty state', () => {
     const html = renderToStaticMarkup(<RoomLogPanel entries={[]} onClose={vi.fn()} />)
     expect(html).toContain('对局开始后，公开事件会记录在这里。')
+  })
+
+  it('keeps the controlled dialog out of the document while closed', () => {
+    const html = renderToStaticMarkup(
+      <RoomLogDialog entries={entries} onClose={vi.fn()} open={false} triggerRef={createRef()} />,
+    )
+
+    expect(html).toBe('')
   })
 })

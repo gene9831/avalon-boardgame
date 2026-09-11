@@ -5,12 +5,8 @@ import { RoomUtilities } from '../src/RoomUtilities'
 
 const tools = {
   connected: true,
-  manualReconnectAvailable: false,
-  onReconnect: vi.fn(),
   onOpenHelp: vi.fn(),
   logEntries: [],
-  profile: { avatarID: 'merlin' as const, name: 'Alice' },
-  onSaveProfile: vi.fn(),
   onRequestRoomExit: vi.fn(),
   roomExitBusy: false,
   roomExitBlocked: false,
@@ -20,19 +16,26 @@ const tools = {
 }
 
 describe('RoomUtilities', () => {
-  it('keeps recovery, help, and log controls in every room mode', () => {
+  it('puts Help then More in the lobby toolbar without identity or profile controls', () => {
     const html = renderToStaticMarkup(<RoomUtilities model={{
-      showProfile: false, showRoomExit: false, showIdentityKnowledge: false, roleKnowledgeOpen: false,
+      variant: 'lobby', showRoomExit: true, showIdentityKnowledge: false, roleKnowledgeOpen: false,
     }} tools={tools} />)
-    expect(html).toContain('aria-label="打开帮助说明"')
-    expect(html).toContain('aria-label="查看对局记录"')
+
+    expect(html.match(/data-room-toolbar-item="([^"]+)"/g)).toEqual([
+      'data-room-toolbar-item="help"',
+      'data-room-toolbar-item="room"',
+    ])
+    expect(html).not.toContain('打开用户中心')
+    expect(html).not.toContain('data-room-toolbar-item="identity"')
   })
 
-  it('adds profile and owner exit controls only when the model permits them', () => {
+  it('keeps direct help, log, and identity controls during the game', () => {
     const html = renderToStaticMarkup(<RoomUtilities model={{
-      showProfile: true, showRoomExit: true, showIdentityKnowledge: false, roleKnowledgeOpen: false,
+      variant: 'game', showRoomExit: true, showIdentityKnowledge: true, roleKnowledgeOpen: false,
     }} tools={tools} />)
-    expect(html).toContain('aria-label="打开用户中心"')
-    expect(html).toContain('>解散房间<')
+
+    expect(html).toContain('aria-label="打开帮助说明"')
+    expect(html).toContain('aria-label="查看对局记录"')
+    expect(html).toContain('data-room-toolbar-item="identity"')
   })
 })
