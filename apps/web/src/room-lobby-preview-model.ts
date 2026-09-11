@@ -17,6 +17,30 @@ export const LOBBY_PREVIEW_SCENARIO_IDS: readonly LobbyPreviewScenarioID[] = [
   'current-player-disconnected',
 ]
 
+export type LobbyPreviewReconnectState = Readonly<{
+  mode: 'automatic' | 'manual'
+  completed: boolean
+}>
+
+export function getLobbyPreviewReconnectPresentation(state: LobbyPreviewReconnectState) {
+  return {
+    connected: state.completed,
+    manualReconnectAvailable: state.mode === 'manual' && !state.completed,
+  }
+}
+
+export function completeLobbyPreviewReconnect(state: LobbyPreviewReconnectState) {
+  if (state.mode !== 'manual' || state.completed) return { state, toast: null }
+  return {
+    state: { ...state, completed: true },
+    toast: { message: '已重新连接房间。', tone: 'success' as const },
+  }
+}
+
+export function resetLobbyPreviewReconnect(_state: LobbyPreviewReconnectState): LobbyPreviewReconnectState {
+  return { mode: 'automatic', completed: false }
+}
+
 const CURRENT_PLAYER_ID = '2' as PlayerID
 const PLAYER_NAMES = ['苍鹰', '雾林', '银月', '赤羽', '青岚', '暮色', '白鹿', '暮鸦', '荆棘', '霜塔']
 

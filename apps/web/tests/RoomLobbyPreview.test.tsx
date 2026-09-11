@@ -4,15 +4,23 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 
 import { RoomLobbyPreview } from '../src/RoomLobbyPreview'
+import {
+  completeLobbyPreviewReconnect,
+  getLobbyPreviewReconnectPresentation,
+  resetLobbyPreviewReconnect,
+} from '../src/room-lobby-preview-model'
+import { ToastProvider } from '../src/toast'
 
 function renderPreview(path: string) {
   return renderToStaticMarkup(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route element={<RoomLobbyPreview />} path="/dev/room-layout/lobby" />
-        <Route element={<RoomLobbyPreview />} path="/dev/room-layout/lobby/:scenarioID" />
-      </Routes>
-    </MemoryRouter>,
+    <ToastProvider>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route element={<RoomLobbyPreview />} path="/dev/room-layout/lobby" />
+          <Route element={<RoomLobbyPreview />} path="/dev/room-layout/lobby/:scenarioID" />
+        </Routes>
+      </MemoryRouter>
+    </ToastProvider>,
   )
 }
 
@@ -50,5 +58,23 @@ describe('RoomLobbyPreview', () => {
     const html = renderPreview('/dev/room-layout/lobby/current-player-disconnected')
     expect(html).toContain('自动重连中')
     expect(html).toContain('可手动重连')
+  })
+
+  it('completes a manual reconnect once, then can reset to automatic recovery', () => {
+    const initial = { mode: 'manual' as const, completed: false }
+    const firstCompletion = completeLobbyPreviewReconnect(initial)
+
+    expect(getLobbyPreviewReconnectPresentation(firstCompletion.state)).toEqual({
+      connected: true,
+      manualReconnectAvailable: false,
+    })
+    expect(firstCompletion.toast).toEqual({ message: '已重新连接房间。', tone: 'success' })
+    expect(completeLobbyPreviewReconnect(firstCompletion.state).toast).toBeNull()
+
+    expect(resetLobbyPreviewReconnect(firstCompletion.state)).toEqual({ mode: 'automatic', completed: false })
+    expect(getLobbyPreviewReconnectPresentation(resetLobbyPreviewReconnect(firstCompletion.state))).toEqual({
+      connected: false,
+      manualReconnectAvailable: false,
+    })
   })
 })
