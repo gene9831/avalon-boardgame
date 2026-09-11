@@ -47,6 +47,23 @@
   box-shadow: 0 12px 28px rgb(0 0 0 / 35%);
 }
 
+.room-lobby-preview__controls-trigger {
+  position: fixed;
+  z-index: 200;
+  right: 1rem;
+  bottom: 1rem;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgb(250 204 21 / 45%);
+  border-radius: 0.75rem;
+  background: rgb(2 6 23 / 94%);
+  color: #f8fafc;
+  box-shadow: 0 12px 28px rgb(0 0 0 / 35%);
+}
+
 .room-lobby-preview__controls h1,
 .room-lobby-preview__controls legend {
   font-size: 0.875rem;
@@ -67,6 +84,11 @@
   background: rgb(30 41 59 / 90%);
   padding: 0.5rem 0.75rem;
   color: inherit;
+}
+
+.room-lobby-preview__controls-close {
+  justify-self: end;
+  width: 44px;
 }
 
 .room-layout-preview__region {

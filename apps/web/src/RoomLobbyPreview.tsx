@@ -1,7 +1,9 @@
 import { useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { SlidersHorizontal } from 'lucide-react'
 import type { PlayerID } from '@avalon/game'
 
+import { useHelp } from './help-context'
 import { RoomScreen } from './RoomScreen'
 import { resolveRoomLayoutDiagnosticsMode } from './room-layout-diagnostics'
 import { buildRoomScreenModel } from './room-screen-controller'
@@ -58,10 +60,12 @@ function LobbyPreviewIndex() {
 function LobbyPreviewScenario({ scenarioID }: { scenarioID: LobbyPreviewScenarioID }) {
   const location = useLocation()
   const navigate = useNavigate()
+  const { openHelp } = useHelp()
   const { pushToast } = useToast()
   const [playerCount, setPlayerCount] = useState(5)
   const [seatChangeTargetID, setSeatChangeTargetID] = useState<PlayerID | null>(null)
   const [startPending, setStartPending] = useState(false)
+  const [controlsOpen, setControlsOpen] = useState(false)
   const [reconnectState, setReconnectState] = useState<LobbyPreviewReconnectState>({ mode: 'automatic', completed: false })
   const reconnectCompletionRef = useRef(false)
   const preview = useMemo(() => buildLobbyPreviewState({
@@ -134,7 +138,7 @@ function LobbyPreviewScenario({ scenarioID }: { scenarioID: LobbyPreviewScenario
           isOwner: room.ownerPlayerID === preview.currentPlayerID,
           logEntries: [],
           onBackHome: () => navigate('/dev/room-layout/lobby'),
-          onOpenHelp: noOp,
+          onOpenHelp: () => openHelp({ playerCount }),
           onRequestRoomExit: noOp,
           onToggleRoleKnowledge: noOp,
           roomExitBlocked: seatChangeTargetID !== null || startPending,
@@ -143,32 +147,39 @@ function LobbyPreviewScenario({ scenarioID }: { scenarioID: LobbyPreviewScenario
           seatChangeTargetID,
         }}
       />
-      <aside aria-label="开发预览控制" className="room-lobby-preview__controls">
-        <h1>开发预览控制</h1>
-        <label>
-          玩家人数
-          <select onChange={(event) => { setPlayerCount(Number(event.target.value)); setSeatChangeTargetID(null) }} value={playerCount}>
-            {[5, 6, 7, 8, 9, 10].map((count) => <option key={count} value={count}>{count} 人</option>)}
-          </select>
-        </label>
-        {emptySeatID !== undefined && (
-          <button disabled={seatChangeTargetID !== null} onClick={() => setSeatChangeTargetID(String(emptySeatID.id))} type="button">模拟换座</button>
-        )}
-        {scenarioID === 'owner-full' && (
-          <button disabled={startPending} onClick={() => setStartPending(true)} type="button">模拟开始中</button>
-        )}
-        {reconnectScenario && (
-          <fieldset>
-            <legend>重连展示</legend>
-            <button aria-pressed={reconnectState.mode === 'automatic'} onClick={resetReconnect} type="button">自动重连中</button>
-            <button aria-pressed={reconnectState.mode === 'manual'} onClick={() => {
-              reconnectCompletionRef.current = false
-              setReconnectState({ mode: 'manual', completed: false })
-            }} type="button">可手动重连</button>
-          </fieldset>
-        )}
-        <button onClick={resetDemo} type="button">重置预览</button>
-      </aside>
+      {controlsOpen ? (
+        <aside aria-label="开发预览控制" className="room-lobby-preview__controls" id="room-lobby-preview-controls">
+          <button aria-controls="room-lobby-preview-controls" aria-expanded={controlsOpen} aria-label="关闭开发预览控制" className="room-lobby-preview__controls-close" onClick={() => setControlsOpen(false)} type="button">×</button>
+          <h1>开发预览控制</h1>
+          <label>
+            玩家人数
+            <select onChange={(event) => { setPlayerCount(Number(event.target.value)); setSeatChangeTargetID(null) }} value={playerCount}>
+              {[5, 6, 7, 8, 9, 10].map((count) => <option key={count} value={count}>{count} 人</option>)}
+            </select>
+          </label>
+          {emptySeatID !== undefined && (
+            <button disabled={seatChangeTargetID !== null} onClick={() => setSeatChangeTargetID(String(emptySeatID.id))} type="button">模拟换座</button>
+          )}
+          {scenarioID === 'owner-full' && (
+            <button disabled={startPending} onClick={() => setStartPending(true)} type="button">模拟开始中</button>
+          )}
+          {reconnectScenario && (
+            <fieldset>
+              <legend>重连展示</legend>
+              <button aria-pressed={reconnectState.mode === 'automatic'} onClick={resetReconnect} type="button">自动重连中</button>
+              <button aria-pressed={reconnectState.mode === 'manual'} onClick={() => {
+                reconnectCompletionRef.current = false
+                setReconnectState({ mode: 'manual', completed: false })
+              }} type="button">可手动重连</button>
+            </fieldset>
+          )}
+          <button onClick={resetDemo} type="button">重置预览</button>
+        </aside>
+      ) : (
+        <button aria-controls="room-lobby-preview-controls" aria-expanded={controlsOpen} aria-label="打开开发预览控制" className="room-lobby-preview__controls-trigger" onClick={() => setControlsOpen(true)} type="button">
+          <SlidersHorizontal aria-hidden="true" size={20} />
+        </button>
+      )}
     </div>
   )
 }

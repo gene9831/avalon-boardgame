@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 
 import { RoomLobbyPreview } from '../src/RoomLobbyPreview'
+import { HelpProvider } from '../src/HelpProvider'
 import { buildRoomScreenModel } from '../src/room-screen-controller'
 import {
   applyLobbyPreviewReconnectCompletion,
@@ -16,14 +17,16 @@ import { ToastProvider } from '../src/toast'
 
 function renderPreview(path: string) {
   return renderToStaticMarkup(
-    <ToastProvider>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route element={<RoomLobbyPreview />} path="/dev/room-layout/lobby" />
-          <Route element={<RoomLobbyPreview />} path="/dev/room-layout/lobby/:scenarioID" />
-        </Routes>
-      </MemoryRouter>
-    </ToastProvider>,
+    <HelpProvider>
+      <ToastProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route element={<RoomLobbyPreview />} path="/dev/room-layout/lobby" />
+            <Route element={<RoomLobbyPreview />} path="/dev/room-layout/lobby/:scenarioID" />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    </HelpProvider>,
   )
 }
 
@@ -56,11 +59,31 @@ describe('RoomLobbyPreview', () => {
   })
 
   it('exposes inspectable lobby and reconnect controls', () => {
-    expect(renderPreview('/dev/room-layout/lobby/owner-full')).toContain('模拟开始中')
-    expect(renderPreview('/dev/room-layout/lobby/member-incomplete')).toContain('模拟换座')
+    expect(renderPreview('/dev/room-layout/lobby/owner-full')).toContain('打开开发预览控制')
+    expect(renderPreview('/dev/room-layout/lobby/member-incomplete')).toContain('打开开发预览控制')
     const html = renderPreview('/dev/room-layout/lobby/current-player-disconnected')
-    expect(html).toContain('自动重连中')
-    expect(html).toContain('可手动重连')
+    expect(html).toContain('打开开发预览控制')
+  })
+
+  it('keeps developer controls collapsed until explicitly opened', () => {
+    const html = renderPreview('/dev/room-layout/lobby/member-incomplete')
+
+    expect(html).toContain('aria-label="打开开发预览控制"')
+    expect(html).toContain('aria-controls="room-lobby-preview-controls"')
+    expect(html).not.toContain('id="room-lobby-preview-controls"')
+    expect(html).not.toContain('aria-label="关闭开发预览控制"')
+    const source = readFileSync(new URL('../src/RoomLobbyPreview.tsx', import.meta.url), 'utf8')
+    expect(source).toContain('setControlsOpen(true)')
+    expect(source).toContain('setControlsOpen(false)')
+    const css = readFileSync(new URL('../src/RoomLayoutPreview.css', import.meta.url), 'utf8')
+    expect(css).toMatch(/\.room-lobby-preview__controls-trigger\s*\{[^}]*position:\s*fixed;[^}]*width:\s*44px;[^}]*height:\s*44px;/s)
+  })
+
+  it('wires the production help action to the existing Help context', () => {
+    const source = readFileSync(new URL('../src/RoomLobbyPreview.tsx', import.meta.url), 'utf8')
+
+    expect(source).toContain("import { useHelp } from './help-context'")
+    expect(source).toContain('onOpenHelp: () => openHelp({ playerCount })')
   })
 
   it('completes a manual reconnect once, then can reset to automatic recovery', () => {
