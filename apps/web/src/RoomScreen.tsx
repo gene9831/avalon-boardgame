@@ -1,14 +1,16 @@
-import type { CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import { getRoomShellStyleVariables, ROOM_SHELL_CLASSES } from '@avalon/ui-layout'
 
 import { IdentityRecognitionLayer } from './IdentityRecognitionLayer'
 import { QuestProgressTrack } from './QuestProgressTrack'
 import { RoomCenterSummary } from './RoomCenterSummary'
+import { RoomLayoutDiagnostics } from './RoomLayoutDiagnostics'
 import { RoomPhasePanelContent } from './RoomPhasePanelContent'
 import { RoomPlayerSeat } from './RoomPlayerSeat'
 import { RoomStage } from './RoomStage'
 import { RoomUtilities, type RoomUtilityTools } from './RoomUtilities'
+import { readRoomSafeAreaInsets, type RoomSafeAreaInsets } from './room-layout-diagnostics'
 import type { RoomScreenActions, RoomScreenModel } from './room-screen-model'
 import { useRoomLayout, type RoomLayoutDiagnosticsMode } from './useRoomLayout'
 
@@ -21,6 +23,15 @@ export interface RoomScreenProps {
 
 export function RoomScreen({ model, actions, diagnosticsMode, tools }: RoomScreenProps) {
   const { canvasRef, stageRef, snapshot } = useRoomLayout(model.numPlayers, diagnosticsMode)
+  const rootRef = useRef<HTMLElement | null>(null)
+  const [safeArea, setSafeArea] = useState<RoomSafeAreaInsets>({ top: 0, right: 0, bottom: 0, left: 0 })
+  const setCanvasRef = useCallback((node: HTMLElement | null) => {
+    rootRef.current = node
+    canvasRef(node)
+  }, [canvasRef])
+  useEffect(() => {
+    if (rootRef.current !== null) setSafeArea(readRoomSafeAreaInsets(rootRef.current))
+  }, [snapshot.viewportSize])
   const phase = RoomPhasePanelContent({ actions, model: model.phase })
   const center = <RoomCenterSummary model={model.center} />
 
@@ -30,7 +41,7 @@ export function RoomScreen({ model, actions, diagnosticsMode, tools }: RoomScree
       data-room-layout-mode={snapshot.shellMetrics?.mode ?? 'measuring'}
       data-room-mode={model.mode}
       data-room-screen="true"
-      ref={canvasRef}
+      ref={setCanvasRef}
       style={snapshot.shellMetrics ? getRoomShellStyleVariables(snapshot.shellMetrics) as CSSProperties : undefined}
     >
       <header className={ROOM_SHELL_CLASSES.topBar}>
@@ -61,6 +72,7 @@ export function RoomScreen({ model, actions, diagnosticsMode, tools }: RoomScree
             />
           )}
           {model.stageOverlay.kind === 'identityRecognition' && <IdentityRecognitionLayer overlay={model.stageOverlay} />}
+          {diagnosticsMode !== 'off' && <RoomLayoutDiagnostics mode={diagnosticsMode} playerCount={model.numPlayers} safeArea={safeArea} snapshot={snapshot} />}
         </div>
       </main>
       <footer className={ROOM_SHELL_CLASSES.phasePanel}>

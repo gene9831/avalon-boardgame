@@ -51,6 +51,10 @@ import { RoomExitDialog } from './RoomExitDialog'
 import { RoomScreen } from './RoomScreen'
 import { useRoomScreenController } from './room-screen-controller'
 import {
+  resolveRoomLayoutDiagnosticsMode,
+  setRoomLayoutDiagnosticsMode,
+} from './room-layout-diagnostics'
+import {
   dissolveRoom,
   changeRoomSeat,
   createRoomParticipationClient,
@@ -1105,6 +1109,12 @@ export function RoomView({
   seatChangePending,
   session,
 }: RoomViewProps) {
+  const [layoutDiagnosticsMode, setLayoutDiagnosticsMode] = useState(() =>
+    resolveRoomLayoutDiagnosticsMode(
+      typeof window === 'undefined' ? '' : window.location.search,
+      import.meta.env.DEV,
+    ),
+  )
   const connected = gameState?.isConnected === true
   const logEntries = useRoomLogEntries(room, gameState)
   const {
@@ -1154,6 +1164,12 @@ export function RoomView({
     room,
     roomExitBusy,
   })
+  const handleLayoutDiagnosticsModeChange = useCallback((mode: typeof layoutDiagnosticsMode) => {
+    setLayoutDiagnosticsMode(mode)
+    if (typeof window === 'undefined') return
+    const nextURL = setRoomLayoutDiagnosticsMode(new URL(window.location.href), mode)
+    window.history.replaceState(window.history.state, '', nextURL)
+  }, [])
 
   return (
     <ImmersiveLobbyShell
@@ -1161,9 +1177,11 @@ export function RoomView({
       developmentControls={(
         <RoomDevTools
           matchID={session.matchID}
+          layoutDiagnosticsMode={layoutDiagnosticsMode}
           onClearLocalSession={onClearLocalSession}
           onDeleteRoom={onDeleteRoom}
           onKickPlayer={onKickPlayer}
+          onLayoutDiagnosticsModeChange={handleLayoutDiagnosticsModeChange}
           phase={phase}
           players={room?.players ?? []}
         />
@@ -1171,7 +1189,7 @@ export function RoomView({
     >
       <RoomScreen
         actions={controller.actions}
-        diagnosticsMode="off"
+        diagnosticsMode={layoutDiagnosticsMode}
         model={controller.model}
         tools={{
           connected,

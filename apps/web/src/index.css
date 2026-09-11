@@ -150,6 +150,27 @@ select {
 }
 .room-utility-button svg { width: 20px; height: 20px; }
 
+.room-layout-diagnostics {
+  position: absolute;
+  z-index: 70;
+  top: 4px;
+  left: 50%;
+  max-width: calc(100% - 16px);
+  translate: -50% 0;
+  padding: 3px 7px;
+  border-radius: 6px;
+  color: #bae6fd;
+  background: rgb(2 6 23 / 88%);
+  font: 11px/1.35 ui-monospace, monospace;
+  text-align: center;
+}
+.room-layout-geometry { position: absolute; z-index: 60; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.room-layout-geometry rect,
+.room-layout-geometry circle { fill: none; stroke: #38bdf8; stroke-width: 1; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
+.room-layout-geometry [data-layout-boundary='center-protection'] { stroke: #fbbf24; }
+.room-layout-geometry [data-layout-boundary='avatar'] { stroke: #fb7185; }
+.room-layout-geometry [data-layout-boundary='name'] { stroke: #c084fc; }
+
 .room-game-shell {
   --room-topbar-height: 48px;
   --room-topbar-padding: 8px;
