@@ -43,7 +43,7 @@ select {
   height: 100%;
   min-width: 0;
   min-height: 0;
-  grid-template-columns: 44px minmax(0, 1fr) 140px;
+  grid-template-columns: 44px minmax(0, 1fr) clamp(180px, 45.5vw, 204px);
   grid-template-rows:
     var(--room-topbar-height)
     minmax(0, 1fr)
@@ -194,14 +194,18 @@ select {
   width: 100%;
 }
 
-.room-game-quest-progress .quest-progress-track > li > div {
-  width: 24px;
-  height: 24px;
+.room-game-quest-progress .quest-progress-track > li {
+  min-width: 0;
 }
 
-.room-game-quest-progress .quest-progress-team-size,
-.room-game-utilities [data-profile-locked] > span:last-child {
-  display: none;
+.room-game-quest-progress .quest-progress-node {
+  width: clamp(32px, 8.33vw, 36px);
+  height: clamp(32px, 8.33vw, 36px);
+}
+
+.quest-progress-meta {
+  line-height: 10px;
+  white-space: nowrap;
 }
 
 .game-seat-button:focus-visible {
@@ -251,8 +255,15 @@ select {
   align-content: center;
 }
 
-.room-game-shell[data-room-layout-mode="compact-landscape"] .quest-progress-team-size {
-  display: none;
+.room-game-shell[data-room-layout-mode="compact-landscape"] .room-game-quest-progress .quest-progress-node {
+  width: 28px;
+  height: 28px;
+}
+
+.room-game-shell[data-room-layout-mode="compact-landscape"] .quest-progress-meta {
+  margin-top: 0;
+  gap: 2px;
+  font-size: 8px;
 }
 
 .room-game-shell[data-room-layout-mode="compact-landscape"] .room-game-utilities {
@@ -322,13 +333,9 @@ select {
   grid-row: 1;
 }
 
-.room-game-shell[data-room-layout-mode="normal-landscape"] .room-game-quest-progress .quest-progress-track > li > div {
-  width: 28px;
-  height: 28px;
-}
-
-.room-game-shell[data-room-layout-mode="normal-landscape"] .room-game-quest-progress .quest-progress-team-size {
-  display: block;
+.room-game-shell[data-room-layout-mode="normal-landscape"] .room-game-quest-progress .quest-progress-node {
+  width: 36px;
+  height: 36px;
 }
 
 .room-game-shell[data-room-layout-mode="normal-landscape"] .room-game-utilities {
