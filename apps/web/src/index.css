@@ -85,6 +85,57 @@ select {
 .room-stage__players { z-index: 20; }
 .room-stage__unavailable { color: #fef3c7; }
 
+.room-seat { pointer-events: none; color: #f8fafc; }
+.room-seat__avatar,
+.room-seat__name { pointer-events: auto; }
+.room-seat__avatar {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 2px solid rgb(216 198 159 / 70%);
+  border-radius: 9999px;
+  background: #efe3c6;
+  box-shadow: 0 5px 12px rgb(0 0 0 / 40%);
+}
+.room-seat__avatar[data-connected='false'] { filter: grayscale(1); opacity: 0.45; }
+.room-seat__avatar[data-avatar-state='current-player'] { border-color: #fde68a; }
+.room-seat__avatar[data-avatar-state='selected'],
+.room-seat__avatar[data-avatar-state='quest-member'] { border-color: #cffafe; box-shadow: 0 0 26px rgb(34 211 238 / 70%); }
+.room-seat__avatar[data-avatar-state='target'] { border-color: #fecdd3; box-shadow: 0 0 26px rgb(251 113 133 / 70%); }
+.room-seat__avatar[data-avatar-state='known-evil'] { border-color: #be123c; box-shadow: 0 0 24px rgb(127 29 29 / 65%); }
+.room-seat__name {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 0.375rem;
+  background: rgb(2 6 23 / 90%);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 500;
+  line-height: 1.1;
+  box-shadow: 0 5px 12px rgb(0 0 0 / 40%);
+}
+.room-seat__decoration {
+  position: absolute;
+  z-index: 4;
+  display: grid;
+  width: 1.25rem;
+  height: 1.25rem;
+  place-items: center;
+  border-radius: 9999px;
+  pointer-events: none;
+}
+.room-seat__decoration svg { width: 0.8rem; height: 0.8rem; }
+.room-seat__decoration[data-seat-decoration='owner'] { left: 1px; top: 1px; color: #0f172a; background: #fcd34d; }
+.room-seat__decoration[data-seat-decoration='leader'] { left: 50%; top: -0.75rem; color: #fcd34d; translate: -50% 0; }
+.room-seat__decoration[data-seat-decoration='vote'] { right: 0; bottom: 0; color: #e2e8f0; background: #0f172a; }
+.room-seat__decoration[data-seat-decoration='quest-member'] { right: 0; top: 0; color: #cffafe; background: #164e63; }
+.room-seat__decoration[data-seat-decoration='known-evil'] { right: 0; top: 0; color: #ffe4e6; background: #881337; }
+.room-seat__decoration[data-seat-decoration='merlin-candidate'] { right: 0; top: 0; color: #fef3c7; background: #78350f; }
+.room-seat:focus-visible { outline: none; }
+.room-seat:focus-visible .room-seat__avatar,
+.room-seat:focus-visible .room-seat__name { outline: 2px solid currentColor; outline-offset: 2px; }
+
 .room-game-shell {
   --room-topbar-height: 48px;
   --room-topbar-padding: 8px;
