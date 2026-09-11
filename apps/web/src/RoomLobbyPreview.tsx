@@ -6,6 +6,7 @@ import { RoomScreen } from './RoomScreen'
 import { resolveRoomLayoutDiagnosticsMode } from './room-layout-diagnostics'
 import { buildRoomScreenModel } from './room-screen-controller'
 import {
+  applyLobbyPreviewReconnectCompletion,
   buildLobbyPreviewState,
   completeLobbyPreviewReconnect,
   getLobbyPreviewReconnectPresentation,
@@ -70,10 +71,13 @@ function LobbyPreviewScenario({ scenarioID }: { scenarioID: LobbyPreviewScenario
   const reconnectPresentation = reconnectScenario
     ? getLobbyPreviewReconnectPresentation(reconnectState)
     : { connected: preview.connected, manualReconnectAvailable: preview.manualReconnectAvailable }
+  const room = reconnectScenario
+    ? applyLobbyPreviewReconnectCompletion(preview.room, preview.currentPlayerID, reconnectState.completed)
+    : preview.room
   const model = useMemo(() => buildRoomScreenModel({
     kind: 'ready',
-    matchID: preview.room.matchID,
-    room: preview.room,
+    matchID: room.matchID,
+    room,
     game: preview.game,
     phase: 'lobby',
     activeStage: undefined,
@@ -86,8 +90,8 @@ function LobbyPreviewScenario({ scenarioID }: { scenarioID: LobbyPreviewScenario
     connected: reconnectPresentation.connected,
     manualReconnectAvailable: reconnectPresentation.manualReconnectAvailable,
     startPending,
-  }), [preview, reconnectPresentation.connected, reconnectPresentation.manualReconnectAvailable, startPending])
-  const emptySeatID = preview.room.players.find((player) => player.name == null)
+  }), [preview, reconnectPresentation.connected, reconnectPresentation.manualReconnectAvailable, room, startPending])
+  const emptySeatID = room.players.find((player) => player.name == null)
   const diagnosticsMode = resolveRoomLayoutDiagnosticsMode(location.search, import.meta.env.DEV)
 
   const resetReconnect = () => {
@@ -127,7 +131,7 @@ function LobbyPreviewScenario({ scenarioID }: { scenarioID: LobbyPreviewScenario
         model={model}
         tools={{
           connected: reconnectPresentation.connected,
-          isOwner: preview.room.ownerPlayerID === preview.currentPlayerID,
+          isOwner: room.ownerPlayerID === preview.currentPlayerID,
           logEntries: [],
           onBackHome: () => navigate('/dev/room-layout/lobby'),
           onOpenHelp: noOp,

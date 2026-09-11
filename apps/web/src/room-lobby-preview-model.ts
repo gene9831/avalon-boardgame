@@ -41,6 +41,20 @@ export function resetLobbyPreviewReconnect(_state: LobbyPreviewReconnectState): 
   return { mode: 'automatic', completed: false }
 }
 
+export function applyLobbyPreviewReconnectCompletion(
+  room: AvalonMatch,
+  currentPlayerID: PlayerID,
+  completed: boolean,
+): AvalonMatch {
+  if (!completed) return room
+  return {
+    ...room,
+    players: room.players.map((player) => String(player.id) === currentPlayerID
+      ? { ...player, isConnected: true }
+      : player),
+  }
+}
+
 const CURRENT_PLAYER_ID = '2' as PlayerID
 const PLAYER_NAMES = ['苍鹰', '雾林', '银月', '赤羽', '青岚', '暮色', '白鹿', '暮鸦', '荆棘', '霜塔']
 

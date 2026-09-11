@@ -4,7 +4,10 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 
 import { RoomLobbyPreview } from '../src/RoomLobbyPreview'
+import { buildRoomScreenModel } from '../src/room-screen-controller'
 import {
+  applyLobbyPreviewReconnectCompletion,
+  buildLobbyPreviewState,
   completeLobbyPreviewReconnect,
   getLobbyPreviewReconnectPresentation,
   resetLobbyPreviewReconnect,
@@ -76,5 +79,29 @@ describe('RoomLobbyPreview', () => {
       connected: false,
       manualReconnectAvailable: false,
     })
+  })
+
+  it('restores the current player seat connection in the completed lobby model', () => {
+    const preview = buildLobbyPreviewState({
+      scenarioID: 'current-player-disconnected', playerCount: 5,
+      reconnectMode: 'manual', seatChangeTargetID: null, startPending: false,
+    })
+    const completion = completeLobbyPreviewReconnect({ mode: 'manual', completed: false })
+    const room = applyLobbyPreviewReconnectCompletion(
+      preview.room,
+      preview.currentPlayerID,
+      completion.state.completed,
+    )
+    const model = buildRoomScreenModel({
+      kind: 'ready', matchID: room.matchID, room, game: preview.game, phase: 'lobby', activeStage: undefined,
+      currentPlayerID: preview.currentPlayerID, selectedTeam: [], selectedTarget: null, roleKnowledgeOpen: false,
+      canStart: preview.canStart, roomExitBusy: false, connected: true, manualReconnectAvailable: false, startPending: false,
+    })
+
+    expect(model.phase.kind).toBe('lobby')
+    expect(model.players.find((player) => player.isCurrentPlayer)?.connected).toBe(true)
+    expect(room.players.filter((player) => String(player.id) !== preview.currentPlayerID)).toEqual(
+      preview.room.players.filter((player) => String(player.id) !== preview.currentPlayerID),
+    )
   })
 })
