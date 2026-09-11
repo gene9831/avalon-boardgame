@@ -1,0 +1,121 @@
+.avalon-room-layout-viewport {
+  --room-layout-safe-top: env(safe-area-inset-top, 0px);
+  --room-layout-safe-right: env(safe-area-inset-right, 0px);
+  --room-layout-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --room-layout-safe-left: env(safe-area-inset-left, 0px);
+  --room-layout-phase-bottom-clearance: max(
+    0px,
+    calc(8px - var(--room-layout-safe-bottom))
+  );
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--room-layout-safe-top) var(--room-layout-safe-right)
+    var(--room-layout-safe-bottom) var(--room-layout-safe-left);
+  overflow: hidden;
+  container: avalon-room-layout / size;
+  isolation: isolate;
+}
+
+.avalon-room-layout {
+  --room-layout-topbar-size: 48px;
+  --room-layout-stage-margin: 8px;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  grid-template-areas:
+    'topbar'
+    'stage'
+    'phase';
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows:
+    var(--room-layout-topbar-size)
+    minmax(0, 1fr)
+    calc(160px + var(--room-layout-phase-bottom-clearance));
+  overflow: hidden;
+}
+
+.avalon-room-layout__topbar,
+.avalon-room-layout__stage-region,
+.avalon-room-layout__stage-content,
+.avalon-room-layout__phase-panel {
+  min-width: 0;
+  min-height: 0;
+}
+
+.avalon-room-layout__topbar {
+  grid-area: topbar;
+  overflow: hidden;
+}
+
+.avalon-room-layout__stage-region {
+  grid-area: stage;
+  padding: var(--room-layout-stage-margin);
+  overflow: hidden;
+}
+
+.avalon-room-layout__stage-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.avalon-room-layout__phase-panel {
+  grid-area: phase;
+  box-sizing: border-box;
+  padding-bottom: var(--room-layout-phase-bottom-clearance);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+@container avalon-room-layout (orientation: portrait) and (min-height: 800px) {
+  .avalon-room-layout {
+    --room-layout-topbar-size: 56px;
+    --room-layout-stage-margin: 12px;
+  }
+}
+
+@container avalon-room-layout (orientation: landscape) and (height < 515px) {
+  .avalon-room-layout {
+    --room-layout-stage-margin: 8px;
+    --room-layout-phase-size: 192px;
+    --room-layout-phase-bottom-clearance: 0px;
+    grid-template-areas: 'topbar stage phase';
+    grid-template-columns:
+      56px minmax(0, 1fr)
+      var(--room-layout-phase-size);
+    grid-template-rows: minmax(0, 1fr);
+  }
+}
+
+@container avalon-room-layout (orientation: landscape) and (height < 515px) and (min-width: 720px) {
+  .avalon-room-layout {
+    --room-layout-phase-size: clamp(224px, 28cqw, 288px);
+  }
+}
+
+@container avalon-room-layout (orientation: landscape) and (height >= 515px) {
+  .avalon-room-layout {
+    --room-layout-topbar-size: 48px;
+    --room-layout-stage-margin: 12px;
+    --room-layout-phase-size: clamp(288px, 28cqw, 384px);
+    --room-layout-phase-bottom-clearance: 0px;
+    grid-template-areas:
+      'topbar topbar'
+      'stage phase';
+    grid-template-columns: minmax(0, 1fr) var(--room-layout-phase-size);
+    grid-template-rows: var(--room-layout-topbar-size) minmax(0, 1fr);
+  }
+}
+
+@container avalon-room-layout (orientation: landscape) and (min-height: 680px) {
+  .avalon-room-layout {
+    --room-layout-topbar-size: 56px;
+    --room-layout-stage-margin: 16px;
+  }
+}

@@ -18,6 +18,7 @@
       "types": "./src/diagnostics.ts",
       "import": "./src/diagnostics.ts"
     },
+    "./room-layout.css": "./src/room-layout.css",
     "./room-shell.css": "./src/room-shell.css"
   },
   "devDependencies": {

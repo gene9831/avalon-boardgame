@@ -49,6 +49,7 @@ import { LobbyView } from './LobbyView'
 import { RoomDevTools } from './RoomDevTools'
 import { RoomExitDialog } from './RoomExitDialog'
 import { formatRoomID } from './room-id'
+import { RoomLayoutPreview } from './RoomLayoutPreview'
 import { RoomScreen } from './RoomScreen'
 import { useRoomScreenController } from './room-screen-controller'
 import {
@@ -273,6 +274,7 @@ function AppRoutes() {
       <Routes>
         <Route element={<LobbyRoute onSaveProfile={handleSaveProfile} profile={profile} />} path="/" />
         <Route element={<RoomRoute onSaveProfile={handleSaveProfile} profile={profile} />} path="/rooms/:matchID" />
+        {import.meta.env.DEV && <Route element={<RoomLayoutPreview />} path="/dev/room-layout" />}
         <Route element={<Navigate replace to="/" />} path="*" />
       </Routes>
     </BrowserRouter>
