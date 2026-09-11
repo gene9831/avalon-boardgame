@@ -107,4 +107,19 @@ describe('buildRoomScreenModel', () => {
     expect(model.players).toEqual([])
     expect(model.questProgress.every((node) => node.teamSize === null)).toBe(true)
   })
+
+  it('keeps the assassin\'s known evil teammates ineligible while role details are closed', () => {
+    const input = readyInput('assassination', {
+      viewer: {
+        role: 'assassin',
+        loyalty: 'evil',
+        knownEvilPlayerIDs: ['3'],
+        knownMerlinCandidatePlayerIDs: [],
+      },
+    })
+    const model = buildRoomScreenModel({ ...input, activeStage: 'assassin' })
+
+    expect(model.playerInteractionMode).toBe('selectAssassinationTarget')
+    expect(model.players.find(({ playerID }) => playerID === '3')?.knownEvil).toBe(true)
+  })
 })

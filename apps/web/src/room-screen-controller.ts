@@ -217,7 +217,10 @@ export function buildRoomScreenModel(input: BuildRoomScreenModelInput): RoomScre
       players: input.room.players, numPlayers, currentPlayerID: input.currentPlayerID,
       ownerPlayerID: input.room.ownerPlayerID, game: input.game,
       selectedTeam: input.selectedTeam, selectedTarget: input.selectedTarget,
-      showKnownPlayerInfo: input.roleKnowledgeOpen || recognitionKnowledge,
+      showKnownPlayerInfo:
+        input.roleKnowledgeOpen ||
+        recognitionKnowledge ||
+        mode === 'assassination',
       showPrivateRoleKnowledge,
     }),
     playerInteractionMode,

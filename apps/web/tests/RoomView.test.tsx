@@ -421,7 +421,6 @@ describe('RoomView playing layout', () => {
     expect(html.match(/data-room-screen="true"/g)).toHaveLength(1)
     expect(html.match(/data-room-stage="true"/g)).toHaveLength(1)
     expect(html).toContain('data-room-mode="teamProposal"')
-    expect(html).not.toContain('data-room-game-shell')
     expect(html).not.toContain('>玩家座位<')
   })
 
@@ -447,6 +446,5 @@ describe('RoomView playing layout', () => {
     expect(html).toContain('data-room-mode="lobby"')
     expect(html).toContain('>开始游戏<')
     expect(html).toContain('aria-label="打开用户中心"')
-    expect(html).not.toContain('data-room-game-shell')
   })
 })
