@@ -1,9 +1,35 @@
 import { renderToStaticMarkup } from 'react-dom/server'
+import type { PlayerID } from '@avalon/game'
 import { describe, expect, it, vi } from 'vitest'
 
 import { canRequestRoomExit, getUpdatedRoomRouteSession, recoverRoomRouteSession, resolveRecoverySeatValidation, resolveRoomRouteSnapshotSession, shouldWakeRoomRouteForSeatTransitionChange, RoomAccessView, RoomView, type RoomViewProps } from '../src/App'
+import type { AvalonMatch } from '../src/lobby'
 import { RoomParticipationHttpError, type SeatTransitionReplayClient } from '../src/room-participation'
 import { beginSeatTransition, loadRoomSession, loadSeatTransition, markSeatTransitionUncertain, saveRoomSession, type RoomSessionStorage } from '../src/room-session'
+import { ToastProvider } from '../src/toast'
+
+const roomLayoutHarness = vi.hoisted(() => ({ measured: false }))
+
+vi.mock('../src/useRoomLayout', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/useRoomLayout')>()
+  return {
+    ...actual,
+    useRoomLayout(playerCount: number | null, diagnosticsMode: 'off' | 'metrics' | 'geometry') {
+      const result = actual.useRoomLayout(playerCount, diagnosticsMode)
+      if (!roomLayoutHarness.measured || playerCount === null) return result
+
+      return {
+        ...result,
+        snapshot: actual.resolveRoomLayoutSnapshot({
+          canvasSize: { height: 600, width: 800 },
+          playerCount,
+          stageSize: { height: 600, width: 800 },
+          viewportSize: { height: 600, width: 800 },
+        }),
+      }
+    },
+  }
+})
 
 vi.mock('../src/config', () => ({
   webConfig: {
@@ -12,7 +38,10 @@ vi.mock('../src/config', () => ({
   },
 }))
 
-function renderRoomView(overrides: Partial<RoomViewProps> = {}) {
+function renderRoomView(
+  overrides: Partial<RoomViewProps> = {},
+  measuredStage = false,
+) {
   const props: RoomViewProps = {
     gameState: null,
     onAssassinate: vi.fn(),
@@ -36,6 +65,8 @@ function renderRoomView(overrides: Partial<RoomViewProps> = {}) {
     },
     roomExitBlocked: false,
     roomExitBusy: false,
+    seatChangeTargetID: null,
+    startPending: false,
     session: {
       credentials: 'credential',
       matchID: 'room-123',
@@ -45,7 +76,48 @@ function renderRoomView(overrides: Partial<RoomViewProps> = {}) {
     ...overrides,
   }
 
-  return renderToStaticMarkup(<RoomView {...props} />)
+  roomLayoutHarness.measured = measuredStage
+  try {
+    return renderToStaticMarkup(
+      <ToastProvider>
+        <RoomView {...props} />
+      </ToastProvider>,
+    )
+  } finally {
+    roomLayoutHarness.measured = false
+  }
+}
+
+function incompleteRoomWithEmptySeat(emptyPlayerID: PlayerID): AvalonMatch {
+  return {
+    gameName: 'avalon',
+    matchID: 'room-123',
+    ownerPlayerID: '0',
+    occupiedPlayerIDs: ['0', '1', '2', '4'],
+    players: [
+      { id: 0, name: 'Alice', isConnected: true },
+      { id: 1, name: 'Bob', isConnected: true },
+      { id: 2, name: 'Claire', isConnected: true },
+      { id: Number(emptyPlayerID), name: null, isConnected: false },
+      { id: 4, name: 'Eve', isConnected: true },
+    ],
+    roleConfiguration: { percivalMorgana: true },
+    setupData: { numPlayers: 5 },
+  }
+}
+
+function fullRoom(): AvalonMatch {
+  return {
+    ...incompleteRoomWithEmptySeat('3'),
+    occupiedPlayerIDs: ['0', '1', '2', '3', '4'],
+    players: [
+      { id: 0, name: 'Alice', isConnected: true },
+      { id: 1, name: 'Bob', isConnected: true },
+      { id: 2, name: 'Claire', isConnected: true },
+      { id: 3, name: 'Dylan', isConnected: true },
+      { id: 4, name: 'Eve', isConnected: true },
+    ],
+  }
 }
 
 const replayTarget: SeatTransitionReplayClient = {
@@ -104,6 +176,18 @@ function playingGameState(): RoomViewProps['gameState'] {
   } as RoomViewProps['gameState']
 }
 
+function lobbyGameState(): RoomViewProps['gameState'] {
+  const state = playingGameState()!
+  state.G.status = 'lobby'
+  state.G.lobby = {
+    occupiedPlayerIDs: ['0', '1', '2', '3', '4'],
+    ownerPlayerID: '0',
+  }
+  state.ctx.phase = 'lobby'
+  state.ctx.activePlayers = null
+  return state
+}
+
 describe('RoomView connection state', () => {
   it('uses player-facing access and loading copy', () => {
     const accessHtml = renderToStaticMarkup(
@@ -111,7 +195,7 @@ describe('RoomView connection state', () => {
     )
     const loadingHtml = renderRoomView()
 
-    expect(accessHtml).toContain('房间 room-123')
+    expect(accessHtml).toContain('房间 room-12')
     expect(accessHtml).toContain('你尚未加入这个房间')
     expect(accessHtml).toContain('>返回房间列表<')
     expect(accessHtml).toContain('选择一个房间后加入')
@@ -425,9 +509,7 @@ describe('RoomView playing layout', () => {
   })
 
   it('uses the same room screen for the waiting lobby', () => {
-    const state = playingGameState()!
-    state.G.status = 'lobby'
-    state.ctx.phase = 'lobby'
+    const state = lobbyGameState()!
     const html = renderRoomView({
       gameState: state,
       room: {
@@ -445,6 +527,34 @@ describe('RoomView playing layout', () => {
     expect(html.match(/data-room-screen="true"/g)).toHaveLength(1)
     expect(html).toContain('data-room-mode="lobby"')
     expect(html).toContain('>开始游戏<')
-    expect(html).toContain('aria-label="打开用户中心"')
+    expect(html).toContain('aria-label="打开帮助说明"')
+  })
+
+  it('marks only the requested empty seat as pending during a seat change', () => {
+    const html = renderRoomView(
+      {
+        gameState: lobbyGameState(),
+        room: incompleteRoomWithEmptySeat('3'),
+        seatChangeTargetID: '3',
+        startPending: false,
+      },
+      true,
+    )
+
+    expect(html).toContain('data-player-id="3"')
+    expect(html).toContain('data-seat-state="pending"')
+    expect(html).toContain('换座中')
+    expect(html.match(/data-seat-state="pending"/g)).toHaveLength(1)
+  })
+
+  it('shows the owner that a full-room start request is pending', () => {
+    const html = renderRoomView({
+      gameState: lobbyGameState(),
+      room: fullRoom(),
+      seatChangeTargetID: null,
+      startPending: true,
+    })
+
+    expect(html).toContain('正在开始…')
   })
 })

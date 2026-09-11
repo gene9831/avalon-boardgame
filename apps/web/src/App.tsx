@@ -88,7 +88,6 @@ import {
   savePlayerProfile,
   type PlayerProfile,
 } from './player-profile'
-import { getSeatAvatarID } from './seat-avatar'
 import {
   buildGameLogEntries,
   buildPresenceLogChanges,
@@ -509,7 +508,9 @@ function RoomRoute({
   const [gameState, setGameState] = useState<AvalonClientState | null>(null)
   const [roomExitDialogOpen, setRoomExitDialogOpen] = useState(false)
   const [roomExitBusy, setRoomExitBusy] = useState(false)
-  const [seatChangePending, setSeatChangePending] = useState(false)
+  const [seatChangeTargetID, setSeatChangeTargetID] = useState<PlayerID | null>(null)
+  const startPendingRef = useRef(false)
+  const [startPending, setStartPending] = useState(false)
   const [seatTransitionRevision, setSeatTransitionRevision] = useState(0)
   const [, setSeatTransitionGuardRevision] = useState(0)
   const seatTransitionChangeRevisionRef = useRef(0)
@@ -612,11 +613,18 @@ function RoomRoute({
     setGameState(null)
     setRoomExitDialogOpen(false)
     setRoomExitBusy(false)
+    setSeatChangeTargetID(null)
+    startPendingRef.current = false
+    setStartPending(false)
   }, [matchID])
 
   const routeSession = session?.matchID === matchID ? session : null
-  const persistedSeatTransitionPending = routeSession !== null &&
-    loadSeatTransition(matchID) !== null
+  const persistedSeatTransition = routeSession === null
+    ? null
+    : loadSeatTransition(matchID)
+  const effectiveSeatChangeTargetID =
+    seatChangeTargetID ?? persistedSeatTransition?.targetPlayerID ?? null
+  const seatChangePending = effectiveSeatChangeTargetID !== null
 
   useEffect(() => {
     const handleRoomSessionStorage = (event: StorageEvent) => {
@@ -800,16 +808,32 @@ function RoomRoute({
   }, [invalidateSession, lobby, matchID, pushToast, refreshRoom, roomParticipation, routeSession, seatTransitionRevision])
 
   const handleStart = async () => {
-    if (gameState?.isActive !== true || routeSession === null || gameState.G.lobby.ownerPlayerID !== routeSession.playerID) return
+    const targetPlayerCount = room === null ? null : getMatchPlayerCount(room)
+    const occupiedCount = gameState?.G.lobby.occupiedPlayerIDs.length ?? 0
+    if (
+      startPendingRef.current ||
+      gameState?.isActive !== true ||
+      gameState.isConnected !== true ||
+      gameState.ctx.phase !== 'lobby' ||
+      routeSession === null ||
+      gameState.G.lobby.ownerPlayerID !== routeSession.playerID ||
+      targetPlayerCount === null ||
+      occupiedCount !== targetPlayerCount
+    ) return
+    startPendingRef.current = true
+    setStartPending(true)
     try {
       await roomParticipation.prepareStart(matchID, routeSession.playerID, routeSession.credentials)
       clientRef.current?.moves.startGame()
     } catch (error) {
       pushToast({ message: getStartErrorMessage(error), tone: 'error' })
+    } finally {
+      startPendingRef.current = false
+      setStartPending(false)
     }
   }
 
-  const handleChangeSeat = async (targetPlayerID: string) => {
+  const handleChangeSeat = async (targetPlayerID: PlayerID) => {
     if (
       routeSession === null ||
       gameState?.ctx.phase !== 'lobby' ||
@@ -817,14 +841,14 @@ function RoomRoute({
       loadSeatTransition(routeSession.matchID) !== null ||
       targetPlayerID === routeSession.playerID
     ) return
-    setSeatChangePending(true)
+    setSeatChangeTargetID(targetPlayerID)
     try {
       const nextSession = await changeRoomSeat(roomParticipation, routeSession, targetPlayerID)
       setSession(nextSession)
     } catch (error) {
       pushToast({ message: getSeatChangeErrorMessage(error), tone: 'error' })
     } finally {
-      setSeatChangePending(false)
+      setSeatChangeTargetID(null)
     }
   }
 
@@ -884,7 +908,7 @@ function RoomRoute({
         gameState?.ctx.phase,
         roomExitBusy,
         seatChangePending,
-        loadSeatTransition(routeSession.matchID) !== null,
+        persistedSeatTransition !== null,
       )
     ) return
 
@@ -905,7 +929,7 @@ function RoomRoute({
         gameState.ctx.phase,
         roomExitBusy,
         seatChangePending,
-        loadSeatTransition(routeSession.matchID) !== null,
+        persistedSeatTransition !== null,
       )
     ) return
 
@@ -999,7 +1023,7 @@ function RoomRoute({
     return <RoomAccessView matchID={matchID} onBackHome={() => navigate('/')} />
   }
 
-  const roomExitBlocked = seatChangePending || persistedSeatTransitionPending
+  const roomExitBlocked = startPending || seatChangePending
 
   return (
     <>
@@ -1024,8 +1048,9 @@ function RoomRoute({
         room={room}
         roomExitBlocked={roomExitBlocked}
         roomExitBusy={roomExitBusy}
-        seatChangePending={seatChangePending || persistedSeatTransitionPending}
+        seatChangeTargetID={effectiveSeatChangeTargetID}
         session={routeSession}
+        startPending={startPending}
       />
       <RoomExitDialog
         busy={roomExitBusy}
@@ -1084,8 +1109,9 @@ export interface RoomViewProps {
   room: AvalonMatch | null
   roomExitBlocked: boolean
   roomExitBusy: boolean
-  seatChangePending: boolean
+  seatChangeTargetID: PlayerID | null
   session: RoomSession
+  startPending: boolean
 }
 
 export function RoomView({
@@ -1104,14 +1130,14 @@ export function RoomView({
   onStart,
   onDeleteRoom,
   onKickPlayer,
-  onSaveProfile,
-  profile,
   room,
   roomExitBusy,
   roomExitBlocked,
-  seatChangePending,
+  seatChangeTargetID,
   session,
+  startPending,
 }: RoomViewProps) {
+  const { pushToast } = useToast()
   const [layoutDiagnosticsMode, setLayoutDiagnosticsMode] = useState(() =>
     resolveRoomLayoutDiagnosticsMode(
       typeof window === 'undefined' ? '' : window.location.search,
@@ -1124,10 +1150,20 @@ export function RoomView({
     beginManualReconnect,
     manualReconnectAvailable,
   } = useDelayedManualReconnect(connected, gameState !== null)
+  const manualReconnectRequestedRef = useRef(false)
   const handleManualReconnect = useCallback(() => {
+    manualReconnectRequestedRef.current = true
     beginManualReconnect()
     onReconnect()
   }, [beginManualReconnect, onReconnect])
+  useEffect(() => {
+    manualReconnectRequestedRef.current = false
+  }, [session.matchID, session.playerID])
+  useEffect(() => {
+    if (!connected || !manualReconnectRequestedRef.current) return
+    manualReconnectRequestedRef.current = false
+    pushToast({ message: '已重新连接房间。', tone: 'success' })
+  }, [connected, pushToast])
   const numPlayers = room === null ? null : getMatchPlayerCount(room)
   const occupiedPlayerIDs = room === null ? [] : getOccupiedPlayerIDs(room)
   const isFull = numPlayers !== null && occupiedPlayerIDs.length === numPlayers
@@ -1139,22 +1175,13 @@ export function RoomView({
     room?.ownerPlayerID === session.playerID &&
     phase === 'lobby' &&
     isFull
-  const currentRoomPlayer = room?.players.find(
-    ({ id }) => String(id) === session.playerID,
-  )
-  const roomProfile: PlayerProfile = {
-    avatarID: getSeatAvatarID(
-      currentRoomPlayer?.data,
-      Number(session.playerID),
-    ),
-    name: currentRoomPlayer?.name ?? session.playerName ?? profile.name,
-  }
   const controller = useRoomScreenController({
     activeStage,
     canStart,
     connected,
     currentPlayerID: session.playerID,
     game: gameState?.G ?? null,
+    manualReconnectAvailable,
     matchID: session.matchID,
     onAssassinate,
     onCastTeamVote,
@@ -1162,10 +1189,12 @@ export function RoomView({
     onConfirmIdentityRecognition,
     onPlayQuestCard,
     onProposeTeam,
+    onReconnect: handleManualReconnect,
     onStart,
     phase,
     room,
     roomExitBusy,
+    startPending,
   })
   const handleLayoutDiagnosticsModeChange = useCallback((mode: typeof layoutDiagnosticsMode) => {
     setLayoutDiagnosticsMode(mode)
@@ -1198,17 +1227,14 @@ export function RoomView({
           connected,
           isOwner: room?.ownerPlayerID === session.playerID,
           logEntries,
-          manualReconnectAvailable,
           onBackHome,
           onOpenHelp: () => onOpenHelp(numPlayers ?? 5),
-          onReconnect: handleManualReconnect,
           onRequestRoomExit,
-          onSaveProfile,
           onToggleRoleKnowledge: controller.toggleRoleKnowledge,
-          profile: roomProfile,
           roomExitBlocked,
           roomExitBusy,
-          seatChangePending,
+          seatChangePending: seatChangeTargetID !== null,
+          seatChangeTargetID,
         }}
       />
     </ImmersiveLobbyShell>
