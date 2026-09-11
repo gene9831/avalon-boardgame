@@ -35,8 +35,22 @@ describe('RoomPhasePanelContent', () => {
   })
 
   it('shows success without a fail choice to a good quest player', () => {
-    const html = render({ kind: 'quest', title: '执行任务', status: '请选择任务牌', canPlaySuccess: true, canPlayFail: false })
+    const html = render({ kind: 'quest', title: '执行任务', status: '请选择任务牌', submittedCard: null, canPlaySuccess: true, canPlayFail: false })
     expect(html.action).toContain('aria-label="让任务成功"')
     expect(html.action).not.toContain('aria-label="让任务失败"')
+  })
+
+  it('keeps the viewer\'s submitted vote and quest card visible only in phase copy', () => {
+    const vote = render({
+      kind: 'teamVote', title: '表决任务队伍', proposedTeamNames: ['Alice', 'Bob'],
+      submittedCount: 1, total: 5, submittedVote: 'reject', canVote: false,
+    })
+    const quest = render({
+      kind: 'quest', title: '执行任务', status: '请选择任务牌', submittedCard: 'fail',
+      canPlaySuccess: false, canPlayFail: false,
+    })
+
+    expect(vote.action).toContain('你已选择：反对')
+    expect(quest.action).toContain('你已提交失败，等待任务结算。')
   })
 })

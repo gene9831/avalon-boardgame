@@ -149,6 +149,7 @@ function buildPhase(
     return {
       kind: 'quest', title: '执行任务',
       status: onTeam ? '请选择任务牌' : '等待任务队员提交',
+      submittedCard: game.viewer.submittedQuestCard ?? null,
       canPlaySuccess: canPlay, canPlayFail: canPlay && game.viewer.loyalty === 'evil',
     }
   }

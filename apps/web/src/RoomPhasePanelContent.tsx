@@ -28,12 +28,12 @@ export function RoomPhasePanelContent({ actions, model }: { actions: RoomScreenA
     case 'teamVote': return {
       title,
       middle: <p className="truncate text-sm text-slate-300">{model.proposedTeamNames.join('、')} · {model.submittedCount}/{model.total} 已投票</p>,
-      action: model.canVote ? <div className="grid grid-cols-2 gap-2"><button aria-label="赞成队伍" className={primaryClass} onClick={() => actions.onCastTeamVote('approve')} type="button">赞成</button><button aria-label="反对队伍" className={secondaryClass} onClick={() => actions.onCastTeamVote('reject')} type="button">反对</button></div> : <p className="text-center text-sm text-slate-300" role="status">{model.submittedVote === null ? '等待其他玩家投票' : '已提交投票'}</p>,
+      action: model.canVote ? <div className="grid grid-cols-2 gap-2"><button aria-label="赞成队伍" className={primaryClass} onClick={() => actions.onCastTeamVote('approve')} type="button">赞成</button><button aria-label="反对队伍" className={secondaryClass} onClick={() => actions.onCastTeamVote('reject')} type="button">反对</button></div> : <p className="text-center text-sm text-slate-300" role="status">{model.submittedVote === null ? '等待其他玩家投票' : `你已选择：${model.submittedVote === 'approve' ? '赞成' : '反对'}`}</p>,
     }
     case 'quest': return {
       title,
       middle: <p className="text-sm text-slate-300">{model.status}</p>,
-      action: model.canPlaySuccess ? <div className={`grid gap-2 ${model.canPlayFail ? 'grid-cols-2' : 'grid-cols-1'}`}><button aria-label="让任务成功" className={primaryClass} onClick={() => actions.onPlayQuestCard('success')} type="button">成功</button>{model.canPlayFail && <button aria-label="让任务失败" className={secondaryClass} onClick={() => actions.onPlayQuestCard('fail')} type="button">失败</button>}</div> : <p className="text-center text-sm text-slate-300" role="status">等待任务结算</p>,
+      action: model.canPlaySuccess ? <div className={`grid gap-2 ${model.canPlayFail ? 'grid-cols-2' : 'grid-cols-1'}`}><button aria-label="让任务成功" className={primaryClass} onClick={() => actions.onPlayQuestCard('success')} type="button">成功</button>{model.canPlayFail && <button aria-label="让任务失败" className={secondaryClass} onClick={() => actions.onPlayQuestCard('fail')} type="button">失败</button>}</div> : <p className="text-center text-sm text-slate-300" role="status">{model.submittedCard === null ? '等待任务结算' : `你已提交${model.submittedCard === 'success' ? '成功' : '失败'}，等待任务结算。`}</p>,
     }
     case 'assassination': return {
       title,

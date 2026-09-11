@@ -67,7 +67,7 @@ export type RoomPhaseModel =
   | Readonly<{ kind: 'identityRecognition'; title: '身份辨认'; confirmationLabel: string; confirmed: boolean; confirmedCount: number; participantCount: number; isParticipant: boolean }>
   | Readonly<{ kind: 'teamProposal'; title: '组建任务队伍'; requiredTeamSize: number; selectedCount: number; leaderName: string; canSubmit: boolean }>
   | Readonly<{ kind: 'teamVote'; title: '表决任务队伍'; proposedTeamNames: readonly string[]; submittedCount: number; total: number; submittedVote: TeamVote | null; canVote: boolean }>
-  | Readonly<{ kind: 'quest'; title: '执行任务'; status: string; canPlaySuccess: boolean; canPlayFail: boolean }>
+  | Readonly<{ kind: 'quest'; title: '执行任务'; status: string; submittedCard: QuestCard | null; canPlaySuccess: boolean; canPlayFail: boolean }>
   | Readonly<{ kind: 'assassination'; title: '刺杀阶段'; isAssassin: boolean; targetName: string | null; canSubmit: boolean }>
   | Readonly<{ kind: 'finished'; title: '对局结束'; summary: string; rolesRevealed: boolean }>
 

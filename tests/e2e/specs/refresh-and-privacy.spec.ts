@@ -300,13 +300,17 @@ test('refresh restores the unified room and keeps pending choices private', asyn
       if (String(index) === firstVote.actor) {
         await expect(
           page.locator('[data-room-slot="phase-action"]'),
-        ).toContainText('已提交投票')
+        ).toContainText(
+          `你已选择：${firstVote.payload.vote === 'approve' ? '赞成' : '反对'}`,
+        )
       } else {
         await expect(
           page.getByRole('button', { name: '赞成队伍' }),
         ).toBeEnabled()
       }
-      await expect(page.getByText(/你已选择：/)).toHaveCount(0)
+      if (String(index) !== firstVote.actor) {
+        await expect(page.getByText(/你已选择：/)).toHaveCount(0)
+      }
     }
 
     const geometryAfterVote = await submitterSeat.evaluate((seat) => {
@@ -331,7 +335,9 @@ test('refresh restores the unified room and keeps pending choices private', asyn
     await votePage.reload()
     await expect(
       votePage.locator('[data-room-slot="phase-action"]'),
-    ).toContainText('已提交投票')
+    ).toContainText(
+      `你已选择：${firstVote.payload.vote === 'approve' ? '赞成' : '反对'}`,
+    )
     await expect(
       votePage.getByRole('button', { name: '赞成队伍' }),
     ).toHaveCount(0)
@@ -368,21 +374,26 @@ test('refresh restores the unified room and keeps pending choices private', asyn
 
     await expect(
       cardPage.locator('[data-room-slot="phase-action"]'),
-    ).toContainText('等待任务结算')
+    ).toContainText(
+      `你已提交${firstQuestCard.payload.card === 'success' ? '成功' : '失败'}，等待任务结算。`,
+    )
     await expect(
       cardPage.getByRole('button', { name: /让任务(成功|失败)/ }),
     ).toHaveCount(0)
     await expect(
       pendingTeammatePage.getByRole('button', { name: '让任务成功' }),
     ).toBeEnabled()
-    for (const page of harness.pages) {
+    for (const [index, page] of harness.pages.entries()) {
+      if (String(index) === firstQuestCard.actor) continue
       await expect(page.getByText(/你已提交(?:成功|失败)/)).toHaveCount(0)
     }
 
     await cardPage.reload()
     await expect(
       cardPage.locator('[data-room-slot="phase-action"]'),
-    ).toContainText('等待任务结算')
+    ).toContainText(
+      `你已提交${firstQuestCard.payload.card === 'success' ? '成功' : '失败'}，等待任务结算。`,
+    )
     await expect(
       cardPage.getByRole('button', { name: /让任务(成功|失败)/ }),
     ).toHaveCount(0)
