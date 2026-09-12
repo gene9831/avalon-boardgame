@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 
 import { RoomLobbyPreview } from '../src/RoomLobbyPreview'
+import { RoomLobbyScene } from '../src/RoomLobbyScene'
 import { HelpProvider } from '../src/HelpProvider'
 import { buildRoomScreenModel } from '../src/room-screen-controller'
 import {
@@ -31,6 +32,30 @@ function renderPreview(path: string) {
 }
 
 describe('RoomLobbyPreview', () => {
+  it('presents the owner start affordance and occupied-seat summary through the lobby scene', () => {
+    const html = renderToStaticMarkup(
+      <RoomLobbyScene
+        actions={{ onActivatePlayer: () => {}, onStart: () => {} }}
+        geometry={{
+          stageLayout: {
+            status: 'ready', shape: 'circle', tabletop: { x: 20, y: 40, width: 319, height: 319 },
+            centerPanel: { x: 103.5, y: 123.5, width: 152, height: 152 },
+            playerSeats: [],
+          },
+        }}
+        scene={{
+          kind: 'lobby', matchID: 'ABC123456', playerCount: 5, players: [], questProgress: [],
+          occupiedCount: 5, seatCount: 5, viewer: 'owner', canStart: true, startRequestState: 'idle',
+        }}
+        slots={{ back: null, toolbar: null }}
+      />,
+    )
+
+    expect(html).toContain('5 / 5')
+    expect(html).toContain('开始游戏')
+    expect(html).toContain('所有玩家已入座')
+  })
+
   it('gives the demo root a definite viewport-sized room container', () => {
     const css = readFileSync(new URL('../src/RoomLayoutPreview.css', import.meta.url), 'utf8')
 

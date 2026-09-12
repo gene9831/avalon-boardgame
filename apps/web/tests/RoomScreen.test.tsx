@@ -2,9 +2,74 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
 import { RoomScreen } from '../src/RoomScreen'
+import { RoomLoadingScene } from '../src/RoomLoadingScene'
+import { RoomSceneFrame } from '../src/RoomSceneFrame'
 import { buildRoomScreenModel } from '../src/room-screen-controller'
 
 describe('RoomScreen', () => {
+  it('gives an informational scene one shared layout and one semantic content slot per region', () => {
+    const html = renderToStaticMarkup(
+      <RoomSceneFrame
+        content={{
+          title: '正在加载房间',
+          center: '正在读取房间信息…',
+          phaseMiddle: '请稍候。',
+          phaseAction: null,
+          stageAtmosphere: <span>加载中的舞台氛围</span>,
+        }}
+        geometry={{ stageLayout: null }}
+        scene={{
+          kind: 'loading', matchID: 'ABC123456', playerCount: null, players: [], questProgress: [], message: '正在读取房间信息…',
+        }}
+        slots={{ back: <button type="button">返回</button>, toolbar: <button type="button">帮助</button> }}
+      />,
+    )
+
+    expect(html.match(/class="avalon-room-layout"/g)).toHaveLength(1)
+    expect(html.match(/data-room-slot="stage"/g)).toHaveLength(1)
+    expect(html.match(/data-room-slot="phase-middle"/g)).toHaveLength(1)
+    expect(html.match(/data-room-slot="phase-action"/g)).toHaveLength(1)
+    expect(html).toContain('加载中的舞台氛围')
+    expect(html).toContain('帮助')
+  })
+
+  it('shows recovery status without a reconnect action while automatic recovery is running', () => {
+    const html = renderToStaticMarkup(
+      <RoomLoadingScene
+        actions={{ onReconnect: () => {} }}
+        geometry={{ stageLayout: null }}
+        scene={{
+          kind: 'connectionRecovery', matchID: 'ABC123456', playerCount: null, players: [], questProgress: [],
+          manualReconnectAvailable: false,
+        }}
+        slots={{ back: null, toolbar: null }}
+      />,
+    )
+
+    expect(html).toContain('正在重新连接')
+    expect(html).toContain('正在恢复与房间的连接。')
+    expect(html).not.toContain('>重新连接</button>')
+  })
+
+  it('shows an enabled reconnect action when recovery requires manual reconnection', () => {
+    const html = renderToStaticMarkup(
+      <RoomLoadingScene
+        actions={{ onReconnect: () => {} }}
+        geometry={{ stageLayout: null }}
+        scene={{
+          kind: 'connectionRecovery', matchID: 'ABC123456', playerCount: null, players: [], questProgress: [],
+          manualReconnectAvailable: true,
+        }}
+        slots={{ back: null, toolbar: null }}
+      />,
+    )
+
+    const reconnectButton = html.match(/<button[^>]*>重新连接<\/button>/)?.[0] ?? ''
+
+    expect(reconnectButton).toContain('>重新连接</button>')
+    expect(reconnectButton).not.toMatch(/\sdisabled(?:=|(?=\s|>))/)
+  })
+
   it('renders one container layout with one instance of every business slot', () => {
     const html = renderToStaticMarkup(
       <RoomScreen
