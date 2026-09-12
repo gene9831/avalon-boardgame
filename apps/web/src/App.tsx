@@ -57,7 +57,9 @@ import { RoomAssassinationPreview } from './RoomAssassinationPreview'
 import { RoomLobbyPreview } from './RoomLobbyPreview'
 import { RoomQuestPreview } from './RoomQuestPreview'
 import { RoomResultPreview } from './RoomResultPreview'
-import { LegacyRoomScreen as RoomScreen } from './LegacyRoomScreen'
+import { RoomBackButton } from './RoomBackButton'
+import { ObservedRoomScreen } from './ObservedRoomScreen'
+import { RoomUtilities } from './RoomUtilities'
 import { RoomTeamProposalPreview } from './RoomTeamProposalPreview'
 import { RoomTeamVotePreview } from './RoomTeamVotePreview'
 import { useRoomScreenController } from './room-screen-controller'
@@ -1071,27 +1073,31 @@ function RoomRoute({
   }
 
   const handleCastTeamVote = (vote: TeamVote) => {
-    if (gameState?.isActive) {
-      clientRef.current?.moves.castTeamVote(vote)
+    if (!gameState?.isActive || clientRef.current === null) {
+      throw new Error('Team vote client is unavailable')
     }
+    clientRef.current.moves.castTeamVote(vote)
   }
 
   const handleConfirmIdentityRecognition = () => {
-    if (gameState?.isActive) {
-      clientRef.current?.moves.confirmIdentityRecognition()
+    if (!gameState?.isActive || clientRef.current === null) {
+      throw new Error('Identity recognition client is unavailable')
     }
+    clientRef.current.moves.confirmIdentityRecognition()
   }
 
   const handlePlayQuestCard = (card: QuestCard) => {
-    if (gameState?.isActive) {
-      clientRef.current?.moves.playQuestCard(card)
+    if (!gameState?.isActive || clientRef.current === null) {
+      throw new Error('Quest card client is unavailable')
     }
+    clientRef.current.moves.playQuestCard(card)
   }
 
   const handleAssassinate = (targetID: PlayerID) => {
-    if (gameState?.isActive) {
-      clientRef.current?.moves.assassinate(targetID)
+    if (!gameState?.isActive || clientRef.current === null) {
+      throw new Error('Assassination client is unavailable')
     }
+    clientRef.current.moves.assassinate(targetID)
   }
 
   const handleReconnect = () => {
@@ -1401,6 +1407,9 @@ export function RoomView({
     onConfirmIdentityRecognition,
     onPlayQuestCard,
     onProposeTeam,
+    onAssassinationSubmissionError: () => pushToast({ message: '确认刺杀失败，请重试。', tone: 'error' }),
+    onIdentityRecognitionSubmissionError: () => pushToast({ message: '确认身份辨认失败，请重试。', tone: 'error' }),
+    onQuestCardSubmissionError: () => pushToast({ message: '确认任务牌失败，请重试。', tone: 'error' }),
     onTeamSubmissionError: () => pushToast({ message: '确认队伍失败，请重试。', tone: 'error' }),
     onTeamVoteSubmissionError: () => pushToast({ message: '确认投票失败，请重试。', tone: 'error' }),
     onReconnect: handleManualReconnect,
@@ -1418,6 +1427,22 @@ export function RoomView({
     window.history.replaceState(window.history.state, '', nextURL)
   }, [])
 
+  const utilityModel = {
+    variant: gameState === null || room === null
+      ? 'loading'
+      : gameState.G.status === 'lobby'
+        ? 'lobby'
+        : 'game',
+    showRoomExit:
+      gameState?.G.status === 'lobby' ||
+      gameState?.G.status === 'finished',
+    showIdentityKnowledge:
+      gameState?.G.status === 'playing' &&
+      controller.binding.scene.kind !== 'identityRecognition' &&
+      controller.binding.scene.kind !== 'connectionRecovery',
+    roleKnowledgeOpen: controller.roleKnowledgeOpen,
+  } as const
+
   return (
     <ImmersiveLobbyShell
       variant="game"
@@ -1434,22 +1459,27 @@ export function RoomView({
         />
       )}
     >
-      <RoomScreen
-        actions={controller.actions}
+      <ObservedRoomScreen
+        {...controller.binding}
         diagnosticsMode={layoutDiagnosticsMode}
-        model={controller.model}
-        tools={{
-          connected,
-          isOwner: room?.ownerPlayerID === session.playerID,
-          logEntries,
-          onBackHome,
-          onOpenHelp: () => onOpenHelp(numPlayers ?? 5),
-          onRequestRoomExit,
-          onToggleRoleKnowledge: controller.toggleRoleKnowledge,
-          roomExitBlocked,
-          roomExitBusy,
-          seatChangePending: seatChangeTargetID !== null,
-          seatChangeTargetID,
+        slots={{
+          back: <RoomBackButton onBack={onBackHome} />,
+          toolbar: (
+            <RoomUtilities
+              model={utilityModel}
+              tools={{
+                connected,
+                isOwner: room?.ownerPlayerID === session.playerID,
+                logEntries,
+                onOpenHelp: () => onOpenHelp(numPlayers ?? 5),
+                onRequestRoomExit,
+                onToggleRoleKnowledge: controller.toggleRoleKnowledge,
+                roomExitBlocked,
+                roomExitBusy,
+                seatChangePending: seatChangeTargetID !== null,
+              }}
+            />
+          ),
         }}
       />
     </ImmersiveLobbyShell>

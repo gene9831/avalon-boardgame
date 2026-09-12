@@ -42,4 +42,12 @@ describe('RoomUtilities', () => {
     expect(helpIndex).toBeGreaterThan(identityIndex)
     expect(logIndex).toBeGreaterThan(helpIndex)
   })
+
+  it('owns an explicit sans-serif boundary for every complete toolbar', () => {
+    const html = renderToStaticMarkup(<RoomUtilities model={{
+      variant: 'game', showRoomExit: false, showIdentityKnowledge: false, roleKnowledgeOpen: false,
+    }} tools={tools} />)
+
+    expect(html).toMatch(/<nav[^>]*class="[^"]*font-sans[^"]*"/)
+  })
 })

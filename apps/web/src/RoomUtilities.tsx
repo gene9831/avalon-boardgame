@@ -4,7 +4,13 @@ import { RoomLogControl } from './RoomLogControl'
 import { RoomMoreMenu } from './RoomMoreMenu'
 import { RoomToolbar, type RoomToolbarItem } from './RoomToolbar'
 import type { RoomLogEntry } from './room-log'
-import type { RoomUtilityModel } from './room-screen-model'
+
+export type RoomUtilitiesModel = Readonly<{
+  variant: 'loading' | 'lobby' | 'game'
+  showRoomExit: boolean
+  showIdentityKnowledge: boolean
+  roleKnowledgeOpen: boolean
+}>
 
 export interface RoomUtilityTools {
   connected: boolean
@@ -18,7 +24,7 @@ export interface RoomUtilityTools {
   onToggleRoleKnowledge: () => void
 }
 
-export function RoomUtilities({ model, tools }: { model: RoomUtilityModel; tools: RoomUtilityTools }) {
+export function RoomUtilities({ model, tools }: { model: RoomUtilitiesModel; tools: RoomUtilityTools }) {
   const helpItem: RoomToolbarItem = {
     icon: CircleHelp,
     id: 'help',

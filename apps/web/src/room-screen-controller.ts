@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type {
   AvalonResult,
   AvalonPlayerView,
@@ -21,11 +21,16 @@ import {
   type RoomCenterModel,
   type RoomPhaseModel,
   type RoomPlayerInteractionMode,
-  type RoomScreenActions,
   type RoomScreenMode,
   type RoomScreenModel,
   type RoomStageOverlayModel,
 } from './room-screen-model'
+import type {
+  RoomActionsByKind,
+  RoomAssassinationView,
+  RoomIdentityClue,
+  RoomScene,
+} from './room-screen-props'
 
 const RECOGNITION_COPY = {
   roleReveal: { title: '查看你的身份', confirmation: '我已确认身份' },
@@ -74,8 +79,29 @@ export type BuildRoomScreenModelInput =
       questCardSubmissionPending?: boolean
       showSettledTeamVoteDetails?: boolean
       assassinationSubmissionPending?: boolean
+      identityRecognitionSubmissionPending?: boolean
       seatChangeTargetID?: PlayerID | null
     } & LobbyPresentationState>
+
+export interface RoomSceneEventHandlers {
+  onActivatePlayer(playerID: PlayerID): void
+  onAssassinate(): void
+  onConfirmIdentityRecognition(): void
+  onConfirmQuestCard(): void
+  onConfirmTeamVote(): void
+  onReconnect(): void
+  onSelectQuestCard(card: QuestCard): void
+  onSelectTeamVote(vote: TeamVote): void
+  onStart(): void
+  onSubmitTeam(): void
+}
+
+export type RoomSceneBinding = {
+  [Kind in RoomScene['kind']]: Readonly<{
+    scene: Extract<RoomScene, { kind: Kind }>
+    actions: RoomActionsByKind[Kind]
+  }>
+}[RoomScene['kind']]
 
 function playerName(room: AvalonMatch, playerID: PlayerID | null): string {
   if (playerID === null) return '等待队长'
@@ -345,6 +371,333 @@ export function buildRoomScreenModel(input: BuildRoomScreenModelInput): RoomScre
   }
 }
 
+type ReadyRoomSceneInput = Extract<BuildRoomScreenModelInput, { kind: 'ready' }>
+
+function identityClue(game: AvalonPlayerView): RoomIdentityClue {
+  const recognition = game.identityRecognition
+  const viewer = game.viewer
+  if (recognition === null || viewer.identityRecognition?.isParticipant !== true) {
+    return { kind: 'none', targetPlayerIDs: [] }
+  }
+
+  if (recognition.step === 'evilRecognition' && viewer.loyalty === 'evil') {
+    return { kind: 'evilAllies', targetPlayerIDs: viewer.knownEvilPlayerIDs }
+  }
+  if (recognition.step === 'merlinRecognition' && viewer.role === 'merlin') {
+    return { kind: 'merlinEvil', targetPlayerIDs: viewer.knownEvilPlayerIDs }
+  }
+  if (recognition.step === 'percivalRecognition' && viewer.role === 'percival') {
+    const [first, second, extra] = viewer.knownMerlinCandidatePlayerIDs
+    if (first !== undefined && second !== undefined && extra === undefined) {
+      return { kind: 'percivalCandidates', targetPlayerIDs: [first, second] }
+    }
+  }
+  return { kind: 'none', targetPlayerIDs: [] }
+}
+
+function buildProductionSceneBase(
+  input: ReadyRoomSceneInput,
+  interactionMode: RoomPlayerInteractionMode,
+  options: Readonly<{
+    showCurrentQuest?: boolean
+    showPrivateRoleKnowledge?: boolean
+    showRoleReveal?: boolean
+    showRoundDecorations?: boolean
+    showKnownPlayerInfo?: boolean
+    showConnectionStatus?: boolean
+    selectedTarget?: PlayerID | null
+  }> = {},
+) {
+  const playerCount = roomPlayerCount(input.room)
+  return {
+    matchID: input.matchID,
+    playerCount,
+    players: buildRoomPlayers({
+      players: input.room.players,
+      numPlayers: playerCount,
+      currentPlayerID: input.currentPlayerID,
+      phase: input.phase,
+      viewerConnected: input.connected,
+      ownerPlayerID: options.showRoleReveal === true ? null : input.room.ownerPlayerID,
+      game: input.game,
+      selectedTeam: options.showRoleReveal === true ? [] : input.selectedTeam,
+      selectedTarget: options.selectedTarget ?? null,
+      showKnownPlayerInfo: options.showKnownPlayerInfo ?? false,
+      showPrivateRoleKnowledge: options.showPrivateRoleKnowledge ?? false,
+      showSettledTeamVoteDetails: input.showSettledTeamVoteDetails,
+      showRoundDecorations: options.showRoundDecorations,
+      showConnectionStatus: options.showConnectionStatus,
+      showRoleReveal: options.showRoleReveal,
+      interactionMode,
+      seatChangeTargetID: input.seatChangeTargetID,
+    }),
+    questProgress: buildQuestProgress(
+      playerCount,
+      input.game,
+      options.showCurrentQuest ?? true,
+    ),
+  }
+}
+
+/**
+ * Maps one player-filtered live snapshot and local presentation state to the
+ * exactly correlated scene/action pair consumed by the production RoomScreen.
+ */
+export function buildRoomSceneBinding(
+  input: BuildRoomScreenModelInput,
+  events: RoomSceneEventHandlers,
+): RoomSceneBinding {
+  if (input.kind === 'loading') {
+    return {
+      scene: {
+        kind: 'loading',
+        matchID: input.matchID,
+        playerCount: null,
+        players: [],
+        questProgress: buildQuestProgress(null, null),
+        message: '正在进入房间，请稍候。',
+      },
+      actions: null,
+    }
+  }
+
+  if (!input.connected) {
+    return {
+      scene: {
+        kind: 'connectionRecovery',
+        ...buildProductionSceneBase(input, 'none'),
+        manualReconnectAvailable: input.manualReconnectAvailable,
+      },
+      actions: { onReconnect: events.onReconnect },
+    }
+  }
+
+  const mode = resolveMode(input.game, input.phase)
+  if (mode === 'lobby') {
+    return {
+      scene: {
+        kind: 'lobby',
+        ...buildProductionSceneBase(input, 'changeSeat'),
+        occupiedCount: occupiedPlayerIDs(input.room).length,
+        seatCount: roomPlayerCount(input.room),
+        viewer: input.room.ownerPlayerID === input.currentPlayerID ? 'owner' : 'player',
+        canStart: input.canStart && !input.startPending,
+        startRequestState: input.startPending ? 'pending' : 'idle',
+      },
+      actions: {
+        onActivatePlayer: events.onActivatePlayer,
+        onStart: events.onStart,
+      },
+    }
+  }
+
+  if (mode === 'identityRecognition') {
+    const recognition = input.game.identityRecognition
+    const viewer = input.game.viewer.identityRecognition
+    const isParticipant = viewer?.isParticipant === true
+    const isRoleReveal = recognition?.step === 'roleReveal'
+    return {
+      scene: {
+        kind: 'identityRecognition',
+        ...buildProductionSceneBase(input, 'none', {
+          showPrivateRoleKnowledge: isParticipant && isRoleReveal,
+          showRoundDecorations: false,
+          showKnownPlayerInfo: false,
+        }),
+        clue: identityClue(input.game),
+        view: !isParticipant || viewer?.confirmed === true ? 'waiting' : 'revealed',
+        confirmedCount: recognition?.confirmedCount ?? 0,
+        participantCount: recognition?.participantCount ?? 0,
+        confirmRequestState: input.identityRecognitionSubmissionPending === true ? 'pending' : 'idle',
+      },
+      actions: {
+        onReveal: () => undefined,
+        onRevealComplete: () => undefined,
+        onConfirm: events.onConfirmIdentityRecognition,
+      },
+    }
+  }
+
+  if (mode === 'teamProposal') {
+    const playerCount = roomPlayerCount(input.room)
+    const requiredTeamSize = getQuestTeamSize(playerCount, input.game.questIndex)
+    const isLeader = input.activeStage === 'leader' && input.game.leaderID === input.currentPlayerID
+    const isSubmitting = isLeader && input.teamSubmissionPending === true
+    return {
+      scene: {
+        kind: 'teamProposal',
+        ...buildProductionSceneBase(input, isLeader ? 'selectTeam' : 'none', {
+          showPrivateRoleKnowledge: input.roleKnowledgeOpen,
+          showKnownPlayerInfo: input.roleKnowledgeOpen,
+        }),
+        questIndex: input.game.questIndex,
+        requiredTeamSize,
+        selectedCount: input.selectedTeam.length,
+        consecutiveRejectedTeams: input.game.consecutiveRejectedTeams,
+        perspective: isLeader ? 'leader' : 'observer',
+        canSubmit: !isSubmitting && canSubmitTeam({
+          activeStage: input.activeStage,
+          leaderID: input.game.leaderID,
+          playerID: input.currentPlayerID,
+          requiredTeamSize,
+          selectedTeam: input.selectedTeam,
+        }),
+        submitRequestState: isSubmitting ? 'pending' : 'idle',
+      },
+      actions: {
+        onActivatePlayer: events.onActivatePlayer,
+        onSubmitTeam: events.onSubmitTeam,
+      },
+    }
+  }
+
+  if (mode === 'teamVote') {
+    const submittedVote = input.game.viewer.submittedVote
+    const isSubmitting = submittedVote === undefined && input.teamVoteSubmissionPending === true
+    return {
+      scene: {
+        kind: 'teamVote',
+        ...buildProductionSceneBase(input, 'none', {
+          showPrivateRoleKnowledge: input.roleKnowledgeOpen,
+          showKnownPlayerInfo: input.roleKnowledgeOpen,
+        }),
+        questIndex: input.game.questIndex,
+        submittedCount: input.game.submittedTeamVotePlayerIDs.length,
+        participantCount: roomPlayerCount(input.room),
+        consecutiveRejectedTeams: input.game.consecutiveRejectedTeams,
+        view: submittedVote === undefined
+          ? {
+              kind: 'choosing',
+              selectedVote: input.selectedTeamVote ?? null,
+              canChoose: input.activeStage === 'vote' && !isSubmitting,
+              submitRequestState: isSubmitting ? 'pending' : 'idle',
+            }
+          : { kind: 'waiting', submittedVote },
+      },
+      actions: {
+        onSelectVote: events.onSelectTeamVote,
+        onConfirmVote: events.onConfirmTeamVote,
+      },
+    }
+  }
+
+  if (mode === 'quest') {
+    const settledQuest = input.game.questHistory.find(
+      ({ questIndex }) => questIndex === input.game.questIndex,
+    )
+    const proposedTeam = input.game.proposedTeam ?? []
+    const onTeam = proposedTeam.includes(input.currentPlayerID)
+    const submittedCard = input.game.viewer.submittedQuestCard
+    const isSubmitting = submittedCard === undefined && input.questCardSubmissionPending === true
+    const canChoose = input.activeStage === 'quest' && onTeam && submittedCard === undefined && !isSubmitting
+    const alignment = input.game.viewer.loyalty === 'evil' ? 'evil' : 'good'
+    return {
+      scene: {
+        kind: 'quest',
+        ...buildProductionSceneBase(input, 'none', {
+          showPrivateRoleKnowledge: input.roleKnowledgeOpen,
+          showKnownPlayerInfo: input.roleKnowledgeOpen,
+        }),
+        questIndex: input.game.questIndex,
+        requiredSubmissionCount: proposedTeam.length,
+        submittedCount: input.game.submittedQuestCardCount,
+        view: settledQuest !== undefined
+          ? {
+              kind: 'result',
+              succeeded: settledQuest.succeeded,
+              successCount: settledQuest.successCount,
+              failCount: settledQuest.failCount,
+            }
+          : !onTeam || submittedCard !== undefined
+            ? {
+                kind: 'waiting',
+                participation: onTeam ? 'member' : 'observer',
+                submittedCard: submittedCard ?? null,
+              }
+            : {
+                kind: 'choosing',
+                alignment,
+                selectedCard: alignment === 'good' ? 'success' : input.selectedQuestCard ?? null,
+                canChoose,
+                submitRequestState: isSubmitting ? 'pending' : 'idle',
+              },
+      },
+      actions: {
+        onSelectCard: events.onSelectQuestCard,
+        onConfirmCard: events.onConfirmQuestCard,
+      },
+    }
+  }
+
+  if (mode === 'assassination') {
+    const isAssassin = input.game.viewer.role === 'assassin'
+    const isSubmitting = isAssassin && input.assassinationSubmissionPending === true
+    const targetID = input.game.result?.reason === 'assassination'
+      ? input.game.result.targetID
+      : undefined
+    const targetRole = targetID === undefined ? undefined : input.game.revealedRoles?.[targetID]
+    const resultView: Extract<RoomAssassinationView, { kind: 'result' }> | null =
+      targetID !== undefined && targetRole !== undefined && input.game.result !== undefined
+      ? {
+          kind: 'result',
+          targetPlayerID: targetID,
+          targetRole,
+          hit: targetRole === 'merlin',
+          winner: input.game.result.winner,
+        }
+      : null
+    const canSelectTarget = isAssassin && input.activeStage === 'assassin' && !isSubmitting
+    return {
+      scene: {
+        kind: 'assassination',
+        ...buildProductionSceneBase(input, canSelectTarget ? 'selectAssassinationTarget' : 'none', {
+          showCurrentQuest: false,
+          showPrivateRoleKnowledge: input.roleKnowledgeOpen,
+          showRoundDecorations: false,
+          showKnownPlayerInfo: true,
+          selectedTarget: isAssassin ? input.selectedTarget : null,
+        }),
+        view: resultView ?? (isAssassin
+          ? {
+              kind: 'selecting',
+              targetPlayerID: input.selectedTarget,
+              canSubmit: canSelectTarget && input.selectedTarget !== null,
+              submitRequestState: isSubmitting ? 'pending' : 'idle',
+            }
+          : {
+              kind: 'observing',
+              perspective: input.game.viewer.loyalty === 'evil' ? 'evil' : 'good',
+            }),
+      },
+      actions: {
+        onActivatePlayer: events.onActivatePlayer,
+        onAssassinate: events.onAssassinate,
+      },
+    }
+  }
+
+  if (input.game.result === undefined) {
+    throw new Error('Finished room is missing its settled result')
+  }
+  return {
+    scene: {
+      kind: 'gameResult',
+      ...buildProductionSceneBase(input, 'none', {
+        showCurrentQuest: false,
+        showPrivateRoleKnowledge: false,
+        showRoleReveal: true,
+        showRoundDecorations: false,
+        showKnownPlayerInfo: false,
+        showConnectionStatus: false,
+      }),
+      winner: input.game.result.winner,
+      reason: finishedResultReason(input.room, input.game.result),
+      questScore: `任务 ${input.game.goodSuccesses} 成功 / ${input.game.evilFailures} 失败`,
+    },
+    actions: null,
+  }
+}
+
 export interface UseRoomScreenControllerInput extends LobbyPresentationState, LobbyPresentationActions {
   activeStage: string | undefined
   canStart: boolean
@@ -365,6 +718,7 @@ export interface UseRoomScreenControllerInput extends LobbyPresentationState, Lo
   onTeamVoteSubmissionError?: (error: unknown) => void
   onQuestCardSubmissionError?: (error: unknown) => void
   onAssassinationSubmissionError?: (error: unknown) => void
+  onIdentityRecognitionSubmissionError?: (error: unknown) => void
   onStart: () => void
 }
 
@@ -375,6 +729,7 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
   const [teamVoteSubmissionPending, setTeamVoteSubmissionPending] = useState(false)
   const [selectedQuestCard, setSelectedQuestCard] = useState<QuestCard | null>(null)
   const [questCardSubmissionPending, setQuestCardSubmissionPending] = useState(false)
+  const [identityRecognitionSubmissionPending, setIdentityRecognitionSubmissionPending] = useState(false)
   const [assassinationSubmissionPending, setAssassinationSubmissionPending] = useState(false)
   const [selectedTarget, setSelectedTarget] = useState<PlayerID | null>(null)
   const [roleKnowledgeOpen, setRoleKnowledgeOpen] = useState(
@@ -414,6 +769,18 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
     setQuestCardSubmissionPending(false)
   }, [input.game?.viewer.submittedQuestCard])
   useEffect(() => {
+    if (phase !== 'identityRecognition') {
+      setIdentityRecognitionSubmissionPending(false)
+      return
+    }
+    if (input.game?.viewer.identityRecognition?.confirmed === true) {
+      setIdentityRecognitionSubmissionPending(false)
+    }
+  }, [input.game?.viewer.identityRecognition?.confirmed, phase])
+  useEffect(() => {
+    setIdentityRecognitionSubmissionPending(false)
+  }, [input.game?.identityRecognition?.step])
+  useEffect(() => {
     const synchronizeRoleKnowledge = (event: StorageEvent) => {
       if (event.key === GAME_CLIENT_SETTINGS_KEY) {
         setRoleKnowledgeOpen(loadGameClientSettings().roleKnowledgeOpen)
@@ -430,42 +797,56 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
     setAssassinationSubmissionPending(false)
   }, [phase])
 
-  const model = useMemo(() => {
-    if (input.room === null || input.game === null) {
-      return buildRoomScreenModel({ kind: 'loading', matchID: input.matchID, numPlayers: null })
-    }
-    return buildRoomScreenModel({
-      kind: 'ready', matchID: input.matchID, room: input.room, game: input.game,
-      phase: input.game.status === 'lobby' ? 'lobby' : input.phase,
-      activeStage: input.activeStage, currentPlayerID: input.currentPlayerID,
-      selectedTeam, selectedTarget, roleKnowledgeOpen, canStart: input.canStart,
-      roomExitBusy: input.roomExitBusy, connected: input.connected,
-      manualReconnectAvailable: input.manualReconnectAvailable,
-      startPending: input.startPending,
-      teamSubmissionPending,
-      selectedTeamVote,
-      teamVoteSubmissionPending,
-      selectedQuestCard,
-      questCardSubmissionPending,
-      assassinationSubmissionPending,
-      seatChangeTargetID: input.seatChangeTargetID,
-    })
-  }, [assassinationSubmissionPending, input.activeStage, input.canStart, input.connected, input.currentPlayerID, input.game, input.manualReconnectAvailable, input.matchID, input.phase, input.room, input.roomExitBusy, input.seatChangeTargetID, input.startPending, questCardSubmissionPending, roleKnowledgeOpen, selectedQuestCard, selectedTarget, selectedTeam, selectedTeamVote, teamSubmissionPending, teamVoteSubmissionPending])
-
-  const actions: RoomScreenActions = {
+  const events: RoomSceneEventHandlers = {
     onActivatePlayer: (playerID) => {
-      if (model.playerInteractionMode === 'changeSeat') input.onChangeSeat(playerID)
-      if (model.playerInteractionMode === 'selectTeam' && model.phase.kind === 'teamProposal') {
-        const requiredTeamSize = model.phase.requiredTeamSize
+      if (phase === 'lobby' && input.connected) input.onChangeSeat(playerID)
+      if (
+        phase === 'teamProposal' &&
+        input.game !== null &&
+        input.activeStage === 'leader' &&
+        input.game.leaderID === input.currentPlayerID &&
+        !teamSubmissionPending
+      ) {
+        const requiredTeamSize = getQuestTeamSize(
+          input.room === null ? 5 : roomPlayerCount(input.room),
+          input.game.questIndex,
+        )
         setSelectedTeam((previous) => toggleTeamMember(previous, playerID, requiredTeamSize))
       }
-      if (model.playerInteractionMode === 'selectAssassinationTarget') setSelectedTarget(playerID)
+      if (
+        phase === 'assassination' &&
+        input.game?.viewer.role === 'assassin' &&
+        input.activeStage === 'assassin' &&
+        !assassinationSubmissionPending
+      ) setSelectedTarget(playerID)
     },
     onStart: input.onStart,
     onReconnect: input.onReconnect,
-    onConfirmIdentityRecognition: input.onConfirmIdentityRecognition,
+    onConfirmIdentityRecognition: () => {
+      if (
+        phase !== 'identityRecognition' ||
+        input.game?.viewer.identityRecognition?.isParticipant !== true ||
+        input.game.viewer.identityRecognition.confirmed ||
+        identityRecognitionSubmissionPending
+      ) return
+      setIdentityRecognitionSubmissionPending(true)
+      try {
+        input.onConfirmIdentityRecognition()
+      } catch (error) {
+        setIdentityRecognitionSubmissionPending(false)
+        input.onIdentityRecognitionSubmissionError?.(error)
+      }
+    },
     onSubmitTeam: () => {
-      if (model.phase.kind !== 'teamProposal' || !model.phase.canSubmit) return
+      if (input.room === null || input.game === null) return
+      const requiredTeamSize = getQuestTeamSize(roomPlayerCount(input.room), input.game.questIndex)
+      if (teamSubmissionPending || !canSubmitTeam({
+        activeStage: input.activeStage,
+        leaderID: input.game.leaderID,
+        playerID: input.currentPlayerID,
+        requiredTeamSize,
+        selectedTeam,
+      })) return
       setTeamSubmissionPending(true)
       try {
         input.onProposeTeam(selectedTeam)
@@ -475,12 +856,19 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
       }
     },
     onSelectTeamVote: (vote) => {
-      if (model.phase.kind === 'teamVote' && model.phase.canVote) setSelectedTeamVote(vote)
+      if (
+        phase === 'teamVote' &&
+        input.activeStage === 'vote' &&
+        input.game?.viewer.submittedVote === undefined &&
+        !teamVoteSubmissionPending
+      ) setSelectedTeamVote(vote)
     },
     onConfirmTeamVote: () => {
       if (
-        model.phase.kind !== 'teamVote' ||
-        !model.phase.canVote ||
+        phase !== 'teamVote' ||
+        input.activeStage !== 'vote' ||
+        input.game?.viewer.submittedVote !== undefined ||
+        teamVoteSubmissionPending ||
         selectedTeamVote === null
       ) return
       setTeamVoteSubmissionPending(true)
@@ -492,21 +880,42 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
       }
     },
     onSelectQuestCard: (card) => {
-      if (model.phase.kind !== 'quest' || !model.phase.canSelect || !model.phase.isEvil) return
+      if (
+        phase !== 'quest' ||
+        input.activeStage !== 'quest' ||
+        input.game?.viewer.loyalty !== 'evil' ||
+        input.game.viewer.submittedQuestCard !== undefined ||
+        questCardSubmissionPending
+      ) return
       setSelectedQuestCard(card)
     },
     onConfirmQuestCard: () => {
-      if (model.phase.kind !== 'quest' || !model.phase.canConfirm || model.phase.selectedCard === null) return
+      if (
+        phase !== 'quest' ||
+        input.activeStage !== 'quest' ||
+        input.game === null ||
+        !input.game.proposedTeam?.includes(input.currentPlayerID) ||
+        input.game.viewer.submittedQuestCard !== undefined ||
+        questCardSubmissionPending
+      ) return
+      const selectedCard = input.game.viewer.loyalty === 'evil' ? selectedQuestCard : 'success'
+      if (selectedCard === null) return
       setQuestCardSubmissionPending(true)
       try {
-        input.onPlayQuestCard(model.phase.selectedCard)
+        input.onPlayQuestCard(selectedCard)
       } catch (error) {
         setQuestCardSubmissionPending(false)
         input.onQuestCardSubmissionError?.(error)
       }
     },
     onAssassinate: () => {
-      if (model.phase.kind !== 'assassination' || !model.phase.canSubmit || selectedTarget === null) return
+      if (
+        phase !== 'assassination' ||
+        input.activeStage !== 'assassin' ||
+        input.game?.viewer.role !== 'assassin' ||
+        assassinationSubmissionPending ||
+        selectedTarget === null
+      ) return
       setAssassinationSubmissionPending(true)
       try {
         input.onAssassinate(selectedTarget)
@@ -517,11 +926,34 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
     },
   }
 
+  const binding = input.room === null || input.game === null
+    ? buildRoomSceneBinding(
+        { kind: 'loading', matchID: input.matchID, numPlayers: null },
+        events,
+      )
+    : buildRoomSceneBinding({
+        kind: 'ready', matchID: input.matchID, room: input.room, game: input.game,
+        phase: input.game.status === 'lobby' ? 'lobby' : input.phase,
+        activeStage: input.activeStage, currentPlayerID: input.currentPlayerID,
+        selectedTeam, selectedTarget, roleKnowledgeOpen, canStart: input.canStart,
+        roomExitBusy: input.roomExitBusy, connected: input.connected,
+        manualReconnectAvailable: input.manualReconnectAvailable,
+        startPending: input.startPending,
+        teamSubmissionPending,
+        selectedTeamVote,
+        teamVoteSubmissionPending,
+        selectedQuestCard,
+        questCardSubmissionPending,
+        assassinationSubmissionPending,
+        identityRecognitionSubmissionPending,
+        seatChangeTargetID: input.seatChangeTargetID,
+      }, events)
+
   const toggleRoleKnowledge = () => {
     const next = !roleKnowledgeOpen
     setRoleKnowledgeOpen(next)
     saveGameClientSettings({ roleKnowledgeOpen: next })
   }
 
-  return { model, actions, toggleRoleKnowledge }
+  return { binding, roleKnowledgeOpen, toggleRoleKnowledge }
 }

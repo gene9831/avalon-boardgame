@@ -17,7 +17,7 @@ export interface RoomToolbarProps {
 
 export function RoomToolbar({ children, items }: RoomToolbarProps) {
   return (
-    <nav aria-label="房间工具" className="room-toolbar flex items-center justify-end gap-1">
+    <nav aria-label="房间工具" className="room-toolbar flex items-center justify-end gap-1 font-sans">
       {items.map(({ disabled = false, icon: Icon, id, label, onActivate, pressed }) => (
         <button
           aria-label={label}

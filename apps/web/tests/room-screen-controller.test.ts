@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest'
+// @vitest-environment happy-dom
+import { act, createElement } from 'react'
+import { createRoot } from 'react-dom/client'
+import { describe, expect, it, vi } from 'vitest'
 import type { AvalonPlayerView } from '@avalon/game'
 
 import type { AvalonMatch } from '../src/lobby'
@@ -6,7 +9,13 @@ import {
   buildRoomPlayerPresentation,
   type FilteredSeatInput,
 } from '../src/room-player-presentation'
-import { buildRoomScreenModel } from '../src/room-screen-controller'
+import {
+  buildRoomSceneBinding,
+  buildRoomScreenModel,
+  type RoomSceneEventHandlers,
+  type UseRoomScreenControllerInput,
+  useRoomScreenController,
+} from '../src/room-screen-controller'
 
 const room: AvalonMatch = {
   matchID: 'room-123456789',
@@ -73,6 +82,360 @@ function readyInput(phase: string, overrides: Partial<AvalonPlayerView> = {}) {
     questCardSubmissionPending: false,
   }
 }
+
+const eventHandlers: RoomSceneEventHandlers = {
+  onActivatePlayer: () => undefined,
+  onAssassinate: () => undefined,
+  onConfirmIdentityRecognition: () => undefined,
+  onConfirmQuestCard: () => undefined,
+  onConfirmTeamVote: () => undefined,
+  onReconnect: () => undefined,
+  onSelectQuestCard: () => undefined,
+  onSelectTeamVote: () => undefined,
+  onStart: () => undefined,
+  onSubmitTeam: () => undefined,
+}
+
+describe('buildRoomSceneBinding', () => {
+  it('returns a loading scene with no actions and no invented room facts', () => {
+    const binding = buildRoomSceneBinding(
+      { kind: 'loading', matchID: 'room-123', numPlayers: null },
+      eventHandlers,
+    )
+
+    expect(binding).toEqual({
+      actions: null,
+      scene: {
+        kind: 'loading',
+        matchID: 'room-123',
+        message: '正在进入房间，请稍候。',
+        playerCount: null,
+        players: [],
+        questProgress: [
+          { failThreshold: null, questIndex: 0, state: 'upcoming', teamSize: null },
+          { failThreshold: null, questIndex: 1, state: 'upcoming', teamSize: null },
+          { failThreshold: null, questIndex: 2, state: 'upcoming', teamSize: null },
+          { failThreshold: null, questIndex: 3, state: 'upcoming', teamSize: null },
+          { failThreshold: null, questIndex: 4, state: 'upcoming', teamSize: null },
+        ],
+      },
+    })
+  })
+
+  it('returns connection recovery instead of phase actions while disconnected', () => {
+    const binding = buildRoomSceneBinding({
+      ...readyInput('teamProposal'),
+      connected: false,
+      manualReconnectAvailable: true,
+    }, eventHandlers)
+
+    expect(binding.scene).toMatchObject({
+      kind: 'connectionRecovery',
+      manualReconnectAvailable: true,
+    })
+    expect(binding.actions).toEqual({ onReconnect: eventHandlers.onReconnect })
+  })
+
+  it('correlates lobby, proposal, and vote scenes with only their own actions', () => {
+    const lobby = buildRoomSceneBinding(readyInput('lobby', { status: 'lobby' }), eventHandlers)
+    const proposal = buildRoomSceneBinding({
+      ...readyInput('teamProposal'),
+      activeStage: 'leader',
+      selectedTeam: ['0', '1'],
+    }, eventHandlers)
+    const vote = buildRoomSceneBinding({
+      ...readyInput('teamVote', {
+        proposedTeam: ['0', '2'],
+        submittedTeamVotePlayerIDs: ['1', '3'],
+      }),
+      selectedTeamVote: 'approve',
+    }, eventHandlers)
+
+    expect(lobby.scene).toMatchObject({
+      kind: 'lobby', occupiedCount: 5, seatCount: 5, viewer: 'owner',
+      canStart: true, startRequestState: 'idle',
+    })
+    expect(Object.keys(lobby.actions ?? {})).toEqual(['onActivatePlayer', 'onStart'])
+    expect(proposal.scene).toMatchObject({
+      kind: 'teamProposal', perspective: 'leader', requiredTeamSize: 2,
+      selectedCount: 2, canSubmit: true, submitRequestState: 'idle',
+    })
+    expect(Object.keys(proposal.actions ?? {})).toEqual(['onActivatePlayer', 'onSubmitTeam'])
+    expect(vote.scene).toMatchObject({
+      kind: 'teamVote', submittedCount: 2, participantCount: 5,
+      view: { kind: 'choosing', selectedVote: 'approve', canChoose: true, submitRequestState: 'idle' },
+    })
+    expect(Object.keys(vote.actions ?? {})).toEqual(['onSelectVote', 'onConfirmVote'])
+    expect(vote.scene.players.find(({ playerID }) => playerID === '1')?.markers).toContainEqual({
+      kind: 'vote', status: 'pending',
+    })
+  })
+
+  it('maps lobby players, proposal observers, and submitted voters to non-authoring views', () => {
+    const lobbyPlayer = buildRoomSceneBinding({
+      ...readyInput('lobby', { status: 'lobby' }), currentPlayerID: '1', canStart: false,
+    }, eventHandlers)
+    const proposalObserver = buildRoomSceneBinding({
+      ...readyInput('teamProposal'), currentPlayerID: '1', activeStage: undefined,
+    }, eventHandlers)
+    const submittedVoter = buildRoomSceneBinding(readyInput('teamVote', {
+      proposedTeam: ['0', '2'],
+      submittedTeamVotePlayerIDs: ['0'],
+      viewer: {
+        role: 'loyal_servant', loyalty: 'good', knownEvilPlayerIDs: [], knownMerlinCandidatePlayerIDs: [],
+        submittedVote: 'reject',
+      },
+    }), eventHandlers)
+
+    expect(lobbyPlayer.scene).toMatchObject({ kind: 'lobby', viewer: 'player', canStart: false })
+    expect(proposalObserver.scene).toMatchObject({
+      kind: 'teamProposal', perspective: 'observer', canSubmit: false,
+    })
+    expect(proposalObserver.scene.players.every(({ interaction }) => interaction.kind === 'none')).toBe(true)
+    expect(submittedVoter.scene).toMatchObject({
+      kind: 'teamVote', view: { kind: 'waiting', submittedVote: 'reject' },
+    })
+  })
+
+  it('maps only viewer-filtered identity-recognition clues and gives nonparticipants no action view', () => {
+    const participant = buildRoomSceneBinding(readyInput('identityRecognition', {
+      identityRecognition: { step: 'merlinRecognition', deadlineAt: 1000, confirmedCount: 0, participantCount: 1 },
+      viewer: {
+        role: 'merlin', loyalty: 'good', knownEvilPlayerIDs: ['3', '4'], knownMerlinCandidatePlayerIDs: [],
+        identityRecognition: { isParticipant: true, confirmed: false, deadlineRefreshRequired: false, serverNow: 0 },
+      },
+    }), eventHandlers)
+    const nonparticipant = buildRoomSceneBinding(readyInput('identityRecognition', {
+      identityRecognition: { step: 'merlinRecognition', deadlineAt: 1000, confirmedCount: 0, participantCount: 1 },
+      viewer: {
+        role: 'loyal_servant', loyalty: 'good', knownEvilPlayerIDs: [], knownMerlinCandidatePlayerIDs: [],
+        identityRecognition: { isParticipant: false, confirmed: false, deadlineRefreshRequired: false, serverNow: 0 },
+      },
+    }), eventHandlers)
+
+    expect(participant.scene).toMatchObject({
+      kind: 'identityRecognition',
+      clue: { kind: 'merlinEvil', targetPlayerIDs: ['3', '4'] },
+      view: 'revealed', confirmRequestState: 'idle',
+    })
+    expect(nonparticipant.scene).toMatchObject({
+      kind: 'identityRecognition', clue: { kind: 'none', targetPlayerIDs: [] }, view: 'waiting',
+    })
+    expect(nonparticipant.scene.players.every((player) => player.portrait.kind === 'playerAvatar')).toBe(true)
+  })
+
+  it('builds Good, Evil, observer, and submitted quest views without offering Good a Fail selection', () => {
+    const common = { proposedTeam: ['0', '1'], submittedQuestCardCount: 1 }
+    const good = buildRoomSceneBinding(readyInput('quest', common), eventHandlers)
+    const evil = buildRoomSceneBinding({
+      ...readyInput('quest', {
+        ...common,
+        viewer: { role: 'minion', loyalty: 'evil', knownEvilPlayerIDs: [], knownMerlinCandidatePlayerIDs: [] },
+      }),
+      currentPlayerID: '1', selectedQuestCard: 'fail',
+    }, eventHandlers)
+    const observer = buildRoomSceneBinding({
+      ...readyInput('quest', common), currentPlayerID: '2', activeStage: undefined,
+    }, eventHandlers)
+    const submitted = buildRoomSceneBinding({
+      ...readyInput('quest', {
+        ...common,
+        viewer: {
+          role: 'minion', loyalty: 'evil', knownEvilPlayerIDs: [], knownMerlinCandidatePlayerIDs: [],
+          submittedQuestCard: 'fail',
+        },
+      }),
+      currentPlayerID: '1',
+    }, eventHandlers)
+
+    expect(good.scene).toMatchObject({
+      kind: 'quest', view: {
+        kind: 'choosing', alignment: 'good', selectedCard: 'success', canChoose: true,
+      },
+    })
+    expect(evil.scene).toMatchObject({
+      kind: 'quest', view: { kind: 'choosing', alignment: 'evil', selectedCard: 'fail', canChoose: true },
+    })
+    expect(observer.scene).toMatchObject({
+      kind: 'quest', view: { kind: 'waiting', participation: 'observer', submittedCard: null },
+    })
+    expect(submitted.scene).toMatchObject({
+      kind: 'quest', view: { kind: 'waiting', participation: 'member', submittedCard: 'fail' },
+    })
+    expect(Object.keys(good.actions ?? {})).toEqual(['onSelectCard', 'onConfirmCard'])
+  })
+
+  it('builds Assassin and observer views and locks target selection while pending', () => {
+    const assassin = buildRoomSceneBinding({
+      ...readyInput('assassination', {
+        goodSuccesses: 3,
+        viewer: { role: 'assassin', loyalty: 'evil', knownEvilPlayerIDs: ['3'], knownMerlinCandidatePlayerIDs: [] },
+      }),
+      activeStage: 'assassin', selectedTarget: '1', assassinationSubmissionPending: true,
+    }, eventHandlers)
+    const observer = buildRoomSceneBinding({
+      ...readyInput('assassination', { goodSuccesses: 3 }),
+      currentPlayerID: '1', activeStage: undefined,
+    }, eventHandlers)
+
+    expect(assassin.scene).toMatchObject({
+      kind: 'assassination', view: {
+        kind: 'selecting', targetPlayerID: '1', canSubmit: false, submitRequestState: 'pending',
+      },
+    })
+    expect(assassin.scene.players.every(({ interaction }) => interaction.kind === 'none')).toBe(true)
+    expect(observer.scene).toMatchObject({
+      kind: 'assassination', view: { kind: 'observing', perspective: 'good' },
+    })
+  })
+
+  it('gives a non-Assassin Evil player only the filtered Evil observer view', () => {
+    const binding = buildRoomSceneBinding({
+      ...readyInput('assassination', {
+        goodSuccesses: 3,
+        viewer: { role: 'minion', loyalty: 'evil', knownEvilPlayerIDs: ['3'], knownMerlinCandidatePlayerIDs: [] },
+      }),
+      currentPlayerID: '3', activeStage: undefined, selectedTarget: '1',
+    }, eventHandlers)
+
+    expect(binding.scene).toMatchObject({
+      kind: 'assassination', view: { kind: 'observing', perspective: 'evil' },
+    })
+    expect(binding.scene.players.every(({ emphasis }) => emphasis !== 'target')).toBe(true)
+  })
+
+  it('uses settled nested quest and assassination results when filtered live input exposes them', () => {
+    const questResult = buildRoomSceneBinding(readyInput('quest', {
+      questIndex: 1,
+      proposedTeam: ['0', '1', '2'],
+      questHistory: [{ questIndex: 1, team: ['0', '1', '2'], successCount: 2, failCount: 1, succeeded: false }],
+    }), eventHandlers)
+    const assassinationResult = buildRoomSceneBinding(readyInput('assassination', {
+      result: { winner: 'good', reason: 'assassination', targetID: '1' },
+      revealedRoles: { '1': 'loyal_servant' },
+    }), eventHandlers)
+
+    expect(questResult.scene).toMatchObject({
+      kind: 'quest', view: { kind: 'result', succeeded: false, successCount: 2, failCount: 1 },
+    })
+    expect(assassinationResult.scene).toMatchObject({
+      kind: 'assassination', view: {
+        kind: 'result', targetPlayerID: '1', targetRole: 'loyal_servant', hit: false, winner: 'good',
+      },
+    })
+  })
+
+  it('builds immutable final seats with settled roles and no process interaction', () => {
+    const binding = buildRoomSceneBinding(readyInput('finished', {
+      status: 'finished',
+      leaderID: '0', proposedTeam: ['0', '1'], submittedTeamVotePlayerIDs: ['2'],
+      result: { winner: 'good', reason: 'assassination', targetID: '2' },
+      revealedRoles: { '0': 'merlin', '1': 'percival', '2': 'loyal_servant', '3': 'assassin', '4': 'morgana' },
+    }), eventHandlers)
+
+    expect(binding.scene).toMatchObject({
+      kind: 'gameResult', winner: 'good', reason: '刺杀未命中：Claire',
+    })
+    expect(binding.actions).toBeNull()
+    expect(binding.scene.players.every((player) => (
+      player.portrait.kind === 'roleArtwork' &&
+      player.caption.kind === 'role' &&
+      player.markers.length === 0 &&
+      player.interaction.kind === 'none'
+    ))).toBe(true)
+  })
+})
+
+describe('useRoomScreenController recognition request lifecycle', () => {
+  it('clears a confirmed request when the server advances to another recognition step', async () => {
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    let controller: ReturnType<typeof useRoomScreenController> | null = null
+    const onConfirmIdentityRecognition = () => undefined
+    const recognitionGame = (step: 'roleReveal' | 'merlinRecognition') => game({
+      identityRecognition: { step, deadlineAt: 1000, confirmedCount: 0, participantCount: step === 'roleReveal' ? 5 : 1 },
+      viewer: {
+        role: 'merlin', loyalty: 'good', knownEvilPlayerIDs: step === 'merlinRecognition' ? ['3', '4'] : [],
+        knownMerlinCandidatePlayerIDs: [],
+        identityRecognition: { isParticipant: true, confirmed: false, deadlineRefreshRequired: false, serverNow: 0 },
+      },
+    })
+    const input = (currentGame: AvalonPlayerView): UseRoomScreenControllerInput => ({
+      activeStage: 'identityRecognition', canStart: false, connected: true,
+      currentPlayerID: '0', game: currentGame, manualReconnectAvailable: false,
+      matchID: room.matchID, onAssassinate: () => undefined, onCastTeamVote: () => undefined,
+      onChangeSeat: () => undefined, onConfirmIdentityRecognition,
+      onPlayQuestCard: () => undefined, onProposeTeam: () => undefined,
+      onReconnect: () => undefined, onStart: () => undefined, phase: 'identityRecognition',
+      room, roomExitBusy: false, seatChangeTargetID: null, startPending: false,
+    })
+    function Harness({ value }: { value: UseRoomScreenControllerInput }) {
+      controller = useRoomScreenController(value)
+      return null
+    }
+
+    await act(async () => root.render(createElement(Harness, { value: input(recognitionGame('roleReveal')) })))
+    if (controller === null || controller.binding.scene.kind !== 'identityRecognition') {
+      throw new Error('Expected identity-recognition controller')
+    }
+    await act(async () => controller?.binding.scene.kind === 'identityRecognition' && controller.binding.actions.onConfirm())
+    expect(controller.binding.scene).toMatchObject({ confirmRequestState: 'pending' })
+
+    await act(async () => root.render(createElement(Harness, { value: input(recognitionGame('merlinRecognition')) })))
+    expect(controller.binding.scene).toMatchObject({
+      kind: 'identityRecognition', confirmRequestState: 'idle',
+      clue: { kind: 'merlinEvil', targetPlayerIDs: ['3', '4'] },
+    })
+
+    await act(async () => root.unmount())
+    container.remove()
+  })
+
+  it('clears a synchronous identity submission failure and reports it to the outer owner', async () => {
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    let controller: ReturnType<typeof useRoomScreenController> | null = null
+    const submissionError = new Error('client unavailable')
+    const onIdentityRecognitionSubmissionError = vi.fn()
+    const input: UseRoomScreenControllerInput = {
+      activeStage: 'identityRecognition', canStart: false, connected: true,
+      currentPlayerID: '0', game: game({
+        identityRecognition: { step: 'roleReveal', deadlineAt: 1000, confirmedCount: 0, participantCount: 5 },
+        viewer: {
+          role: 'merlin', loyalty: 'good', knownEvilPlayerIDs: [], knownMerlinCandidatePlayerIDs: [],
+          identityRecognition: { isParticipant: true, confirmed: false, deadlineRefreshRequired: false, serverNow: 0 },
+        },
+      }),
+      manualReconnectAvailable: false, matchID: room.matchID,
+      onAssassinate: () => undefined, onCastTeamVote: () => undefined,
+      onChangeSeat: () => undefined, onConfirmIdentityRecognition: () => { throw submissionError },
+      onIdentityRecognitionSubmissionError,
+      onPlayQuestCard: () => undefined, onProposeTeam: () => undefined,
+      onReconnect: () => undefined, onStart: () => undefined, phase: 'identityRecognition',
+      room, roomExitBusy: false, seatChangeTargetID: null, startPending: false,
+    }
+    function Harness() {
+      controller = useRoomScreenController(input)
+      return null
+    }
+
+    await act(async () => root.render(createElement(Harness)))
+    if (controller === null || controller.binding.scene.kind !== 'identityRecognition') {
+      throw new Error('Expected identity-recognition controller')
+    }
+    await act(async () => controller?.binding.scene.kind === 'identityRecognition' && controller.binding.actions.onConfirm())
+
+    expect(onIdentityRecognitionSubmissionError).toHaveBeenCalledWith(submissionError)
+    expect(controller.binding.scene).toMatchObject({ confirmRequestState: 'idle' })
+
+    await act(async () => root.unmount())
+    container.remove()
+  })
+})
 
 describe('buildRoomScreenModel', () => {
   it('cleans process state from a settled public role presentation', () => {

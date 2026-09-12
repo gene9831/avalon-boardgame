@@ -729,9 +729,9 @@ describe('RoomView playing layout', () => {
     expect(html).toContain('data-stage-layout-status="measuring"')
     expect(html).toContain('aria-label="五次任务进度"')
     expect(html).toContain('data-room-shell-variant="game"')
-    expect(html.match(/data-room-screen="true"/g)).toHaveLength(1)
+    expect(html.match(/data-room-scene="teamProposal"/g)).toHaveLength(1)
     expect(html.match(/data-room-stage="true"/g)).toHaveLength(1)
-    expect(html).toContain('data-room-mode="teamProposal"')
+    expect(html).not.toContain('data-room-mode=')
     expect(html).toContain('请选择 <strong class="text-amber-200">2 名玩家</strong>')
     expect(html).toContain('已选 <strong class="text-cyan-200">0 / 2</strong>')
     expect(html).toContain('aria-label="确认队伍"')
@@ -754,10 +754,56 @@ describe('RoomView playing layout', () => {
       },
     })
 
-    expect(html.match(/data-room-screen="true"/g)).toHaveLength(1)
-    expect(html).toContain('data-room-mode="lobby"')
+    expect(html.match(/data-room-scene="lobby"/g)).toHaveLength(1)
+    expect(html).not.toContain('data-room-mode=')
     expect(html).toContain('>开始游戏<')
     expect(html).toContain('aria-label="打开帮助说明"')
+  })
+
+  it('keeps lobby room actions in the complete toolbar during connection recovery', () => {
+    const state = lobbyGameState()!
+    state.isConnected = false
+    const html = renderRoomView({ gameState: state, room: fullRoom() })
+
+    expect(html).toContain('data-room-scene="connectionRecovery"')
+    expect(html).toContain('data-room-toolbar-item="room"')
+  })
+
+  it('composes exactly one back control and one complete toolbar outside the observed scene', () => {
+    const html = renderRoomView({ gameState: playingGameState(), room: fullRoom() })
+
+    expect(html.match(/aria-label="返回主页"/g)).toHaveLength(1)
+    expect(html.match(/aria-label="房间工具"/g)).toHaveLength(1)
+    expect(html).toContain('font-sans')
+  })
+
+  it('keeps live role-reveal identity recognition filtered to its participant', () => {
+    const state = playingGameState()!
+    state.ctx.phase = 'identityRecognition'
+    state.ctx.activePlayers = { '0': 'identityRecognition' }
+    state.G.identityRecognition = {
+      step: 'roleReveal', deadlineAt: 1000, confirmedCount: 0, participantCount: 5,
+    }
+    state.G.viewer.identityRecognition = {
+      isParticipant: true, confirmed: false, deadlineRefreshRequired: false, serverNow: 0,
+    }
+    const participant = renderRoomView({ gameState: state, room: fullRoom() }, true)
+
+    state.G.viewer = {
+      role: null, loyalty: null, knownEvilPlayerIDs: [], knownMerlinCandidatePlayerIDs: [],
+      identityRecognition: {
+        isParticipant: false, confirmed: false, deadlineRefreshRequired: false, serverNow: 0,
+      },
+    }
+    const nonparticipant = renderRoomView({ gameState: state, room: fullRoom() }, true)
+
+    expect(participant).toContain('data-room-scene="identityRecognition"')
+    expect(participant).toContain('data-role-avatar="merlin"')
+    expect(participant).toContain('>我已了解<')
+    expect(nonparticipant).toContain('data-room-scene="identityRecognition"')
+    expect(nonparticipant).not.toContain('data-role-avatar=')
+    expect(nonparticipant).not.toContain('>我已了解<')
+    expect(nonparticipant).not.toContain('>我已辨认<')
   })
 
   it('marks only the requested empty seat as pending during a seat change', () => {
@@ -777,7 +823,7 @@ describe('RoomView playing layout', () => {
     expect(html.match(/data-seat-state="pending"/g)).toHaveLength(1)
   })
 
-  it('shows the owner that a full-room start request is pending', () => {
+  it('keeps the original start label while the pending request disables it', () => {
     const html = renderRoomView({
       gameState: lobbyGameState(),
       room: fullRoom(),
@@ -785,6 +831,7 @@ describe('RoomView playing layout', () => {
       startPending: true,
     })
 
-    expect(html).toContain('正在开始…')
+    expect(html).toContain('>开始游戏<')
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>开始游戏<\/button>/)
   })
 })
