@@ -1,7 +1,11 @@
 import type { PlayerID } from '@avalon/game'
 
 import type { RoomIdentityRecognitionPresentation } from './RoomIdentityRecognition'
-import type { RoomPlayerPresentation } from './room-screen-props'
+import type {
+  RoomIdentityClue,
+  RoomIdentityRecognitionScene,
+  RoomPlayerPresentation,
+} from './room-screen-props'
 
 export type RoomPlayerSeatRecognition =
   | Readonly<{ state: 'dimmed' }>
@@ -13,48 +17,55 @@ export type RoomPlayerSeatRecognition =
     }>
 
 const TARGET_MARKERS = {
-  'evil-allies': { label: '同伴', state: 'target', tone: 'ally' },
-  'merlin-evil': { label: '邪恶', state: 'target', tone: 'evil' },
-  'percival-candidates': { label: '候选人', state: 'target', tone: 'candidate' },
-} as const satisfies Record<
-  Exclude<RoomIdentityRecognitionPresentation['scene']['type'], 'none'>,
-  RoomPlayerSeatRecognition
->
+  evilAllies: { label: '同伴', state: 'target', tone: 'ally' },
+  merlinEvil: { label: '邪恶', state: 'target', tone: 'evil' },
+  percivalCandidates: { label: '候选人', state: 'target', tone: 'candidate' },
+} as const satisfies Record<Exclude<RoomIdentityClue['kind'], 'none'>, RoomPlayerSeatRecognition>
+
+type RecognitionSeatScene = Pick<RoomIdentityRecognitionScene, 'clue' | 'view'>
 
 export function getRoomIdentityRecognitionSeat(
-  presentation: RoomIdentityRecognitionPresentation,
+  scene: RecognitionSeatScene,
   playerID: PlayerID,
   isCurrentPlayer: boolean,
 ): RoomPlayerSeatRecognition | undefined {
-  if (presentation.state === 'waiting') return undefined
+  if (scene.view === 'waiting') return undefined
   if (isCurrentPlayer) return { label: '你', state: 'self' }
 
-  const cluesVisible = presentation.state === 'revealing' ||
-    presentation.state === 'revealed' ||
-    presentation.state === 'confirming'
+  const cluesVisible = scene.view === 'revealing' || scene.view === 'revealed'
   if (
     cluesVisible &&
-    presentation.scene.type !== 'none' &&
-    presentation.scene.targetPlayerIDs.includes(playerID)
+    scene.clue.kind !== 'none' &&
+    scene.clue.targetPlayerIDs.includes(playerID)
   ) {
-    return TARGET_MARKERS[presentation.scene.type]
+    return TARGET_MARKERS[scene.clue.kind]
   }
 
   return { state: 'dimmed' }
 }
 
 export function applyRoomIdentityRecognitionSeat(
-  presentation: RoomIdentityRecognitionPresentation,
+  scene: RecognitionSeatScene,
   player: RoomPlayerPresentation,
 ): RoomPlayerPresentation {
-  const recognition = getRoomIdentityRecognitionSeat(
-    presentation,
-    player.playerID,
-    player.isCurrentPlayer,
-  )
-  if (recognition === undefined) return player
+  const recognition = getRoomIdentityRecognitionSeat(scene, player.playerID, player.isCurrentPlayer)
+  if (recognition === undefined) {
+    return {
+      ...player,
+      caption: { kind: 'none' },
+      emphasis: 'default',
+      interaction: { kind: 'none' },
+      markers: [],
+    }
+  }
   if (recognition.state === 'dimmed') {
-    return { ...player, caption: { kind: 'none' }, emphasis: 'dimmed' }
+    return {
+      ...player,
+      caption: { kind: 'none' },
+      emphasis: 'dimmed',
+      interaction: { kind: 'none' },
+      markers: [],
+    }
   }
   return {
     ...player,
@@ -63,5 +74,25 @@ export function applyRoomIdentityRecognitionSeat(
       label: recognition.label,
       tone: recognition.state === 'self' ? 'self' : recognition.tone,
     },
+    emphasis: recognition.state === 'target' ? 'target' : 'default',
+    interaction: { kind: 'none' },
+    markers: [],
   }
+}
+
+/** Temporary adapter for the pre-Task-6 RoomScreen entry path. */
+export function applyLegacyRoomIdentityRecognitionSeat(
+  presentation: RoomIdentityRecognitionPresentation,
+  player: RoomPlayerPresentation,
+): RoomPlayerPresentation {
+  const clue = (() => {
+    switch (presentation.scene.type) {
+      case 'evil-allies': return { kind: 'evilAllies', targetPlayerIDs: presentation.scene.targetPlayerIDs } as const
+      case 'merlin-evil': return { kind: 'merlinEvil', targetPlayerIDs: presentation.scene.targetPlayerIDs } as const
+      case 'percival-candidates': return { kind: 'percivalCandidates', targetPlayerIDs: presentation.scene.targetPlayerIDs } as const
+      case 'none': return { kind: 'none', targetPlayerIDs: presentation.scene.targetPlayerIDs } as const
+    }
+  })()
+  const view = presentation.state === 'confirming' ? 'revealed' : presentation.state
+  return applyRoomIdentityRecognitionSeat({ clue, view }, player)
 }

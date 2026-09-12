@@ -1,96 +1,127 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
+import type { PlayerSeatLayout } from '@avalon/ui-layout'
 
-import {
-  RoomIdentityRecognitionCenter,
-  RoomIdentityRecognitionPhaseContent,
-  RoomIdentityRecognitionStage,
-  type RoomIdentityRecognitionPresentation,
-} from '../src/RoomIdentityRecognition'
-import { getRoomIdentityRecognitionSeat } from '../src/room-identity-recognition-seat'
+import { RoomIdentityRecognitionScene } from '../src/RoomIdentityRecognitionScene'
+import type {
+  RoomActionsByKind,
+  RoomIdentityClue,
+  RoomIdentityRecognitionScene as RoomIdentityRecognitionSceneData,
+  RoomPlayerPresentation,
+} from '../src/room-screen-props'
 
-function presentation(
-  state: RoomIdentityRecognitionPresentation['state'],
-): RoomIdentityRecognitionPresentation {
+const players: readonly RoomPlayerPresentation[] = ['0', '1', '2'].map((playerID, relativeSeatIndex) => ({
+  playerID, relativeSeatIndex, seatNumber: relativeSeatIndex + 1,
+  name: ['Alice', 'Bob', 'Carol'][relativeSeatIndex], occupied: true, isCurrentPlayer: playerID === '2',
+  portrait: { kind: 'playerAvatar', avatarID: 'merlin', connected: true },
+  markers: playerID === '0' ? [{ kind: 'knownEvil' }] : [],
+  caption: { kind: 'none' }, emphasis: playerID === '0' ? 'knownEvil' : 'default',
+  interaction: playerID === '1'
+    ? { kind: 'selectTeam', disabled: false, selected: false }
+    : { kind: 'none' },
+}))
+
+const playerSeats: readonly PlayerSeatLayout[] = players.map((player) => ({
+  relativeSeatIndex: player.relativeSeatIndex,
+  playerSeatBounds: { x: player.relativeSeatIndex * 100, y: 0, width: 92, height: 88 },
+  playerBoundaryCircle: { center: { x: player.relativeSeatIndex * 100 + 46, y: 34 }, radius: 46 },
+  avatarRect: { x: player.relativeSeatIndex * 100 + 22, y: 10, width: 48, height: 48 },
+  nameRect: { x: player.relativeSeatIndex * 100, y: 64, width: 92, height: 22 }, avatarTopClearance: 10,
+}))
+
+const actions = (): RoomActionsByKind['identityRecognition'] => ({
+  onConfirm: vi.fn(), onReveal: vi.fn(), onRevealComplete: vi.fn(),
+})
+
+function scene(
+  view: RoomIdentityRecognitionSceneData['view'],
+  clue: RoomIdentityClue = { kind: 'merlinEvil', targetPlayerIDs: ['0'] },
+  confirmRequestState: RoomIdentityRecognitionSceneData['confirmRequestState'] = 'idle',
+): RoomIdentityRecognitionSceneData {
   return {
-    confirmedCount: 3,
-    onConfirm: vi.fn(),
-    onReveal: vi.fn(),
-    onRevealComplete: vi.fn(),
-    participantCount: 5,
-    scene: { type: 'merlin-evil', targetPlayerIDs: ['0', '4'] },
-    state,
+    kind: 'identityRecognition', matchID: 'ABC123456', playerCount: 3, players, questProgress: [],
+    clue, view, confirmedCount: view === 'waiting' ? 3 : 1, participantCount: 5, confirmRequestState,
   }
 }
 
-describe('RoomIdentityRecognition', () => {
-  it('locks the reveal control until the clue transition finishes', () => {
-    const revealing = presentation('revealing')
-    const revealingAction = renderToStaticMarkup(
-      <>{RoomIdentityRecognitionPhaseContent({ presentation: revealing }).action}</>,
-    )
+function renderScene(
+  view: RoomIdentityRecognitionSceneData['view'],
+  clue?: RoomIdentityClue,
+  confirmRequestState: RoomIdentityRecognitionSceneData['confirmRequestState'] = 'idle',
+) {
+  return renderToStaticMarkup(
+    <RoomIdentityRecognitionScene
+      actions={actions()}
+      geometry={{ stageLayout: {
+        status: 'ready', shape: 'circle', tabletop: { x: 0, y: 0, width: 300, height: 300 },
+        centerPanel: { x: 74, y: 74, width: 152, height: 152 }, playerSeats,
+      } }}
+      scene={scene(view, clue, confirmRequestState)}
+      slots={{ back: null, toolbar: null }}
+    />,
+  )
+}
 
-    expect(revealingAction).toContain('查看线索')
-    expect(revealingAction).toContain('disabled=""')
-    expect(revealingAction).not.toContain('我已辨认')
+describe('RoomIdentityRecognitionScene', () => {
+  it('locks the reveal control until the clue transition finishes', () => {
+    const html = renderScene('revealing')
+
+    expect(html).toContain('查看线索')
+    expect(html).toContain('disabled=""')
+    expect(html).not.toContain('我已辨认')
   })
 
   it('uses a decorative night atmosphere instead of a content overlay', () => {
-    const revealed = renderToStaticMarkup(
-      <RoomIdentityRecognitionStage presentation={presentation('revealed')} />,
-    )
-    const waiting = renderToStaticMarkup(
-      <RoomIdentityRecognitionStage presentation={presentation('waiting')} />,
-    )
+    const html = renderScene('revealed')
 
-    expect(revealed).toContain('aria-hidden="true"')
-    expect(revealed).toContain('data-identity-recognition-atmosphere="revealed"')
-    expect(revealed).not.toContain('身份辨认幕布')
-    expect(waiting).toBe('')
+    expect(html).toContain('aria-hidden="true"')
+    expect(html).toContain('data-identity-recognition-atmosphere="revealed"')
+    expect(html).not.toContain('身份辨认幕布')
   })
 
-  it('maps only supplied target IDs onto recognition seat states', () => {
-    const current = presentation('revealed')
+  it('maps only supplied target IDs onto normalized recognition seats', () => {
+    const html = renderScene('revealed')
 
-    expect(getRoomIdentityRecognitionSeat(current, '0', false)).toEqual({ label: '邪恶', state: 'target', tone: 'evil' })
-    expect(getRoomIdentityRecognitionSeat(current, '2', true)).toEqual({ label: '你', state: 'self' })
-    expect(getRoomIdentityRecognitionSeat(current, '1', false)).toEqual({ state: 'dimmed' })
+    expect(html).toMatch(/data-player-id="0"[^>]*data-recognition-seat-state="target"[^>]*data-recognition-tone="evil"/)
+    expect(html).toMatch(/data-player-id="2"[^>]*data-recognition-seat-state="self"[^>]*data-recognition-tone="self"/)
+    expect(html).toMatch(/data-player-id="1"[^>]*data-recognition-seat-state="dimmed"/)
+    expect(html).toContain('>邪恶</span>')
+    expect(html).toContain('>你</span>')
   })
 
-  it('keeps visible clues on screen while confirmation is pending', () => {
-    const revealed = presentation('revealed')
-    const revealedPhase = RoomIdentityRecognitionPhaseContent({ presentation: revealed })
-    const revealedMiddle = renderToStaticMarkup(<>{revealedPhase.middle}</>)
-    const revealedAction = renderToStaticMarkup(<>{revealedPhase.action}</>)
-    const confirming = presentation('confirming')
-    const confirmingCenter = renderToStaticMarkup(
-      <RoomIdentityRecognitionCenter presentation={confirming} />,
-    )
-    const confirmingAction = renderToStaticMarkup(
-      <>{RoomIdentityRecognitionPhaseContent({ presentation: confirming }).action}</>,
-    )
+  it('removes preexisting seat interactions from the private recognition scene', () => {
+    const html = renderScene('revealed')
 
-    expect(revealedMiddle).toContain('2 名邪恶玩家')
-    expect(revealedAction).toContain('我已辨认')
-    expect(revealedAction).not.toContain('暂时隐藏线索')
-    expect(revealedAction.match(/<button/g)).toHaveLength(1)
-    expect(confirmingCenter).toContain('奥术视野')
-    expect(confirmingAction).toContain('正在确认…')
-    expect(confirmingAction.match(/disabled=""/g)).toHaveLength(1)
+    expect(html).toContain('data-player-id="1"')
+    expect(html).toContain('>Bob</span>')
+    expect(html).not.toMatch(/<button[^>]*data-player-id="1"/)
   })
 
-  it('clears private clues before showing aggregate waiting progress', () => {
-    const current = presentation('waiting')
-    const center = renderToStaticMarkup(
-      <RoomIdentityRecognitionCenter presentation={current} />,
-    )
-    const phase = RoomIdentityRecognitionPhaseContent({ presentation: current })
-    const phaseTitle = renderToStaticMarkup(<>{phase.title}</>)
-    const phaseAction = renderToStaticMarkup(<>{phase.action}</>)
+  it('keeps the original target clue and label while confirmation is pending', () => {
+    const html = renderScene('revealed', undefined, 'pending')
 
-    expect(center).toMatch(/3 \/ 5.*玩家已完成辨认.*等待其他玩家/s)
-    expect(center).not.toContain('奥术视野')
-    expect(phaseTitle).toContain('等待其他玩家')
-    expect(phaseAction).toBe('')
+    expect(html).toContain('奥术视野')
+    expect(html).toContain('1 名邪恶玩家')
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>我已辨认<\/button>/)
+    expect(html).not.toContain('正在确认')
+  })
+
+  it('keeps the no-clue confirmation label while the request is pending', () => {
+    const html = renderScene('revealed', { kind: 'none', targetPlayerIDs: [] }, 'pending')
+
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>我已了解<\/button>/)
+    expect(html).not.toContain('正在确认')
+  })
+
+  it('clears every private clue before showing aggregate waiting progress', () => {
+    const html = renderScene('waiting')
+
+    expect(html).toMatch(/3 \/ 5.*玩家已完成辨认.*等待其他玩家/s)
+    expect(html).not.toContain('奥术视野')
+    expect(html).not.toContain('data-identity-recognition-label')
+    expect(html).not.toContain('data-recognition-seat-state="target"')
+    expect(html).not.toContain('data-identity-recognition-atmosphere')
+    expect(html).not.toContain('已知阵营信息')
+    expect(html).not.toContain('data-avatar-state="known-evil"')
   })
 })

@@ -1,121 +1,161 @@
+import { readFileSync } from 'node:fs'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
+import type { PlayerSeatLayout } from '@avalon/ui-layout'
 
-import {
-  RoomIdentityConfirmationPhaseContent,
-  RoomIdentityConfirmationStage,
-  type RoomIdentityConfirmationPresentation,
-} from '../src/RoomIdentityConfirmation'
+import { RoomIdentityConfirmationScene } from '../src/RoomIdentityConfirmationScene'
+import type {
+  RoomActionsByKind,
+  RoomIdentityConfirmationScene as RoomIdentityConfirmationSceneData,
+} from '../src/room-screen-props'
 
-function presentation(
-  state: RoomIdentityConfirmationPresentation['state'],
-): RoomIdentityConfirmationPresentation {
+const interactivePlayer = {
+  playerID: '0', relativeSeatIndex: 0, seatNumber: 1, name: 'Alice', occupied: true,
+  isCurrentPlayer: true,
+  portrait: { kind: 'playerAvatar', avatarID: 'merlin', connected: true },
+  markers: [], caption: { kind: 'none' }, emphasis: 'selected',
+  interaction: { kind: 'selectTeam', disabled: false, selected: true },
+} as const satisfies RoomIdentityConfirmationSceneData['players'][number]
+
+const interactivePlayerSeat: PlayerSeatLayout = {
+  relativeSeatIndex: 0,
+  playerSeatBounds: { x: 0, y: 0, width: 92, height: 88 },
+  playerBoundaryCircle: { center: { x: 46, y: 34 }, radius: 46 },
+  avatarRect: { x: 22, y: 10, width: 48, height: 48 },
+  nameRect: { x: 0, y: 64, width: 92, height: 22 }, avatarTopClearance: 10,
+}
+
+const actions = (): RoomActionsByKind['identityConfirmation'] => ({
+  onCloseReview: vi.fn(),
+  onConfirm: vi.fn(),
+  onHide: vi.fn(),
+  onHideComplete: vi.fn(),
+  onReveal: vi.fn(),
+  onRevealComplete: vi.fn(),
+  onReview: vi.fn(),
+})
+
+function scene(
+  view: RoomIdentityConfirmationSceneData['view'],
+  confirmRequestState: RoomIdentityConfirmationSceneData['confirmRequestState'] = 'idle',
+): RoomIdentityConfirmationSceneData {
   return {
-    confirmedCount: 1,
-    onCloseReview: vi.fn(),
-    onConfirm: vi.fn(),
-    onHide: vi.fn(),
-    onHideComplete: vi.fn(),
-    onReveal: vi.fn(),
-    onRevealComplete: vi.fn(),
-    onReview: vi.fn(),
-    participantCount: 5,
-    role: 'merlin',
-    state,
+    kind: 'identityConfirmation', matchID: 'ABC123456', playerCount: 5, players: [], questProgress: [],
+    role: 'merlin', view, confirmedCount: view === 'waiting' ? 3 : 1, participantCount: 5,
+    confirmRequestState,
   }
 }
 
-describe('RoomIdentityConfirmation', () => {
-  it('reveals the complete private role summary without releasing recognition knowledge', () => {
-    const current = presentation('revealed')
-    const stage = renderToStaticMarkup(
-      <RoomIdentityConfirmationStage presentation={current} />,
-    )
-    const phase = RoomIdentityConfirmationPhaseContent({ presentation: current })
-    const phaseAction = renderToStaticMarkup(<>{phase.action}</>)
+function renderScene(
+  view: RoomIdentityConfirmationSceneData['view'],
+  confirmRequestState: RoomIdentityConfirmationSceneData['confirmRequestState'] = 'idle',
+) {
+  return renderToStaticMarkup(
+    <RoomIdentityConfirmationScene
+      actions={actions()}
+      geometry={{ stageLayout: {
+        status: 'ready', shape: 'circle', tabletop: { x: 0, y: 0, width: 300, height: 300 },
+        centerPanel: { x: 74, y: 74, width: 152, height: 152 }, playerSeats: [],
+      } }}
+      scene={scene(view, confirmRequestState)}
+      slots={{ back: null, toolbar: null }}
+    />,
+  )
+}
 
-    expect(stage).toContain('data-identity-confirmation-stage="revealed"')
-    expect(stage).toContain('data-identity-role-artwork="merlin"')
-    expect(stage).toContain('梅林')
-    expect(stage).toContain('正义阵营')
-    expect(stage).toContain('你的目标')
-    expect(stage).toContain('角色能力')
-    expect(stage).toContain('行动提示')
-    expect(stage).not.toContain('你知道的玩家')
-    expect(`${stage}${phaseAction}`).not.toContain('仅你可见')
-    expect(phaseAction).toContain('暂时隐藏')
-    expect(phaseAction).toContain('我已记住身份')
+describe('RoomIdentityConfirmationScene', () => {
+  it('keeps the private role absent until the viewer explicitly reveals it', () => {
+    const html = renderScene('concealed')
+
+    expect(html).toContain('data-room-scene="identityConfirmation"')
+    expect(html).toContain('aria-label="揭示身份"')
+    expect(html).toContain('请确保其他玩家无法看到你的屏幕')
+    expect(html).not.toContain('data-identity-role-artwork')
+    expect(html).not.toContain('梅林')
   })
 
-  it('keeps the concealed phase controls while the role card is revealing', () => {
-    const current = presentation('revealing')
-    const stage = renderToStaticMarkup(
-      <RoomIdentityConfirmationStage presentation={current} />,
+  it('removes preexisting seat interactions from the private confirmation scene', () => {
+    const current = { ...scene('concealed'), players: [interactivePlayer] }
+    const html = renderToStaticMarkup(
+      <RoomIdentityConfirmationScene
+        actions={actions()}
+        geometry={{ stageLayout: {
+          status: 'ready', shape: 'circle', tabletop: { x: 0, y: 0, width: 300, height: 300 },
+          centerPanel: { x: 74, y: 74, width: 152, height: 152 }, playerSeats: [interactivePlayerSeat],
+        } }}
+        scene={current}
+        slots={{ back: null, toolbar: null }}
+      />,
     )
-    const phase = RoomIdentityConfirmationPhaseContent({ presentation: current })
-    const phaseTitle = renderToStaticMarkup(<>{phase.title}</>)
-    const phaseAction = renderToStaticMarkup(<>{phase.action}</>)
 
-    expect(stage).toContain('data-identity-card-motion="revealing"')
-    expect(stage).toContain('data-identity-role-artwork="merlin"')
-    expect(phaseTitle).toContain('确认你的身份')
-    expect(phaseAction).toContain('disabled=""')
-    expect(phaseAction).not.toContain('我已记住身份')
+    expect(html).toContain('data-player-id="0"')
+    expect(html).toContain('>Alice</span>')
+    expect(html).not.toMatch(/<button[^>]*data-player-id="0"/)
   })
 
-  it('keeps the revealed phase controls while the role card is hiding', () => {
-    const current = presentation('hiding')
-    const stage = renderToStaticMarkup(
-      <RoomIdentityConfirmationStage presentation={current} />,
-    )
-    const phase = RoomIdentityConfirmationPhaseContent({ presentation: current })
-    const phaseTitle = renderToStaticMarkup(<>{phase.title}</>)
-    const phaseAction = renderToStaticMarkup(<>{phase.action}</>)
+  it('reveals the complete private role card without recognition knowledge', () => {
+    const html = renderScene('revealed')
 
-    expect(stage).toContain('data-identity-card-motion="hiding"')
-    expect(stage).toContain('data-identity-role-artwork="merlin"')
-    expect(phaseTitle).toContain('记住你的身份')
-    expect(phaseAction.match(/disabled=""/g)).toHaveLength(2)
+    expect(html).toContain('data-identity-role-artwork="merlin"')
+    expect(html).toContain('梅林')
+    expect(html).toContain('正义阵营')
+    expect(html).toContain('你的目标')
+    expect(html).toContain('角色能力')
+    expect(html).toContain('行动提示')
+    expect(html).not.toContain('你知道的玩家')
+    expect(html).toContain('暂时隐藏')
+    expect(html).toContain('我已记住身份')
   })
 
-  it('returns to the unobstructed round table after the viewer confirms', () => {
-    const current = { ...presentation('waiting'), confirmedCount: 3 }
-    const stage = renderToStaticMarkup(
-      <RoomIdentityConfirmationStage presentation={current} />,
-    )
-    const phase = RoomIdentityConfirmationPhaseContent({ presentation: current })
-    const phaseMiddle = renderToStaticMarkup(<>{phase.middle}</>)
-    const phaseAction = renderToStaticMarkup(<>{phase.action}</>)
+  it('keeps the fixed role card separate from independently scrolling details', () => {
+    const html = renderScene('revealed')
+    const css = readFileSync(new URL('../src/RoomIdentityConfirmation.css', import.meta.url), 'utf8')
 
-    expect(stage).toBe('')
-    expect(phaseMiddle).toContain('你的身份已确认')
-    expect(phaseAction).toContain('再次查看身份')
+    expect(html).toMatch(/identity-confirmation-card-motion.*identity-confirmation-details-slot/s)
+    expect(css).toMatch(/\.identity-confirmation-card-motion\s*\{[^}]*position:\s*absolute;/s)
+    expect(css).toMatch(/\.identity-confirmation-details\s*\{[^}]*overflow-y:\s*auto;/s)
+  })
+
+  it('keeps the concealed controls while the role card is revealing', () => {
+    const html = renderScene('revealing')
+
+    expect(html).toContain('data-identity-card-motion="revealing"')
+    expect(html).toContain('data-identity-role-artwork="merlin"')
+    expect(html).toContain('确认你的身份')
+    expect(html).toContain('disabled=""')
+    expect(html).not.toContain('我已记住身份')
+  })
+
+  it('keeps the revealed controls while the role card is hiding', () => {
+    const html = renderScene('hiding')
+
+    expect(html).toContain('data-identity-card-motion="hiding"')
+    expect(html).toContain('data-identity-role-artwork="merlin"')
+    expect(html).toContain('记住你的身份')
+    expect(html.match(/disabled=""/g)).toHaveLength(2)
+  })
+
+  it('shows aggregate confirmation progress in the table center while waiting', () => {
+    const html = renderScene('waiting')
+
+    expect(html).toMatch(/3 \/ 5.*玩家已确认身份.*等待其他玩家确认/s)
+    expect(html).not.toContain('data-identity-role-artwork')
+    expect(html).toContain('再次查看身份')
   })
 
   it('reopens a confirmed identity for review without offering confirmation again', () => {
-    const current = presentation('reviewing')
-    const stage = renderToStaticMarkup(
-      <RoomIdentityConfirmationStage presentation={current} />,
-    )
-    const phase = RoomIdentityConfirmationPhaseContent({ presentation: current })
-    const phaseAction = renderToStaticMarkup(<>{phase.action}</>)
+    const html = renderScene('reviewing')
 
-    expect(stage).toContain('data-identity-confirmation-stage="reviewing"')
-    expect(stage).toContain('data-identity-role-artwork="merlin"')
-    expect(phaseAction).toContain('收起身份')
-    expect(phaseAction).not.toContain('我已记住身份')
+    expect(html).toContain('data-identity-role-artwork="merlin"')
+    expect(html).toContain('收起身份')
+    expect(html).not.toContain('我已记住身份')
   })
 
-  it('keeps the identity visible while the confirmation request is pending', () => {
-    const current = presentation('confirming')
-    const stage = renderToStaticMarkup(
-      <RoomIdentityConfirmationStage presentation={current} />,
-    )
-    const phase = RoomIdentityConfirmationPhaseContent({ presentation: current })
-    const phaseAction = renderToStaticMarkup(<>{phase.action}</>)
+  it('keeps the original confirmation label while only the request is pending', () => {
+    const html = renderScene('revealed', 'pending')
 
-    expect(stage).toContain('data-identity-role-artwork="merlin"')
-    expect(phaseAction).toContain('正在确认…')
-    expect(phaseAction.match(/disabled=""/g)).toHaveLength(2)
+    expect(html).toContain('data-identity-role-artwork="merlin"')
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>我已记住身份<\/button>/)
+    expect(html).not.toContain('正在确认')
   })
 })

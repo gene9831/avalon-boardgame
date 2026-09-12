@@ -1,3 +1,13 @@
+[data-room-scene='identityRecognition'] .avalon-room-layout__stage-accessory {
+  z-index: 30;
+  inset: var(--room-layout-stage-margin);
+  width: auto;
+  height: auto;
+  max-width: 744px;
+  max-height: 800px;
+  margin: auto;
+}
+
 [data-identity-recognition-state] [data-seat-decoration],
 [data-identity-recognition-state] [data-seat-disconnected-badge='true'] {
   display: none;

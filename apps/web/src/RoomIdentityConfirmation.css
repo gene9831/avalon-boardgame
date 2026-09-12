@@ -1,3 +1,17 @@
+.identity-confirmation-layer {
+  pointer-events: auto;
+}
+
+[data-room-scene='identityConfirmation'] .avalon-room-layout__stage-accessory {
+  z-index: 40;
+  inset: var(--room-layout-stage-margin);
+  width: auto;
+  height: auto;
+  max-width: 744px;
+  max-height: 800px;
+  margin: auto;
+}
+
 .identity-confirmation-layer::before {
   position: absolute;
   inset: -20px;

@@ -25,7 +25,7 @@ describe('RoomIdentityConfirmationPreview', () => {
   it.each([
     ['concealed', '确认你的身份', 'aria-label="揭示身份"'],
     ['revealed', '记住你的身份', 'data-identity-role-artwork="merlin"'],
-    ['confirming', '记住你的身份', '正在确认…'],
+    ['confirming', '记住你的身份', '我已记住身份'],
     ['waiting', '等待其他玩家', '再次查看身份'],
   ])('renders the %s scenario through the shared room screen', (scenarioID, title, expectedMarkup) => {
     const html = renderPreview(`/dev/room-layout/identity-confirmation/${scenarioID}`)
@@ -34,6 +34,10 @@ describe('RoomIdentityConfirmationPreview', () => {
     expect(html).toContain(`data-identity-confirmation-state="${scenarioID}"`)
     expect(html).toContain(title)
     expect(html).toContain(expectedMarkup)
+    if (scenarioID === 'confirming') {
+      expect(html).toContain('disabled=""')
+      expect(html).not.toContain('正在确认')
+    }
   })
 
   it('does not render an intermediate identity confirmation index', () => {

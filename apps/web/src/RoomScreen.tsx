@@ -22,7 +22,7 @@ import {
   RoomIdentityRecognitionStage,
   type RoomIdentityRecognitionPresentation,
 } from './RoomIdentityRecognition'
-import { applyRoomIdentityRecognitionSeat } from './room-identity-recognition-seat'
+import { applyLegacyRoomIdentityRecognitionSeat } from './room-identity-recognition-seat'
 import { RoomPlayerSeat } from './RoomPlayerSeat'
 import { RoomStage } from './RoomStage'
 import { RoomUtilities, type RoomUtilityTools } from './RoomUtilities'
@@ -97,7 +97,7 @@ export function RoomScreen({ model, actions, diagnosticsMode, identityConfirmati
                     onActivate={() => actions.onActivatePlayer(player.playerID)}
                     player={identityRecognition === undefined
                       ? player
-                      : applyRoomIdentityRecognitionSeat(identityRecognition, player)}
+                      : applyLegacyRoomIdentityRecognitionSeat(identityRecognition, player)}
                   />
                 )}
               />
