@@ -5,15 +5,15 @@ import type {
   RoundTableStageLayoutResult,
 } from '@avalon/ui-layout'
 
-import type { RoomPlayerModel } from './room-screen-model'
+import type { RoomPlayerPresentation } from './room-screen-props'
 
 export interface RoomStageProps {
   ariaLabel: string
   center: ReactNode
   layout: RoundTableStageLayoutResult | null
-  players: readonly RoomPlayerModel[]
+  players: readonly RoomPlayerPresentation[]
   renderPlayer: (
-    player: RoomPlayerModel,
+    player: RoomPlayerPresentation,
     layout: PlayerSeatLayout,
   ) => ReactNode
 }

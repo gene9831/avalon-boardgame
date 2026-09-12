@@ -67,8 +67,9 @@ function LobbyPreviewScenario({ scenarioID }: { scenarioID: LobbyPreviewScenario
     roomExitBusy: false,
     connected: reconnectPresentation.connected,
     manualReconnectAvailable: reconnectPresentation.manualReconnectAvailable,
+    seatChangeTargetID,
     startPending,
-  }), [preview, reconnectPresentation.connected, reconnectPresentation.manualReconnectAvailable, room, startPending])
+  }), [preview, reconnectPresentation.connected, reconnectPresentation.manualReconnectAvailable, room, seatChangeTargetID, startPending])
   const emptySeatID = room.players.find((player) => player.name == null)
   const diagnosticsMode = resolveRoomLayoutDiagnosticsMode(location.search, import.meta.env.DEV)
 

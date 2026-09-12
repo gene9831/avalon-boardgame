@@ -22,12 +22,12 @@ import {
   RoomIdentityRecognitionStage,
   type RoomIdentityRecognitionPresentation,
 } from './RoomIdentityRecognition'
-import { getRoomIdentityRecognitionSeat } from './room-identity-recognition-seat'
+import { applyRoomIdentityRecognitionSeat } from './room-identity-recognition-seat'
 import { RoomPlayerSeat } from './RoomPlayerSeat'
 import { RoomStage } from './RoomStage'
 import { RoomUtilities, type RoomUtilityTools } from './RoomUtilities'
 import { readRoomSafeAreaInsets, type RoomSafeAreaInsets } from './room-layout-diagnostics'
-import type { RoomPlayerModel, RoomScreenActions, RoomScreenModel } from './room-screen-model'
+import type { RoomScreenActions, RoomScreenModel } from './room-screen-model'
 import { useRoomLayout, type RoomLayoutDiagnosticsMode } from './useRoomLayout'
 
 export interface RoomScreenProps {
@@ -93,19 +93,11 @@ export function RoomScreen({ model, actions, diagnosticsMode, identityConfirmati
                 players={model.players}
                 renderPlayer={(player, layout) => (
                   <RoomPlayerSeat
-                    disabled={isPlayerDisabled(model, player, tools.seatChangeTargetID)}
-                    interactionMode={model.playerInteractionMode}
                     layout={layout}
-                    onActivate={actions.onActivatePlayer}
-                    pending={tools.seatChangeTargetID === player.playerID}
-                    player={player}
-                    recognition={identityRecognition === undefined
-                      ? undefined
-                      : getRoomIdentityRecognitionSeat(
-                        identityRecognition,
-                        player.playerID,
-                        player.isCurrentPlayer,
-                      )}
+                    onActivate={() => actions.onActivatePlayer(player.playerID)}
+                    player={identityRecognition === undefined
+                      ? player
+                      : applyRoomIdentityRecognitionSeat(identityRecognition, player)}
                   />
                 )}
               />
@@ -123,19 +115,4 @@ export function RoomScreen({ model, actions, diagnosticsMode, identityConfirmati
       />
     </div>
   )
-}
-
-function isPlayerDisabled(
-  model: RoomScreenModel,
-  player: RoomPlayerModel,
-  seatChangeTargetID: PlayerID | null,
-): boolean {
-  if (model.playerInteractionMode === 'none') return true
-  if (model.playerInteractionMode === 'changeSeat') {
-    return !model.connected || player.occupied || seatChangeTargetID !== null
-  }
-  if (model.playerInteractionMode === 'selectAssassinationTarget') {
-    return player.isCurrentPlayer || player.knownEvil
-  }
-  return !player.occupied
 }

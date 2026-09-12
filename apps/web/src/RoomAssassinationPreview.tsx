@@ -5,20 +5,16 @@ import type { AvalonPlayerView, PlayerID, Role } from '@avalon/game'
 
 import { useHelp } from './help-context'
 import type { AvalonMatch, LobbyPlayer } from './lobby'
-import { ROLE_LABELS } from './room-game'
+import {
+  withAssassinationOutcome,
+  type AssassinationOutcome,
+} from './room-assassination-preview-model'
 import { resolveRoomLayoutDiagnosticsMode } from './room-layout-diagnostics'
 import { buildRoomScreenModel } from './room-screen-controller'
-import type { RoomScreenModel } from './room-screen-model'
 import { RoomScreen } from './RoomScreen'
 import { useToast } from './toast-context'
 
 type AssassinationPreviewScenarioID = 'assassin' | 'evil' | 'good'
-type AssassinationOutcome = Readonly<{
-  targetID: PlayerID
-  targetRole: Role
-  hit: boolean
-  winner: 'good' | 'evil'
-}>
 
 const SCENARIO_IDS: readonly AssassinationPreviewScenarioID[] = ['assassin', 'evil', 'good']
 const CURRENT_PLAYER_ID = '2' as PlayerID
@@ -101,31 +97,6 @@ function createPreviewState(input: Readonly<{
         },
         revealedRoles: roles,
       }),
-    },
-  }
-}
-
-function withAssassinationOutcome(
-  model: RoomScreenModel,
-  outcome: AssassinationOutcome,
-  targetName: string,
-): RoomScreenModel {
-  return {
-    ...model,
-    players: model.players.map((player) => ({
-      ...player,
-      isSelectedTarget: player.playerID === outcome.targetID,
-      visibleRole: player.playerID === outcome.targetID ? outcome.targetRole : null,
-    })),
-    center: {
-      kind: 'assassinationSummary', title: '刺杀梅林',
-      status: outcome.hit ? '刺杀命中' : '刺杀未命中',
-      detail: outcome.winner === 'evil' ? '邪恶阵营获胜' : '正义阵营获胜',
-      statusTone: outcome.winner === 'evil' ? 'failure' : 'success',
-    },
-    phase: {
-      kind: 'assassinationResult', title: '刺杀结果', hit: outcome.hit,
-      targetName, targetRoleLabel: ROLE_LABELS[outcome.targetRole], winner: outcome.winner,
     },
   }
 }

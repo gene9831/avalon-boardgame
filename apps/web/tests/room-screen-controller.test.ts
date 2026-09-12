@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { AvalonPlayerView } from '@avalon/game'
 
 import type { AvalonMatch } from '../src/lobby'
+import {
+  buildRoomPlayerPresentation,
+  type FilteredSeatInput,
+} from '../src/room-player-presentation'
 import { buildRoomScreenModel } from '../src/room-screen-controller'
 
 const room: AvalonMatch = {
@@ -71,6 +75,28 @@ function readyInput(phase: string, overrides: Partial<AvalonPlayerView> = {}) {
 }
 
 describe('buildRoomScreenModel', () => {
+  it('cleans process state from a settled public role presentation', () => {
+    const finalResultInput: FilteredSeatInput = {
+      playerID: '0', relativeSeatIndex: 0, seatNumber: 1, name: 'Alice', occupied: true,
+      isCurrentPlayer: true,
+      avatarID: 'merlin', connected: false,
+      role: { kind: 'settledReveal', role: 'merlin' },
+      isOwner: true, isLeader: true, isQuestMember: true,
+      isSelected: true, isSelectedTarget: true,
+      knownEvil: true, knownMerlinCandidate: true,
+      voteStatus: 'approve',
+      recognition: { kind: 'recognition', label: '你', tone: 'self' },
+      interaction: { kind: 'selectTeam', disabled: false, selected: true },
+    }
+
+    expect(buildRoomPlayerPresentation(finalResultInput)).toMatchObject({
+      portrait: { kind: 'roleArtwork', role: 'merlin' },
+      markers: [],
+      caption: { kind: 'role', role: 'merlin' },
+      interaction: { kind: 'none' },
+    })
+  })
+
   it.each([
     ['lobby', readyInput('lobby', { status: 'lobby' }), 'lobby'],
     ['identityRecognition', readyInput('identityRecognition', {
@@ -105,7 +131,7 @@ describe('buildRoomScreenModel', () => {
     }))
 
     expect(model.stageOverlay).toMatchObject({ kind: 'identityRecognition', curtainState: 'closed', role: null })
-    expect(model.players.every((player) => player.visibleRole === null)).toBe(true)
+    expect(model.players.every((player) => player.portrait.kind === 'playerAvatar')).toBe(true)
   })
 
   it('builds a loading shell without invented player or quest requirements', () => {
@@ -132,6 +158,26 @@ describe('buildRoomScreenModel', () => {
     expect(model.utilities).toMatchObject({ variant: 'lobby', showRoomExit: true })
   })
 
+  it('normalizes lobby migration state into each seat interaction', () => {
+    const model = buildRoomScreenModel({
+      ...readyInput('lobby', { status: 'lobby' }),
+      room: {
+        ...room,
+        players: room.players.map((player) => player.id === 3
+          ? { ...player, name: undefined }
+          : player),
+      },
+      seatChangeTargetID: '3',
+    })
+
+    expect(model.players.find(({ playerID }) => playerID === '3')?.interaction).toEqual({
+      kind: 'changeSeat', disabled: true, pending: true,
+    })
+    expect(model.players.find(({ playerID }) => playerID === '4')?.interaction).toEqual({
+      kind: 'changeSeat', disabled: true, pending: false,
+    })
+  })
+
   it('uses a local recovery presentation and marks only the viewer locally disconnected', () => {
     const input = readyInput('lobby', { status: 'lobby' })
     const model = buildRoomScreenModel({
@@ -147,7 +193,9 @@ describe('buildRoomScreenModel', () => {
       title: '正在重新连接',
       manualReconnectAvailable: true,
     })
-    expect(model.players.find((player) => player.isCurrentPlayer)?.connected).toBe(false)
+    expect(model.players.find((player) => player.isCurrentPlayer)?.portrait).toMatchObject({
+      kind: 'playerAvatar', connected: false,
+    })
   })
 
   it('builds distinct leader and observer presentations for a team proposal', () => {
@@ -165,6 +213,9 @@ describe('buildRoomScreenModel', () => {
     })
 
     expect(leader.playerInteractionMode).toBe('selectTeam')
+    expect(leader.players.find(({ playerID }) => playerID === '1')?.interaction).toEqual({
+      kind: 'selectTeam', disabled: false, selected: true,
+    })
     expect(leader.center).toMatchObject({
       kind: 'questSummary', status: '由你组建本次任务队伍',
     })
@@ -173,6 +224,7 @@ describe('buildRoomScreenModel', () => {
       selectedCount: 1, isLeader: true, canSubmit: false, isSubmitting: false,
     })
     expect(observer.playerInteractionMode).toBe('none')
+    expect(observer.players.every(({ interaction }) => interaction.kind === 'none')).toBe(true)
     expect(observer.center).toMatchObject({
       kind: 'questSummary', status: '等待队长选择任务队员',
     })
@@ -202,10 +254,12 @@ describe('buildRoomScreenModel', () => {
       kind: 'teamVote', selectedVote: 'approve', submittedVote: null,
       canVote: true, isSubmitting: false,
     })
-    expect(model.players.find(({ playerID }) => playerID === '0')).toMatchObject({
-      isQuestMember: true, voteStatus: null,
+    expect(model.players.find(({ playerID }) => playerID === '0')?.markers).toContainEqual({
+      kind: 'questMember',
     })
-    expect(model.players.find(({ playerID }) => playerID === '1')?.voteStatus).toBe('pending')
+    expect(model.players.find(({ playerID }) => playerID === '1')?.markers).toContainEqual({
+      kind: 'vote', status: 'pending',
+    })
   })
 
   it('builds Good, Evil, observer, and submitted quest presentations from filtered state', () => {
@@ -273,7 +327,10 @@ describe('buildRoomScreenModel', () => {
     const model = buildRoomScreenModel({ ...input, activeStage: 'assassin' })
 
     expect(model.playerInteractionMode).toBe('selectAssassinationTarget')
-    expect(model.players.find(({ playerID }) => playerID === '3')?.knownEvil).toBe(true)
+    expect(model.players.find(({ playerID }) => playerID === '3')).toMatchObject({
+      markers: [{ kind: 'knownEvil' }],
+      interaction: { kind: 'selectAssassinationTarget', disabled: true, selected: false },
+    })
   })
 
   it('builds private Assassin selection without carrying round decorations into assassination', () => {
@@ -305,8 +362,13 @@ describe('buildRoomScreenModel', () => {
       targetName: 'Bob', canSubmit: true, isSubmitting: false,
     })
     expect(model.playerInteractionMode).toBe('selectAssassinationTarget')
-    expect(model.players.find(({ playerID }) => playerID === '1')?.isSelectedTarget).toBe(true)
-    expect(model.players.every(({ isLeader, isQuestMember, voteStatus }) => !isLeader && !isQuestMember && voteStatus === null)).toBe(true)
+    expect(model.players.find(({ playerID }) => playerID === '1')).toMatchObject({
+      emphasis: 'target',
+      interaction: { kind: 'selectAssassinationTarget', disabled: false, selected: true },
+    })
+    expect(model.players.every(({ markers }) => markers.every(
+      ({ kind }) => kind !== 'leader' && kind !== 'questMember' && kind !== 'vote',
+    ))).toBe(true)
     expect(model.questProgress.every(({ state }) => state !== 'current')).toBe(true)
   })
 
@@ -331,8 +393,8 @@ describe('buildRoomScreenModel', () => {
       kind: 'assassination', title: '等待刺杀', perspective: 'good',
       targetName: null, canSubmit: false, isSubmitting: false,
     })
-    expect(evil.players.every(({ isSelectedTarget }) => !isSelectedTarget)).toBe(true)
-    expect(good.players.every(({ isSelectedTarget }) => !isSelectedTarget)).toBe(true)
+    expect(evil.players.every(({ emphasis }) => emphasis !== 'target')).toBe(true)
+    expect(good.players.every(({ emphasis }) => emphasis !== 'target')).toBe(true)
   })
 
   it('locks the Assassin target while submission is pending', () => {
@@ -418,9 +480,11 @@ describe('buildRoomScreenModel', () => {
       reason: '刺杀未命中：Claire', questScore: '任务 3 成功 / 1 失败',
     })
     expect(model.players.every((player) => (
-      player.connected && !player.isOwner && !player.isLeader && !player.isQuestMember &&
-      !player.isSelected && !player.isSelectedTarget && !player.knownEvil &&
-      !player.knownMerlinCandidate && player.voteStatus === null && player.showRoleReveal
+      player.portrait.kind === 'roleArtwork' &&
+      player.markers.length === 0 &&
+      player.caption.kind === 'role' &&
+      player.emphasis === 'default' &&
+      player.interaction.kind === 'none'
     ))).toBe(true)
     expect(model.questProgress.every(({ state }) => state !== 'current')).toBe(true)
     expect(model.utilities).toEqual({

@@ -1,7 +1,16 @@
 import type { PlayerID } from '@avalon/game'
 
 import type { RoomIdentityRecognitionPresentation } from './RoomIdentityRecognition'
-import type { RoomPlayerSeatRecognition } from './RoomPlayerSeat'
+import type { RoomPlayerPresentation } from './room-screen-props'
+
+export type RoomPlayerSeatRecognition =
+  | Readonly<{ state: 'dimmed' }>
+  | Readonly<{ state: 'self'; label: '你' }>
+  | Readonly<{
+      state: 'target'
+      label: '同伴' | '邪恶' | '候选人'
+      tone: 'ally' | 'evil' | 'candidate'
+    }>
 
 const TARGET_MARKERS = {
   'evil-allies': { label: '同伴', state: 'target', tone: 'ally' },
@@ -32,4 +41,27 @@ export function getRoomIdentityRecognitionSeat(
   }
 
   return { state: 'dimmed' }
+}
+
+export function applyRoomIdentityRecognitionSeat(
+  presentation: RoomIdentityRecognitionPresentation,
+  player: RoomPlayerPresentation,
+): RoomPlayerPresentation {
+  const recognition = getRoomIdentityRecognitionSeat(
+    presentation,
+    player.playerID,
+    player.isCurrentPlayer,
+  )
+  if (recognition === undefined) return player
+  if (recognition.state === 'dimmed') {
+    return { ...player, caption: { kind: 'none' }, emphasis: 'dimmed' }
+  }
+  return {
+    ...player,
+    caption: {
+      kind: 'recognition',
+      label: recognition.label,
+      tone: recognition.state === 'self' ? 'self' : recognition.tone,
+    },
+  }
 }

@@ -86,8 +86,7 @@ describe('room screen player model', () => {
       seatNumber: 3,
       name: '',
       occupied: false,
-      connected: false,
-      avatarID: 'merlin',
+      portrait: { kind: 'playerAvatar', connected: false, avatarID: 'merlin' },
     })
   })
 
@@ -103,21 +102,21 @@ describe('room screen player model', () => {
 
     expect(result.find(({ playerID }) => playerID === '0')).toMatchObject({
       isCurrentPlayer: true,
-      isQuestMember: true,
-      visibleRole: 'merlin',
-      voteStatus: 'pending',
+      portrait: { kind: 'roleArtwork', role: 'merlin' },
+      markers: [
+        { kind: 'questMember' },
+        { kind: 'vote', status: 'pending' },
+      ],
     })
     expect(result.find(({ playerID }) => playerID === '1')).toMatchObject({
-      isLeader: true,
-      isQuestMember: true,
-      isSelectedTarget: true,
+      emphasis: 'target',
+      markers: [{ kind: 'leader' }, { kind: 'questMember' }],
     })
     expect(result.find(({ playerID }) => playerID === '3')).toMatchObject({
-      isOwner: true,
-      knownEvil: true,
+      markers: [{ kind: 'owner' }, { kind: 'knownEvil' }],
     })
     expect(result.find(({ playerID }) => playerID === '4')).toMatchObject({
-      isSelected: true,
+      emphasis: 'selected',
     })
   })
 
@@ -143,7 +142,10 @@ describe('room screen player model', () => {
       phase: 'teamVote',
     })
 
-    expect(result.map(({ playerID, voteStatus }) => [playerID, voteStatus])).toEqual([
+    expect(result.map(({ playerID, markers }) => [
+      playerID,
+      markers.find((marker) => marker.kind === 'vote')?.status ?? null,
+    ])).toEqual([
       ['0', null],
       ['1', null],
       ['2', 'pending'],

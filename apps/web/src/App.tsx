@@ -1408,6 +1408,7 @@ export function RoomView({
     phase,
     room,
     roomExitBusy,
+    seatChangeTargetID,
     startPending,
   })
   const handleLayoutDiagnosticsModeChange = useCallback((mode: typeof layoutDiagnosticsMode) => {

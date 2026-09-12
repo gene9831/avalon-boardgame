@@ -116,7 +116,9 @@ describe('RoomLobbyPreview', () => {
     })
 
     expect(model.phase.kind).toBe('lobby')
-    expect(model.players.find((player) => player.isCurrentPlayer)?.connected).toBe(true)
+    expect(model.players.find((player) => player.isCurrentPlayer)?.portrait).toMatchObject({
+      kind: 'playerAvatar', connected: true,
+    })
     expect(room.players.filter((player) => String(player.id) !== preview.currentPlayerID)).toEqual(
       preview.room.players.filter((player) => String(player.id) !== preview.currentPlayerID),
     )

@@ -10,40 +10,34 @@ import {
   ShieldAlert,
   UserRound,
 } from 'lucide-react'
-import { loyaltyForRole, type PlayerID, type Role, type TeamVote } from '@avalon/game'
+import { loyaltyForRole, type Role, type TeamVote } from '@avalon/game'
 import type { PlayerSeatLayout, Rect } from '@avalon/ui-layout'
 
 import { PlayerAvatar } from './player-avatars'
 import { RoleAvatar } from './RoleCard'
 import { ROLE_LABELS } from './room-game'
 import type {
-  RoomPlayerInteractionMode,
-  RoomPlayerModel,
-} from './room-screen-model'
+  RoomPlayerCaption,
+  RoomPlayerInteraction,
+  RoomPlayerMarker,
+  RoomPlayerPortrait,
+  RoomPlayerPresentation,
+} from './room-screen-props'
 
 const SHORT_ROLE_LABELS: Readonly<Record<Role, string>> = {
-  assassin: '刺客',
-  loyal_servant: '忠臣',
-  merlin: '梅林',
-  minion: '爪牙',
-  morgana: '莫甘娜',
-  percival: '帕西维尔',
+  assassin: '刺客', loyal_servant: '忠臣', merlin: '梅林', minion: '爪牙',
+  morgana: '莫甘娜', percival: '帕西维尔',
 }
 
 export interface RoomPlayerSeatProps {
-  interactionMode: RoomPlayerInteractionMode
   layout: PlayerSeatLayout
-  player: RoomPlayerModel
-  disabled: boolean
-  onActivate: (playerID: PlayerID) => void
-  pending?: boolean
-  recognition?: RoomPlayerSeatRecognition
+  player: RoomPlayerPresentation
+  onActivate: () => void
 }
 
-export type RoomPlayerSeatRecognition =
-  | Readonly<{ state: 'dimmed' }>
-  | Readonly<{ state: 'self'; label: '你' }>
-  | Readonly<{ state: 'target'; label: '同伴' | '邪恶' | '候选人'; tone: 'ally' | 'evil' | 'candidate' }>
+function assertNever(value: never): never {
+  throw new Error(`Unexpected room player variant: ${JSON.stringify(value)}`)
+}
 
 function localRectStyle(rect: Rect, bounds: Rect): CSSProperties {
   return {
@@ -96,130 +90,233 @@ function RoomOwnerIcon() {
   )
 }
 
-function RoomSeatDecorations({ player }: { player: RoomPlayerModel }) {
-  return (
-    <>
-      {player.isLeader && (
-        <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="leader">
+function markerStatus(marker: RoomPlayerMarker): string {
+  switch (marker.kind) {
+    case 'owner': return '房间拥有者'
+    case 'leader': return '队长'
+    case 'questMember': return '任务队员'
+    case 'vote':
+      return marker.status === 'approve' ? '赞成' : marker.status === 'reject' ? '反对' : '已投票'
+    case 'knownEvil': return '已知阵营信息：邪恶'
+    case 'merlinCandidate': return '梅林候选'
+    default: return assertNever(marker)
+  }
+}
+
+function markerDecoration(marker: RoomPlayerMarker, index: number): ReactNode {
+  switch (marker.kind) {
+    case 'owner':
+      return null
+    case 'leader':
+      return (
+        <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="leader" key={`${marker.kind}-${index}`}>
           <Crown fill="currentColor" stroke="#f8fafc" strokeWidth={1.5} />
         </span>
-      )}
-      {player.isSelected && (
-        <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="selected">
-          <CircleCheck fill="#0f172a" />
-        </span>
-      )}
-      {player.isQuestMember && !player.isSelected && (
-        <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="quest-member">
+      )
+    case 'questMember':
+      return (
+        <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="quest-member" key={`${marker.kind}-${index}`}>
           <UserRound />
         </span>
-      )}
-      {player.voteStatus !== null && (
-        <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="vote">
-          <VoteStatusIcon status={player.voteStatus} />
+      )
+    case 'vote':
+      return (
+        <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="vote" key={`${marker.kind}-${index}`}>
+          <VoteStatusIcon status={marker.status} />
         </span>
-      )}
-      {player.knownEvil && (
-        <span aria-label="已知邪恶阵营" className="room-seat__decoration" data-known-player-info="evil" data-seat-decoration="known-evil">
+      )
+    case 'knownEvil':
+      return (
+        <span aria-label="已知邪恶阵营" className="room-seat__decoration" data-known-player-info="evil" data-seat-decoration="known-evil" key={`${marker.kind}-${index}`}>
           <ShieldAlert />
         </span>
-      )}
-      {player.knownMerlinCandidate && (
-        <span aria-label="Merlin 候选" className="room-seat__decoration" data-known-player-info="merlin-candidate" data-seat-decoration="merlin-candidate">
+      )
+    case 'merlinCandidate':
+      return (
+        <span aria-label="Merlin 候选" className="room-seat__decoration" data-known-player-info="merlin-candidate" data-seat-decoration="merlin-candidate" key={`${marker.kind}-${index}`}>
           <HelpCircle />
         </span>
-      )}
-    </>
-  )
+      )
+    default:
+      return assertNever(marker)
+  }
 }
 
-function actionLabel(
-  interactionMode: RoomPlayerInteractionMode,
-  player: RoomPlayerModel,
-  pending: boolean,
-): string {
+function interactionPresentation(
+  interaction: RoomPlayerInteraction,
+  player: RoomPlayerPresentation,
+): Readonly<{
+  actionLabel: string
+  canActivate: boolean
+  pending: boolean
+  pressed: boolean | undefined
+}> {
   const name = player.name || `${player.seatNumber} 号空座位`
-  if (interactionMode === 'changeSeat') {
-    return player.occupied ? `${player.seatNumber}. ${name}` : pending ? `正在移至 ${name}` : `移至 ${name}`
+  switch (interaction.kind) {
+    case 'none':
+      return {
+        actionLabel: `${player.seatNumber}. ${name}`,
+        canActivate: false,
+        pending: false,
+        pressed: undefined,
+      }
+    case 'changeSeat':
+      return {
+        actionLabel: player.occupied
+          ? `${player.seatNumber}. ${name}`
+          : interaction.pending ? `正在移至 ${name}` : `移至 ${name}`,
+        canActivate: !interaction.disabled,
+        pending: interaction.pending,
+        pressed: undefined,
+      }
+    case 'selectTeam':
+      return {
+        actionLabel: interaction.selected
+          ? `取消选择 ${name}`
+          : `选择 ${name} 加入任务队伍`,
+        canActivate: !interaction.disabled,
+        pending: false,
+        pressed: interaction.selected,
+      }
+    case 'selectAssassinationTarget':
+      return {
+        actionLabel: `选择 ${name} 作为刺杀目标`,
+        canActivate: !interaction.disabled,
+        pending: false,
+        pressed: interaction.selected,
+      }
+    default:
+      return assertNever(interaction)
   }
-  if (interactionMode === 'selectTeam') {
-    return player.isSelected ? `取消选择 ${name}` : `选择 ${name} 加入任务队伍`
-  }
-  if (interactionMode === 'selectAssassinationTarget') {
-    return `选择 ${name} 作为刺杀目标`
-  }
-  return `${player.seatNumber}. ${name}`
 }
 
-function playerStatuses(player: RoomPlayerModel): string[] {
-  const voteStatus = player.voteStatus === 'approve'
-    ? '赞成'
-    : player.voteStatus === 'reject'
-      ? '反对'
-      : player.voteStatus === 'pending'
-        ? '已投票'
-        : null
-
-  return [
-    player.isLeader ? '队长' : null,
-    player.isQuestMember ? '任务队员' : null,
-    player.isOwner ? '房间拥有者' : null,
-    player.isCurrentPlayer ? '当前玩家' : null,
-    player.occupied && !player.connected ? '已断线' : null,
-    player.knownEvil ? '已知阵营信息：邪恶' : null,
-    player.knownMerlinCandidate ? '梅林候选' : null,
-    player.visibleRole === null ? null : ROLE_LABELS[player.visibleRole],
-    voteStatus,
-  ].filter((status): status is string => status !== null)
+function portraitContent(portrait: RoomPlayerPortrait): ReactNode {
+  switch (portrait.kind) {
+    case 'playerAvatar':
+      return <PlayerAvatar avatarID={portrait.avatarID} className="size-full object-contain p-[12%]" />
+    case 'roleArtwork':
+      return <RoleAvatar className="size-full object-cover" role={portrait.role} />
+    default:
+      return assertNever(portrait)
+  }
 }
 
-export function RoomPlayerSeat({
-  interactionMode,
-  layout,
-  player,
-  disabled,
-  onActivate,
-  pending = false,
-  recognition,
-}: RoomPlayerSeatProps) {
-  const interactive = interactionMode !== 'none'
-  const canActivate = interactive && !disabled
-  const accessibleLabel = [
-    actionLabel(interactionMode, player, pending),
-    ...playerStatuses(player),
-    recognition !== undefined && recognition.state !== 'dimmed' ? recognition.label : null,
-  ].filter((status): status is string => status !== null).join('，')
+function captionContent(caption: RoomPlayerCaption, style: CSSProperties): ReactNode {
+  switch (caption.kind) {
+    case 'none':
+      return null
+    case 'role': {
+      const loyalty = loyaltyForRole(caption.role)
+      return (
+        <span
+          className="room-seat__role-label"
+          data-room-role-revealed="true"
+          data-role-loyalty={loyalty}
+          style={style}
+        >
+          {SHORT_ROLE_LABELS[caption.role]}
+        </span>
+      )
+    }
+    case 'recognition':
+      return (
+        <span
+          className="room-seat__recognition-label"
+          data-identity-recognition-label="true"
+          data-recognition-tone={caption.tone}
+          style={style}
+        >
+          {caption.label}
+        </span>
+      )
+    default:
+      return assertNever(caption)
+  }
+}
+
+function avatarState(player: RoomPlayerPresentation): string {
+  if (player.caption.kind === 'role') {
+    return `revealed-${loyaltyForRole(player.caption.role)}`
+  }
+  switch (player.emphasis) {
+    case 'target': return 'target'
+    case 'selected': return 'selected'
+    case 'questMember': return 'quest-member'
+    case 'knownEvil': return 'known-evil'
+    case 'default':
+    case 'dimmed':
+      return 'default'
+    default:
+      return assertNever(player.emphasis)
+  }
+}
+
+function portraitRole(portrait: RoomPlayerPortrait): Role | null {
+  switch (portrait.kind) {
+    case 'playerAvatar': return null
+    case 'roleArtwork': return portrait.role
+    default: return assertNever(portrait)
+  }
+}
+
+export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatProps) {
+  const interaction = interactionPresentation(player.interaction, player)
   const avatarStyle = localRectStyle(layout.avatarRect, layout.playerSeatBounds)
-  const visibleName = player.occupied ? player.name : pending ? '换座中' : '空位'
-  const nameSize = nameplateSize(visibleName, player.isOwner)
+  const visibleName = player.occupied ? player.name : interaction.pending ? '换座中' : '空位'
+  const owner = player.markers.some((marker) => marker.kind === 'owner')
+  const nameSize = nameplateSize(visibleName, owner)
   const nameStyle = localNameStyle(layout.nameRect, layout.playerSeatBounds, nameSize)
   const roleStyle = localRoleStyle(layout.nameRect, layout.playerSeatBounds)
-  const revealedLoyalty = player.showRoleReveal && player.visibleRole !== null
-    ? loyaltyForRole(player.visibleRole)
-    : null
-  const avatarState = revealedLoyalty !== null
-    ? `revealed-${revealedLoyalty}`
-    : player.isSelectedTarget
-    ? 'target'
-    : player.isSelected
-      ? 'selected'
-      : player.isQuestMember
-        ? 'quest-member'
-        : player.knownEvil
-          ? 'known-evil'
-            : 'default'
+  const role = portraitRole(player.portrait)
+  const connected = player.portrait.kind === 'playerAvatar' && player.portrait.connected
+  const recognitionState = player.emphasis === 'dimmed'
+    ? 'dimmed'
+    : player.caption.kind === 'recognition'
+      ? player.caption.tone === 'self' ? 'self' : 'target'
+      : undefined
+  const selected = player.interaction.kind === 'selectTeam' && player.interaction.selected
+  const statuses = [
+    ...player.markers.map(markerStatus),
+    player.isCurrentPlayer ? '当前玩家' : null,
+    player.occupied && player.portrait.kind === 'playerAvatar' && !player.portrait.connected ? '已断线' : null,
+    role === null ? null : ROLE_LABELS[role],
+    player.caption.kind === 'recognition' ? player.caption.label : null,
+  ].filter((status): status is string => status !== null)
+  const accessibleLabel = [interaction.actionLabel, ...statuses].join('，')
   const content: ReactNode = (
     <>
       {player.occupied ? (
-        <span className="room-seat__avatar absolute" data-avatar-state={avatarState} data-room-role-revealed={player.showRoleReveal ? 'true' : undefined} data-round-table-avatar="true" data-seat-pointer-target="avatar" id={player.isCurrentPlayer ? 'current-player-avatar' : undefined} style={avatarStyle} data-seat-state="occupied">
-          <span className="room-seat__portrait" data-seat-portrait-connected={player.connected}>
-            {player.visibleRole === null ? <PlayerAvatar avatarID={player.avatarID} className="size-full object-contain p-[12%]" /> : <RoleAvatar className="size-full object-cover" role={player.visibleRole} />}
+        <span
+          className="room-seat__avatar absolute"
+          data-avatar-state={avatarState(player)}
+          data-room-role-revealed={player.caption.kind === 'role' ? 'true' : undefined}
+          data-round-table-avatar="true"
+          data-seat-pointer-target="avatar"
+          data-seat-state="occupied"
+          id={player.isCurrentPlayer ? 'current-player-avatar' : undefined}
+          style={avatarStyle}
+        >
+          <span
+            className="room-seat__portrait"
+            data-seat-portrait-connected={player.portrait.kind === 'playerAvatar' ? connected : undefined}
+          >
+            {portraitContent(player.portrait)}
           </span>
-          {!player.connected && <span className="room-seat__disconnected" data-seat-disconnected-badge="true">掉线</span>}
+          {player.portrait.kind === 'playerAvatar' && !player.portrait.connected && (
+            <span className="room-seat__disconnected" data-seat-disconnected-badge="true">掉线</span>
+          )}
         </span>
       ) : (
-        <span className="room-seat__avatar room-seat__avatar--empty absolute" data-seat-state={pending ? 'pending' : 'empty'} data-round-table-avatar="true" data-seat-pointer-target="avatar" style={avatarStyle}>
-          {pending ? <LoaderCircle aria-hidden="true" className="size-5 animate-spin" /> : player.seatNumber}
+        <span
+          className="room-seat__avatar room-seat__avatar--empty absolute"
+          data-round-table-avatar="true"
+          data-seat-pointer-target="avatar"
+          data-seat-state={interaction.pending ? 'pending' : 'empty'}
+          style={avatarStyle}
+        >
+          {interaction.pending
+            ? <LoaderCircle aria-hidden="true" className="size-5 animate-spin" />
+            : player.seatNumber}
         </span>
       )}
       <span
@@ -230,31 +327,17 @@ export function RoomPlayerSeat({
         style={nameStyle}
         title={player.occupied ? player.name : `${player.seatNumber} 号空座位`}
       >
-        {player.isOwner && <RoomOwnerIcon />}
+        {owner && <RoomOwnerIcon />}
         <span className="min-w-0 truncate">{visibleName}</span>
       </span>
-      {revealedLoyalty !== null && player.visibleRole !== null && (
-        <span
-          className="room-seat__role-label"
-          data-room-role-revealed="true"
-          data-role-loyalty={revealedLoyalty}
-          style={roleStyle}
-        >
-          {SHORT_ROLE_LABELS[player.visibleRole]}
-        </span>
-      )}
-      {recognition !== undefined && recognition.state !== 'dimmed' && (
-        <span
-          className="room-seat__recognition-label"
-          data-identity-recognition-label="true"
-          data-recognition-tone={recognition.state === 'target' ? recognition.tone : 'self'}
-          style={roleStyle}
-        >
-          {recognition.label}
-        </span>
-      )}
+      {captionContent(player.caption, roleStyle)}
       <span className="room-seat__decorations absolute" style={avatarStyle}>
-        <RoomSeatDecorations player={player} />
+        {selected && (
+          <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="selected">
+            <CircleCheck fill="#0f172a" />
+          </span>
+        )}
+        {player.markers.map(markerDecoration)}
       </span>
     </>
   )
@@ -262,21 +345,16 @@ export function RoomPlayerSeat({
     'aria-label': accessibleLabel,
     className: 'room-seat relative size-full border-0 bg-transparent p-0 text-center',
     'data-player-id': player.playerID,
-    'data-recognition-seat-state': recognition?.state,
-    'data-recognition-tone': recognition?.state === 'target' ? recognition.tone : undefined,
+    'data-recognition-seat-state': recognitionState,
+    'data-recognition-tone': player.caption.kind === 'recognition' ? player.caption.tone : undefined,
     'data-round-table-player': 'true',
   } as const
 
-  return canActivate ? (
+  return interaction.canActivate ? (
     <button
       {...commonProps}
-      aria-pressed={interactionMode === 'selectTeam'
-        ? player.isSelected
-        : interactionMode === 'selectAssassinationTarget'
-          ? player.isSelectedTarget
-          : undefined}
-      disabled={disabled}
-      onClick={() => onActivate(player.playerID)}
+      aria-pressed={interaction.pressed}
+      onClick={onActivate}
       type="button"
     >
       {content}

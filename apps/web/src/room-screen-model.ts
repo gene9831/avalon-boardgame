@@ -9,9 +9,10 @@ import {
 } from '@avalon/game'
 
 import type { LobbyPlayer } from './lobby'
-import type { PlayerAvatarID } from './player-profile'
+import { buildRoomPlayerPresentation, type FilteredSeatRole } from './room-player-presentation'
 import { getDisplayedTeamVoteResult } from './room-game'
 import { getSeatAvatarID } from './seat-avatar'
+import type { RoomPlayerInteraction, RoomPlayerPresentation } from './room-screen-props'
 
 export type RoomScreenMode =
   | 'loading'
@@ -28,27 +29,6 @@ export type RoomPlayerInteractionMode =
   | 'changeSeat'
   | 'selectTeam'
   | 'selectAssassinationTarget'
-
-export type RoomPlayerModel = Readonly<{
-  playerID: PlayerID
-  relativeSeatIndex: number
-  seatNumber: number
-  name: string
-  avatarID: PlayerAvatarID
-  occupied: boolean
-  connected: boolean
-  isCurrentPlayer: boolean
-  isOwner: boolean
-  isLeader: boolean
-  isQuestMember: boolean
-  isSelected: boolean
-  isSelectedTarget: boolean
-  knownEvil: boolean
-  knownMerlinCandidate: boolean
-  visibleRole: Role | null
-  showRoleReveal: boolean
-  voteStatus: 'pending' | TeamVote | null
-}>
 
 export type QuestProgressNodeModel = Readonly<{
   questIndex: number
@@ -181,7 +161,7 @@ export interface RoomScreenModel {
   matchID: string
   numPlayers: number | null
   connected: boolean
-  players: readonly RoomPlayerModel[]
+  players: readonly RoomPlayerPresentation[]
   playerInteractionMode: RoomPlayerInteractionMode
   questProgress: readonly QuestProgressNodeModel[]
   center: RoomCenterModel
@@ -206,7 +186,9 @@ export function buildRoomPlayers(input: Readonly<{
   showRoundDecorations?: boolean
   showConnectionStatus?: boolean
   showRoleReveal?: boolean
-}>): readonly RoomPlayerModel[] {
+  interactionMode?: RoomPlayerInteractionMode
+  seatChangeTargetID?: PlayerID | null
+}>): readonly RoomPlayerPresentation[] {
   const orderedPlayerIDs = Array.from(
     { length: input.numPlayers },
     (_, index) => String(index) as PlayerID,
@@ -227,10 +209,60 @@ export function buildRoomPlayers(input: Readonly<{
     const isCurrentPlayer = playerID === input.currentPlayerID
     const revealedRole = input.game?.revealedRoles?.[playerID]
     const privateRole = input.showPrivateRoleKnowledge && isCurrentPlayer
-      ? input.game?.viewer.role
+      ? input.game?.viewer.role ?? null
       : null
+    const role: FilteredSeatRole = revealedRole !== undefined
+      ? input.showRoleReveal === true
+        ? { kind: 'settledReveal', role: revealedRole }
+        : { kind: 'viewerVisible', role: revealedRole }
+      : privateRole === null
+        ? { kind: 'none' }
+        : { kind: 'viewerVisible', role: privateRole }
+    const isOwner = playerID === input.ownerPlayerID
+    const isLeader = input.showRoundDecorations !== false && input.game?.leaderID === playerID
+    const isQuestMember = input.showRoundDecorations !== false && input.game?.proposedTeam?.includes(playerID) === true
+    const isSelected = input.selectedTeam.includes(playerID)
+    const isSelectedTarget = input.selectedTarget === playerID
+    const knownEvil =
+      input.showKnownPlayerInfo &&
+      input.game?.viewer.knownEvilPlayerIDs.includes(playerID) === true
+    const knownMerlinCandidate =
+      input.showKnownPlayerInfo &&
+      input.game?.status !== 'finished' &&
+      input.game !== null &&
+      (input.game.viewer.knownMerlinCandidatePlayerIDs ?? []).includes(playerID)
+    const voteStatus = input.showRoundDecorations === false
+      ? null
+      : settledVotes?.[playerID] ??
+        (input.game?.submittedTeamVotePlayerIDs.includes(playerID) === true
+          ? 'pending'
+          : null)
+    const interactionMode = input.interactionMode ?? 'none'
+    let interaction: RoomPlayerInteraction
+    switch (interactionMode) {
+      case 'none':
+        interaction = { kind: 'none' }
+        break
+      case 'changeSeat':
+        interaction = {
+          kind: 'changeSeat',
+          disabled: !input.viewerConnected || occupied || input.seatChangeTargetID != null,
+          pending: input.seatChangeTargetID === playerID,
+        }
+        break
+      case 'selectTeam':
+        interaction = { kind: 'selectTeam', disabled: !occupied, selected: isSelected }
+        break
+      case 'selectAssassinationTarget':
+        interaction = {
+          kind: 'selectAssassinationTarget',
+          disabled: !occupied || isCurrentPlayer || knownEvil,
+          selected: isSelectedTarget,
+        }
+        break
+    }
 
-    return {
+    return buildRoomPlayerPresentation({
       playerID,
       relativeSeatIndex,
       seatNumber: seatIndex + 1,
@@ -243,28 +275,18 @@ export function buildRoomPlayers(input: Readonly<{
           : lobbyPlayer?.isConnected === true
       )),
       isCurrentPlayer,
-      isOwner: playerID === input.ownerPlayerID,
-      isLeader: input.showRoundDecorations !== false && input.game?.leaderID === playerID,
-      isQuestMember: input.showRoundDecorations !== false && input.game?.proposedTeam?.includes(playerID) === true,
-      isSelected: input.selectedTeam.includes(playerID),
-      isSelectedTarget: input.selectedTarget === playerID,
-      knownEvil:
-        input.showKnownPlayerInfo &&
-        input.game?.viewer.knownEvilPlayerIDs.includes(playerID) === true,
-      knownMerlinCandidate:
-        input.showKnownPlayerInfo &&
-        input.game?.status !== 'finished' &&
-        input.game !== null &&
-        (input.game.viewer.knownMerlinCandidatePlayerIDs ?? []).includes(playerID),
-      visibleRole: revealedRole ?? privateRole ?? null,
-      showRoleReveal: input.showRoleReveal === true,
-      voteStatus: input.showRoundDecorations === false
-        ? null
-        : settledVotes?.[playerID] ??
-          (input.game?.submittedTeamVotePlayerIDs.includes(playerID) === true
-            ? 'pending'
-            : null),
-    }
+      role,
+      isOwner,
+      isLeader,
+      isQuestMember,
+      isSelected,
+      isSelectedTarget,
+      knownEvil,
+      knownMerlinCandidate,
+      voteStatus,
+      recognition: { kind: 'none' },
+      interaction,
+    })
   })
 }
 

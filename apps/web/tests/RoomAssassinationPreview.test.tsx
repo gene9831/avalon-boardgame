@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest'
 
 import { HelpProvider } from '../src/HelpProvider'
 import { RoomAssassinationPreview } from '../src/RoomAssassinationPreview'
+import { withAssassinationOutcome } from '../src/room-assassination-preview-model'
+import type { RoomScreenModel } from '../src/room-screen-model'
 import { ToastProvider } from '../src/toast'
 
 function renderPreview(path: string) {
@@ -22,6 +24,45 @@ function renderPreview(path: string) {
 }
 
 describe('RoomAssassinationPreview', () => {
+  it('normalizes the temporary assassination outcome target for the production seat renderer', () => {
+    const baseModel: RoomScreenModel = {
+      mode: 'assassination', matchID: 'assassination-preview-assassin', numPlayers: 1,
+      connected: true,
+      players: [{
+        playerID: '0', relativeSeatIndex: 0, seatNumber: 1, name: '苍 1', occupied: true,
+        isCurrentPlayer: false,
+        portrait: { kind: 'playerAvatar', avatarID: 'merlin', connected: true },
+        markers: [], caption: { kind: 'none' }, emphasis: 'default', interaction: { kind: 'none' },
+      }],
+      playerInteractionMode: 'none', questProgress: [],
+      center: {
+        kind: 'assassinationSummary', title: '刺杀梅林', status: '正在确认', detail: '',
+        statusTone: 'neutral',
+      },
+      phase: {
+        kind: 'assassination', title: '刺杀梅林', perspective: 'assassin',
+        targetName: '苍 1', canSubmit: false, isSubmitting: true,
+      },
+      stageOverlay: { kind: 'none' },
+      utilities: {
+        variant: 'game', showRoomExit: false, showIdentityKnowledge: false,
+        roleKnowledgeOpen: false,
+      },
+    }
+
+    const model = withAssassinationOutcome(
+      baseModel,
+      { targetID: '0', targetRole: 'merlin', hit: true, winner: 'evil' },
+      '苍 1',
+    )
+
+    expect(model.players[0]).toMatchObject({
+      emphasis: 'target',
+      portrait: { kind: 'roleArtwork', role: 'merlin' },
+      caption: { kind: 'none' },
+    })
+  })
+
   it('renders all three assassination perspectives through the production RoomScreen', () => {
     for (const scenarioID of ['assassin', 'evil', 'good']) {
       const html = renderPreview(`/dev/room-layout/assassination/${scenarioID}`)

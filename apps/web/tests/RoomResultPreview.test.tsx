@@ -43,7 +43,10 @@ describe('RoomResultPreview', () => {
     expect(html).toContain('打开开发预览控制')
     expect(model.center).toMatchObject({ kind: 'resultSummary', winner })
     expect(model.center.kind === 'resultSummary' ? model.center.reason : '').toContain(reason)
-    expect(model.players.every(({ showRoleReveal, visibleRole }) => showRoleReveal && visibleRole !== null)).toBe(true)
+    expect(model.players.every(({ portrait, caption, markers, interaction }) => (
+      portrait.kind === 'roleArtwork' && caption.kind === 'role' &&
+      markers.length === 0 && interaction.kind === 'none'
+    ))).toBe(true)
   })
 
   it('defaults to five players with the paired roles enabled', () => {

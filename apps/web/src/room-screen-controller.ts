@@ -74,6 +74,7 @@ export type BuildRoomScreenModelInput =
       questCardSubmissionPending?: boolean
       showSettledTeamVoteDetails?: boolean
       assassinationSubmissionPending?: boolean
+      seatChangeTargetID?: PlayerID | null
     } & LobbyPresentationState>
 
 function playerName(room: AvalonMatch, playerID: PlayerID | null): string {
@@ -324,6 +325,8 @@ export function buildRoomScreenModel(input: BuildRoomScreenModelInput): RoomScre
       showRoundDecorations: mode !== 'assassination' && mode !== 'finished',
       showConnectionStatus: mode !== 'finished',
       showRoleReveal: mode === 'finished',
+      interactionMode: playerInteractionMode,
+      seatChangeTargetID: input.seatChangeTargetID,
       selectedTarget: mode !== 'finished' && (playerInteractionMode === 'selectAssassinationTarget' || input.assassinationSubmissionPending === true)
         ? input.selectedTarget
         : null,
@@ -351,6 +354,7 @@ export interface UseRoomScreenControllerInput extends LobbyPresentationState, Lo
   room: AvalonMatch | null
   currentPlayerID: PlayerID
   roomExitBusy: boolean
+  seatChangeTargetID: PlayerID | null
   onAssassinate: (targetID: PlayerID) => void
   onCastTeamVote: (vote: TeamVote) => void
   onChangeSeat: (targetID: PlayerID) => void
@@ -444,8 +448,9 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
       selectedQuestCard,
       questCardSubmissionPending,
       assassinationSubmissionPending,
+      seatChangeTargetID: input.seatChangeTargetID,
     })
-  }, [assassinationSubmissionPending, input.activeStage, input.canStart, input.connected, input.currentPlayerID, input.game, input.manualReconnectAvailable, input.matchID, input.phase, input.room, input.roomExitBusy, input.startPending, questCardSubmissionPending, roleKnowledgeOpen, selectedQuestCard, selectedTarget, selectedTeam, selectedTeamVote, teamSubmissionPending, teamVoteSubmissionPending])
+  }, [assassinationSubmissionPending, input.activeStage, input.canStart, input.connected, input.currentPlayerID, input.game, input.manualReconnectAvailable, input.matchID, input.phase, input.room, input.roomExitBusy, input.seatChangeTargetID, input.startPending, questCardSubmissionPending, roleKnowledgeOpen, selectedQuestCard, selectedTarget, selectedTeam, selectedTeamVote, teamSubmissionPending, teamVoteSubmissionPending])
 
   const actions: RoomScreenActions = {
     onActivatePlayer: (playerID) => {

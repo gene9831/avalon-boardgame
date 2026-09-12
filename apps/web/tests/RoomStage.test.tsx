@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { RoundTableStageLayout } from '@avalon/ui-layout'
 
 import { RoomStage } from '../src/RoomStage'
-import type { RoomPlayerModel } from '../src/room-screen-model'
+import type { RoomPlayerPresentation } from '../src/room-screen-props'
 
 const layout: RoundTableStageLayout = {
   status: 'ready',
@@ -30,25 +30,19 @@ const layout: RoundTableStageLayout = {
   ],
 }
 
-function player(playerID: string, relativeSeatIndex: number): RoomPlayerModel {
+function player(playerID: string, relativeSeatIndex: number): RoomPlayerPresentation {
   return {
     playerID,
     relativeSeatIndex,
     seatNumber: Number(playerID) + 1,
     name: `Player ${playerID}`,
-    avatarID: 'merlin',
     occupied: true,
-    connected: true,
     isCurrentPlayer: playerID === '0',
-    isOwner: false,
-    isLeader: false,
-    isQuestMember: false,
-    isSelected: false,
-    isSelectedTarget: false,
-    knownEvil: false,
-    knownMerlinCandidate: false,
-    visibleRole: null,
-    voteStatus: null,
+    portrait: { kind: 'playerAvatar', avatarID: 'merlin', connected: true },
+    markers: [],
+    caption: { kind: 'none' },
+    emphasis: 'default',
+    interaction: { kind: 'none' },
   }
 }
 
