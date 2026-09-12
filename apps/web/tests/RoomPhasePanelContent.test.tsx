@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
+import { RoomPhasePanel } from '../src/RoomPhasePanel'
 import { RoomPhasePanelContent } from '../src/RoomPhasePanelContent'
 import type { RoomPhaseModel, RoomScreenActions } from '../src/room-screen-model'
 
@@ -20,6 +21,21 @@ function render(model: RoomPhaseModel) {
 }
 
 describe('RoomPhasePanelContent', () => {
+  it('inherits one serif baseline and preserves the bottom action band without an action', () => {
+    const content = RoomPhasePanelContent({
+      actions,
+      model: { kind: 'loading', title: '连接房间', message: '正在连接' },
+    })
+    const html = renderToStaticMarkup(
+      <RoomPhasePanel action={content.action} middle={content.middle} />,
+    )
+
+    expect(html).toContain('font-avalon-serif')
+    expect(html).toContain('grid-rows-[minmax(0,1fr)_3.5rem]')
+    expect(html).toContain('data-room-slot="phase-middle"')
+    expect(html).toContain('data-room-slot="phase-action"')
+  })
+
   it.each([
     [{ isOwner: true, occupied: 3, total: 5 }, '还差 2 位玩家即可开始', '开始游戏', true],
     [{ isOwner: true, occupied: 5, total: 5 }, '所有玩家已入座，可以开始游戏', '开始游戏', false],
