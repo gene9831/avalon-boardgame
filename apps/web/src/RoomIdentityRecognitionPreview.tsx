@@ -11,7 +11,7 @@ import {
   type RoomIdentityRecognitionScene,
   type RoomIdentityRecognitionState,
 } from './RoomIdentityRecognition'
-import { RoomScreen } from './RoomScreen'
+import { LegacyRoomScreen as RoomScreen } from './LegacyRoomScreen'
 import { useToast } from './toast-context'
 
 type IdentityRecognitionPreviewScenarioID = RoomIdentityRecognitionScene['type']

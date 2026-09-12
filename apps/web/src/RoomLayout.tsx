@@ -44,7 +44,7 @@ export function RoomLayout({
               {stageAccessory}
             </div>
           )}
-          <div className="avalon-room-layout__stage-content" ref={stageRef}>{stage}</div>
+          <div className="avalon-room-layout__stage-content" data-room-layout-diagnostics-host="true" ref={stageRef}>{stage}</div>
         </main>
         <footer className="avalon-room-layout__phase-region">
           <div className="avalon-room-layout__phase">{chrome.phase}</div>

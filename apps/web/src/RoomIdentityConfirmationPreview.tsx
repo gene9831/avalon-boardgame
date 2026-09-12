@@ -10,7 +10,7 @@ import { buildRoomScreenModel } from './room-screen-controller'
 import {
   type RoomIdentityConfirmationState,
 } from './RoomIdentityConfirmation'
-import { RoomScreen } from './RoomScreen'
+import { LegacyRoomScreen as RoomScreen } from './LegacyRoomScreen'
 import { ROLE_LABELS } from './room-game'
 import { useToast } from './toast-context'
 

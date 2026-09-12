@@ -4,7 +4,7 @@ import { Info } from 'lucide-react'
 import type { PlayerID } from '@avalon/game'
 
 import { useHelp } from './help-context'
-import { RoomScreen } from './RoomScreen'
+import { LegacyRoomScreen as RoomScreen } from './LegacyRoomScreen'
 import { resolveRoomLayoutDiagnosticsMode } from './room-layout-diagnostics'
 import { buildRoomScreenModel } from './room-screen-controller'
 import {

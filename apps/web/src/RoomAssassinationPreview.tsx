@@ -11,7 +11,7 @@ import {
 } from './room-assassination-preview-model'
 import { resolveRoomLayoutDiagnosticsMode } from './room-layout-diagnostics'
 import { buildRoomScreenModel } from './room-screen-controller'
-import { RoomScreen } from './RoomScreen'
+import { LegacyRoomScreen as RoomScreen } from './LegacyRoomScreen'
 import { useToast } from './toast-context'
 
 type AssassinationPreviewScenarioID = 'assassin' | 'evil' | 'good'

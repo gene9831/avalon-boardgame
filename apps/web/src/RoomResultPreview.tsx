@@ -16,7 +16,7 @@ import { useHelp } from './help-context'
 import type { AvalonMatch, LobbyPlayer } from './lobby'
 import { resolveRoomLayoutDiagnosticsMode } from './room-layout-diagnostics'
 import { buildRoomScreenModel } from './room-screen-controller'
-import { RoomScreen } from './RoomScreen'
+import { LegacyRoomScreen as RoomScreen } from './LegacyRoomScreen'
 
 type ResultPreviewScenarioID =
   | 'good-assassination'
