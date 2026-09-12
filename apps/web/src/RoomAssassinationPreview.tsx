@@ -1,17 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Info } from 'lucide-react'
-import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 import type { AvalonPlayerView, PlayerID, Role } from '@avalon/game'
 
-import { useHelp } from './help-context'
 import type { AvalonMatch, LobbyPlayer } from './lobby'
-import {
-  withAssassinationOutcome,
-  type AssassinationOutcome,
-} from './room-assassination-preview-model'
-import { resolveRoomLayoutDiagnosticsMode } from './room-layout-diagnostics'
-import { buildRoomScreenModel } from './room-screen-controller'
-import { LegacyRoomScreen as RoomScreen } from './LegacyRoomScreen'
+import type { AssassinationOutcome } from './room-assassination-preview-model'
+import { buildQuestProgress, buildRoomPlayers } from './room-screen-model'
+import type { RoomAssassinationScene, RoomGameResultScene } from './room-screen-props'
+import { RoomScreenPreviewShell } from './RoomScreenPreviewShell'
 import { useToast } from './toast-context'
 
 type AssassinationPreviewScenarioID = 'assassin' | 'evil' | 'good'
@@ -19,8 +14,6 @@ type AssassinationPreviewScenarioID = 'assassin' | 'evil' | 'good'
 const SCENARIO_IDS: readonly AssassinationPreviewScenarioID[] = ['assassin', 'evil', 'good']
 const CURRENT_PLAYER_ID = '2' as PlayerID
 const PLAYER_NAMES = ['苍', '雾林守望者', '银', '来自卡美洛的无名骑士', '青岚']
-const noOp = () => undefined
-
 function isScenarioID(value: string | undefined): value is AssassinationPreviewScenarioID {
   return value !== undefined && SCENARIO_IDS.includes(value as AssassinationPreviewScenarioID)
 }
@@ -108,14 +101,10 @@ export function RoomAssassinationPreview() {
 }
 
 function AssassinationPreviewScenario({ scenarioID }: { scenarioID: AssassinationPreviewScenarioID }) {
-  const location = useLocation()
-  const navigate = useNavigate()
-  const { openHelp } = useHelp()
   const { pushToast } = useToast()
   const [selectedTarget, setSelectedTarget] = useState<PlayerID | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [disconnected, setDisconnected] = useState(true)
-  const [controlsOpen, setControlsOpen] = useState(false)
   const [outcome, setOutcome] = useState<AssassinationOutcome | null>(null)
   const [finalOutcome, setFinalOutcome] = useState<AssassinationOutcome | null>(null)
 
@@ -129,22 +118,6 @@ function AssassinationPreviewScenario({ scenarioID }: { scenarioID: Assassinatio
   }, [outcome])
 
   const preview = useMemo(() => createPreviewState({ scenarioID, disconnected, finalOutcome }), [disconnected, finalOutcome, scenarioID])
-  const diagnosticsMode = resolveRoomLayoutDiagnosticsMode(location.search, import.meta.env.DEV)
-  const baseModel = useMemo(() => buildRoomScreenModel({
-    kind: 'ready', matchID: preview.room.matchID, room: preview.room, game: preview.game,
-    phase: finalOutcome === null ? 'assassination' : 'finished',
-    activeStage: finalOutcome === null && scenarioID === 'assassin' ? 'assassin' : undefined,
-    currentPlayerID: CURRENT_PLAYER_ID, selectedTeam: [], selectedTarget,
-    roleKnowledgeOpen: false, canStart: false, roomExitBusy: false,
-    connected: true, manualReconnectAvailable: false, startPending: false,
-    assassinationSubmissionPending: submitting || outcome !== null,
-  }), [finalOutcome, outcome, preview, scenarioID, selectedTarget, submitting])
-  const targetName = selectedTarget === null
-    ? ''
-    : preview.room.players.find(({ id }) => String(id) === selectedTarget)?.name ?? `玩家 ${Number(selectedTarget) + 1}`
-  const model = outcome === null
-    ? baseModel
-    : withAssassinationOutcome(baseModel, outcome, targetName)
 
   const resetPreview = () => {
     setSelectedTarget(null)
@@ -162,39 +135,8 @@ function AssassinationPreviewScenario({ scenarioID }: { scenarioID: Assassinatio
     setOutcome({ targetID, targetRole, hit, winner: hit ? 'evil' : 'good' })
   }
 
-  return (
-    <div className="room-lobby-preview">
-      <RoomScreen
-        actions={{
-          onActivatePlayer: (playerID) => {
-            if (scenarioID !== 'assassin' || submitting || outcome !== null || finalOutcome !== null) return
-            setSelectedTarget(playerID)
-          },
-          onStart: noOp, onReconnect: noOp, onConfirmIdentityRecognition: noOp,
-          onSubmitTeam: noOp, onSelectTeamVote: noOp, onConfirmTeamVote: noOp,
-          onSelectQuestCard: noOp, onConfirmQuestCard: noOp,
-          onAssassinate: () => {
-            if (scenarioID === 'assassin' && selectedTarget !== null) setSubmitting(true)
-          },
-        }}
-        diagnosticsMode={diagnosticsMode}
-        model={model}
-        stageAccessory={!controlsOpen ? (
-          <button aria-expanded={controlsOpen} aria-label="打开开发预览控制" className="room-lobby-preview__controls-trigger" onClick={() => setControlsOpen(true)} type="button">
-            <Info aria-hidden="true" size={20} />
-          </button>
-        ) : undefined}
-        tools={{
-          connected: true, isOwner: preview.room.ownerPlayerID === CURRENT_PLAYER_ID,
-          logEntries: [], onBackHome: () => navigate('/dev/room-layout'),
-          onOpenHelp: () => openHelp({ playerCount: 5 }), onRequestRoomExit: noOp,
-          onToggleRoleKnowledge: noOp, roomExitBlocked: false, roomExitBusy: false,
-          seatChangePending: false, seatChangeTargetID: null,
-        }}
-      />
-      {controlsOpen && (
-        <aside aria-label="开发预览控制" className="room-lobby-preview__controls" id="room-assassination-preview-controls">
-          <button aria-controls="room-assassination-preview-controls" aria-expanded={controlsOpen} aria-label="关闭开发预览控制" className="room-lobby-preview__controls-close" onClick={() => setControlsOpen(false)} type="button">×</button>
+  const controls = (
+    <>
           <h1>刺杀阶段预览</h1>
           <label className="room-lobby-preview__controls-check">
             <input checked={disconnected} onChange={(event) => setDisconnected(event.target.checked)} type="checkbox" />2 号玩家掉线
@@ -212,8 +154,100 @@ function AssassinationPreviewScenario({ scenarioID }: { scenarioID: Assassinatio
           <button onClick={() => simulateOutcome(true)} type="button">模拟刺杀命中</button>
           <button onClick={() => simulateOutcome(false)} type="button">模拟刺杀未命中</button>
           <button onClick={resetPreview} type="button">重置预览</button>
-        </aside>
-      )}
-    </div>
+    </>
+  )
+
+  if (finalOutcome !== null) {
+    const scene: RoomGameResultScene = {
+      kind: 'gameResult',
+      matchID: preview.room.matchID,
+      playerCount: 5,
+      players: buildRoomPlayers({
+        players: preview.room.players,
+        numPlayers: 5,
+        currentPlayerID: CURRENT_PLAYER_ID,
+        phase: 'finished',
+        viewerConnected: true,
+        ownerPlayerID: null,
+        game: preview.game,
+        selectedTeam: [],
+        selectedTarget: null,
+        showKnownPlayerInfo: false,
+        showPrivateRoleKnowledge: false,
+        showRoleReveal: true,
+        showRoundDecorations: false,
+        showConnectionStatus: false,
+        interactionMode: 'none',
+      }),
+      questProgress: buildQuestProgress(5, preview.game, false),
+      winner: finalOutcome.winner,
+      reason: finalOutcome.hit ? '刺杀命中梅林' : '刺杀未命中',
+      questScore: '任务 3 成功 / 0 失败',
+    }
+    return <RoomScreenPreviewShell actions={null} controls={controls} scene={scene} />
+  }
+
+  const selectable = scenarioID === 'assassin' && outcome === null
+  const basePlayers = buildRoomPlayers({
+    players: preview.room.players,
+    numPlayers: 5,
+    currentPlayerID: CURRENT_PLAYER_ID,
+    phase: 'assassination',
+    viewerConnected: true,
+    ownerPlayerID: preview.room.ownerPlayerID,
+    game: preview.game,
+    selectedTeam: [],
+    selectedTarget: scenarioID === 'assassin' ? selectedTarget : null,
+    showKnownPlayerInfo: true,
+    showPrivateRoleKnowledge: false,
+    showRoundDecorations: false,
+    interactionMode: selectable ? 'selectAssassinationTarget' : 'none',
+  })
+  const scene: RoomAssassinationScene = {
+    kind: 'assassination',
+    matchID: preview.room.matchID,
+    playerCount: 5,
+    players: outcome === null
+      ? basePlayers
+      : basePlayers.map((player) => player.playerID === outcome.targetID
+          ? {
+              ...player,
+              portrait: { kind: 'roleArtwork', role: outcome.targetRole },
+              emphasis: 'target',
+            }
+          : player),
+    questProgress: buildQuestProgress(5, preview.game, false),
+    view: outcome !== null
+      ? {
+          kind: 'result',
+          targetPlayerID: outcome.targetID,
+          targetRole: outcome.targetRole,
+          hit: outcome.hit,
+          winner: outcome.winner,
+        }
+      : scenarioID === 'assassin'
+        ? {
+            kind: 'selecting',
+            targetPlayerID: selectedTarget,
+            canSubmit: !submitting && selectedTarget !== null,
+            submitRequestState: submitting ? 'pending' : 'idle',
+          }
+        : { kind: 'observing', perspective: scenarioID },
+  }
+
+  return (
+    <RoomScreenPreviewShell
+      actions={{
+        onActivatePlayer: (playerID) => {
+          if (scenarioID !== 'assassin' || submitting || outcome !== null) return
+          setSelectedTarget(playerID)
+        },
+        onAssassinate: () => {
+          if (scenarioID === 'assassin' && selectedTarget !== null) setSubmitting(true)
+        },
+      }}
+      controls={controls}
+      scene={scene}
+    />
   )
 }

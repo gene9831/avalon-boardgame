@@ -1,17 +1,15 @@
 import { useMemo, useState } from 'react'
-import { Info } from 'lucide-react'
-import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 import { loyaltyForRole, type AvalonPlayerView, type PlayerID, type Role } from '@avalon/game'
 
-import { useHelp } from './help-context'
 import type { AvalonMatch, LobbyPlayer } from './lobby'
-import { resolveRoomLayoutDiagnosticsMode } from './room-layout-diagnostics'
-import { buildRoomScreenModel } from './room-screen-controller'
 import {
   type RoomIdentityConfirmationState,
 } from './RoomIdentityConfirmation'
-import { LegacyRoomScreen as RoomScreen } from './LegacyRoomScreen'
 import { ROLE_LABELS } from './room-game'
+import { buildQuestProgress, buildRoomPlayers } from './room-screen-model'
+import type { RoomIdentityConfirmationScene } from './room-screen-props'
+import { RoomScreenPreviewShell } from './RoomScreenPreviewShell'
 import { useToast } from './toast-context'
 
 type IdentityConfirmationPreviewScenarioID = Extract<
@@ -28,8 +26,6 @@ const SCENARIO_IDS: readonly IdentityConfirmationPreviewScenarioID[] = [
 const ROLES: readonly Role[] = ['merlin', 'percival', 'loyal_servant', 'assassin', 'morgana', 'minion']
 const CURRENT_PLAYER_ID = '2' as PlayerID
 const PLAYER_NAMES = ['苍', '雾林守望者', '银', '来自卡美洛的无名骑士', '青岚', '暮色远征者', '白鹿', '暮鸦议会记录官', '荆棘', '霜塔守夜人']
-const noOp = () => undefined
-
 function isScenarioID(value: string | undefined): value is IdentityConfirmationPreviewScenarioID {
   return value !== undefined && SCENARIO_IDS.includes(value as IdentityConfirmationPreviewScenarioID)
 }
@@ -111,37 +107,15 @@ function IdentityConfirmationPreviewScenario({
 }: {
   scenarioID: IdentityConfirmationPreviewScenarioID
 }) {
-  const location = useLocation()
-  const navigate = useNavigate()
-  const { openHelp } = useHelp()
   const { pushToast } = useToast()
   const [playerCount, setPlayerCount] = useState(5)
   const [role, setRole] = useState<Role>('merlin')
   const [confirmedCount, setConfirmedCount] = useState(scenarioID === 'waiting' ? 3 : 0)
   const [state, setState] = useState<RoomIdentityConfirmationState>(scenarioID)
-  const [controlsOpen, setControlsOpen] = useState(false)
   const preview = useMemo(
     () => createPreviewState({ playerCount, role, confirmedCount }),
     [confirmedCount, playerCount, role],
   )
-  const model = useMemo(() => buildRoomScreenModel({
-    kind: 'ready',
-    matchID: preview.room.matchID,
-    room: preview.room,
-    game: preview.game,
-    phase: 'identityRecognition',
-    activeStage: 'identityRecognition',
-    currentPlayerID: CURRENT_PLAYER_ID,
-    selectedTeam: [],
-    selectedTarget: null,
-    roleKnowledgeOpen: false,
-    canStart: false,
-    roomExitBusy: false,
-    connected: true,
-    manualReconnectAvailable: false,
-    startPending: false,
-  }), [preview])
-  const diagnosticsMode = resolveRoomLayoutDiagnosticsMode(location.search, import.meta.env.DEV)
   const setPreviewState = (next: RoomIdentityConfirmationState) => {
     setState(next)
     if (next === 'waiting' || next === 'reviewing') {
@@ -149,58 +123,34 @@ function IdentityConfirmationPreviewScenario({
     }
   }
 
-  return (
-    <div className="room-lobby-preview">
-      <RoomScreen
-        actions={{
-          onActivatePlayer: noOp,
-          onStart: noOp,
-          onReconnect: noOp,
-          onConfirmIdentityRecognition: noOp,
-          onSubmitTeam: noOp,
-          onSelectTeamVote: noOp,
-          onConfirmTeamVote: noOp,
-          onSelectQuestCard: noOp,
-          onConfirmQuestCard: noOp,
-          onAssassinate: noOp,
-        }}
-        diagnosticsMode={diagnosticsMode}
-        identityConfirmation={{
-          confirmedCount,
-          onCloseReview: () => setPreviewState('waiting'),
-          onConfirm: () => setPreviewState('confirming'),
-          onHide: () => setPreviewState('hiding'),
-          onHideComplete: () => setPreviewState('concealed'),
-          onReveal: () => setPreviewState('revealing'),
-          onRevealComplete: () => setPreviewState('revealed'),
-          onReview: () => setPreviewState('reviewing'),
-          participantCount: playerCount,
-          role,
-          state,
-        }}
-        model={model}
-        stageAccessory={!controlsOpen ? (
-          <button aria-expanded={controlsOpen} aria-label="打开开发预览控制" className="room-lobby-preview__controls-trigger" onClick={() => setControlsOpen(true)} type="button">
-            <Info aria-hidden="true" size={20} />
-          </button>
-        ) : undefined}
-        tools={{
-          connected: true,
-          isOwner: false,
-          logEntries: [],
-          onBackHome: () => navigate('/dev/room-layout'),
-          onOpenHelp: () => openHelp({ playerCount }),
-          onRequestRoomExit: noOp,
-          onToggleRoleKnowledge: noOp,
-          roomExitBlocked: false,
-          roomExitBusy: false,
-          seatChangePending: false,
-          seatChangeTargetID: null,
-        }}
-      />
-      {controlsOpen && (
-        <aside aria-label="开发预览控制" className="room-lobby-preview__controls" id="room-identity-confirmation-preview-controls">
-          <button aria-controls="room-identity-confirmation-preview-controls" aria-expanded={controlsOpen} aria-label="关闭开发预览控制" className="room-lobby-preview__controls-close" onClick={() => setControlsOpen(false)} type="button">×</button>
+  const scene: RoomIdentityConfirmationScene = {
+    kind: 'identityConfirmation',
+    matchID: preview.room.matchID,
+    playerCount,
+    players: buildRoomPlayers({
+      players: preview.room.players,
+      numPlayers: playerCount,
+      currentPlayerID: CURRENT_PLAYER_ID,
+      phase: 'identityRecognition',
+      viewerConnected: true,
+      ownerPlayerID: preview.room.ownerPlayerID,
+      game: preview.game,
+      selectedTeam: [],
+      selectedTarget: null,
+      showKnownPlayerInfo: false,
+      showPrivateRoleKnowledge: false,
+      showRoundDecorations: false,
+      interactionMode: 'none',
+    }),
+    questProgress: buildQuestProgress(playerCount, preview.game),
+    role,
+    view: state === 'confirming' ? 'revealed' : state,
+    confirmedCount,
+    participantCount: playerCount,
+    confirmRequestState: state === 'confirming' ? 'pending' : 'idle',
+  }
+  const controls = (
+    <>
           <h1>首次身份确认预览</h1>
           <label>
             玩家人数
@@ -245,8 +195,24 @@ function IdentityConfirmationPreviewScenario({
               }} type="button">模拟确认失败</button>
             </fieldset>
           )}
-        </aside>
-      )}
+    </>
+  )
+
+  return (
+    <div className="size-full" data-identity-confirmation-state={state}>
+      <RoomScreenPreviewShell
+        actions={{
+          onCloseReview: () => setPreviewState('waiting'),
+          onConfirm: () => setPreviewState('confirming'),
+          onHide: () => setPreviewState('hiding'),
+          onHideComplete: () => setPreviewState('concealed'),
+          onReveal: () => setPreviewState('revealing'),
+          onRevealComplete: () => setPreviewState('revealed'),
+          onReview: () => setPreviewState('reviewing'),
+        }}
+        controls={controls}
+        scene={scene}
+      />
     </div>
   )
 }

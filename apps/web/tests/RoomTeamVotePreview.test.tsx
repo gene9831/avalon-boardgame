@@ -1,8 +1,12 @@
 import { renderToStaticMarkup } from 'react-dom/server'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 
+import { HelpProvider } from '../src/HelpProvider'
+import { RoomTeamVotePreview } from '../src/RoomTeamVotePreview'
 import { RoomTeamVoteScene } from '../src/RoomTeamVoteScene'
 import type { RoomTeamVoteScene as Scene } from '../src/room-screen-props'
+import { ToastProvider } from '../src/toast'
 
 const stageLayout = {
   status: 'ready' as const,
@@ -30,7 +34,29 @@ function render(view: Scene['view']) {
   )
 }
 
+function renderPreview() {
+  return renderToStaticMarkup(
+    <HelpProvider>
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/dev/room-layout/team-vote/voter']}>
+          <Routes>
+            <Route element={<RoomTeamVotePreview />} path="/dev/room-layout/team-vote/:scenarioID" />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    </HelpProvider>,
+  )
+}
+
 describe('RoomTeamVoteScene', () => {
+  it('renders the voter preview through the shared formal scene shell', () => {
+    const html = renderPreview()
+
+    expect(html).toContain('data-room-preview-shell="true"')
+    expect(html).toContain('data-room-scene="teamVote"')
+    expect(html).toContain('aria-label="打开开发预览控制"')
+  })
+
   it('requires one private vote choice before enabling confirmation', () => {
     const unselected = render({ kind: 'choosing', selectedVote: null, canChoose: true, submitRequestState: 'idle' })
     const selected = render({ kind: 'choosing', selectedVote: 'approve', canChoose: true, submitRequestState: 'idle' })

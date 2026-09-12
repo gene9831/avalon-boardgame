@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Info } from 'lucide-react'
-import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 import {
   buildRoleDeck,
   getPlayerCountConfig,
@@ -12,11 +11,10 @@ import {
   type Role,
 } from '@avalon/game'
 
-import { useHelp } from './help-context'
 import type { AvalonMatch, LobbyPlayer } from './lobby'
-import { resolveRoomLayoutDiagnosticsMode } from './room-layout-diagnostics'
-import { buildRoomScreenModel } from './room-screen-controller'
-import { LegacyRoomScreen as RoomScreen } from './LegacyRoomScreen'
+import { buildQuestProgress, buildRoomPlayers } from './room-screen-model'
+import type { RoomGameResultScene } from './room-screen-props'
+import { RoomScreenPreviewShell } from './RoomScreenPreviewShell'
 
 type ResultPreviewScenarioID =
   | 'good-assassination'
@@ -32,8 +30,6 @@ const SCENARIO_IDS: readonly ResultPreviewScenarioID[] = [
 ]
 const CURRENT_PLAYER_ID = '2' as PlayerID
 const PLAYER_NAMES = ['苍', '雾林守望者', '银', '来自卡美洛的无名骑士', '青岚', '暮色远征者', '白鹿', '暮鸦议会记录官', '荆棘', '霜塔守夜人']
-const noOp = () => undefined
-
 function isScenarioID(value: string | undefined): value is ResultPreviewScenarioID {
   return value !== undefined && SCENARIO_IDS.includes(value as ResultPreviewScenarioID)
 }
@@ -84,6 +80,14 @@ function resultForScenario(
   }
   const missedTargetID = Object.entries(roles).find(([, role]) => role !== 'merlin' && loyaltyForRole(role) === 'good')?.[0] as PlayerID
   return { winner: 'good', reason: 'assassination', targetID: missedTargetID }
+}
+
+function resultReason(room: AvalonMatch, result: AvalonResult): string {
+  if (result.reason === 'five_rejections') return '连续否决 5 支队伍'
+  if (result.reason === 'three_quests') return result.winner === 'good' ? '完成 3 次任务' : '破坏 3 次任务'
+  const targetName = room.players.find(({ id }) => String(id) === result.targetID)?.name
+    ?? `${Number(result.targetID) + 1} 号玩家`
+  return result.winner === 'evil' ? `刺杀命中梅林：${targetName}` : `刺杀未命中：${targetName}`
 }
 
 // oxlint-disable-next-line react/only-export-components
@@ -145,6 +149,39 @@ export function createRoomResultPreviewState(input: Readonly<{
   }
 }
 
+// oxlint-disable-next-line react/only-export-components
+export function createRoomResultPreviewScene(
+  preview: ReturnType<typeof createRoomResultPreviewState>,
+): RoomGameResultScene {
+  const playerCount = preview.room.setupData?.numPlayers ?? preview.room.players.length
+  return {
+    kind: 'gameResult',
+    matchID: preview.room.matchID,
+    playerCount,
+    players: buildRoomPlayers({
+      players: preview.room.players,
+      numPlayers: playerCount,
+      currentPlayerID: CURRENT_PLAYER_ID,
+      phase: 'finished',
+      viewerConnected: true,
+      ownerPlayerID: null,
+      game: preview.game,
+      selectedTeam: [],
+      selectedTarget: null,
+      showKnownPlayerInfo: false,
+      showPrivateRoleKnowledge: false,
+      showRoleReveal: true,
+      showRoundDecorations: false,
+      showConnectionStatus: false,
+      interactionMode: 'none',
+    }),
+    questProgress: buildQuestProgress(playerCount, preview.game, false),
+    winner: preview.game.result?.winner ?? 'good',
+    reason: preview.game.result === undefined ? '' : resultReason(preview.room, preview.game.result),
+    questScore: `任务 ${preview.game.goodSuccesses} 成功 / ${preview.game.evilFailures} 失败`,
+  }
+}
+
 export function RoomResultPreview() {
   const { scenarioID } = useParams()
   if (!isScenarioID(scenarioID)) return <Navigate replace to="/dev/room-layout" />
@@ -152,52 +189,15 @@ export function RoomResultPreview() {
 }
 
 function ResultPreviewScenario({ scenarioID }: { scenarioID: ResultPreviewScenarioID }) {
-  const location = useLocation()
-  const navigate = useNavigate()
-  const { openHelp } = useHelp()
   const [playerCount, setPlayerCount] = useState(5)
   const [pairedRoles, setPairedRoles] = useState(true)
-  const [controlsOpen, setControlsOpen] = useState(false)
   const preview = useMemo(
     () => createRoomResultPreviewState({ scenarioID, playerCount, pairedRoles }),
     [pairedRoles, playerCount, scenarioID],
   )
-  const model = useMemo(() => buildRoomScreenModel({
-    kind: 'ready', matchID: preview.room.matchID, room: preview.room, game: preview.game,
-    phase: 'finished', activeStage: undefined, currentPlayerID: CURRENT_PLAYER_ID,
-    selectedTeam: ['0'], selectedTarget: '1', roleKnowledgeOpen: false,
-    canStart: false, roomExitBusy: false, connected: true,
-    manualReconnectAvailable: false, startPending: false,
-  }), [preview])
-  const diagnosticsMode = resolveRoomLayoutDiagnosticsMode(location.search, import.meta.env.DEV)
-
-  return (
-    <div className="room-lobby-preview">
-      <RoomScreen
-        actions={{
-          onActivatePlayer: noOp, onStart: noOp, onReconnect: noOp,
-          onConfirmIdentityRecognition: noOp, onSubmitTeam: noOp,
-          onSelectTeamVote: noOp, onConfirmTeamVote: noOp,
-          onSelectQuestCard: noOp, onConfirmQuestCard: noOp, onAssassinate: noOp,
-        }}
-        diagnosticsMode={diagnosticsMode}
-        model={model}
-        stageAccessory={!controlsOpen ? (
-          <button aria-expanded={controlsOpen} aria-label="打开开发预览控制" className="room-lobby-preview__controls-trigger" onClick={() => setControlsOpen(true)} type="button">
-            <Info aria-hidden="true" size={20} />
-          </button>
-        ) : undefined}
-        tools={{
-          connected: true, isOwner: false, logEntries: [],
-          onBackHome: () => navigate('/dev/room-layout'),
-          onOpenHelp: () => openHelp({ playerCount }), onRequestRoomExit: noOp,
-          onToggleRoleKnowledge: noOp, roomExitBlocked: false, roomExitBusy: false,
-          seatChangePending: false, seatChangeTargetID: null,
-        }}
-      />
-      {controlsOpen && (
-        <aside aria-label="开发预览控制" className="room-lobby-preview__controls" id="room-result-preview-controls">
-          <button aria-controls="room-result-preview-controls" aria-expanded={controlsOpen} aria-label="关闭开发预览控制" className="room-lobby-preview__controls-close" onClick={() => setControlsOpen(false)} type="button">×</button>
+  const scene = useMemo(() => createRoomResultPreviewScene(preview), [preview])
+  const controls = (
+    <>
           <h1>对局结果预览</h1>
           <label>
             玩家人数
@@ -208,8 +208,8 @@ function ResultPreviewScenario({ scenarioID }: { scenarioID: ResultPreviewScenar
           <label className="room-lobby-preview__controls-check">
             <input checked={pairedRoles} onChange={(event) => setPairedRoles(event.target.checked)} type="checkbox" />启用帕西维尔与莫甘娜
           </label>
-        </aside>
-      )}
-    </div>
+    </>
   )
+
+  return <RoomScreenPreviewShell actions={null} controls={controls} scene={scene} />
 }

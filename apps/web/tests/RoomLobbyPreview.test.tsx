@@ -6,7 +6,6 @@ import { describe, expect, it } from 'vitest'
 import { RoomLobbyPreview } from '../src/RoomLobbyPreview'
 import { RoomLobbyScene } from '../src/RoomLobbyScene'
 import { HelpProvider } from '../src/HelpProvider'
-import { buildRoomScreenModel } from '../src/room-screen-controller'
 import {
   applyLobbyPreviewReconnectCompletion,
   buildLobbyPreviewState,
@@ -14,6 +13,7 @@ import {
   getLobbyPreviewReconnectPresentation,
   resetLobbyPreviewReconnect,
 } from '../src/room-lobby-preview-model'
+import { buildRoomPlayers } from '../src/room-screen-model'
 import { ToastProvider } from '../src/toast'
 
 function renderPreview(path: string) {
@@ -84,25 +84,22 @@ describe('RoomLobbyPreview', () => {
     expect(html).toContain('打开开发预览控制')
   })
 
-  it('keeps developer controls collapsed until explicitly opened', () => {
+  it('keeps shared developer controls collapsed and outside the production stage', () => {
     const html = renderPreview('/dev/room-layout/lobby/member-incomplete')
 
     expect(html).toContain('aria-label="打开开发预览控制"')
-    expect(html).not.toContain('aria-controls="room-lobby-preview-controls"')
-    expect(html).not.toContain('id="room-lobby-preview-controls"')
+    expect(html).not.toContain('id="room-screen-preview-controls"')
     expect(html).not.toContain('aria-label="关闭开发预览控制"')
-    expect(html).toMatch(/data-room-slot="stage-accessory"[^>]*>\s*<button[^>]*aria-label="打开开发预览控制"/)
+    expect(html).not.toContain('data-room-slot="stage-accessory"')
     expect(html).toContain('lucide-info')
-    const source = readFileSync(new URL('../src/RoomLobbyPreview.tsx', import.meta.url), 'utf8')
-    expect(source).toContain('setControlsOpen(true)')
-    expect(source).toContain('setControlsOpen(false)')
   })
 
-  it('wires the production help action to the existing Help context', () => {
-    const source = readFileSync(new URL('../src/RoomLobbyPreview.tsx', import.meta.url), 'utf8')
+  it('exposes the existing help entry through the shared complete toolbar', () => {
+    const html = renderPreview('/dev/room-layout/lobby/member-incomplete')
 
-    expect(source).toContain("import { useHelp } from './help-context'")
-    expect(source).toContain('onOpenHelp: () => openHelp({ playerCount })')
+    expect(html).toContain('aria-label="房间工具"')
+    expect(html).toContain('data-room-toolbar-item="help"')
+    expect(html).toContain('aria-label="帮助"')
   })
 
   it('completes a manual reconnect once, then can reset to automatic recovery', () => {
@@ -134,14 +131,22 @@ describe('RoomLobbyPreview', () => {
       preview.currentPlayerID,
       completion.state.completed,
     )
-    const model = buildRoomScreenModel({
-      kind: 'ready', matchID: room.matchID, room, game: preview.game, phase: 'lobby', activeStage: undefined,
-      currentPlayerID: preview.currentPlayerID, selectedTeam: [], selectedTarget: null, roleKnowledgeOpen: false,
-      canStart: preview.canStart, roomExitBusy: false, connected: true, manualReconnectAvailable: false, startPending: false,
+    const players = buildRoomPlayers({
+      players: room.players,
+      numPlayers: 5,
+      currentPlayerID: preview.currentPlayerID,
+      phase: 'lobby',
+      viewerConnected: true,
+      ownerPlayerID: room.ownerPlayerID,
+      game: preview.game,
+      selectedTeam: [],
+      selectedTarget: null,
+      showKnownPlayerInfo: false,
+      showPrivateRoleKnowledge: false,
+      interactionMode: 'changeSeat',
     })
 
-    expect(model.phase.kind).toBe('lobby')
-    expect(model.players.find((player) => player.isCurrentPlayer)?.portrait).toMatchObject({
+    expect(players.find((player) => player.isCurrentPlayer)?.portrait).toMatchObject({
       kind: 'playerAvatar', connected: true,
     })
     expect(room.players.filter((player) => String(player.id) !== preview.currentPlayerID)).toEqual(

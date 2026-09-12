@@ -1,12 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
-import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Info } from 'lucide-react'
+import { Navigate, useParams } from 'react-router-dom'
 import type { PlayerID } from '@avalon/game'
 
-import { useHelp } from './help-context'
-import { LegacyRoomScreen as RoomScreen } from './LegacyRoomScreen'
-import { resolveRoomLayoutDiagnosticsMode } from './room-layout-diagnostics'
-import { buildRoomScreenModel } from './room-screen-controller'
 import {
   applyLobbyPreviewReconnectCompletion,
   buildLobbyPreviewState,
@@ -17,13 +12,14 @@ import {
   type LobbyPreviewReconnectState,
   type LobbyPreviewScenarioID,
 } from './room-lobby-preview-model'
+import { buildQuestProgress, buildRoomPlayers } from './room-screen-model'
+import type { RoomConnectionRecoveryScene, RoomLobbyScene } from './room-screen-props'
+import { RoomScreenPreviewShell } from './RoomScreenPreviewShell'
 import { useToast } from './toast-context'
 
 function isScenarioID(value: string | undefined): value is LobbyPreviewScenarioID {
   return value !== undefined && LOBBY_PREVIEW_SCENARIO_IDS.includes(value as LobbyPreviewScenarioID)
 }
-
-const noOp = () => undefined
 
 export function RoomLobbyPreview() {
   const { scenarioID } = useParams()
@@ -32,14 +28,10 @@ export function RoomLobbyPreview() {
 }
 
 function LobbyPreviewScenario({ scenarioID }: { scenarioID: LobbyPreviewScenarioID }) {
-  const location = useLocation()
-  const navigate = useNavigate()
-  const { openHelp } = useHelp()
   const { pushToast } = useToast()
   const [playerCount, setPlayerCount] = useState(5)
   const [seatChangeTargetID, setSeatChangeTargetID] = useState<PlayerID | null>(null)
   const [startPending, setStartPending] = useState(false)
-  const [controlsOpen, setControlsOpen] = useState(false)
   const [reconnectState, setReconnectState] = useState<LobbyPreviewReconnectState>({ mode: 'automatic', completed: false })
   const reconnectCompletionRef = useRef(false)
   const preview = useMemo(() => buildLobbyPreviewState({
@@ -52,26 +44,28 @@ function LobbyPreviewScenario({ scenarioID }: { scenarioID: LobbyPreviewScenario
   const room = reconnectScenario
     ? applyLobbyPreviewReconnectCompletion(preview.room, preview.currentPlayerID, reconnectState.completed)
     : preview.room
-  const model = useMemo(() => buildRoomScreenModel({
-    kind: 'ready',
-    matchID: room.matchID,
-    room,
-    game: preview.game,
-    phase: 'lobby',
-    activeStage: undefined,
+  const emptySeatID = room.players.find((player) => player.name == null)
+  const players = useMemo(() => buildRoomPlayers({
+    players: room.players,
+    numPlayers: room.setupData?.numPlayers ?? room.players.length,
     currentPlayerID: preview.currentPlayerID,
+    phase: 'lobby',
+    viewerConnected: reconnectPresentation.connected,
+    ownerPlayerID: room.ownerPlayerID,
+    game: preview.game,
     selectedTeam: [],
     selectedTarget: null,
-    roleKnowledgeOpen: false,
-    canStart: preview.canStart,
-    roomExitBusy: false,
-    connected: reconnectPresentation.connected,
-    manualReconnectAvailable: reconnectPresentation.manualReconnectAvailable,
+    showKnownPlayerInfo: false,
+    showPrivateRoleKnowledge: false,
+    interactionMode: reconnectPresentation.connected ? 'changeSeat' : 'none',
     seatChangeTargetID,
-    startPending,
-  }), [preview, reconnectPresentation.connected, reconnectPresentation.manualReconnectAvailable, room, seatChangeTargetID, startPending])
-  const emptySeatID = room.players.find((player) => player.name == null)
-  const diagnosticsMode = resolveRoomLayoutDiagnosticsMode(location.search, import.meta.env.DEV)
+  }), [preview.currentPlayerID, preview.game, reconnectPresentation.connected, room, seatChangeTargetID])
+  const sceneBase = {
+    matchID: room.matchID,
+    playerCount: room.setupData?.numPlayers ?? room.players.length,
+    players,
+    questProgress: buildQuestProgress(room.setupData?.numPlayers ?? room.players.length, preview.game),
+  }
 
   const resetReconnect = () => {
     reconnectCompletionRef.current = false
@@ -93,45 +87,8 @@ function LobbyPreviewScenario({ scenarioID }: { scenarioID: LobbyPreviewScenario
     resetReconnect()
   }
 
-  return (
-    <div className="room-lobby-preview">
-      <RoomScreen
-        actions={{
-          onActivatePlayer: (playerID) => setSeatChangeTargetID(playerID),
-          onStart: () => setStartPending(true),
-          onReconnect: handleReconnect,
-          onConfirmIdentityRecognition: noOp,
-          onSubmitTeam: noOp,
-          onSelectTeamVote: noOp,
-          onConfirmTeamVote: noOp,
-          onSelectQuestCard: noOp,
-          onConfirmQuestCard: noOp,
-          onAssassinate: noOp,
-        }}
-        diagnosticsMode={diagnosticsMode}
-        model={model}
-        stageAccessory={!controlsOpen ? (
-          <button aria-expanded={controlsOpen} aria-label="打开开发预览控制" className="room-lobby-preview__controls-trigger" onClick={() => setControlsOpen(true)} type="button">
-            <Info aria-hidden="true" size={20} />
-          </button>
-        ) : undefined}
-        tools={{
-          connected: reconnectPresentation.connected,
-          isOwner: room.ownerPlayerID === preview.currentPlayerID,
-          logEntries: [],
-          onBackHome: () => navigate('/dev/room-layout'),
-          onOpenHelp: () => openHelp({ playerCount }),
-          onRequestRoomExit: noOp,
-          onToggleRoleKnowledge: noOp,
-          roomExitBlocked: seatChangeTargetID !== null || startPending,
-          roomExitBusy: false,
-          seatChangePending: seatChangeTargetID !== null,
-          seatChangeTargetID,
-        }}
-      />
-      {controlsOpen && (
-        <aside aria-label="开发预览控制" className="room-lobby-preview__controls" id="room-lobby-preview-controls">
-          <button aria-controls="room-lobby-preview-controls" aria-expanded={controlsOpen} aria-label="关闭开发预览控制" className="room-lobby-preview__controls-close" onClick={() => setControlsOpen(false)} type="button">×</button>
+  const controls = (
+    <>
           <h1>开发预览控制</h1>
           <label>
             玩家人数
@@ -156,8 +113,35 @@ function LobbyPreviewScenario({ scenarioID }: { scenarioID: LobbyPreviewScenario
             </fieldset>
           )}
           <button onClick={resetDemo} type="button">重置预览</button>
-        </aside>
-      )}
-    </div>
+    </>
+  )
+
+  if (!reconnectPresentation.connected) {
+    const scene: RoomConnectionRecoveryScene = {
+      kind: 'connectionRecovery',
+      ...sceneBase,
+      manualReconnectAvailable: reconnectPresentation.manualReconnectAvailable,
+    }
+    return <RoomScreenPreviewShell actions={{ onReconnect: handleReconnect }} controls={controls} scene={scene} />
+  }
+
+  const scene: RoomLobbyScene = {
+    kind: 'lobby',
+    ...sceneBase,
+    occupiedCount: room.players.filter(({ name }) => name != null).length,
+    seatCount: sceneBase.playerCount,
+    viewer: room.ownerPlayerID === preview.currentPlayerID ? 'owner' : 'player',
+    canStart: preview.canStart && !startPending,
+    startRequestState: startPending ? 'pending' : 'idle',
+  }
+  return (
+    <RoomScreenPreviewShell
+      actions={{
+        onActivatePlayer: (playerID) => setSeatChangeTargetID(playerID),
+        onStart: () => setStartPending(true),
+      }}
+      controls={controls}
+      scene={scene}
+    />
   )
 }

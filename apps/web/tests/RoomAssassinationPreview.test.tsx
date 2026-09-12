@@ -1,9 +1,13 @@
 import { renderToStaticMarkup } from 'react-dom/server'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import type { PlayerSeatLayout, RoundTableStageLayoutResult } from '@avalon/ui-layout'
 
+import { HelpProvider } from '../src/HelpProvider'
+import { RoomAssassinationPreview } from '../src/RoomAssassinationPreview'
 import { RoomAssassinationScene } from '../src/RoomAssassinationScene'
 import type { RoomAssassinationScene as Scene, RoomPlayerPresentation } from '../src/room-screen-props'
+import { ToastProvider } from '../src/toast'
 
 const playerLayout: PlayerSeatLayout = {
   relativeSeatIndex: 0,
@@ -45,7 +49,29 @@ function render(view: Scene['view']) {
   )
 }
 
+function renderPreview(scenarioID: 'assassin' | 'evil' | 'good') {
+  return renderToStaticMarkup(
+    <HelpProvider>
+      <ToastProvider>
+        <MemoryRouter initialEntries={[`/dev/room-layout/assassination/${scenarioID}`]}>
+          <Routes>
+            <Route element={<RoomAssassinationPreview />} path="/dev/room-layout/assassination/:scenarioID" />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    </HelpProvider>,
+  )
+}
+
 describe('RoomAssassinationScene', () => {
+  it.each(['assassin', 'evil', 'good'] as const)('renders the %s preview through the shared formal scene shell', (scenarioID) => {
+    const html = renderPreview(scenarioID)
+
+    expect(html).toContain('data-room-preview-shell="true"')
+    expect(html).toContain('data-room-scene="assassination"')
+    expect(html).toContain('aria-label="打开开发预览控制"')
+  })
+
   it('gives only the selecting Assassin a target control and confirmation action', () => {
     const html = render({ kind: 'selecting', targetPlayerID: '0', canSubmit: true, submitRequestState: 'idle' })
 

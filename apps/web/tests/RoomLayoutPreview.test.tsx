@@ -10,6 +10,9 @@ import { RoomQuestPreview } from '../src/RoomQuestPreview'
 import { RoomResultPreview } from '../src/RoomResultPreview'
 import { RoomTeamProposalPreview } from '../src/RoomTeamProposalPreview'
 import { RoomTeamVotePreview } from '../src/RoomTeamVotePreview'
+import { RoomScreenPreviewShell } from '../src/RoomScreenPreviewShell'
+import { HelpProvider } from '../src/HelpProvider'
+import { ToastProvider } from '../src/toast'
 
 function renderGroupedPreviewRoot(path: string) {
   return renderToStaticMarkup(
@@ -28,6 +31,34 @@ function renderGroupedPreviewRoot(path: string) {
 }
 
 describe('RoomLayoutPreview', () => {
+  it('puts one observed production screen, complete chrome, and development controls outside the screen contract', () => {
+    const html = renderToStaticMarkup(
+      <HelpProvider>
+        <ToastProvider>
+          <MemoryRouter>
+            <RoomScreenPreviewShell
+              actions={null}
+              controls={<p>preview controls</p>}
+              scene={{ kind: 'gameResult', matchID: 'preview', playerCount: 5, players: [], questProgress: [], winner: 'good', reason: '任务成功', questScore: '3 : 1' }}
+            />
+          </MemoryRouter>
+        </ToastProvider>
+      </HelpProvider>,
+    )
+
+    expect(html.match(/data-room-preview-shell="true"/g)).toHaveLength(1)
+    expect(html.match(/data-room-screen="true"/g)).toHaveLength(1)
+    expect(html.match(/aria-label="返回主页"/g)).toHaveLength(1)
+    expect(html.match(/aria-label="房间工具"/g)).toHaveLength(1)
+    expect(html.match(/aria-label="系统通知"/g)).toHaveLength(1)
+    expect(html).toContain('data-room-toolbar-item="identity"')
+    expect(html).toContain('data-room-toolbar-item="help"')
+    expect(html).toContain('aria-label="查看对局记录"')
+    expect(html).toContain('data-room-toolbar-item="room"')
+    expect(html).toContain('aria-label="打开开发预览控制"')
+    expect(html).not.toContain('data-room-slot="stage-accessory"')
+  })
+
   it('links every room layout demo from one index', () => {
     const html = renderToStaticMarkup(
       <MemoryRouter><RoomLayoutPreview /></MemoryRouter>,

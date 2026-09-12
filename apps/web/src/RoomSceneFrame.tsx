@@ -68,7 +68,7 @@ export function RoomSceneFrame({
   )
 
   return (
-    <div className="size-full" data-room-scene={scene.kind}>
+    <div className="size-full" data-room-scene={scene.kind} data-room-screen="true">
       <RoomLayout
         chrome={{
           back: slots.back,

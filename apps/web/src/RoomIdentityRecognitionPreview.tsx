@@ -1,20 +1,17 @@
 import { useMemo, useState } from 'react'
-import { Info } from 'lucide-react'
-import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 import { getPlayerCountConfig, loyaltyForRole, type AvalonPlayerView, type PlayerID, type Role } from '@avalon/game'
 
-import { useHelp } from './help-context'
 import type { AvalonMatch, LobbyPlayer } from './lobby'
-import { resolveRoomLayoutDiagnosticsMode } from './room-layout-diagnostics'
-import { buildRoomScreenModel } from './room-screen-controller'
 import {
-  type RoomIdentityRecognitionScene,
   type RoomIdentityRecognitionState,
 } from './RoomIdentityRecognition'
-import { LegacyRoomScreen as RoomScreen } from './LegacyRoomScreen'
+import { buildQuestProgress, buildRoomPlayers } from './room-screen-model'
+import type { RoomIdentityClue, RoomIdentityRecognitionScene } from './room-screen-props'
+import { RoomScreenPreviewShell } from './RoomScreenPreviewShell'
 import { useToast } from './toast-context'
 
-type IdentityRecognitionPreviewScenarioID = RoomIdentityRecognitionScene['type']
+type IdentityRecognitionPreviewScenarioID = 'evil-allies' | 'merlin-evil' | 'percival-candidates' | 'none'
 
 const SCENARIO_IDS: readonly IdentityRecognitionPreviewScenarioID[] = [
   'evil-allies',
@@ -24,8 +21,6 @@ const SCENARIO_IDS: readonly IdentityRecognitionPreviewScenarioID[] = [
 ]
 const CURRENT_PLAYER_ID = '2' as PlayerID
 const PLAYER_NAMES = ['苍', '雾林守望者', '银', '来自卡美洛的无名骑士', '青岚', '暮色远征者', '白鹿', '暮鸦议会记录官', '荆棘', '霜塔守夜人']
-const noOp = () => undefined
-
 const SCENARIO_ROLES: Readonly<Record<IdentityRecognitionPreviewScenarioID, Role>> = {
   'evil-allies': 'assassin',
   'merlin-evil': 'merlin',
@@ -45,25 +40,25 @@ function createPlayers(playerCount: number): LobbyPlayer[] {
   }))
 }
 
-function createScene(
+function createClue(
   scenarioID: IdentityRecognitionPreviewScenarioID,
   playerCount: number,
-): RoomIdentityRecognitionScene {
+): RoomIdentityClue {
   const evilCount = getPlayerCountConfig(playerCount).evil
   const evilSeats = ['0', '4', '6', '8'] as const satisfies readonly PlayerID[]
   if (scenarioID === 'evil-allies') {
-    return { type: scenarioID, targetPlayerIDs: evilSeats.slice(0, evilCount - 1) }
+    return { kind: 'evilAllies', targetPlayerIDs: evilSeats.slice(0, evilCount - 1) }
   }
   if (scenarioID === 'merlin-evil') {
-    return { type: scenarioID, targetPlayerIDs: evilSeats.slice(0, evilCount) }
+    return { kind: 'merlinEvil', targetPlayerIDs: evilSeats.slice(0, evilCount) }
   }
   if (scenarioID === 'percival-candidates') {
     return {
-      type: scenarioID,
+      kind: 'percivalCandidates',
       targetPlayerIDs: ['1', playerCount >= 7 ? '6' : '4'],
     }
   }
-  return { type: 'none', targetPlayerIDs: [] }
+  return { kind: 'none', targetPlayerIDs: [] }
 }
 
 function createPreviewState(input: Readonly<{
@@ -134,92 +129,49 @@ function IdentityRecognitionPreviewScenario({
 }: {
   scenarioID: IdentityRecognitionPreviewScenarioID
 }) {
-  const location = useLocation()
-  const navigate = useNavigate()
-  const { openHelp } = useHelp()
   const { pushToast } = useToast()
   const [playerCount, setPlayerCount] = useState(5)
   const [confirmedCount, setConfirmedCount] = useState(0)
   const [state, setState] = useState<RoomIdentityRecognitionState>('concealed')
-  const [controlsOpen, setControlsOpen] = useState(false)
   const role = SCENARIO_ROLES[scenarioID]
-  const scene = useMemo(() => createScene(scenarioID, playerCount), [playerCount, scenarioID])
+  const clue = useMemo(() => createClue(scenarioID, playerCount), [playerCount, scenarioID])
   const preview = useMemo(
     () => createPreviewState({ playerCount, role, confirmedCount }),
     [confirmedCount, playerCount, role],
   )
-  const model = useMemo(() => buildRoomScreenModel({
-    kind: 'ready',
-    matchID: preview.room.matchID,
-    room: preview.room,
-    game: preview.game,
-    phase: 'identityRecognition',
-    activeStage: 'identityRecognition',
-    currentPlayerID: CURRENT_PLAYER_ID,
-    selectedTeam: [],
-    selectedTarget: null,
-    roleKnowledgeOpen: false,
-    canStart: false,
-    roomExitBusy: false,
-    connected: true,
-    manualReconnectAvailable: false,
-    startPending: false,
-  }), [preview])
-  const diagnosticsMode = resolveRoomLayoutDiagnosticsMode(location.search, import.meta.env.DEV)
-
   const showStableState = (next: RoomIdentityRecognitionState) => {
     setState(next)
     if (next === 'waiting') setConfirmedCount((count) => Math.max(1, count))
   }
 
-  return (
-    <div className="room-lobby-preview">
-      <RoomScreen
-        actions={{
-          onActivatePlayer: noOp,
-          onStart: noOp,
-          onReconnect: noOp,
-          onConfirmIdentityRecognition: noOp,
-          onSubmitTeam: noOp,
-          onSelectTeamVote: noOp,
-          onConfirmTeamVote: noOp,
-          onSelectQuestCard: noOp,
-          onConfirmQuestCard: noOp,
-          onAssassinate: noOp,
-        }}
-        diagnosticsMode={diagnosticsMode}
-        identityRecognition={{
-          confirmedCount,
-          onConfirm: () => setState('confirming'),
-          onReveal: () => setState('revealing'),
-          onRevealComplete: () => setState('revealed'),
-          participantCount: playerCount,
-          scene,
-          state,
-        }}
-        model={model}
-        stageAccessory={!controlsOpen ? (
-          <button aria-expanded={controlsOpen} aria-label="打开开发预览控制" className="room-lobby-preview__controls-trigger" onClick={() => setControlsOpen(true)} type="button">
-            <Info aria-hidden="true" size={20} />
-          </button>
-        ) : undefined}
-        tools={{
-          connected: true,
-          isOwner: false,
-          logEntries: [],
-          onBackHome: () => navigate('/dev/room-layout'),
-          onOpenHelp: () => openHelp({ playerCount }),
-          onRequestRoomExit: noOp,
-          onToggleRoleKnowledge: noOp,
-          roomExitBlocked: false,
-          roomExitBusy: false,
-          seatChangePending: false,
-          seatChangeTargetID: null,
-        }}
-      />
-      {controlsOpen && (
-        <aside aria-label="开发预览控制" className="room-lobby-preview__controls" id="room-identity-recognition-preview-controls">
-          <button aria-controls="room-identity-recognition-preview-controls" aria-expanded={controlsOpen} aria-label="关闭开发预览控制" className="room-lobby-preview__controls-close" onClick={() => setControlsOpen(false)} type="button">×</button>
+  const scene: RoomIdentityRecognitionScene = {
+    kind: 'identityRecognition',
+    matchID: preview.room.matchID,
+    playerCount,
+    players: buildRoomPlayers({
+      players: preview.room.players,
+      numPlayers: playerCount,
+      currentPlayerID: CURRENT_PLAYER_ID,
+      phase: 'identityRecognition',
+      viewerConnected: true,
+      ownerPlayerID: preview.room.ownerPlayerID,
+      game: preview.game,
+      selectedTeam: [],
+      selectedTarget: null,
+      showKnownPlayerInfo: false,
+      showPrivateRoleKnowledge: false,
+      showRoundDecorations: false,
+      interactionMode: 'none',
+    }),
+    questProgress: buildQuestProgress(playerCount, preview.game),
+    clue,
+    view: state === 'confirming' ? 'revealed' : state,
+    confirmedCount,
+    participantCount: playerCount,
+    confirmRequestState: state === 'confirming' ? 'pending' : 'idle',
+  }
+  const controls = (
+    <>
           <h1>身份辨认预览</h1>
           <label>
             玩家人数
@@ -257,8 +209,20 @@ function IdentityRecognitionPreviewScenario({
               }} type="button">模拟确认失败</button>
             </fieldset>
           )}
-        </aside>
-      )}
+    </>
+  )
+
+  return (
+    <div className="size-full" data-identity-recognition-scene={scenarioID} data-identity-recognition-state={state}>
+      <RoomScreenPreviewShell
+        actions={{
+          onConfirm: () => setState('confirming'),
+          onReveal: () => setState('revealing'),
+          onRevealComplete: () => setState('revealed'),
+        }}
+        controls={controls}
+        scene={scene}
+      />
     </div>
   )
 }

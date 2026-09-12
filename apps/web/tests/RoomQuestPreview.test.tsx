@@ -1,8 +1,12 @@
 import { renderToStaticMarkup } from 'react-dom/server'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 
+import { HelpProvider } from '../src/HelpProvider'
+import { RoomQuestPreview } from '../src/RoomQuestPreview'
 import { RoomQuestScene } from '../src/RoomQuestScene'
 import type { RoomQuestScene as Scene } from '../src/room-screen-props'
+import { ToastProvider } from '../src/toast'
 
 const stageLayout = {
   status: 'ready' as const,
@@ -30,7 +34,29 @@ function render(view: Scene['view']) {
   )
 }
 
+function renderPreview(scenarioID: 'member-good' | 'member-evil' | 'observer') {
+  return renderToStaticMarkup(
+    <HelpProvider>
+      <ToastProvider>
+        <MemoryRouter initialEntries={[`/dev/room-layout/quest/${scenarioID}`]}>
+          <Routes>
+            <Route element={<RoomQuestPreview />} path="/dev/room-layout/quest/:scenarioID" />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    </HelpProvider>,
+  )
+}
+
 describe('RoomQuestScene', () => {
+  it.each(['member-good', 'member-evil', 'observer'] as const)('renders the %s preview through the shared formal scene shell', (scenarioID) => {
+    const html = renderPreview(scenarioID)
+
+    expect(html).toContain('data-room-preview-shell="true"')
+    expect(html).toContain('data-room-scene="quest"')
+    expect(html).toContain('aria-label="打开开发预览控制"')
+  })
+
   it('shows a Good member only the authorized Success choice', () => {
     const html = render({ kind: 'choosing', alignment: 'good', selectedCard: 'success', canChoose: true, submitRequestState: 'idle' })
 

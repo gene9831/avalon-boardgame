@@ -1,9 +1,13 @@
 import { renderToStaticMarkup } from 'react-dom/server'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import type { PlayerSeatLayout, RoundTableStageLayoutResult } from '@avalon/ui-layout'
 
+import { HelpProvider } from '../src/HelpProvider'
+import { RoomTeamProposalPreview } from '../src/RoomTeamProposalPreview'
 import { RoomTeamProposalScene } from '../src/RoomTeamProposalScene'
 import type { RoomPlayerPresentation, RoomTeamProposalScene as Scene } from '../src/room-screen-props'
+import { ToastProvider } from '../src/toast'
 
 const playerLayout: PlayerSeatLayout = {
   relativeSeatIndex: 0,
@@ -47,7 +51,29 @@ function render(scene: Scene) {
   )
 }
 
+function renderPreview(scenarioID: 'leader' | 'member') {
+  return renderToStaticMarkup(
+    <HelpProvider>
+      <ToastProvider>
+        <MemoryRouter initialEntries={[`/dev/room-layout/team-proposal/${scenarioID}`]}>
+          <Routes>
+            <Route element={<RoomTeamProposalPreview />} path="/dev/room-layout/team-proposal/:scenarioID" />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    </HelpProvider>,
+  )
+}
+
 describe('RoomTeamProposalScene', () => {
+  it.each(['leader', 'member'] as const)('renders the %s preview through the shared formal scene shell', (scenarioID) => {
+    const html = renderPreview(scenarioID)
+
+    expect(html).toContain('data-room-preview-shell="true"')
+    expect(html).toContain('data-room-scene="teamProposal"')
+    expect(html).toContain('aria-label="打开开发预览控制"')
+  })
+
   it('gives the leader selectable seats and enables the exact team action only when ready', () => {
     const incomplete = render(makeScene())
     const complete = render(makeScene({ selectedCount: 3, canSubmit: true }))

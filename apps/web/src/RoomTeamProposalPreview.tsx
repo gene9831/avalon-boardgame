@@ -1,14 +1,12 @@
 import { useMemo, useState } from 'react'
-import { Info } from 'lucide-react'
-import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 import type { AvalonPlayerView, PlayerID } from '@avalon/game'
 
-import { useHelp } from './help-context'
 import type { AvalonMatch, LobbyPlayer } from './lobby'
-import { LegacyRoomScreen as RoomScreen } from './LegacyRoomScreen'
 import { getQuestTeamSize, toggleTeamMember } from './room-game'
-import { resolveRoomLayoutDiagnosticsMode } from './room-layout-diagnostics'
-import { buildRoomScreenModel } from './room-screen-controller'
+import { buildQuestProgress, buildRoomPlayers } from './room-screen-model'
+import type { RoomTeamProposalScene } from './room-screen-props'
+import { RoomScreenPreviewShell } from './RoomScreenPreviewShell'
 import { useToast } from './toast-context'
 
 type TeamProposalPreviewScenarioID = 'leader' | 'member'
@@ -16,8 +14,6 @@ type TeamProposalPreviewScenarioID = 'leader' | 'member'
 const SCENARIO_IDS: readonly TeamProposalPreviewScenarioID[] = ['leader', 'member']
 const CURRENT_PLAYER_ID = '2' as PlayerID
 const PLAYER_NAMES = ['苍', '雾林守望者', '银', '来自卡美洛的无名骑士', '青岚', '暮色远征者', '白鹿', '暮鸦议会记录官', '荆棘', '霜塔守夜人']
-const noOp = () => undefined
-
 function isScenarioID(value: string | undefined): value is TeamProposalPreviewScenarioID {
   return value !== undefined && SCENARIO_IDS.includes(value as TeamProposalPreviewScenarioID)
 }
@@ -97,9 +93,6 @@ export function RoomTeamProposalPreview() {
 }
 
 function TeamProposalPreviewScenario({ scenarioID }: { scenarioID: TeamProposalPreviewScenarioID }) {
-  const location = useLocation()
-  const navigate = useNavigate()
-  const { openHelp } = useHelp()
   const { pushToast } = useToast()
   const [playerCount, setPlayerCount] = useState(5)
   const [questIndex, setQuestIndex] = useState(0)
@@ -107,31 +100,11 @@ function TeamProposalPreviewScenario({ scenarioID }: { scenarioID: TeamProposalP
   const [selectedTeam, setSelectedTeam] = useState<PlayerID[]>([CURRENT_PLAYER_ID])
   const [disconnected, setDisconnected] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [controlsOpen, setControlsOpen] = useState(false)
   const preview = useMemo(() => createPreviewState({
     scenarioID, playerCount, questIndex, consecutiveRejectedTeams, disconnected,
   }), [consecutiveRejectedTeams, disconnected, playerCount, questIndex, scenarioID])
   const requiredTeamSize = getQuestTeamSize(playerCount, questIndex)
   const isLeader = scenarioID === 'leader'
-  const diagnosticsMode = resolveRoomLayoutDiagnosticsMode(location.search, import.meta.env.DEV)
-  const model = useMemo(() => buildRoomScreenModel({
-    kind: 'ready',
-    matchID: preview.room.matchID,
-    room: preview.room,
-    game: preview.game,
-    phase: 'teamProposal',
-    activeStage: isLeader ? 'leader' : undefined,
-    currentPlayerID: CURRENT_PLAYER_ID,
-    selectedTeam: isLeader ? selectedTeam : [],
-    selectedTarget: null,
-    roleKnowledgeOpen: false,
-    canStart: false,
-    roomExitBusy: false,
-    connected: true,
-    manualReconnectAvailable: false,
-    startPending: false,
-    teamSubmissionPending: submitting,
-  }), [isLeader, preview, selectedTeam, submitting])
 
   const setSelection = (selection: readonly PlayerID[]) => {
     setSelectedTeam([...selection])
@@ -139,48 +112,35 @@ function TeamProposalPreviewScenario({ scenarioID }: { scenarioID: TeamProposalP
   }
   const selectionOrder = [CURRENT_PLAYER_ID, ...Array.from({ length: playerCount }, (_, id) => String(id) as PlayerID).filter((id) => id !== CURRENT_PLAYER_ID)]
 
-  return (
-    <div className="room-lobby-preview">
-      <RoomScreen
-        actions={{
-          onActivatePlayer: (playerID) => {
-            if (!isLeader || submitting) return
-            setSelection(toggleTeamMember(selectedTeam, playerID, requiredTeamSize))
-          },
-          onStart: noOp,
-          onReconnect: noOp,
-          onConfirmIdentityRecognition: noOp,
-          onSubmitTeam: () => setSubmitting(true),
-          onSelectTeamVote: noOp,
-          onConfirmTeamVote: noOp,
-          onSelectQuestCard: noOp,
-          onConfirmQuestCard: noOp,
-          onAssassinate: noOp,
-        }}
-        diagnosticsMode={diagnosticsMode}
-        model={model}
-        stageAccessory={!controlsOpen ? (
-          <button aria-expanded={controlsOpen} aria-label="打开开发预览控制" className="room-lobby-preview__controls-trigger" onClick={() => setControlsOpen(true)} type="button">
-            <Info aria-hidden="true" size={20} />
-          </button>
-        ) : undefined}
-        tools={{
-          connected: true,
-          isOwner: preview.room.ownerPlayerID === CURRENT_PLAYER_ID,
-          logEntries: [],
-          onBackHome: () => navigate('/dev/room-layout'),
-          onOpenHelp: () => openHelp({ playerCount }),
-          onRequestRoomExit: noOp,
-          onToggleRoleKnowledge: noOp,
-          roomExitBlocked: false,
-          roomExitBusy: false,
-          seatChangePending: false,
-          seatChangeTargetID: null,
-        }}
-      />
-      {controlsOpen && (
-        <aside aria-label="开发预览控制" className="room-lobby-preview__controls" id="room-team-proposal-preview-controls">
-          <button aria-controls="room-team-proposal-preview-controls" aria-expanded={controlsOpen} aria-label="关闭开发预览控制" className="room-lobby-preview__controls-close" onClick={() => setControlsOpen(false)} type="button">×</button>
+  const scene: RoomTeamProposalScene = {
+    kind: 'teamProposal',
+    matchID: preview.room.matchID,
+    playerCount,
+    players: buildRoomPlayers({
+      players: preview.room.players,
+      numPlayers: playerCount,
+      currentPlayerID: CURRENT_PLAYER_ID,
+      phase: 'teamProposal',
+      viewerConnected: true,
+      ownerPlayerID: preview.room.ownerPlayerID,
+      game: preview.game,
+      selectedTeam: isLeader ? selectedTeam : [],
+      selectedTarget: null,
+      showKnownPlayerInfo: false,
+      showPrivateRoleKnowledge: false,
+      interactionMode: isLeader ? 'selectTeam' : 'none',
+    }),
+    questProgress: buildQuestProgress(playerCount, preview.game),
+    questIndex,
+    requiredTeamSize,
+    selectedCount: isLeader ? selectedTeam.length : 0,
+    consecutiveRejectedTeams,
+    perspective: isLeader ? 'leader' : 'observer',
+    canSubmit: isLeader && !submitting && selectedTeam.length === requiredTeamSize,
+    submitRequestState: submitting ? 'pending' : 'idle',
+  }
+  const controls = (
+    <>
           <h1>组队阶段预览</h1>
           <label>
             玩家人数
@@ -215,8 +175,20 @@ function TeamProposalPreviewScenario({ scenarioID }: { scenarioID: TeamProposalP
           )}
           {submitting && <button onClick={() => { setSubmitting(false); pushToast({ message: '确认队伍失败，请重试。', tone: 'error' }) }} type="button">模拟确认失败</button>}
           <button onClick={() => { setQuestIndex(0); setConsecutiveRejectedTeams(0); setDisconnected(true); setSelection([]) }} type="button">重置预览</button>
-        </aside>
-      )}
-    </div>
+    </>
+  )
+
+  return (
+    <RoomScreenPreviewShell
+      actions={{
+        onActivatePlayer: (playerID) => {
+          if (!isLeader || submitting) return
+          setSelection(toggleTeamMember(selectedTeam, playerID, requiredTeamSize))
+        },
+        onSubmitTeam: () => setSubmitting(true),
+      }}
+      controls={controls}
+      scene={scene}
+    />
   )
 }
