@@ -1,10 +1,10 @@
 import { Check, CircleX, UserRound, X } from 'lucide-react'
 import '@fontsource/almendra/700.css'
 
-import type { QuestProgressNodeModel } from './room-screen-model'
+import type { QuestProgressNode } from './room-presentation'
 
 interface QuestProgressTrackProps {
-  nodes: readonly QuestProgressNodeModel[]
+  nodes: readonly QuestProgressNode[]
 }
 
 const questNumerals = ['I', 'II', 'III', 'IV', 'V'] as const

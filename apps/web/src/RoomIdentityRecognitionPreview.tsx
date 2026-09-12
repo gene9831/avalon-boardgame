@@ -3,15 +3,14 @@ import { Navigate, useParams } from 'react-router-dom'
 import { getPlayerCountConfig, loyaltyForRole, type AvalonPlayerView, type PlayerID, type Role } from '@avalon/game'
 
 import type { AvalonMatch, LobbyPlayer } from './lobby'
-import {
-  type RoomIdentityRecognitionState,
-} from './RoomIdentityRecognition'
-import { buildQuestProgress, buildRoomPlayers } from './room-screen-model'
+import { buildQuestProgress, buildRoomPlayers } from './room-presentation'
 import type { RoomIdentityClue, RoomIdentityRecognitionScene } from './room-screen-props'
 import { RoomScreenPreviewShell } from './RoomScreenPreviewShell'
 import { useToast } from './toast-context'
 
 type IdentityRecognitionPreviewScenarioID = 'evil-allies' | 'merlin-evil' | 'percival-candidates' | 'none'
+type CluePresentation = Extract<RoomIdentityRecognitionScene['presentation'], { kind: 'clue' }>
+type RoomIdentityRecognitionPreviewState = CluePresentation['view'] | 'confirming'
 
 const SCENARIO_IDS: readonly IdentityRecognitionPreviewScenarioID[] = [
   'evil-allies',
@@ -132,14 +131,14 @@ function IdentityRecognitionPreviewScenario({
   const { pushToast } = useToast()
   const [playerCount, setPlayerCount] = useState(5)
   const [confirmedCount, setConfirmedCount] = useState(0)
-  const [state, setState] = useState<RoomIdentityRecognitionState>('concealed')
+  const [state, setState] = useState<RoomIdentityRecognitionPreviewState>('concealed')
   const role = SCENARIO_ROLES[scenarioID]
   const clue = useMemo(() => createClue(scenarioID, playerCount), [playerCount, scenarioID])
   const preview = useMemo(
     () => createPreviewState({ playerCount, role, confirmedCount }),
     [confirmedCount, playerCount, role],
   )
-  const showStableState = (next: RoomIdentityRecognitionState) => {
+  const showStableState = (next: RoomIdentityRecognitionPreviewState) => {
     setState(next)
     if (next === 'waiting') setConfirmedCount((count) => Math.max(1, count))
   }
@@ -164,11 +163,14 @@ function IdentityRecognitionPreviewScenario({
       interactionMode: 'none',
     }),
     questProgress: buildQuestProgress(playerCount, preview.game),
-    clue,
-    view: state === 'confirming' ? 'revealed' : state,
+    presentation: {
+      kind: 'clue',
+      clue,
+      view: state === 'confirming' ? 'revealed' : state,
+      confirmRequestState: state === 'confirming' ? 'pending' : 'idle',
+    },
     confirmedCount,
     participantCount: playerCount,
-    confirmRequestState: state === 'confirming' ? 'pending' : 'idle',
   }
   const controls = (
     <>

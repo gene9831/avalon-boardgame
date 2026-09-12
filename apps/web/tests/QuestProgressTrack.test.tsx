@@ -2,9 +2,9 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { QuestProgressTrack } from '../src/QuestProgressTrack'
-import type { QuestProgressNodeModel } from '../src/room-screen-model'
+import type { QuestProgressNode } from '../src/room-presentation'
 
-const nodes: readonly QuestProgressNodeModel[] = [
+const nodes: readonly QuestProgressNode[] = [
   { questIndex: 0, teamSize: 2, failThreshold: 1, state: 'success' },
   { questIndex: 1, teamSize: 3, failThreshold: 1, state: 'current' },
   { questIndex: 2, teamSize: 2, failThreshold: 1, state: 'upcoming' },

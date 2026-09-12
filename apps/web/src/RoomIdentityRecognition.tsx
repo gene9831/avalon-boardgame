@@ -1,15 +1,19 @@
-import type { AnimationEvent } from 'react'
-import type { PlayerID } from '@avalon/game'
-
+import type { AnimationEvent, ReactNode } from 'react'
 import { RoomActionButton } from './RoomActionButton'
 import { RoomCenter } from './RoomCenter'
-import type { RoomPhasePanelSlots } from './RoomPhasePanelContent'
+import { RoleCard } from './RoleCard'
 import type {
   RoomActionsByKind,
   RoomIdentityClue,
   RoomIdentityRecognitionScene as RoomIdentityRecognitionSceneData,
 } from './room-screen-props'
 import './RoomIdentityRecognition.css'
+
+type RoomPhaseContent = Readonly<{
+  title: string
+  middle: ReactNode
+  action: ReactNode
+}>
 
 export interface RoomIdentityRecognitionSurfaceProps {
   actions: RoomActionsByKind['identityRecognition']
@@ -56,145 +60,173 @@ function CenterMessage({ description, title, kind }: { description: string; titl
   )
 }
 
+function WaitingProgress({ scene, label }: {
+  scene: RoomIdentityRecognitionSceneData
+  label: string
+}) {
+  return (
+    <RoomCenter data-identity-recognition-center="waiting" density="compact" role="status">
+      <strong className="block text-2xl font-semibold text-amber-100">
+        {scene.confirmedCount} / {scene.participantCount}
+      </strong>
+      <span className="mt-1 block text-sm text-slate-200">{label}</span>
+      <span className="mt-1 block text-xs text-slate-400">等待其他玩家</span>
+    </RoomCenter>
+  )
+}
+
+function assertNeverPresentation(value: never): never {
+  throw new Error(`Unhandled identity-recognition presentation: ${String(value)}`)
+}
+
 export function RoomIdentityRecognitionCenterSurface({
   scene,
 }: Pick<RoomIdentityRecognitionSurfaceProps, 'scene'>) {
-  if (scene.view === 'concealed' || scene.view === 'revealing') {
-    return <CenterMessage description="准备查看你的线索" title="夜幕降临" kind="concealed" />
+  const presentation = scene.presentation
+  switch (presentation.kind) {
+    case 'observer':
+      return <WaitingProgress label="玩家正在完成辨认" scene={scene} />
+    case 'roleReveal':
+      return <WaitingProgress label="玩家已确认身份" scene={scene} />
+    case 'clue': {
+      if (presentation.view === 'concealed' || presentation.view === 'revealing') {
+        return <CenterMessage description="准备查看你的线索" title="夜幕降临" kind="concealed" />
+      }
+      if (presentation.view === 'waiting') {
+        return <WaitingProgress label="玩家已完成辨认" scene={scene} />
+      }
+      const copy = CLUE_COPY[presentation.clue.kind]
+      return <CenterMessage description={copy.description} title={copy.title} kind={presentation.clue.kind} />
+    }
+    default:
+      return assertNeverPresentation(presentation)
   }
-
-  if (scene.view === 'waiting') {
-    return (
-      <RoomCenter data-identity-recognition-center="waiting" density="compact" role="status">
-        <strong className="block text-2xl font-semibold text-amber-100">
-          {scene.confirmedCount} / {scene.participantCount}
-        </strong>
-        <span className="mt-1 block text-sm text-slate-200">玩家已完成辨认</span>
-        <span className="mt-1 block text-xs text-slate-400">等待其他玩家</span>
-      </RoomCenter>
-    )
-  }
-
-  const copy = CLUE_COPY[scene.clue.kind]
-  return <CenterMessage description={copy.description} title={copy.title} kind={scene.clue.kind} />
 }
 
 export function RoomIdentityRecognitionPhaseContentSurface({
   actions,
   scene,
-}: RoomIdentityRecognitionSurfaceProps): RoomPhasePanelSlots {
-  if (scene.view === 'waiting') {
-    return {
-      title: '等待其他玩家',
-      middle: <p className="text-sm text-slate-300">你的线索已确认</p>,
-      action: null,
-    }
+}: RoomIdentityRecognitionSurfaceProps): RoomPhaseContent {
+  const presentation = scene.presentation
+  switch (presentation.kind) {
+    case 'observer':
+      return {
+        title: '等待其他玩家',
+        middle: <p className="text-sm text-slate-300">等待参与玩家完成辨认</p>,
+        action: null,
+      }
+    case 'roleReveal':
+      if (presentation.view === 'waiting') {
+        return {
+          title: '等待其他玩家',
+          middle: <p className="text-sm text-slate-300">你的身份已确认，等待其他玩家</p>,
+          action: null,
+        }
+      }
+      return {
+        title: '确认你的身份',
+        middle: <p className="text-sm text-slate-300">记住角色能力与本局目标</p>,
+        action: (
+          <RoomActionButton onClick={actions.onConfirm} requestState={presentation.confirmRequestState}>
+            我已确认身份
+          </RoomActionButton>
+        ),
+      }
+    case 'clue':
+      if (presentation.view === 'waiting') {
+        return {
+          title: '等待其他玩家',
+          middle: <p className="text-sm text-slate-300">你的线索已确认</p>,
+          action: null,
+        }
+      }
+      if (presentation.view === 'revealed') {
+        return {
+          title: '辨认你的线索',
+          middle: <p className="text-sm text-slate-300">{clueSummary(presentation.clue)}</p>,
+          action: (
+            <RoomActionButton onClick={actions.onConfirm} requestState={presentation.confirmRequestState}>
+              {confirmationLabel(presentation.clue)}
+            </RoomActionButton>
+          ),
+        }
+      }
+      return {
+        title: '辨认你的线索',
+        middle: <p className="text-sm text-slate-300">请确保其他玩家无法看到你的屏幕</p>,
+        action: (
+          <RoomActionButton disabled={presentation.view === 'revealing'} onClick={actions.onReveal}>
+            查看线索
+          </RoomActionButton>
+        ),
+      }
+    default:
+      return assertNeverPresentation(presentation)
   }
+}
 
-  if (scene.view === 'revealed') {
-    return {
-      title: '辨认你的线索',
-      middle: <p className="text-sm text-slate-300">{clueSummary(scene.clue)}</p>,
-      action: (
-        <RoomActionButton onClick={actions.onConfirm} requestState={scene.confirmRequestState}>
-          {confirmationLabel(scene.clue)}
-        </RoomActionButton>
-      ),
-    }
-  }
-
-  return {
-    title: '辨认你的线索',
-    middle: <p className="text-sm text-slate-300">请确保其他玩家无法看到你的屏幕</p>,
-    action: (
-      <RoomActionButton disabled={scene.view === 'revealing'} onClick={actions.onReveal}>
-        查看线索
-      </RoomActionButton>
-    ),
-  }
+function CurtainDecoration() {
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(56,45,24,0.3),_transparent_34%),linear-gradient(180deg,_#0b1728,_#030812)]">
+      <div className="absolute inset-x-0 top-0 h-2 bg-gradient-to-r from-transparent via-amber-300/45 to-transparent" />
+      <div className="absolute inset-y-0 left-0 w-[18%] bg-gradient-to-r from-black/55 to-transparent" />
+      <div className="absolute inset-y-0 right-0 w-[18%] bg-gradient-to-l from-black/55 to-transparent" />
+    </div>
+  )
 }
 
 export function RoomIdentityRecognitionStageSurface({
   actions,
   scene,
 }: RoomIdentityRecognitionSurfaceProps) {
-  if (scene.view === 'waiting') return null
+  const presentation = scene.presentation
+  if (presentation.kind === 'observer') {
+    return (
+      <section
+        aria-label="身份辨认幕布"
+        className="identity-curtain identity-curtain--closed absolute inset-0 z-[30] grid place-items-center overflow-hidden px-5 text-center"
+        data-curtain-state="closed"
+        data-identity-step="waiting"
+      >
+        <CurtainDecoration />
+        <h2 className="relative z-10 font-serif text-2xl font-semibold text-amber-50">等待身份辨认</h2>
+      </section>
+    )
+  }
+  if (presentation.kind === 'roleReveal') {
+    return (
+      <section
+        aria-label="身份辨认"
+        className="pointer-events-none absolute inset-0 z-[30] overflow-hidden"
+        data-curtain-state="lowered"
+        data-identity-step="roleReveal"
+        data-table-visibility="hidden"
+      >
+        <div aria-hidden="true" className="identity-curtain identity-curtain--lowering absolute inset-0">
+          <CurtainDecoration />
+        </div>
+        <div className="identity-role-reveal-content relative z-10 flex h-full flex-col items-center justify-center gap-4 p-3">
+          <h2 className="font-serif text-xl font-semibold text-amber-50">查看你的身份</h2>
+          <RoleCard role={presentation.role} />
+        </div>
+      </section>
+    )
+  }
+  if (presentation.view === 'waiting') return null
 
   const handleAnimationEnd = (event: AnimationEvent<HTMLDivElement>) => {
     if (event.target !== event.currentTarget) return
-    if (scene.view === 'revealing') actions.onRevealComplete()
+    if (presentation.view === 'revealing') actions.onRevealComplete()
   }
 
   return (
     <div
       aria-hidden="true"
       className="identity-recognition-atmosphere pointer-events-none absolute inset-0 z-[30] overflow-hidden"
-      data-identity-recognition-atmosphere={scene.view}
+      data-identity-recognition-atmosphere={presentation.view}
       onAnimationEnd={handleAnimationEnd}
     >
       <span className="identity-recognition-wave absolute left-1/2 top-1/2 rounded-full" />
     </div>
   )
-}
-
-// Compatibility for the pre-migration RoomScreen and identity previews.
-export type RoomIdentityRecognitionScene =
-  | Readonly<{ type: 'evil-allies'; targetPlayerIDs: readonly PlayerID[] }>
-  | Readonly<{ type: 'merlin-evil'; targetPlayerIDs: readonly PlayerID[] }>
-  | Readonly<{ type: 'percival-candidates'; targetPlayerIDs: readonly [PlayerID, PlayerID] }>
-  | Readonly<{ type: 'none'; targetPlayerIDs: readonly [] }>
-
-export type RoomIdentityRecognitionState = RoomIdentityRecognitionSceneData['view'] | 'confirming'
-
-export interface RoomIdentityRecognitionPresentation {
-  confirmedCount: number
-  onConfirm(): void
-  onReveal(): void
-  onRevealComplete(): void
-  participantCount: number
-  scene: RoomIdentityRecognitionScene
-  state: RoomIdentityRecognitionState
-}
-
-function legacyClue(clue: RoomIdentityRecognitionScene): RoomIdentityClue {
-  switch (clue.type) {
-    case 'evil-allies': return { kind: 'evilAllies', targetPlayerIDs: clue.targetPlayerIDs }
-    case 'merlin-evil': return { kind: 'merlinEvil', targetPlayerIDs: clue.targetPlayerIDs }
-    case 'percival-candidates': return { kind: 'percivalCandidates', targetPlayerIDs: clue.targetPlayerIDs }
-    case 'none': return { kind: 'none', targetPlayerIDs: clue.targetPlayerIDs }
-  }
-}
-
-function legacyBinding(presentation: RoomIdentityRecognitionPresentation): RoomIdentityRecognitionSurfaceProps {
-  return {
-    actions: {
-      onConfirm: presentation.onConfirm,
-      onReveal: presentation.onReveal,
-      onRevealComplete: presentation.onRevealComplete,
-    },
-    scene: {
-      kind: 'identityRecognition', matchID: '', playerCount: null, players: [], questProgress: [],
-      clue: legacyClue(presentation.scene),
-      view: presentation.state === 'confirming' ? 'revealed' : presentation.state,
-      confirmedCount: presentation.confirmedCount,
-      participantCount: presentation.participantCount,
-      confirmRequestState: presentation.state === 'confirming' ? 'pending' : 'idle',
-    },
-  }
-}
-
-export function RoomIdentityRecognitionCenter({ presentation }: { presentation: RoomIdentityRecognitionPresentation }) {
-  return <RoomIdentityRecognitionCenterSurface scene={legacyBinding(presentation).scene} />
-}
-
-export function RoomIdentityRecognitionPhaseContent({ presentation }: { presentation: RoomIdentityRecognitionPresentation }) {
-  const phase = RoomIdentityRecognitionPhaseContentSurface(legacyBinding(presentation))
-  return {
-    ...phase,
-    title: <h2 className="truncate text-base font-semibold text-amber-100">{phase.title}</h2>,
-  }
-}
-
-export function RoomIdentityRecognitionStage({ presentation }: { presentation: RoomIdentityRecognitionPresentation }) {
-  return <RoomIdentityRecognitionStageSurface {...legacyBinding(presentation)} />
 }

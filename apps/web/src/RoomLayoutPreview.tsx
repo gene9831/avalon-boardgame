@@ -9,10 +9,10 @@ import './RoomLayoutPreview.css'
 import { RoomNumber } from './RoomNumber'
 import { RoomPhaseLabel } from './RoomPhaseLabel'
 import { RoomToolbar, type RoomToolbarItem } from './RoomToolbar'
-import type { QuestProgressNodeModel } from './room-screen-model'
+import type { QuestProgressNode } from './room-presentation'
 import { useElementSize, type ElementSize } from './useElementSize'
 
-const previewQuestNodes: readonly QuestProgressNodeModel[] = [
+const previewQuestNodes: readonly QuestProgressNode[] = [
   { questIndex: 0, teamSize: 2, failThreshold: 1, state: 'success' },
   { questIndex: 1, teamSize: 3, failThreshold: 1, state: 'current' },
   { questIndex: 2, teamSize: 2, failThreshold: 1, state: 'upcoming' },
@@ -29,6 +29,12 @@ function PreviewRegion({ label, tone }: { label: string; tone: 'phase' | 'stage'
 }
 
 const PREVIEW_GROUPS = [
+  {
+    title: '进入房间',
+    links: [
+      { label: '加载房间', to: '/dev/room-layout/loading' },
+    ],
+  },
   {
     title: '基础布局',
     links: [

@@ -1,9 +1,8 @@
-import type { AnimationEvent } from 'react'
-import { loyaltyForRole, type Role } from '@avalon/game'
+import type { AnimationEvent, ReactNode } from 'react'
+import { loyaltyForRole } from '@avalon/game'
 
 import { RoomActionButton } from './RoomActionButton'
 import { RoomCenter } from './RoomCenter'
-import type { RoomPhasePanelSlots } from './RoomPhasePanelContent'
 import { ROLE_GUIDANCE } from './role-guidance'
 import { getRoleArtworkSourceSet, ROLE_ARTWORK } from './role-artwork'
 import { LOYALTY_LABELS, ROLE_LABELS } from './room-game'
@@ -12,6 +11,12 @@ import type {
   RoomIdentityConfirmationScene,
 } from './room-screen-props'
 import './RoomIdentityConfirmation.css'
+
+type RoomPhaseContent = Readonly<{
+  title: string
+  middle: ReactNode
+  action: ReactNode
+}>
 
 export interface RoomIdentityConfirmationSurfaceProps {
   actions: RoomActionsByKind['identityConfirmation']
@@ -131,7 +136,7 @@ export function RoomIdentityConfirmationStageSurface({
 export function RoomIdentityConfirmationPhaseContentSurface({
   actions,
   scene,
-}: RoomIdentityConfirmationSurfaceProps): RoomPhasePanelSlots {
+}: RoomIdentityConfirmationSurfaceProps): RoomPhaseContent {
   if (scene.view === 'concealed' || scene.view === 'revealing') {
     return {
       title: '确认你的身份',
@@ -181,62 +186,5 @@ export function RoomIdentityConfirmationPhaseContentSurface({
     title: '查看已确认身份',
     middle: <p className="text-sm text-slate-300">你的身份已确认</p>,
     action: <RoomActionButton onClick={actions.onCloseReview} tone="secondary">收起身份</RoomActionButton>,
-  }
-}
-
-// Compatibility for the pre-migration RoomScreen and identity previews.
-export type RoomIdentityConfirmationState =
-  | RoomIdentityConfirmationScene['view']
-  | 'confirming'
-
-export interface RoomIdentityConfirmationPresentation {
-  confirmedCount: number
-  onCloseReview(): void
-  onConfirm(): void
-  onHide(): void
-  onHideComplete(): void
-  onReveal(): void
-  onRevealComplete(): void
-  onReview(): void
-  participantCount: number
-  role: Role
-  state: RoomIdentityConfirmationState
-}
-
-function legacyBinding(presentation: RoomIdentityConfirmationPresentation): RoomIdentityConfirmationSurfaceProps {
-  return {
-    actions: {
-      onCloseReview: presentation.onCloseReview,
-      onConfirm: presentation.onConfirm,
-      onHide: presentation.onHide,
-      onHideComplete: presentation.onHideComplete,
-      onReveal: presentation.onReveal,
-      onRevealComplete: presentation.onRevealComplete,
-      onReview: presentation.onReview,
-    },
-    scene: {
-      kind: 'identityConfirmation', matchID: '', playerCount: null, players: [], questProgress: [],
-      role: presentation.role,
-      view: presentation.state === 'confirming' ? 'revealed' : presentation.state,
-      confirmedCount: presentation.confirmedCount,
-      participantCount: presentation.participantCount,
-      confirmRequestState: presentation.state === 'confirming' ? 'pending' : 'idle',
-    },
-  }
-}
-
-export function RoomIdentityConfirmationCenter({ presentation }: { presentation: RoomIdentityConfirmationPresentation }) {
-  return <RoomIdentityConfirmationCenterSurface scene={legacyBinding(presentation).scene} />
-}
-
-export function RoomIdentityConfirmationStage({ presentation }: { presentation: RoomIdentityConfirmationPresentation }) {
-  return <RoomIdentityConfirmationStageSurface {...legacyBinding(presentation)} />
-}
-
-export function RoomIdentityConfirmationPhaseContent({ presentation }: { presentation: RoomIdentityConfirmationPresentation }) {
-  const phase = RoomIdentityConfirmationPhaseContentSurface(legacyBinding(presentation))
-  return {
-    ...phase,
-    title: <h2 className="truncate text-base font-semibold text-amber-100">{phase.title}</h2>,
   }
 }

@@ -19,6 +19,10 @@ export interface RoomIdentityRecognitionSceneProps {
   slots: RoomScreenSlots
 }
 
+function recognitionState(scene: RoomIdentityRecognitionSceneData) {
+  return scene.presentation.kind === 'observer' ? 'observer' : scene.presentation.view
+}
+
 export function RoomIdentityRecognitionScene({
   actions,
   geometry,
@@ -32,7 +36,7 @@ export function RoomIdentityRecognitionScene({
   }
 
   return (
-    <div className="size-full" data-identity-recognition-state={scene.view}>
+    <div className="size-full" data-identity-recognition-state={recognitionState(scene)}>
       <RoomSceneFrame
         content={{
           title: phase.title,

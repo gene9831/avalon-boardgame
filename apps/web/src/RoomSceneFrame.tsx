@@ -80,7 +80,7 @@ export function RoomSceneFrame({
         layoutRef={geometry.layoutRef}
         phasePanel={<RoomPhasePanel action={content.phaseAction} middle={content.phaseMiddle} />}
         stage={stage}
-        stageAccessory={content.stageAtmosphere}
+        stageAtmosphere={content.stageAtmosphere}
         stageRef={geometry.stageRef}
       />
     </div>

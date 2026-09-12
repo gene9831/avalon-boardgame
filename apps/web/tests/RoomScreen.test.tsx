@@ -150,8 +150,11 @@ describe('RoomScreen', () => {
         } }}
         scene={{
           kind: 'identityRecognition', matchID: 'ABC123456', playerCount: 5, players: [], questProgress: [],
-          clue: { kind: 'evilAllies', targetPlayerIDs: ['0'] }, view: 'revealed',
-          confirmedCount: 0, participantCount: 5, confirmRequestState: 'idle',
+          presentation: {
+            kind: 'clue', clue: { kind: 'evilAllies', targetPlayerIDs: ['0'] },
+            view: 'revealed', confirmRequestState: 'idle',
+          },
+          confirmedCount: 0, participantCount: 5,
         }}
         slots={{ back: null, toolbar: null }}
       />,

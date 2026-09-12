@@ -13,7 +13,7 @@ import {
   getLobbyPreviewReconnectPresentation,
   resetLobbyPreviewReconnect,
 } from '../src/room-lobby-preview-model'
-import { buildRoomPlayers } from '../src/room-screen-model'
+import { buildRoomPlayers } from '../src/room-presentation'
 import { ToastProvider } from '../src/toast'
 
 function renderPreview(path: string) {
@@ -90,7 +90,7 @@ describe('RoomLobbyPreview', () => {
     expect(html).toContain('aria-label="打开开发预览控制"')
     expect(html).not.toContain('id="room-screen-preview-controls"')
     expect(html).not.toContain('aria-label="关闭开发预览控制"')
-    expect(html).not.toContain('data-room-slot="stage-accessory"')
+    expect(html).not.toContain('data-room-slot="stage-atmosphere"')
     expect(html).toContain('lucide-info')
   })
 

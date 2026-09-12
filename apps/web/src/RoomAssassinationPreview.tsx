@@ -3,13 +3,18 @@ import { Navigate, useParams } from 'react-router-dom'
 import type { AvalonPlayerView, PlayerID, Role } from '@avalon/game'
 
 import type { AvalonMatch, LobbyPlayer } from './lobby'
-import type { AssassinationOutcome } from './room-assassination-preview-model'
-import { buildQuestProgress, buildRoomPlayers } from './room-screen-model'
+import { buildQuestProgress, buildRoomPlayers } from './room-presentation'
 import type { RoomAssassinationScene, RoomGameResultScene } from './room-screen-props'
 import { RoomScreenPreviewShell } from './RoomScreenPreviewShell'
 import { useToast } from './toast-context'
 
 type AssassinationPreviewScenarioID = 'assassin' | 'evil' | 'good'
+type AssassinationOutcome = Readonly<{
+  targetID: PlayerID
+  targetRole: Role
+  hit: boolean
+  winner: 'good' | 'evil'
+}>
 
 const SCENARIO_IDS: readonly AssassinationPreviewScenarioID[] = ['assassin', 'evil', 'good']
 const CURRENT_PLAYER_ID = '2' as PlayerID

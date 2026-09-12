@@ -12,7 +12,7 @@ import {
 } from '@avalon/game'
 
 import type { AvalonMatch, LobbyPlayer } from './lobby'
-import { buildQuestProgress, buildRoomPlayers } from './room-screen-model'
+import { buildQuestProgress, buildRoomPlayers } from './room-presentation'
 import type { RoomGameResultScene } from './room-screen-props'
 import { RoomScreenPreviewShell } from './RoomScreenPreviewShell'
 

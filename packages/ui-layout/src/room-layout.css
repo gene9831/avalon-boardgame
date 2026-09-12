@@ -111,7 +111,7 @@
   overflow: hidden;
 }
 
-.avalon-room-layout__stage-accessory {
+.avalon-room-layout__stage-atmosphere {
   position: absolute;
   z-index: 3;
   top: 0;
@@ -119,7 +119,7 @@
   pointer-events: none;
 }
 
-.avalon-room-layout__stage-accessory > * {
+.avalon-room-layout__stage-atmosphere > * {
   pointer-events: auto;
 }
 
@@ -131,10 +131,6 @@
   max-height: 800px;
   place-self: center;
   overflow: hidden;
-}
-
-[data-room-mode='finished'] .avalon-room-layout__stage-content {
-  padding-bottom: 16px;
 }
 
 .avalon-room-layout__phase-region {

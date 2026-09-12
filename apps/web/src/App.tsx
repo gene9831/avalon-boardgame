@@ -55,6 +55,7 @@ import { RoomIdentityConfirmationPreview } from './RoomIdentityConfirmationPrevi
 import { RoomIdentityRecognitionPreview } from './RoomIdentityRecognitionPreview'
 import { RoomAssassinationPreview } from './RoomAssassinationPreview'
 import { RoomLobbyPreview } from './RoomLobbyPreview'
+import { RoomLoadingPreview } from './RoomLoadingPreview'
 import { RoomQuestPreview } from './RoomQuestPreview'
 import { RoomResultPreview } from './RoomResultPreview'
 import { RoomBackButton } from './RoomBackButton'
@@ -414,6 +415,7 @@ function AppRoutes() {
         <Route element={<LobbyRoute onSaveProfile={handleSaveProfile} profile={profile} />} path="/" />
         <Route element={<RoomRoute onSaveProfile={handleSaveProfile} profile={profile} />} path="/rooms/:matchID" />
         {import.meta.env.DEV && <Route element={<RoomLayoutPreview />} path="/dev/room-layout" />}
+        {import.meta.env.DEV && <Route element={<RoomLoadingPreview />} path="/dev/room-layout/loading" />}
         {import.meta.env.DEV && <Route element={<RoomLayoutBasePreview />} path="/dev/room-layout/base" />}
         {import.meta.env.DEV && <Route element={<RoomIdentityConfirmationPreview />} path="/dev/room-layout/identity-confirmation" />}
         {import.meta.env.DEV && <Route element={<RoomIdentityConfirmationPreview />} path="/dev/room-layout/identity-confirmation/:scenarioID" />}
@@ -1416,7 +1418,6 @@ export function RoomView({
     onStart,
     phase,
     room,
-    roomExitBusy,
     seatChangeTargetID,
     startPending,
   })

@@ -33,22 +33,29 @@ const actions = (): RoomActionsByKind['identityRecognition'] => ({
   onConfirm: vi.fn(), onReveal: vi.fn(), onRevealComplete: vi.fn(),
 })
 
+type CluePresentation = Extract<RoomIdentityRecognitionSceneData['presentation'], { kind: 'clue' }>
+
 function scene(
-  view: RoomIdentityRecognitionSceneData['view'],
+  view: CluePresentation['view'],
   clue: RoomIdentityClue = { kind: 'merlinEvil', targetPlayerIDs: ['0'] },
-  confirmRequestState: RoomIdentityRecognitionSceneData['confirmRequestState'] = 'idle',
+  confirmRequestState: CluePresentation['confirmRequestState'] = 'idle',
 ): RoomIdentityRecognitionSceneData {
   return {
     kind: 'identityRecognition', matchID: 'ABC123456', playerCount: 3, players, questProgress: [],
-    clue, view, confirmedCount: view === 'waiting' ? 3 : 1, participantCount: 5, confirmRequestState,
+    presentation: { kind: 'clue', clue, view, confirmRequestState },
+    confirmedCount: view === 'waiting' ? 3 : 1, participantCount: 5,
   }
 }
 
 function renderScene(
-  view: RoomIdentityRecognitionSceneData['view'],
+  view: CluePresentation['view'],
   clue?: RoomIdentityClue,
-  confirmRequestState: RoomIdentityRecognitionSceneData['confirmRequestState'] = 'idle',
+  confirmRequestState: CluePresentation['confirmRequestState'] = 'idle',
 ) {
+  return renderSceneData(scene(view, clue, confirmRequestState))
+}
+
+function renderSceneData(sceneData: RoomIdentityRecognitionSceneData) {
   return renderToStaticMarkup(
     <RoomIdentityRecognitionScene
       actions={actions()}
@@ -56,7 +63,7 @@ function renderScene(
         status: 'ready', shape: 'circle', tabletop: { x: 0, y: 0, width: 300, height: 300 },
         centerPanel: { x: 74, y: 74, width: 152, height: 152 }, playerSeats,
       } }}
-      scene={scene(view, clue, confirmRequestState)}
+      scene={sceneData}
       slots={{ back: null, toolbar: null }}
     />,
   )
@@ -123,5 +130,41 @@ describe('RoomIdentityRecognitionScene', () => {
     expect(html).not.toContain('data-identity-recognition-atmosphere')
     expect(html).not.toContain('已知阵营信息')
     expect(html).not.toContain('data-avatar-state="known-evil"')
+  })
+
+  it('shows the complete authorized role card and retains it after confirmation', () => {
+    const roleReveal = (view: 'revealed' | 'waiting'): RoomIdentityRecognitionSceneData => ({
+      kind: 'identityRecognition', matchID: 'ABC123456', playerCount: 3, players, questProgress: [],
+      presentation: { kind: 'roleReveal', role: 'merlin', view, confirmRequestState: 'idle' },
+      confirmedCount: view === 'waiting' ? 1 : 0, participantCount: 3,
+    })
+
+    const revealed = renderSceneData(roleReveal('revealed'))
+    const waiting = renderSceneData(roleReveal('waiting'))
+
+    for (const html of [revealed, waiting]) {
+      expect(html).toContain('data-curtain-state="lowered"')
+      expect(html).toContain('data-role-card="merlin"')
+      expect(html).toContain('aria-label="我的身份：梅林"')
+      expect(html).toContain('本局目标：')
+    }
+    expect(revealed).toContain('>我已确认身份<')
+    expect(waiting).toContain('你的身份已确认，等待其他玩家')
+    expect(waiting).not.toContain('>我已确认身份<')
+  })
+
+  it('keeps observers behind a closed opaque curtain without private content or actions', () => {
+    const html = renderSceneData({
+      kind: 'identityRecognition', matchID: 'ABC123456', playerCount: 3, players, questProgress: [],
+      presentation: { kind: 'observer' }, confirmedCount: 1, participantCount: 2,
+    })
+
+    expect(html).toContain('data-curtain-state="closed"')
+    expect(html).toContain('等待参与玩家完成辨认')
+    expect(html).not.toContain('data-role-card=')
+    expect(html).not.toContain('data-role-avatar=')
+    expect(html).not.toContain('data-recognition-seat-state="target"')
+    expect(html).not.toContain('你的线索已确认')
+    expect(html).not.toContain('<button')
   })
 })

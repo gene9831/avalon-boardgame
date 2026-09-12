@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { RoomLayoutPreview } from '../src/RoomLayoutPreview'
 import { RoomAssassinationPreview } from '../src/RoomAssassinationPreview'
 import { RoomLobbyPreview } from '../src/RoomLobbyPreview'
+import { RoomLoadingPreview } from '../src/RoomLoadingPreview'
 import { RoomIdentityRecognitionPreview } from '../src/RoomIdentityRecognitionPreview'
 import { RoomQuestPreview } from '../src/RoomQuestPreview'
 import { RoomResultPreview } from '../src/RoomResultPreview'
@@ -18,6 +19,7 @@ function renderGroupedPreviewRoot(path: string) {
   return renderToStaticMarkup(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
+        <Route element={<RoomLoadingPreview />} path="/dev/room-layout/loading" />
         <Route element={<RoomLobbyPreview />} path="/dev/room-layout/lobby" />
         <Route element={<RoomIdentityRecognitionPreview />} path="/dev/room-layout/identity-recognition" />
         <Route element={<RoomTeamProposalPreview />} path="/dev/room-layout/team-proposal" />
@@ -56,7 +58,7 @@ describe('RoomLayoutPreview', () => {
     expect(html).toContain('aria-label="查看对局记录"')
     expect(html).toContain('data-room-toolbar-item="room"')
     expect(html).toContain('aria-label="打开开发预览控制"')
-    expect(html).not.toContain('data-room-slot="stage-accessory"')
+    expect(html).not.toContain('data-room-slot="stage-atmosphere"')
   })
 
   it('links every room layout demo from one index', () => {
@@ -64,7 +66,8 @@ describe('RoomLayoutPreview', () => {
       <MemoryRouter><RoomLayoutPreview /></MemoryRouter>,
     )
 
-    expect(html.match(/href="\/dev\/room-layout\//g)).toHaveLength(27)
+    expect(html.match(/href="\/dev\/room-layout\//g)).toHaveLength(28)
+    expect(html).toContain('href="/dev/room-layout/loading"')
     expect(html).toContain('href="/dev/room-layout/base"')
     expect(html).toContain('href="/dev/room-layout/identity-confirmation/concealed"')
     expect(html).toContain('href="/dev/room-layout/identity-confirmation/revealed"')

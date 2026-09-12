@@ -4,7 +4,7 @@ import type { AvalonPlayerView } from '@avalon/game'
 import {
   buildQuestProgress,
   buildRoomPlayers,
-} from '../src/room-screen-model'
+} from '../src/room-presentation'
 
 const players = [
   { id: 0, name: 'Alice', isConnected: true },
@@ -65,7 +65,7 @@ function gameView(overrides: Partial<AvalonPlayerView> = {}): AvalonPlayerView {
   }
 }
 
-describe('room screen player model', () => {
+describe('room player presentation', () => {
   it('orders seats from the viewer without carrying renderer geometry', () => {
     const result = buildRoomPlayers(baseInput)
 
@@ -154,8 +154,7 @@ describe('room screen player model', () => {
     ])
   })
 })
-
-describe('room screen quest progress model', () => {
+describe('room quest progress presentation', () => {
   it('provides known lobby requirements and unknown loading placeholders', () => {
     expect(buildQuestProgress(5, null).map((node) => node.state)).toEqual([
       'upcoming',

@@ -3,17 +3,15 @@ import { Navigate, useParams } from 'react-router-dom'
 import { loyaltyForRole, type AvalonPlayerView, type PlayerID, type Role } from '@avalon/game'
 
 import type { AvalonMatch, LobbyPlayer } from './lobby'
-import {
-  type RoomIdentityConfirmationState,
-} from './RoomIdentityConfirmation'
 import { ROLE_LABELS } from './room-game'
-import { buildQuestProgress, buildRoomPlayers } from './room-screen-model'
+import { buildQuestProgress, buildRoomPlayers } from './room-presentation'
 import type { RoomIdentityConfirmationScene } from './room-screen-props'
 import { RoomScreenPreviewShell } from './RoomScreenPreviewShell'
 import { useToast } from './toast-context'
 
+type RoomIdentityConfirmationPreviewState = RoomIdentityConfirmationScene['view'] | 'confirming'
 type IdentityConfirmationPreviewScenarioID = Extract<
-  RoomIdentityConfirmationState,
+  RoomIdentityConfirmationPreviewState,
   'concealed' | 'revealed' | 'confirming' | 'waiting'
 >
 
@@ -111,12 +109,12 @@ function IdentityConfirmationPreviewScenario({
   const [playerCount, setPlayerCount] = useState(5)
   const [role, setRole] = useState<Role>('merlin')
   const [confirmedCount, setConfirmedCount] = useState(scenarioID === 'waiting' ? 3 : 0)
-  const [state, setState] = useState<RoomIdentityConfirmationState>(scenarioID)
+  const [state, setState] = useState<RoomIdentityConfirmationPreviewState>(scenarioID)
   const preview = useMemo(
     () => createPreviewState({ playerCount, role, confirmedCount }),
     [confirmedCount, playerCount, role],
   )
-  const setPreviewState = (next: RoomIdentityConfirmationState) => {
+  const setPreviewState = (next: RoomIdentityConfirmationPreviewState) => {
     setState(next)
     if (next === 'waiting' || next === 'reviewing') {
       setConfirmedCount((count) => Math.max(1, count))

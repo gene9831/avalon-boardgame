@@ -12,7 +12,7 @@ import {
   type LobbyPreviewReconnectState,
   type LobbyPreviewScenarioID,
 } from './room-lobby-preview-model'
-import { buildQuestProgress, buildRoomPlayers } from './room-screen-model'
+import { buildQuestProgress, buildRoomPlayers } from './room-presentation'
 import type { RoomConnectionRecoveryScene, RoomLobbyScene } from './room-screen-props'
 import { RoomScreenPreviewShell } from './RoomScreenPreviewShell'
 import { useToast } from './toast-context'

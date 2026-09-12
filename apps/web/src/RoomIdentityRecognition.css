@@ -1,4 +1,4 @@
-[data-room-scene='identityRecognition'] .avalon-room-layout__stage-accessory {
+[data-room-scene='identityRecognition'] .avalon-room-layout__stage-atmosphere {
   z-index: 30;
   inset: var(--room-layout-stage-margin);
   width: auto;

@@ -4,7 +4,7 @@ import type { AvalonPlayerView, PlayerID } from '@avalon/game'
 
 import type { AvalonMatch, LobbyPlayer } from './lobby'
 import { getQuestTeamSize, toggleTeamMember } from './room-game'
-import { buildQuestProgress, buildRoomPlayers } from './room-screen-model'
+import { buildQuestProgress, buildRoomPlayers } from './room-presentation'
 import type { RoomTeamProposalScene } from './room-screen-props'
 import { RoomScreenPreviewShell } from './RoomScreenPreviewShell'
 import { useToast } from './toast-context'

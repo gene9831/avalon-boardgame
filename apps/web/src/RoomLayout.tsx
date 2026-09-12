@@ -14,7 +14,7 @@ export interface RoomLayoutProps {
   phasePanel: ReactNode
   phasePanelRef?: Ref<HTMLDivElement>
   stage: ReactNode
-  stageAccessory?: ReactNode
+  stageAtmosphere?: ReactNode
   stageRef?: Ref<HTMLDivElement>
   topBarRef?: Ref<HTMLDivElement>
 }
@@ -25,7 +25,7 @@ export function RoomLayout({
   phasePanel,
   phasePanelRef,
   stage,
-  stageAccessory,
+  stageAtmosphere,
   stageRef,
   topBarRef,
 }: RoomLayoutProps) {
@@ -39,9 +39,9 @@ export function RoomLayout({
         </header>
         <div className="avalon-room-layout__room-number">{chrome.roomNumber}</div>
         <main className="avalon-room-layout__stage-region" data-room-slot="stage">
-          {stageAccessory !== undefined && (
-            <div className="avalon-room-layout__stage-accessory" data-room-slot="stage-accessory">
-              {stageAccessory}
+          {stageAtmosphere !== undefined && (
+            <div className="avalon-room-layout__stage-atmosphere" data-room-slot="stage-atmosphere">
+              {stageAtmosphere}
             </div>
           )}
           <div className="avalon-room-layout__stage-content" data-room-layout-diagnostics-host="true" ref={stageRef}>{stage}</div>

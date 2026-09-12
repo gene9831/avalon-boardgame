@@ -163,7 +163,7 @@ describe('RoomPlayerSeat', () => {
         ...player, markers: [{ kind: 'owner' }],
       }} />,
     )
-    expect(html).toMatch(/class="room-seat__name absolute"[^>]*>.*data-seat-decoration="owner".*Alice.*<\/span>/s)
+    expect(html).toMatch(/class="room-seat__name absolute font-avalon-serif"[^>]*>.*data-seat-decoration="owner".*Alice.*<\/span>/s)
   })
 
   it('assigns short, medium, and maximum nameplate width tiers', () => {

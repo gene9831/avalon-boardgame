@@ -320,7 +320,7 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
         </span>
       )}
       <span
-        className="room-seat__name absolute"
+        className="room-seat__name absolute font-avalon-serif"
         data-nameplate-size={nameSize}
         data-round-table-nameplate="true"
         data-seat-pointer-target="name"
