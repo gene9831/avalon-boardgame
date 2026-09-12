@@ -1,91 +1,95 @@
 import { renderToStaticMarkup } from 'react-dom/server'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import type { PlayerSeatLayout, RoundTableStageLayoutResult } from '@avalon/ui-layout'
 
-import { HelpProvider } from '../src/HelpProvider'
-import { RoomAssassinationPreview } from '../src/RoomAssassinationPreview'
-import { withAssassinationOutcome } from '../src/room-assassination-preview-model'
-import type { RoomScreenModel } from '../src/room-screen-model'
-import { ToastProvider } from '../src/toast'
+import { RoomAssassinationScene } from '../src/RoomAssassinationScene'
+import type { RoomAssassinationScene as Scene, RoomPlayerPresentation } from '../src/room-screen-props'
 
-function renderPreview(path: string) {
+const playerLayout: PlayerSeatLayout = {
+  relativeSeatIndex: 0,
+  playerSeatBounds: { x: 100, y: 200, width: 92, height: 88 },
+  playerBoundaryCircle: { center: { x: 146, y: 234 }, radius: 46 },
+  avatarRect: { x: 122, y: 210, width: 48, height: 48 },
+  nameRect: { x: 100, y: 264, width: 92, height: 22 },
+  avatarTopClearance: 10,
+}
+const stageLayout: RoundTableStageLayoutResult = {
+  status: 'ready', shape: 'circle',
+  tabletop: { x: 20, y: 40, width: 319, height: 319 },
+  centerPanel: { x: 103.5, y: 123.5, width: 152, height: 152 },
+  playerSeats: [playerLayout],
+}
+const player: RoomPlayerPresentation = {
+  playerID: '0', relativeSeatIndex: 0, seatNumber: 1, name: 'Alice', occupied: true,
+  isCurrentPlayer: false,
+  portrait: { kind: 'playerAvatar', avatarID: 'merlin', connected: true },
+  markers: [], caption: { kind: 'none' }, emphasis: 'default',
+  interaction: { kind: 'selectAssassinationTarget', disabled: false, selected: true },
+}
+
+function makeScene(view: Scene['view']): Scene {
+  return {
+    kind: 'assassination', matchID: 'assassination-room', playerCount: 5,
+    players: [player], questProgress: [], view,
+  }
+}
+
+function render(view: Scene['view']) {
   return renderToStaticMarkup(
-    <HelpProvider>
-      <ToastProvider>
-        <MemoryRouter initialEntries={[path]}>
-          <Routes>
-            <Route element={<RoomAssassinationPreview />} path="/dev/room-layout/assassination" />
-            <Route element={<RoomAssassinationPreview />} path="/dev/room-layout/assassination/:scenarioID" />
-          </Routes>
-        </MemoryRouter>
-      </ToastProvider>
-    </HelpProvider>,
+    <RoomAssassinationScene
+      actions={{ onActivatePlayer: vi.fn(), onAssassinate: vi.fn() }}
+      geometry={{ stageLayout }}
+      scene={makeScene(view)}
+      slots={{ back: null, toolbar: null }}
+    />,
   )
 }
 
-describe('RoomAssassinationPreview', () => {
-  it('normalizes the temporary assassination outcome target for the production seat renderer', () => {
-    const baseModel: RoomScreenModel = {
-      mode: 'assassination', matchID: 'assassination-preview-assassin', numPlayers: 1,
-      connected: true,
-      players: [{
-        playerID: '0', relativeSeatIndex: 0, seatNumber: 1, name: '苍 1', occupied: true,
-        isCurrentPlayer: false,
-        portrait: { kind: 'playerAvatar', avatarID: 'merlin', connected: true },
-        markers: [], caption: { kind: 'none' }, emphasis: 'default', interaction: { kind: 'none' },
-      }],
-      playerInteractionMode: 'none', questProgress: [],
-      center: {
-        kind: 'assassinationSummary', title: '刺杀梅林', status: '正在确认', detail: '',
-        statusTone: 'neutral',
-      },
-      phase: {
-        kind: 'assassination', title: '刺杀梅林', perspective: 'assassin',
-        targetName: '苍 1', canSubmit: false, isSubmitting: true,
-      },
-      stageOverlay: { kind: 'none' },
-      utilities: {
-        variant: 'game', showRoomExit: false, showIdentityKnowledge: false,
-        roleKnowledgeOpen: false,
-      },
-    }
+describe('RoomAssassinationScene', () => {
+  it('gives only the selecting Assassin a target control and confirmation action', () => {
+    const html = render({ kind: 'selecting', targetPlayerID: '0', canSubmit: true, submitRequestState: 'idle' })
 
-    const model = withAssassinationOutcome(
-      baseModel,
-      { targetID: '0', targetRole: 'merlin', hit: true, winner: 'evil' },
-      '苍 1',
-    )
-
-    expect(model.players[0]).toMatchObject({
-      emphasis: 'target',
-      portrait: { kind: 'roleArtwork', role: 'merlin' },
-      caption: { kind: 'none' },
-    })
+    expect(html).toContain('目标：Alice')
+    expect(html).toContain('aria-label="选择 Alice 作为刺杀目标"')
+    expect(html).toContain('>确认刺杀</button>')
   })
 
-  it('renders all three assassination perspectives through the production RoomScreen', () => {
-    for (const scenarioID of ['assassin', 'evil', 'good']) {
-      const html = renderPreview(`/dev/room-layout/assassination/${scenarioID}`)
+  it('locks the original action and target selections while pending', () => {
+    const html = render({ kind: 'selecting', targetPlayerID: '0', canSubmit: true, submitRequestState: 'pending' })
 
-      expect(html).toContain('data-room-screen="true"')
-      expect(html).toContain('打开开发预览控制')
-    }
+    expect(html).toMatch(/aria-label="确认刺杀"[^>]*disabled=""/)
+    expect(html).toContain('>确认刺杀</button>')
+    expect(html).not.toContain('正在确认')
+    expect(html).not.toContain('<button aria-label="选择 Alice 作为刺杀目标"')
   })
 
-  it('gives only the Assassin a private target action', () => {
-    const assassin = renderPreview('/dev/room-layout/assassination/assassin')
-    const evil = renderPreview('/dev/room-layout/assassination/evil')
-    const good = renderPreview('/dev/room-layout/assassination/good')
+  it('normalizes Evil and Good observer seats to informational groups', () => {
+    const evil = render({ kind: 'observing', perspective: 'evil' })
+    const good = render({ kind: 'observing', perspective: 'good' })
 
-    expect(assassin).toContain('选择你认为是梅林的玩家')
-    expect(assassin).toContain('确认刺杀')
     expect(evil).toContain('协助刺客找出梅林')
-    expect(evil).not.toContain('确认刺杀')
     expect(good).toContain('等待刺客选择目标')
+    expect(evil).toContain('role="group"')
     expect(good).not.toContain('确认刺杀')
+    expect(evil).not.toContain('<button aria-label="选择 Alice')
   })
 
-  it('does not render an intermediate assassination index', () => {
-    expect(renderPreview('/dev/room-layout/assassination')).not.toContain('data-room-screen="true"')
+  it('keeps the public assassination result informational and reveals the supplied target role', () => {
+    const html = render({ kind: 'result', targetPlayerID: '0', targetRole: 'merlin', hit: true, winner: 'evil' })
+
+    expect(html).toMatch(/Alice.*梅林/s)
+    expect(html).toContain('刺杀命中')
+    expect(html).toContain('邪恶阵营获胜')
+    expect(html).not.toContain('确认刺杀')
+    expect(html).not.toContain('<button aria-label="选择 Alice')
+  })
+
+  it('renders a supplied assassination miss without restoring an action', () => {
+    const html = render({ kind: 'result', targetPlayerID: '0', targetRole: 'percival', hit: false, winner: 'good' })
+
+    expect(html).toMatch(/Alice.*帕西维尔/s)
+    expect(html).toContain('刺杀未命中')
+    expect(html).toContain('正义阵营获胜')
+    expect(html).not.toContain('确认刺杀')
   })
 })

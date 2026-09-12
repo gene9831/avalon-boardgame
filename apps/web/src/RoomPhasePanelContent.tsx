@@ -44,13 +44,25 @@ export function RoomPhasePanelContent({ actions, model }: { actions: RoomScreenA
       ) : <p className="text-sm text-slate-300">队长正在组建任务队伍</p>,
       action: model.isLeader ? (
         <button aria-label="确认队伍" className={primaryClass} disabled={!model.canSubmit} onClick={actions.onSubmitTeam} type="button">
-          {model.isSubmitting ? '正在确认…' : '确认队伍'}
+          确认队伍
         </button>
       ) : null,
     }
     case 'teamVote': {
-      const visibleVote = model.submittedVote ?? model.selectedVote
-      const confirmed = model.submittedVote !== null
+      if (model.submittedVote !== null) {
+        return {
+          title,
+          middle: (
+            <div className="space-y-1 text-sm text-slate-300" role="status">
+              <p>你已提交<strong className={model.submittedVote === 'approve' ? 'text-emerald-300' : 'text-rose-300'}>{model.submittedVote === 'approve' ? '同意票' : '反对票'}</strong></p>
+              <p>等待其他玩家投票</p>
+            </div>
+          ),
+          action: null,
+        }
+      }
+
+      const visibleVote = model.selectedVote
       return {
         title,
         middle: (
@@ -85,7 +97,7 @@ export function RoomPhasePanelContent({ actions, model }: { actions: RoomScreenA
             onClick={actions.onConfirmTeamVote}
             type="button"
           >
-            {confirmed ? '已确认' : model.isSubmitting ? '正在确认…' : '确认投票'}
+            确认投票
           </button>
         ),
       }
@@ -137,7 +149,7 @@ export function RoomPhasePanelContent({ actions, model }: { actions: RoomScreenA
         middle,
         action: (
           <button className={primaryClass} disabled={!model.canConfirm} onClick={actions.onConfirmQuestCard} type="button">
-            {model.isSubmitting ? '正在确认…' : model.isEvil ? '确认任务牌' : '确认成功牌'}
+            {model.isEvil ? '确认任务牌' : '确认成功牌'}
           </button>
         ),
       }
@@ -162,7 +174,7 @@ export function RoomPhasePanelContent({ actions, model }: { actions: RoomScreenA
         title,
         middle: <p className="text-sm text-slate-300">{middle}</p>,
         action: model.perspective === 'assassin'
-          ? <button className={primaryClass} disabled={!model.canSubmit} onClick={actions.onAssassinate} type="button">{model.isSubmitting ? '正在确认…' : '确认刺杀'}</button>
+          ? <button className={primaryClass} disabled={!model.canSubmit} onClick={actions.onAssassinate} type="button">确认刺杀</button>
           : null,
       }
     }

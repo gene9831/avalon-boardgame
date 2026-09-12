@@ -97,8 +97,9 @@ describe('RoomPhasePanelContent', () => {
     expect(selecting.action).toContain('disabled=""')
     expect(complete.action).toContain('>确认队伍<')
     expect(complete.action).not.toContain('disabled=""')
-    expect(submitting.action).toContain('>正在确认…<')
+    expect(submitting.action).toContain('>确认队伍<')
     expect(submitting.action).toContain('disabled=""')
+    expect(submitting.action).not.toContain('正在确认')
   })
 
   it('gives non-leaders waiting copy without a bottom action', () => {
@@ -173,9 +174,10 @@ describe('RoomPhasePanelContent', () => {
     })
 
     expect(submitting.middle.match(/disabled=""/g)).toHaveLength(2)
-    expect(submitting.action).toContain('>正在确认…<')
-    expect(submitted.middle).toContain('aria-pressed="true"')
-    expect(submitted.action).toContain('>已确认<')
+    expect(submitting.action).toContain('>确认投票<')
+    expect(submitting.action).not.toContain('正在确认')
+    expect(submitted.middle).toMatch(/你已提交.*反对票/s)
+    expect(submitted.action).toBe('')
   })
 
   it('locks the selected quest card while submitting', () => {
@@ -186,8 +188,9 @@ describe('RoomPhasePanelContent', () => {
     })
 
     expect(quest.middle.match(/disabled=""/g)).toHaveLength(2)
-    expect(quest.action).toContain('>正在确认…<')
+    expect(quest.action).toContain('>确认任务牌<')
     expect(quest.action).toContain('disabled=""')
+    expect(quest.action).not.toContain('正在确认')
   })
 
   it('keeps only the viewer\'s submitted card in waiting copy and removes the bottom action', () => {
@@ -263,8 +266,9 @@ describe('RoomPhasePanelContent', () => {
 
     expect(selected.middle).toContain('目标：梅林候选')
     expect(selected.action).not.toContain('disabled=""')
-    expect(submitting.action).toContain('>正在确认…<')
+    expect(submitting.action).toContain('>确认刺杀<')
     expect(submitting.action).toContain('disabled=""')
+    expect(submitting.action).not.toContain('正在确认')
   })
 
   it('keeps assassination settlement informational', () => {
