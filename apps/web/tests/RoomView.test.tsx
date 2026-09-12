@@ -732,6 +732,9 @@ describe('RoomView playing layout', () => {
     expect(html.match(/data-room-screen="true"/g)).toHaveLength(1)
     expect(html.match(/data-room-stage="true"/g)).toHaveLength(1)
     expect(html).toContain('data-room-mode="teamProposal"')
+    expect(html).toContain('请选择 <strong class="text-amber-200">2 名玩家</strong>')
+    expect(html).toContain('已选 <strong class="text-cyan-200">0 / 2</strong>')
+    expect(html).toContain('aria-label="确认队伍"')
     expect(html).not.toContain('>玩家座位<')
   })
 

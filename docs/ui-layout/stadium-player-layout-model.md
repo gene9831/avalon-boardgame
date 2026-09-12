@@ -4,7 +4,7 @@
 
 本文定义独立、DOM-free 的纵向跑道玩家布局数学模型。它解决“固定头像尺寸时，如何在圆形或最短纵向跑道中心线上放置 5–10 个圆形玩家边界，并可选避让一个同心圆形桌心保护区”。
 
-当前 `solveStadiumPlayerLayout`、`/stadium-layout-lab.html` 和业务入口 `solveRoundTableStageLayout` 都使用本模型。业务适配层负责头像自动降档、桌面与桌心面板几何，并固定传入 80px 桌心保护半径。
+当前 `solveStadiumPlayerLayout`、`/stadium-layout-lab.html` 和业务入口 `solveRoundTableStageLayout` 都使用本模型。业务适配层负责头像自动降档、桌面与桌心面板几何，并固定传入 68px 桌心保护半径。
 
 数学模型不负责 Avalon 顶栏、底栏、桌面、桌心面板、姓名、皇冠、角色标记或其他业务内容。姓名等内容可以超出玩家边界圆，其与桌心或其他业务元素的关系留给后续业务适配层处理。
 

@@ -37,12 +37,6 @@ describe('RoomLobbyPreview', () => {
     expect(css).toMatch(/\.room-lobby-preview\s*\{[^}]*width:\s*100vw;[^}]*height:\s*100vh;[^}]*height:\s*100dvh;[^}]*overflow:\s*hidden;/s)
   })
 
-  it('lists the five lobby scenarios', () => {
-    const html = renderPreview('/dev/room-layout/lobby')
-
-    expect(html.match(/href="\/dev\/room-layout\/lobby\//g)).toHaveLength(5)
-  })
-
   it.each([
     'member-incomplete',
     'owner-incomplete',
@@ -72,11 +66,11 @@ describe('RoomLobbyPreview', () => {
     expect(html).not.toContain('aria-controls="room-lobby-preview-controls"')
     expect(html).not.toContain('id="room-lobby-preview-controls"')
     expect(html).not.toContain('aria-label="关闭开发预览控制"')
+    expect(html).toMatch(/data-room-slot="stage-accessory"[^>]*>\s*<button[^>]*aria-label="打开开发预览控制"/)
+    expect(html).toContain('lucide-info')
     const source = readFileSync(new URL('../src/RoomLobbyPreview.tsx', import.meta.url), 'utf8')
     expect(source).toContain('setControlsOpen(true)')
     expect(source).toContain('setControlsOpen(false)')
-    const css = readFileSync(new URL('../src/RoomLayoutPreview.css', import.meta.url), 'utf8')
-    expect(css).toMatch(/\.room-lobby-preview__controls-trigger\s*\{[^}]*position:\s*fixed;[^}]*width:\s*44px;[^}]*height:\s*44px;/s)
   })
 
   it('wires the production help action to the existing Help context', () => {

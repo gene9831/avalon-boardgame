@@ -99,7 +99,8 @@ describe('tall round-table stage layout', () => {
         expect(contains(stageBounds, diagnostics.roundTableFrame)).toBe(true)
         expect(contains(stageBounds, layout.tabletop)).toBe(true)
         expect(contains(stageBounds, layout.centerPanel)).toBe(true)
-        expect(diagnostics.centerProtectionCircle.radius).toBe(80)
+        expect(layout.centerPanel).toMatchObject({ width: 128, height: 128 })
+        expect(diagnostics.centerProtectionCircle.radius).toBe(68)
         for (const seat of playerSeats) {
           expect(contains(stageBounds, seat.playerSeatBounds)).toBe(true)
           expect(contains(stageBounds, {
@@ -138,7 +139,7 @@ describe('tall round-table stage layout', () => {
               diagnostics.centerProtectionCircle.center,
               seat.playerBoundaryCircle.center,
             ) - seat.playerBoundaryCircle.radius,
-          ).toBeGreaterThanOrEqual(79.989)
+          ).toBeGreaterThanOrEqual(67.989)
         }
 
         const bottomAvatarCenter = playerSeats[0].avatarRect.y
@@ -150,6 +151,13 @@ describe('tall round-table stage layout', () => {
       }
     },
     10_000,
+  )
+
+  it.each([5, 6])(
+    'keeps a circular table for %i players on a narrow portrait stage',
+    (playerCount) => {
+      expect(expectReady(366, 596, playerCount).shape).toBe('circle')
+    },
   )
 
   it.each([5, 6, 7, 8, 9, 10])(

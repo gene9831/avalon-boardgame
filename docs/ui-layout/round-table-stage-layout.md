@@ -127,7 +127,7 @@ stageBounds = Rect(0, 0, maxStageWidth, maxStageHeight)
 placementGuideWidth = 0.86 × roundTableFrameWidth
 tabletopWidth = 0.74 × roundTableFrameWidth
 
-centerPanelDiameter = 152
+centerPanelDiameter = 128
 centerProtectionRadius = 80
 ```
 
@@ -161,7 +161,7 @@ maximumStadiumStraightLength = maxStageHeight
 
 圆形可行时数学模型立即选择圆形，不继续压缩圆形宽度。否则它在硬边界内求满足所有两两间距的最短纵向跑道，再依次最小化相邻视觉顺序 gap 的最大超出量和总超出量。偶数人数固定六点钟和十二点钟锚点；奇数人数固定六点钟锚点；其余座位按顺时针顺序并关于竖直中轴镜像。`gap` 是硬下限，不要求间距相等。
 
-业务桌心保护区与边界合并为固定半径 80px 的同心圆。数学模型直接接收该半径，并保证任一玩家边界圆不与其相交；152px 桌心面板位于其中。实验室的几何模式直接渲染求解结果中的 `centerProtectionCircle`，不再从面板尺寸二次计算。
+业务桌心保护区与边界合并为固定半径 68px 的同心圆。数学模型直接接收该半径，并保证任一玩家边界圆不与其相交；128px 桌心面板位于其中。实验室的几何模式直接渲染求解结果中的 `centerProtectionCircle`，不再从面板尺寸二次计算。
 
 ## 8. 求解与居中
 
@@ -208,7 +208,7 @@ roundTableFootprintCenter.y = maxStageHeight / 2
 | 430×932 | 406×684 | 56 | 跑道 |
 | 768×1024 | 744×776 | 56 | 圆形 |
 
-以上结果均使用默认 `gap = 8`。另一个参数化回归基线为页面 402×714、舞台 386×482：使用 `gap = 4`、`maxAvatarSize = 56`、默认 `avatarSizeStep = 8` 时，5–10 人的结果为 `[56, 56, 56, 56, 48, 48]`。这些结果以全部两两圆边界 gap、固定 80px 桌心保护半径、硬边界包含、圆形优先/最短跑道与单调档位可行性为准。
+以上结果均使用默认 `gap = 8`。另一个参数化回归基线为页面 402×714、舞台 386×482：使用 `gap = 4`、`maxAvatarSize = 56`、默认 `avatarSizeStep = 8` 时，5–10 人的结果为 `[56, 56, 56, 56, 48, 48]`。这些结果以全部两两圆边界 gap、固定 68px 桌心保护半径、硬边界包含、圆形优先/最短跑道与单调档位可行性为准。
 
 ## 11. 验收规则
 
@@ -226,4 +226,4 @@ roundTableFootprintCenter.y = maxStageHeight / 2
 12. `gap` 对全部头像档位统一生效；负数、无穷值和非数字返回 `invalid-input`。
 13. `maxAvatarSize` 超出 36–56，或 `avatarSizeStep` 不是大于等于 4 的有限数时返回 `invalid-input`。
 14. 相同舞台和档位参数下，5–10 人的头像尺寸随人数增加保持不增。
-15. 桌心面板直径固定 152px，桌心保护区与边界的合并半径固定 80px，玩家边界圆不得与其相交。
+15. 桌心面板直径固定 128px，桌心保护区与边界的合并半径固定 68px，玩家边界圆不得与其相交。

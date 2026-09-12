@@ -29,13 +29,17 @@ describe('RoomUtilities', () => {
     expect(html).not.toContain('data-room-toolbar-item="identity"')
   })
 
-  it('keeps direct help, log, and identity controls during the game', () => {
+  it('keeps identity first, followed by help and the direct log control during the game', () => {
     const html = renderToStaticMarkup(<RoomUtilities model={{
       variant: 'game', showRoomExit: true, showIdentityKnowledge: true, roleKnowledgeOpen: false,
     }} tools={tools} />)
 
-    expect(html).toContain('aria-label="打开帮助说明"')
-    expect(html).toContain('aria-label="查看对局记录"')
-    expect(html).toContain('data-room-toolbar-item="identity"')
+    const identityIndex = html.indexOf('data-room-toolbar-item="identity"')
+    const helpIndex = html.indexOf('aria-label="打开帮助说明"')
+    const logIndex = html.indexOf('aria-label="查看对局记录"')
+
+    expect(identityIndex).toBeGreaterThanOrEqual(0)
+    expect(helpIndex).toBeGreaterThan(identityIndex)
+    expect(logIndex).toBeGreaterThan(helpIndex)
   })
 })

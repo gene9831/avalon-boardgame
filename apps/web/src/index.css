@@ -65,6 +65,13 @@ select {
 .room-seat__avatar[data-avatar-state='quest-member'] { border-color: #cffafe; box-shadow: 0 0 26px rgb(34 211 238 / 70%); }
 .room-seat__avatar[data-avatar-state='target'] { border-color: #fecdd3; box-shadow: 0 0 26px rgb(251 113 133 / 70%); }
 .room-seat__avatar[data-avatar-state='known-evil'] { border-color: #be123c; box-shadow: 0 0 24px rgb(127 29 29 / 65%); }
+.room-seat__avatar[data-avatar-state='revealed-good'] { border-color: rgb(103 232 249 / 68%); box-shadow: 0 5px 12px rgb(0 0 0 / 40%); }
+.room-seat__avatar[data-avatar-state='revealed-evil'] { border-color: rgb(253 164 175 / 68%); box-shadow: 0 5px 12px rgb(0 0 0 / 40%); }
+.room-seat__avatar[data-room-role-revealed='true'] { animation: room-role-reveal 300ms ease-out both; }
+.room-seat__role-label { position: absolute; z-index: 2; display: block; overflow: hidden; padding: 1px 5px; border-radius: 9999px; pointer-events: none; color: #e2e8f0; background: rgb(2 6 23 / 82%); font-size: 0.625rem; font-weight: 600; line-height: 0.875rem; text-overflow: ellipsis; transform: translateX(-50%); white-space: nowrap; }
+.room-seat__role-label[data-room-role-revealed='true'] { animation: room-role-label-reveal 300ms ease-out both; }
+.room-seat__role-label[data-role-loyalty='good'] { color: #a5f3fc; }
+.room-seat__role-label[data-role-loyalty='evil'] { color: #fecdd3; }
 .room-seat__name {
   display: flex;
   align-items: center;
@@ -84,20 +91,24 @@ select {
   position: absolute;
   z-index: 4;
   display: grid;
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1rem;
+  height: 1rem;
   place-items: center;
   border-radius: 9999px;
   pointer-events: none;
 }
-.room-seat__decoration svg { width: 0.8rem; height: 0.8rem; }
+.room-seat__decorations { z-index: 4; pointer-events: none; }
+.room-seat__decoration svg { width: 0.75rem; height: 0.75rem; }
 .room-seat__owner-icon { display: grid; width: 0.75rem; height: 0.75rem; flex: none; place-items: center; color: #94a3b8; }
 .room-seat__owner-icon svg { width: 0.75rem; height: 0.75rem; stroke-width: 2; }
-.room-seat__decoration[data-seat-decoration='leader'] { left: 50%; top: -0.75rem; color: #fcd34d; translate: -50% 0; }
-.room-seat__decoration[data-seat-decoration='vote'] { right: 0; bottom: 0; color: #e2e8f0; background: #0f172a; }
-.room-seat__decoration[data-seat-decoration='quest-member'] { right: 0; top: 0; color: #cffafe; background: #164e63; }
-.room-seat__decoration[data-seat-decoration='known-evil'] { right: 0; top: 0; color: #ffe4e6; background: #881337; }
-.room-seat__decoration[data-seat-decoration='merlin-candidate'] { right: 0; top: 0; color: #fef3c7; background: #78350f; }
+.room-seat__decoration[data-seat-decoration='leader'] { left: 50%; top: -0.75rem; width: 1.5rem; height: 1.5rem; color: #fcd34d; transform: translateX(-50%); }
+.room-seat__decoration[data-seat-decoration='leader'] svg { width: 1.15rem; height: 1.15rem; }
+.room-seat__decoration[data-seat-decoration='leader'] svg path:last-child { display: none; }
+.room-seat__decoration[data-seat-decoration='vote'] { right: -0.3rem; bottom: -0.3rem; color: #e2e8f0; background: #0f172a; }
+.room-seat__decoration[data-seat-decoration='selected'] { right: -0.3rem; top: -0.3rem; color: #67e8f9; }
+.room-seat__decoration[data-seat-decoration='quest-member'] { left: 50%; bottom: -0.3rem; color: #f3e5c3; background: #5b4630; transform: translateX(-50%); }
+.room-seat__decoration[data-seat-decoration='known-evil'] { right: -0.3rem; top: -0.3rem; color: #ffe4e6; background: #881337; }
+.room-seat__decoration[data-seat-decoration='merlin-candidate'] { right: -0.3rem; top: -0.3rem; color: #fef3c7; background: #78350f; }
 .room-seat:focus-visible { outline: none; }
 .room-seat:focus-visible .room-seat__avatar,
 .room-seat:focus-visible .room-seat__name { outline: 2px solid currentColor; outline-offset: 2px; }
@@ -208,6 +219,30 @@ select {
   }
 }
 
+@keyframes room-role-reveal {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes room-role-label-reveal {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}
+
 @keyframes help-role-focus-pulse {
   0%, 100% {
     border-color: rgb(255 255 255 / 0.1);
@@ -225,6 +260,12 @@ select {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .room-seat__avatar[data-room-role-revealed='true'] {
+    animation: none;
+  }
+  .room-seat__role-label[data-room-role-revealed='true'] {
+    animation: none;
+  }
   .help-role-card--pulse {
     animation: none;
   }

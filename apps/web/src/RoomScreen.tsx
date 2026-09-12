@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { PlayerID } from '@avalon/game'
 
 import { IdentityRecognitionLayer } from './IdentityRecognitionLayer'
@@ -8,9 +8,21 @@ import { RoomBackButton } from './RoomBackButton'
 import { RoomLayout } from './RoomLayout'
 import { RoomLayoutDiagnostics } from './RoomLayoutDiagnostics'
 import { RoomNumber } from './RoomNumber'
-import { RoomPhaseLabel } from './RoomPhaseLabel'
 import { RoomPhasePanel } from './RoomPhasePanel'
 import { RoomPhasePanelContent } from './RoomPhasePanelContent'
+import {
+  RoomIdentityConfirmationCenter,
+  RoomIdentityConfirmationPhaseContent,
+  RoomIdentityConfirmationStage,
+  type RoomIdentityConfirmationPresentation,
+} from './RoomIdentityConfirmation'
+import {
+  RoomIdentityRecognitionCenter,
+  RoomIdentityRecognitionPhaseContent,
+  RoomIdentityRecognitionStage,
+  type RoomIdentityRecognitionPresentation,
+} from './RoomIdentityRecognition'
+import { getRoomIdentityRecognitionSeat } from './room-identity-recognition-seat'
 import { RoomPlayerSeat } from './RoomPlayerSeat'
 import { RoomStage } from './RoomStage'
 import { RoomUtilities, type RoomUtilityTools } from './RoomUtilities'
@@ -22,10 +34,13 @@ export interface RoomScreenProps {
   model: RoomScreenModel
   actions: RoomScreenActions
   diagnosticsMode: RoomLayoutDiagnosticsMode
+  identityConfirmation?: RoomIdentityConfirmationPresentation
+  identityRecognition?: RoomIdentityRecognitionPresentation
+  stageAccessory?: ReactNode
   tools: RoomUtilityTools & { onBackHome: () => void; seatChangeTargetID: PlayerID | null }
 }
 
-export function RoomScreen({ model, actions, diagnosticsMode, tools }: RoomScreenProps) {
+export function RoomScreen({ model, actions, diagnosticsMode, identityConfirmation, identityRecognition, stageAccessory, tools }: RoomScreenProps) {
   const { canvasRef, stageRef, snapshot } = useRoomLayout(model.numPlayers, diagnosticsMode)
   const rootRef = useRef<HTMLElement | null>(null)
   const [safeArea, setSafeArea] = useState<RoomSafeAreaInsets>({ top: 0, right: 0, bottom: 0, left: 0 })
@@ -36,15 +51,30 @@ export function RoomScreen({ model, actions, diagnosticsMode, tools }: RoomScree
   useEffect(() => {
     if (rootRef.current !== null) setSafeArea(readRoomSafeAreaInsets(rootRef.current))
   }, [snapshot.viewportSize])
-  const phase = RoomPhasePanelContent({ actions, model: model.phase })
-  const center = <RoomCenterSummary model={model.center} />
+  const phase = identityRecognition !== undefined
+    ? RoomIdentityRecognitionPhaseContent({ presentation: identityRecognition })
+    : identityConfirmation !== undefined
+      ? RoomIdentityConfirmationPhaseContent({ presentation: identityConfirmation })
+      : RoomPhasePanelContent({ actions, model: model.phase })
+  const center = identityRecognition !== undefined
+    ? <RoomIdentityRecognitionCenter presentation={identityRecognition} />
+    : identityConfirmation?.state === 'waiting'
+      ? <RoomIdentityConfirmationCenter presentation={identityConfirmation} />
+      : <RoomCenterSummary model={model.center} />
 
   return (
-    <div className="size-full" data-room-mode={model.mode} data-room-screen="true">
+    <div
+      className="size-full"
+      data-identity-confirmation-state={identityConfirmation?.state}
+      data-identity-recognition-scene={identityRecognition?.scene.type}
+      data-identity-recognition-state={identityRecognition?.state}
+      data-room-mode={model.mode}
+      data-room-screen="true"
+    >
       <RoomLayout
         chrome={{
           back: <RoomBackButton onBack={tools.onBackHome} />,
-          phase: <RoomPhaseLabel phase={model.phase.title} />,
+          phase: phase.title,
           questProgress: <QuestProgressTrack nodes={model.questProgress} />,
           roomNumber: <RoomNumber matchID={model.matchID} />,
           toolbar: <RoomUtilities model={model.utilities} tools={tools} />,
@@ -69,14 +99,26 @@ export function RoomScreen({ model, actions, diagnosticsMode, tools }: RoomScree
                     onActivate={actions.onActivatePlayer}
                     pending={tools.seatChangeTargetID === player.playerID}
                     player={player}
+                    recognition={identityRecognition === undefined
+                      ? undefined
+                      : getRoomIdentityRecognitionSeat(
+                        identityRecognition,
+                        player.playerID,
+                        player.isCurrentPlayer,
+                      )}
                   />
                 )}
               />
             )}
-            {model.stageOverlay.kind === 'identityRecognition' && <IdentityRecognitionLayer overlay={model.stageOverlay} />}
+            {identityRecognition !== undefined
+              ? <RoomIdentityRecognitionStage presentation={identityRecognition} />
+              : identityConfirmation !== undefined
+                ? <RoomIdentityConfirmationStage presentation={identityConfirmation} />
+                : model.stageOverlay.kind === 'identityRecognition' && <IdentityRecognitionLayer overlay={model.stageOverlay} />}
             {diagnosticsMode !== 'off' && <RoomLayoutDiagnostics mode={diagnosticsMode} playerCount={model.numPlayers} safeArea={safeArea} snapshot={snapshot} />}
           </>
         )}
+        stageAccessory={stageAccessory}
         stageRef={stageRef}
       />
     </div>

@@ -66,6 +66,7 @@ export function getAvalonPlayerView(
     submittedTeamVotePlayerIDs: Object.keys(secret.pendingVotes).sort(
       (left, right) => Number(left) - Number(right),
     ),
+    submittedQuestCardCount: Object.keys(secret.pendingQuestCards).length,
     viewer: {
       role: role ?? null,
       loyalty,

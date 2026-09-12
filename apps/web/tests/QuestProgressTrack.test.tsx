@@ -18,7 +18,7 @@ describe('QuestProgressTrack', () => {
 
     expect(html.match(/data-quest-index=/g)).toHaveLength(5)
     expect(html).toContain('第 2 次任务，3 人，需 1 张失败牌才会失败，当前任务')
-    expect(html).toContain('lucide-users-round')
+    expect(html).toContain('lucide-user-round')
     expect(html.match(/lucide-circle-x/g)).toHaveLength(1)
     expect(html).toContain('>II<')
     expect(html).toContain('aria-current="step"')

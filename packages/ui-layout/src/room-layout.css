@@ -101,6 +101,7 @@
 }
 
 .avalon-room-layout__stage-region {
+  position: relative;
   display: grid;
   grid-column: 1 / -1;
   grid-row: 2;
@@ -108,6 +109,18 @@
   place-items: stretch;
   background: radial-gradient(circle at 50% 47%, #172a3b 0, #0b1927 56%, #07111f 100%);
   overflow: hidden;
+}
+
+.avalon-room-layout__stage-accessory {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  right: 0;
+  pointer-events: none;
+}
+
+.avalon-room-layout__stage-accessory > * {
+  pointer-events: auto;
 }
 
 .avalon-room-layout__stage-content {
@@ -120,12 +133,16 @@
   overflow: hidden;
 }
 
+[data-room-mode='finished'] .avalon-room-layout__stage-content {
+  padding-bottom: 16px;
+}
+
 .avalon-room-layout__phase-region {
   display: grid;
   grid-column: 1 / -1;
   grid-row: 3;
   grid-template-columns: minmax(0, 1fr) max-content;
-  grid-template-rows: max-content minmax(0, 1fr);
+  grid-template-rows: 48px minmax(0, 1fr);
   padding-bottom: var(--room-layout-phase-bottom-clearance);
   overflow: hidden;
 }
@@ -164,6 +181,10 @@
 @container avalon-room-layout (orientation: portrait) {
   .avalon-room-layout__toolbar {
     border-top: 1px solid rgb(202 169 91 / 20%);
+  }
+
+  .avalon-room-layout__phase-panel [data-room-slot='phase-middle'] {
+    padding-block: 6px;
   }
 }
 

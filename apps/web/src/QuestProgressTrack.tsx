@@ -1,4 +1,4 @@
-import { Check, CircleX, UsersRound, X } from 'lucide-react'
+import { Check, CircleX, UserRound, X } from 'lucide-react'
 import '@fontsource/almendra/700.css'
 
 import type { QuestProgressNodeModel } from './room-screen-model'
@@ -25,7 +25,7 @@ export function QuestProgressTrack({ nodes }: QuestProgressTrackProps) {
             ? null
             : (
               <span aria-hidden="true" className="quest-progress-meta absolute inset-x-0 bottom-0 flex min-h-3 items-center justify-center gap-0.5 whitespace-nowrap text-xs font-semibold leading-3 text-amber-50/85">
-                <span className="flex items-center"><UsersRound aria-hidden="true" className="size-3" strokeWidth={2.2} />{node.teamSize}</span>
+                <span className="flex items-center"><UserRound aria-hidden="true" className="size-3" strokeWidth={2.2} />{node.teamSize}</span>
                 {node.failThreshold > 1 && (
                   <span className="flex items-center"><CircleX aria-hidden="true" className="size-3 text-rose-200/90" strokeWidth={2.2} />{node.failThreshold}</span>
                 )}

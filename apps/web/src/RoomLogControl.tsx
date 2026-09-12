@@ -14,7 +14,7 @@ export function RoomLogControl({ entries }: { entries: readonly RoomLogEntry[] }
       <button
         aria-expanded={open}
         aria-label="查看对局记录"
-        className="grid min-h-11 min-w-11 place-items-center rounded-lg border border-white/15 text-slate-200 transition hover:border-amber-300/60 hover:text-white"
+        className="grid min-h-11 min-w-11 shrink-0 place-items-center rounded-lg border-0 bg-transparent p-0 text-slate-200 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200"
         onClick={() => setOpen(true)}
         ref={triggerRef}
         title="对局记录"

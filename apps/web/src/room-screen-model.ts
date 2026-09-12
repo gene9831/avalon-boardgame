@@ -46,6 +46,7 @@ export type RoomPlayerModel = Readonly<{
   knownEvil: boolean
   knownMerlinCandidate: boolean
   visibleRole: Role | null
+  showRoleReveal: boolean
   voteStatus: 'pending' | TeamVote | null
 }>
 
@@ -59,19 +60,91 @@ export type QuestProgressNodeModel = Readonly<{
 export type RoomCenterModel =
   | Readonly<{ kind: 'loadingSummary'; message: string }>
   | Readonly<{ kind: 'lobbySummary'; occupied: number; total: number; ready: boolean }>
-  | Readonly<{ kind: 'questSummary'; questIndex: number; goodSuccesses: number; evilFailures: number; consecutiveRejectedTeams: number }>
-  | Readonly<{ kind: 'resultSummary'; winner: 'good' | 'evil'; reason: string }>
+  | Readonly<{
+      kind: 'questSummary'
+      questIndex: number
+      status: string | null
+      detail?: string | null
+      rule?: string | null
+      statusTone?: 'neutral' | 'success' | 'failure'
+      consecutiveRejectedTeams: number
+    }>
+  | Readonly<{
+      kind: 'assassinationSummary'
+      title: string
+      status: string
+      detail: string
+      statusTone: 'neutral' | 'success' | 'failure'
+    }>
+  | Readonly<{
+      kind: 'resultSummary'
+      winner: 'good' | 'evil'
+      reason: string
+      questScore: string
+    }>
 
 export type RoomPhaseModel =
   | Readonly<{ kind: 'loading'; title: string; message: string }>
   | Readonly<{ kind: 'lobby'; title: '等待玩家'; occupied: number; total: number; isOwner: boolean; canStart: boolean; startPending: boolean }>
   | Readonly<{ kind: 'connectionRecovery'; title: '正在重新连接'; manualReconnectAvailable: boolean }>
   | Readonly<{ kind: 'identityRecognition'; title: '身份辨认'; confirmationLabel: string; confirmed: boolean; confirmedCount: number; participantCount: number; isParticipant: boolean }>
-  | Readonly<{ kind: 'teamProposal'; title: '组建任务队伍'; requiredTeamSize: number; selectedCount: number; leaderName: string; canSubmit: boolean }>
-  | Readonly<{ kind: 'teamVote'; title: '表决任务队伍'; proposedTeamNames: readonly string[]; submittedCount: number; total: number; submittedVote: TeamVote | null; canVote: boolean }>
-  | Readonly<{ kind: 'quest'; title: '执行任务'; status: string; submittedCard: QuestCard | null; canPlaySuccess: boolean; canPlayFail: boolean }>
-  | Readonly<{ kind: 'assassination'; title: '刺杀阶段'; isAssassin: boolean; targetName: string | null; canSubmit: boolean }>
-  | Readonly<{ kind: 'finished'; title: '对局结束'; summary: string; rolesRevealed: boolean }>
+  | Readonly<{
+      kind: 'teamProposal'
+      title: '组建任务队伍' | '等待队长组队'
+      requiredTeamSize: number
+      selectedCount: number
+      isLeader: boolean
+      canSubmit: boolean
+      isSubmitting: boolean
+    }>
+  | Readonly<{
+      kind: 'teamVote'
+      title: '表决任务队伍'
+      selectedVote: TeamVote | null
+      submittedVote: TeamVote | null
+      canVote: boolean
+      isSubmitting: boolean
+    }>
+  | Readonly<{
+      kind: 'quest'
+      title: '执行任务' | '等待任务结果'
+      isOnTeam: boolean
+      isEvil: boolean
+      selectedCard: QuestCard | null
+      submittedCard: QuestCard | null
+      canSelect: boolean
+      canConfirm: boolean
+      isSubmitting: boolean
+    }>
+  | Readonly<{
+      kind: 'questResult'
+      title: '任务结算'
+      succeeded: boolean
+      successCount: number
+      failCount: number
+    }>
+  | Readonly<{
+      kind: 'assassination'
+      title: '刺杀梅林' | '协助刺杀' | '等待刺杀'
+      perspective: 'assassin' | 'evil' | 'good'
+      targetName: string | null
+      canSubmit: boolean
+      isSubmitting: boolean
+    }>
+  | Readonly<{
+      kind: 'assassinationResult'
+      title: '刺杀结果'
+      hit: boolean
+      targetName: string
+      targetRoleLabel: string
+      winner: 'good' | 'evil'
+    }>
+  | Readonly<{
+      kind: 'finished'
+      title: '对局结束'
+      message: string
+      rolesRevealed: boolean
+    }>
 
 export interface RoomScreenActions {
   onActivatePlayer(playerID: PlayerID): void
@@ -79,8 +152,10 @@ export interface RoomScreenActions {
   onReconnect(): void
   onConfirmIdentityRecognition(): void
   onSubmitTeam(): void
-  onCastTeamVote(vote: TeamVote): void
-  onPlayQuestCard(card: QuestCard): void
+  onSelectTeamVote(vote: TeamVote): void
+  onConfirmTeamVote(): void
+  onSelectQuestCard(card: QuestCard): void
+  onConfirmQuestCard(): void
   onAssassinate(): void
 }
 
@@ -127,6 +202,10 @@ export function buildRoomPlayers(input: Readonly<{
   selectedTarget: PlayerID | null
   showKnownPlayerInfo: boolean
   showPrivateRoleKnowledge: boolean
+  showSettledTeamVoteDetails?: boolean
+  showRoundDecorations?: boolean
+  showConnectionStatus?: boolean
+  showRoleReveal?: boolean
 }>): readonly RoomPlayerModel[] {
   const orderedPlayerIDs = Array.from(
     { length: input.numPlayers },
@@ -137,7 +216,7 @@ export function buildRoomPlayers(input: Readonly<{
     ...orderedPlayerIDs.slice(currentIndex),
     ...orderedPlayerIDs.slice(0, currentIndex),
   ]
-  const settledVotes = input.game === null
+  const settledVotes = input.game === null || input.showSettledTeamVoteDetails === false
     ? undefined
     : getDisplayedTeamVoteResult(input.game, input.phase)?.votes
 
@@ -158,15 +237,15 @@ export function buildRoomPlayers(input: Readonly<{
       name: occupied ? lobbyPlayer.name! : '',
       avatarID: getSeatAvatarID(lobbyPlayer?.data, seatIndex),
       occupied,
-      connected: occupied && (
+      connected: occupied && (input.showConnectionStatus === false || (
         isCurrentPlayer
           ? input.viewerConnected && lobbyPlayer?.isConnected === true
           : lobbyPlayer?.isConnected === true
-      ),
+      )),
       isCurrentPlayer,
       isOwner: playerID === input.ownerPlayerID,
-      isLeader: input.game?.leaderID === playerID,
-      isQuestMember: input.game?.proposedTeam?.includes(playerID) === true,
+      isLeader: input.showRoundDecorations !== false && input.game?.leaderID === playerID,
+      isQuestMember: input.showRoundDecorations !== false && input.game?.proposedTeam?.includes(playerID) === true,
       isSelected: input.selectedTeam.includes(playerID),
       isSelectedTarget: input.selectedTarget === playerID,
       knownEvil:
@@ -178,11 +257,13 @@ export function buildRoomPlayers(input: Readonly<{
         input.game !== null &&
         (input.game.viewer.knownMerlinCandidatePlayerIDs ?? []).includes(playerID),
       visibleRole: revealedRole ?? privateRole ?? null,
-      voteStatus:
-        settledVotes?.[playerID] ??
-        (input.game?.submittedTeamVotePlayerIDs.includes(playerID) === true
-          ? 'pending'
-          : null),
+      showRoleReveal: input.showRoleReveal === true,
+      voteStatus: input.showRoundDecorations === false
+        ? null
+        : settledVotes?.[playerID] ??
+          (input.game?.submittedTeamVotePlayerIDs.includes(playerID) === true
+            ? 'pending'
+            : null),
     }
   })
 }
@@ -190,6 +271,7 @@ export function buildRoomPlayers(input: Readonly<{
 export function buildQuestProgress(
   numPlayers: number | null,
   game: AvalonPlayerView | null,
+  showCurrent = true,
 ): readonly QuestProgressNodeModel[] {
   const config = numPlayers === null ? null : getPlayerCountConfig(numPlayers)
 
@@ -198,7 +280,7 @@ export function buildQuestProgress(
       (quest) => quest.questIndex === questIndex,
     )
     const isCurrent =
-      game !== null && game.status !== 'finished' && game.questIndex === questIndex
+      showCurrent && game !== null && game.status !== 'finished' && game.questIndex === questIndex
 
     return {
       questIndex,

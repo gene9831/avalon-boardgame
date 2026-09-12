@@ -31,10 +31,30 @@ const player: RoomPlayerModel = {
   knownEvil: false,
   knownMerlinCandidate: false,
   visibleRole: null,
+  showRoleReveal: false,
   voteStatus: null,
 }
 
 describe('RoomPlayerSeat', () => {
+  it('labels an identity recognition target without replacing the player avatar', () => {
+    const props = {
+      disabled: true,
+      interactionMode: 'none' as const,
+      layout,
+      onActivate: vi.fn(),
+      player: { ...player, isLeader: false },
+      recognition: { label: '同伴' as const, state: 'target' as const, tone: 'ally' as const },
+    }
+    const html = renderToStaticMarkup(<RoomPlayerSeat {...props} />)
+
+    expect(html).toContain('data-recognition-seat-state="target"')
+    expect(html).toContain('data-recognition-tone="ally"')
+    expect(html).toContain('data-identity-recognition-label="true"')
+    expect(html).toContain('>同伴</span>')
+    expect(html).toContain('aria-label="1. Alice，同伴"')
+    expect(html).not.toContain('data-room-role-revealed="true"')
+  })
+
   it('uses one semantic control whose pointer targets are only avatar and name', () => {
     const html = renderToStaticMarkup(
       <RoomPlayerSeat
@@ -51,6 +71,39 @@ describe('RoomPlayerSeat', () => {
     expect(html).toContain('data-seat-pointer-target="avatar"')
     expect(html).toContain('data-seat-pointer-target="name"')
     expect(html).toContain('data-seat-decoration="leader"')
+  })
+
+  it('marks a locally selected quest member and announces that activating it cancels selection', () => {
+    const html = renderToStaticMarkup(
+      <RoomPlayerSeat
+        disabled={false}
+        interactionMode="selectTeam"
+        layout={layout}
+        onActivate={vi.fn()}
+        player={{ ...player, isSelected: true }}
+      />,
+    )
+
+    expect(html).toContain('aria-label="取消选择 Alice，队长"')
+    expect(html).toContain('aria-pressed="true"')
+    expect(html).toContain('data-seat-decoration="selected"')
+    expect(html).toMatch(/<svg[^>]*fill="#0f172a"[^>]*class="lucide lucide-circle-check"/)
+    expect(html).toMatch(/data-seat-decoration="leader"[^>]*>.*lucide-crown/s)
+    expect(html).toMatch(/<svg[^>]*fill="currentColor"[^>]*class="lucide lucide-crown"/)
+  })
+
+  it('uses the shared people icon for a confirmed quest member', () => {
+    const html = renderToStaticMarkup(
+      <RoomPlayerSeat
+        disabled
+        interactionMode="none"
+        layout={layout}
+        onActivate={vi.fn()}
+        player={{ ...player, isQuestMember: true, isLeader: false }}
+      />,
+    )
+
+    expect(html).toMatch(/data-seat-decoration="quest-member"[^>]*>.*lucide-user-round/s)
   })
 
   it('renders a non-button group when the seat has no interaction', () => {
@@ -187,5 +240,28 @@ describe('RoomPlayerSeat', () => {
     expect(renderNameplate('暮色森林 7')).toContain('data-nameplate-size="medium" data-round-table-nameplate="true" data-seat-pointer-target="name" style="left:2px;top:64px;width:88px')
     expect(renderNameplate('阿瓦隆远征骑士 10')).toContain('data-nameplate-size="max" data-round-table-nameplate="true" data-seat-pointer-target="name" style="left:0;top:64px;width:92px')
     expect(renderNameplate('银月 3', true)).toContain('data-nameplate-size="short" data-round-table-nameplate="true" data-seat-pointer-target="name" style="left:14px;top:64px;width:64px')
+  })
+
+  it.each([
+    ['merlin', '梅林', 'good', 'revealed-good'],
+    ['assassin', '刺客', 'evil', 'revealed-evil'],
+  ] as const)('reveals the compact %s role label and allegiance styling after the game', (role, shortLabel, loyalty, avatarState) => {
+    const html = renderToStaticMarkup(
+      <RoomPlayerSeat
+        disabled
+        interactionMode="none"
+        layout={layout}
+        onActivate={vi.fn()}
+        player={{ ...player, visibleRole: role, showRoleReveal: true, isLeader: false }}
+      />,
+    )
+
+    expect(html).toContain(`data-avatar-state="${avatarState}"`)
+    expect(html).toContain('data-room-role-revealed="true"')
+    expect(html).toContain(`data-role-loyalty="${loyalty}"`)
+    expect(html).toContain(`>${shortLabel}</span>`)
+    expect(html.indexOf('data-role-loyalty')).toBeGreaterThan(
+      html.indexOf('data-round-table-nameplate'),
+    )
   })
 })

@@ -50,9 +50,16 @@ import { LobbyView } from './LobbyView'
 import { RoomDevTools } from './RoomDevTools'
 import { RoomExitDialog } from './RoomExitDialog'
 import { formatRoomID } from './room-id'
-import { RoomLayoutPreview } from './RoomLayoutPreview'
+import { RoomLayoutBasePreview, RoomLayoutPreview } from './RoomLayoutPreview'
+import { RoomIdentityConfirmationPreview } from './RoomIdentityConfirmationPreview'
+import { RoomIdentityRecognitionPreview } from './RoomIdentityRecognitionPreview'
+import { RoomAssassinationPreview } from './RoomAssassinationPreview'
 import { RoomLobbyPreview } from './RoomLobbyPreview'
+import { RoomQuestPreview } from './RoomQuestPreview'
+import { RoomResultPreview } from './RoomResultPreview'
 import { RoomScreen } from './RoomScreen'
+import { RoomTeamProposalPreview } from './RoomTeamProposalPreview'
+import { RoomTeamVotePreview } from './RoomTeamVotePreview'
 import { useRoomScreenController } from './room-screen-controller'
 import {
   resolveRoomLayoutDiagnosticsMode,
@@ -405,8 +412,23 @@ function AppRoutes() {
         <Route element={<LobbyRoute onSaveProfile={handleSaveProfile} profile={profile} />} path="/" />
         <Route element={<RoomRoute onSaveProfile={handleSaveProfile} profile={profile} />} path="/rooms/:matchID" />
         {import.meta.env.DEV && <Route element={<RoomLayoutPreview />} path="/dev/room-layout" />}
+        {import.meta.env.DEV && <Route element={<RoomLayoutBasePreview />} path="/dev/room-layout/base" />}
+        {import.meta.env.DEV && <Route element={<RoomIdentityConfirmationPreview />} path="/dev/room-layout/identity-confirmation" />}
+        {import.meta.env.DEV && <Route element={<RoomIdentityConfirmationPreview />} path="/dev/room-layout/identity-confirmation/:scenarioID" />}
+        {import.meta.env.DEV && <Route element={<RoomIdentityRecognitionPreview />} path="/dev/room-layout/identity-recognition" />}
+        {import.meta.env.DEV && <Route element={<RoomIdentityRecognitionPreview />} path="/dev/room-layout/identity-recognition/:scenarioID" />}
         {import.meta.env.DEV && <Route element={<RoomLobbyPreview />} path="/dev/room-layout/lobby" />}
         {import.meta.env.DEV && <Route element={<RoomLobbyPreview />} path="/dev/room-layout/lobby/:scenarioID" />}
+        {import.meta.env.DEV && <Route element={<RoomTeamProposalPreview />} path="/dev/room-layout/team-proposal" />}
+        {import.meta.env.DEV && <Route element={<RoomTeamProposalPreview />} path="/dev/room-layout/team-proposal/:scenarioID" />}
+        {import.meta.env.DEV && <Route element={<RoomTeamVotePreview />} path="/dev/room-layout/team-vote" />}
+        {import.meta.env.DEV && <Route element={<RoomTeamVotePreview />} path="/dev/room-layout/team-vote/:scenarioID" />}
+        {import.meta.env.DEV && <Route element={<RoomQuestPreview />} path="/dev/room-layout/quest" />}
+        {import.meta.env.DEV && <Route element={<RoomQuestPreview />} path="/dev/room-layout/quest/:scenarioID" />}
+        {import.meta.env.DEV && <Route element={<RoomAssassinationPreview />} path="/dev/room-layout/assassination" />}
+        {import.meta.env.DEV && <Route element={<RoomAssassinationPreview />} path="/dev/room-layout/assassination/:scenarioID" />}
+        {import.meta.env.DEV && <Route element={<RoomResultPreview />} path="/dev/room-layout/result" />}
+        {import.meta.env.DEV && <Route element={<RoomResultPreview />} path="/dev/room-layout/result/:scenarioID" />}
         <Route element={<Navigate replace to="/" />} path="*" />
       </Routes>
     </BrowserRouter>
@@ -1042,9 +1064,10 @@ function RoomRoute({
   }
 
   const handleProposeTeam = (team: PlayerID[]) => {
-    if (gameState?.isActive) {
-      clientRef.current?.moves.proposeTeam(team)
+    if (!gameState?.isActive || clientRef.current === null) {
+      throw new Error('Team proposal client is unavailable')
     }
+    clientRef.current.moves.proposeTeam(team)
   }
 
   const handleCastTeamVote = (vote: TeamVote) => {
@@ -1378,6 +1401,8 @@ export function RoomView({
     onConfirmIdentityRecognition,
     onPlayQuestCard,
     onProposeTeam,
+    onTeamSubmissionError: () => pushToast({ message: '确认队伍失败，请重试。', tone: 'error' }),
+    onTeamVoteSubmissionError: () => pushToast({ message: '确认投票失败，请重试。', tone: 'error' }),
     onReconnect: handleManualReconnect,
     onStart,
     phase,

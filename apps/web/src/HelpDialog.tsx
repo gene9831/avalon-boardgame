@@ -16,27 +16,13 @@ import {
 import type { HelpTab } from './help-context'
 import { ModalDialog } from './ModalDialog'
 import { ROLE_GUIDANCE } from './role-guidance'
+import { getRoleArtworkSourceSet, ROLE_ARTWORK } from './role-artwork'
 import { LOYALTY_LABELS, ROLE_LABELS } from './room-game'
 
 const tabs: readonly { id: HelpTab; label: string }[] = [
   { id: 'rules', label: '游戏基础规则' },
   { id: 'roles', label: '角色说明' },
 ]
-
-interface HelpRoleArtworkSource {
-  height: number
-  slug: string
-  width: number
-}
-
-const HELP_ROLE_ARTWORK: Partial<Record<Role, HelpRoleArtworkSource>> = {
-  assassin: { height: 1051, slug: 'assassin', width: 674 },
-  loyal_servant: { height: 1010, slug: 'loyal-servant', width: 674 },
-  merlin: { height: 1127, slug: 'merlin', width: 752 },
-  minion: { height: 1010, slug: 'minion', width: 674 },
-  morgana: { height: 1127, slug: 'morgana', width: 752 },
-  percival: { height: 1127, slug: 'percival', width: 752 },
-}
 
 const HELP_ROLE_ARTWORK_SIZES = '(min-width: 1024px) 18rem, (min-width: 640px) 42vw, 5.5rem'
 
@@ -316,23 +302,11 @@ function HelpRoleCard({
 }
 
 function HelpRoleArtwork({ role }: { role: Role }) {
-  const artwork = HELP_ROLE_ARTWORK[role]
+  const artwork = ROLE_ARTWORK[role]
   const className = 'relative isolate w-[5.5rem] overflow-hidden rounded-xl border border-white/15 bg-slate-950/35 sm:aspect-[4/3] sm:w-auto'
 
-  if (artwork === undefined) {
-    return (
-      <div
-        aria-hidden="true"
-        className={`${className} aspect-[11/14] border-dashed`}
-        data-role-artwork-placeholder={role}
-      />
-    )
-  }
-
   const src = `/images/roles/${artwork.slug}-${artwork.width}.webp`
-  const srcSet = [320, 480, artwork.width]
-    .map((width) => `/images/roles/${artwork.slug}-${width}.webp ${width}w`)
-    .join(', ')
+  const srcSet = getRoleArtworkSourceSet(artwork)
 
   return (
     <div aria-hidden="true" className={className}>

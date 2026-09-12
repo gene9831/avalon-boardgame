@@ -91,6 +91,7 @@ function createPublicLobbyGame(room: AvalonMatch): AvalonPlayerView {
     questIndex: 0,
     proposedTeam: null,
     submittedTeamVotePlayerIDs: [],
+    submittedQuestCardCount: 0,
     voteHistory: [],
     questHistory: [],
     consecutiveRejectedTeams: 0,

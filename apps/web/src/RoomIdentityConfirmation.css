@@ -1,0 +1,352 @@
+.identity-confirmation-layer::before {
+  position: absolute;
+  inset: -20px;
+  content: '';
+  background:
+    radial-gradient(circle at 50% 45%, rgb(148 116 55 / 18%), transparent 34%),
+    rgb(3 8 18 / 38%);
+  backdrop-filter: blur(3px) brightness(0.82);
+}
+
+.identity-confirmation-reading {
+  --identity-card-width: min(62cqw, 220px);
+  --identity-card-height: calc(var(--identity-card-width) * 1.4);
+  --identity-card-start-left: 50%;
+  --identity-card-start-top: 50%;
+  --identity-card-start-translate-x: -50%;
+  --identity-card-start-translate-y: -50%;
+  --identity-card-end-left: 50%;
+  --identity-card-end-top: 0%;
+  --identity-card-end-translate-x: -50%;
+  --identity-card-end-translate-y: 0%;
+}
+
+.identity-confirmation-card-motion {
+  position: absolute;
+  z-index: 2;
+  top: var(--identity-card-end-top);
+  left: var(--identity-card-end-left);
+  width: var(--identity-card-width);
+  height: var(--identity-card-height);
+  transform: translate(
+    var(--identity-card-end-translate-x),
+    var(--identity-card-end-translate-y)
+  );
+  perspective: 1000px;
+}
+
+.identity-confirmation-card-motion[data-identity-card-motion='concealed'] {
+  top: var(--identity-card-start-top);
+  left: var(--identity-card-start-left);
+  transform: translate(
+    var(--identity-card-start-translate-x),
+    var(--identity-card-start-translate-y)
+  );
+}
+
+.identity-confirmation-card-motion[data-identity-card-motion='revealing'] {
+  animation: identity-confirmation-card-move-up 650ms cubic-bezier(0.22, 0.8, 0.22, 1) both;
+}
+
+.identity-confirmation-card-motion[data-identity-card-motion='hiding'] {
+  animation: identity-confirmation-card-move-down 650ms cubic-bezier(0.22, 0.8, 0.22, 1) both;
+}
+
+.identity-confirmation-card-motion[data-identity-card-motion='soft'] {
+  animation: identity-confirmation-card-soft-entry 180ms ease-out both;
+}
+
+.identity-confirmation-card-flip {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform: rotateY(180deg);
+  transform-style: preserve-3d;
+}
+
+[data-identity-card-motion='concealed'] .identity-confirmation-card-flip {
+  transform: rotateY(0deg);
+}
+
+[data-identity-card-motion='revealing'] .identity-confirmation-card-flip {
+  animation: identity-confirmation-card-flip-open 650ms cubic-bezier(0.22, 0.8, 0.22, 1) both;
+}
+
+[data-identity-card-motion='hiding'] .identity-confirmation-card-flip {
+  animation: identity-confirmation-card-flip-closed 650ms cubic-bezier(0.22, 0.8, 0.22, 1) both;
+}
+
+.identity-confirmation-card-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid rgb(202 169 91 / 54%);
+  border-radius: 1rem;
+  background: #07111f;
+  box-shadow: 0 24px 65px rgb(0 0 0 / 62%);
+  backface-visibility: hidden;
+}
+
+.identity-confirmation-card-back {
+  background:
+    linear-gradient(135deg, transparent 14px, rgb(202 169 91 / 34%) 15px 16px, transparent 17px) 0 0 / 30px 30px,
+    radial-gradient(circle at center, rgb(202 169 91 / 17%), transparent 44%),
+    linear-gradient(145deg, #172538, #07111f 62%, #2d2115);
+  box-shadow:
+    0 24px 65px rgb(0 0 0 / 62%),
+    inset 0 0 0 5px rgb(7 17 31 / 92%),
+    inset 0 0 0 6px rgb(202 169 91 / 30%);
+}
+
+.identity-confirmation-card-back::before {
+  position: absolute;
+  inset: 12px;
+  border: 1px solid rgb(202 169 91 / 42%);
+  border-radius: 0.75rem;
+  content: '';
+}
+
+.identity-confirmation-card-back__seal {
+  display: grid;
+  width: 3.5rem;
+  height: 3.5rem;
+  place-items: center;
+  border: 1px solid rgb(253 230 138 / 54%);
+  border-radius: 9999px;
+  color: #fde68a;
+  background: rgb(7 17 31 / 78%);
+  box-shadow: 0 0 28px rgb(202 169 91 / 28%);
+  font-size: 1.5rem;
+}
+
+.identity-confirmation-card-trigger {
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.identity-confirmation-card-trigger:hover {
+  border-color: rgb(253 230 138 / 82%);
+  box-shadow: 0 0 28px rgb(202 169 91 / 18%);
+}
+
+.identity-confirmation-card-trigger:focus-visible {
+  outline: 2px solid #fde68a;
+  outline-offset: 4px;
+}
+
+.identity-confirmation-role-card {
+  transform: rotateY(180deg);
+}
+
+.identity-confirmation-reading[data-role-loyalty='good'] .identity-confirmation-role-card {
+  box-shadow: 0 24px 65px rgb(0 0 0 / 58%), 0 0 34px rgb(111 145 194 / 24%);
+}
+
+.identity-confirmation-reading[data-role-loyalty='evil'] .identity-confirmation-role-card {
+  box-shadow: 0 24px 65px rgb(0 0 0 / 58%), 0 0 34px rgb(145 69 84 / 26%);
+}
+
+.identity-confirmation-details-slot {
+  position: absolute;
+  z-index: 1;
+  inset: calc(var(--identity-card-height) + 12px) 0 0;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.identity-confirmation-details {
+  width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: rgb(202 169 91 / 42%) transparent;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.identity-confirmation-details::-webkit-scrollbar {
+  width: 6px;
+}
+
+.identity-confirmation-details::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: rgb(202 169 91 / 42%);
+}
+
+[data-identity-confirmation-stage='revealing'] .identity-confirmation-details {
+  animation: identity-confirmation-details-reveal 220ms ease-out 430ms both;
+}
+
+[data-identity-confirmation-stage='hiding'] .identity-confirmation-details {
+  animation: identity-confirmation-details-hide 160ms ease-in both;
+}
+
+[data-identity-card-motion='soft'] ~ .identity-confirmation-details-slot .identity-confirmation-details {
+  animation: identity-confirmation-details-soft-entry 180ms ease-out both;
+}
+
+[data-identity-confirmation-state] [data-seat-decoration],
+[data-identity-confirmation-state] [data-seat-disconnected-badge='true'] {
+  display: none;
+}
+
+[data-identity-confirmation-state='waiting'] #current-player-avatar {
+  border-color: rgb(253 230 138 / 92%);
+  box-shadow: 0 0 0 3px rgb(202 169 91 / 30%), 0 0 22px rgb(202 169 91 / 40%);
+}
+
+[data-identity-confirmation-state='waiting'] #current-player-avatar::after {
+  position: absolute;
+  right: -0.25rem;
+  bottom: -0.2rem;
+  display: grid;
+  width: 1.25rem;
+  height: 1.25rem;
+  place-items: center;
+  border: 1px solid rgb(254 243 199 / 78%);
+  border-radius: 9999px;
+  content: '✓';
+  color: #08111f;
+  background: #d6b66d;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+@container avalon-room-layout (orientation: portrait) and (height < 700px) {
+  .identity-confirmation-reading {
+    --identity-card-width: min(54cqw, 190px);
+  }
+}
+
+@container avalon-room-layout (orientation: landscape) {
+  .identity-confirmation-reading {
+    --identity-card-end-left: 21%;
+    --identity-card-end-top: 44%;
+    --identity-card-end-translate-y: -50%;
+  }
+
+  .identity-confirmation-card-motion {
+    width: auto;
+    height: min(calc(100% - 16px), 322px);
+    aspect-ratio: 5 / 7;
+  }
+
+  .identity-confirmation-details-slot {
+    inset: 0 0 0 42%;
+    align-items: center;
+    justify-content: flex-start;
+  }
+
+  .identity-confirmation-details {
+    max-height: calc(100% - 16px);
+  }
+}
+
+@container avalon-room-layout (orientation: landscape) and (height < 515px) {
+  .identity-confirmation-layer {
+    padding: 8px;
+  }
+
+  .identity-confirmation-card-motion {
+    height: min(calc(100% - 16px), 252px);
+  }
+
+  .identity-confirmation-details {
+    gap: 6px;
+    padding: 10px;
+  }
+
+  .identity-confirmation-details p {
+    margin-top: 2px;
+    font-size: 0.75rem;
+    line-height: 1.125rem;
+  }
+}
+
+@keyframes identity-confirmation-card-move-up {
+  from {
+    top: var(--identity-card-start-top);
+    left: var(--identity-card-start-left);
+    transform: translate(
+      var(--identity-card-start-translate-x),
+      var(--identity-card-start-translate-y)
+    );
+  }
+
+  to {
+    top: var(--identity-card-end-top);
+    left: var(--identity-card-end-left);
+    transform: translate(
+      var(--identity-card-end-translate-x),
+      var(--identity-card-end-translate-y)
+    );
+  }
+}
+
+@keyframes identity-confirmation-card-move-down {
+  from {
+    top: var(--identity-card-end-top);
+    left: var(--identity-card-end-left);
+    transform: translate(
+      var(--identity-card-end-translate-x),
+      var(--identity-card-end-translate-y)
+    );
+  }
+
+  to {
+    top: var(--identity-card-start-top);
+    left: var(--identity-card-start-left);
+    transform: translate(
+      var(--identity-card-start-translate-x),
+      var(--identity-card-start-translate-y)
+    );
+  }
+}
+
+@keyframes identity-confirmation-card-flip-open {
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(180deg); }
+}
+
+@keyframes identity-confirmation-card-flip-closed {
+  from { transform: rotateY(180deg); }
+  to { transform: rotateY(360deg); }
+}
+
+@keyframes identity-confirmation-card-soft-entry {
+  from { opacity: 0; transform: translate(var(--identity-card-end-translate-x), calc(var(--identity-card-end-translate-y) + 6px)); }
+  to { opacity: 1; transform: translate(var(--identity-card-end-translate-x), var(--identity-card-end-translate-y)); }
+}
+
+@keyframes identity-confirmation-details-reveal {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes identity-confirmation-details-hide {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(8px); }
+}
+
+@keyframes identity-confirmation-details-soft-entry {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .identity-confirmation-card-motion,
+  .identity-confirmation-card-flip,
+  .identity-confirmation-details {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition: none !important;
+  }
+}

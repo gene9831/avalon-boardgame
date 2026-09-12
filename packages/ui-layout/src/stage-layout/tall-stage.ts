@@ -8,8 +8,8 @@ type ResolvedSeatTier = SeatTier & Readonly<{ seatGap: number }>
 
 const PLAYER_ORBIT_WIDTH_SCALE = 0.86
 const TABLETOP_WIDTH_SCALE = 0.74
-const CENTER_PROTECTION_RADIUS = 80
-const CENTER_PANEL_DIAMETER = 152
+const CENTER_PROTECTION_RADIUS = 68
+const CENTER_PANEL_DIAMETER = 128
 const NAME_GAP = 4
 const MIN_AVATAR_SIZE = 36
 const SEAT_TIER_ANCHORS: readonly SeatTier[] = [
