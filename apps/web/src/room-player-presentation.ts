@@ -69,6 +69,7 @@ function buildMarkers(input: FilteredSeatInput): readonly RoomPlayerMarker[] {
   if (input.isQuestMember) markers.push({ kind: 'questMember' })
   if (input.voteStatus !== null) markers.push({ kind: 'vote', status: input.voteStatus })
   if (input.knownEvil) markers.push({ kind: 'knownEvil' })
+  if (input.isSelectedTarget) markers.push({ kind: 'assassinationTarget' })
   if (input.knownMerlinCandidate) markers.push({ kind: 'merlinCandidate' })
   return markers
 }

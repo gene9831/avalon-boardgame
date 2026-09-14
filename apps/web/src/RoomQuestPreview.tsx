@@ -6,13 +6,14 @@ import {
   type PlayerID,
   type QuestCard,
   type QuestResult,
+  type Role,
   type TeamVote,
 } from '@avalon/game'
 
 import type { AvalonMatch, LobbyPlayer } from './lobby'
 import { getQuestTeamSize } from './room-game'
 import { buildQuestProgress, buildRoomPlayers } from './room-presentation'
-import type { RoomQuestScene, RoomTeamProposalScene } from './room-screen-props'
+import type { RoomAssassinationScene, RoomGameResultScene, RoomQuestScene, RoomTeamProposalScene } from './room-screen-props'
 import { RoomScreenPreviewShell } from './RoomScreenPreviewShell'
 import { useToast } from './toast-context'
 
@@ -21,6 +22,7 @@ type QuestPreviewScenarioID = 'member-good' | 'member-evil' | 'observer'
 const SCENARIO_IDS: readonly QuestPreviewScenarioID[] = ['member-good', 'member-evil', 'observer']
 const CURRENT_PLAYER_ID = '2' as PlayerID
 const PLAYER_NAMES = ['苍', '雾林守望者', '银', '来自卡美洛的无名骑士', '青岚', '暮色远征者', '白鹿', '暮鸦议会记录官', '荆棘', '霜塔守夜人']
+const PREVIEW_ROLES: readonly Role[] = ['merlin', 'percival', 'loyal_servant', 'loyal_servant', 'assassin', 'minion', 'loyal_servant', 'minion', 'loyal_servant', 'minion']
 function isScenarioID(value: string | undefined): value is QuestPreviewScenarioID {
   return value !== undefined && SCENARIO_IDS.includes(value as QuestPreviewScenarioID)
 }
@@ -53,6 +55,10 @@ function createApprovedVote(playerIDs: readonly PlayerID[], questIndex: number, 
     index === playerIDs.length - 1 ? 'reject' : 'approve',
   ])) as Record<PlayerID, TeamVote>
   return { proposerID: '0' as PlayerID, questIndex, team: [...team], votes, approved: true }
+}
+
+function previewRoles(playerCount: number): Record<PlayerID, Role> {
+  return Object.fromEntries(Array.from({ length: playerCount }, (_, index) => [String(index), PREVIEW_ROLES[index]!])) as Record<PlayerID, Role>
 }
 
 function createPreviewState(input: Readonly<{
@@ -118,6 +124,41 @@ function createPreviewState(input: Readonly<{
   }
 }
 
+function postQuestGame(
+  game: AvalonPlayerView,
+  playerCount: number,
+  result: QuestResult,
+  intent: 'assassination' | 'gameResult',
+): AvalonPlayerView {
+  const questHistory = [...game.questHistory, result]
+  const viewer = {
+    role: game.viewer.role,
+    loyalty: game.viewer.loyalty,
+    knownEvilPlayerIDs: game.viewer.knownEvilPlayerIDs,
+    knownMerlinCandidatePlayerIDs: game.viewer.knownMerlinCandidatePlayerIDs,
+  }
+  const base = {
+    ...game,
+    questHistory,
+    questIndex: Math.min(result.questIndex + 1, 4),
+    proposedTeam: null,
+    submittedTeamVotePlayerIDs: [],
+    submittedQuestCardCount: 0,
+    leaderID: String((Number(game.leaderID) + 1) % playerCount),
+    goodSuccesses: questHistory.filter(({ succeeded }) => succeeded).length,
+    evilFailures: questHistory.filter(({ succeeded }) => !succeeded).length,
+    viewer,
+  }
+  if (intent === 'gameResult') {
+    return {
+      ...base, status: 'finished',
+      result: { winner: 'good', reason: 'three_quests' },
+      revealedRoles: previewRoles(playerCount),
+    }
+  }
+  return base
+}
+
 export function RoomQuestPreview() {
   const { scenarioID } = useParams()
   if (!isScenarioID(scenarioID)) return <Navigate replace to="/dev/room-layout" />
@@ -136,20 +177,14 @@ function QuestPreviewScenario({ scenarioID }: { scenarioID: QuestPreviewScenario
   const [showVoteDetails, setShowVoteDetails] = useState(false)
   const [questResult, setQuestResult] = useState<QuestResult | null>(null)
   const [advancedResult, setAdvancedResult] = useState<QuestResult | null>(null)
+  const [resultIntent, setResultIntent] = useState<'continue' | 'assassination' | 'gameResult'>('continue')
+  const [continuedResult, setContinuedResult] = useState<Readonly<{ intent: 'assassination' | 'gameResult'; result: QuestResult }> | null>(null)
 
   useEffect(() => {
     if (!showVoteDetails) return
     const timer = window.setTimeout(() => setShowVoteDetails(false), 3_000)
     return () => window.clearTimeout(timer)
   }, [showVoteDetails])
-  useEffect(() => {
-    if (questResult === null) return
-    const timer = window.setTimeout(() => {
-      setAdvancedResult(questResult)
-      setQuestResult(null)
-    }, 3_000)
-    return () => window.clearTimeout(timer)
-  }, [questResult])
 
   const preview = useMemo(() => createPreviewState({
     scenarioID, playerCount, questIndex, submittedCount, submittedCard, disconnected, advancedResult,
@@ -163,6 +198,7 @@ function QuestPreviewScenario({ scenarioID }: { scenarioID: QuestPreviewScenario
     setSubmittedCount(1)
     setQuestResult(null)
     setAdvancedResult(null)
+    setContinuedResult(null)
   }
   const simulateResult = (succeeded: boolean) => {
     const failCount = succeeded ? Math.max(0, failThreshold - 1) : failThreshold
@@ -177,6 +213,7 @@ function QuestPreviewScenario({ scenarioID }: { scenarioID: QuestPreviewScenario
     setSubmitting(false)
     setQuestResult(result)
     setAdvancedResult(null)
+    setContinuedResult(null)
   }
   const resetPreview = () => {
     setQuestIndex(0)
@@ -225,6 +262,13 @@ function QuestPreviewScenario({ scenarioID }: { scenarioID: QuestPreviewScenario
           <button onClick={() => setShowVoteDetails(true)} type="button">显示表决明细 3 秒</button>
           <button onClick={() => simulateResult(true)} type="button">模拟任务成功</button>
           <button onClick={() => simulateResult(false)} type="button">模拟任务失败</button>
+          <label>结算后场景
+            <select onChange={(event) => setResultIntent(event.target.value as typeof resultIntent)} value={resultIntent}>
+              <option value="continue">继续提议</option>
+              <option value="assassination">进入刺杀阶段</option>
+              <option value="gameResult">查看对局结果</option>
+            </select>
+          </label>
           {advancedResult !== null && <button onClick={() => { setAdvancedResult(null); setSubmittedCount(1); setSubmittedCard(null) }} type="button">返回当前任务</button>}
           <button onClick={resetPreview} type="button">重置预览</button>
     </>
@@ -243,10 +287,40 @@ function QuestPreviewScenario({ scenarioID }: { scenarioID: QuestPreviewScenario
     selectedTarget: null,
     showKnownPlayerInfo: false,
     showPrivateRoleKnowledge: false,
-    showSettledTeamVoteDetails: showVoteDetails,
+    showSettledTeamVoteDetails: advancedResult === null ? showVoteDetails : false,
     interactionMode: 'none',
   })
   const questProgress = buildQuestProgress(playerCount, preview.game)
+
+  if (continuedResult !== null) {
+    const postGame = postQuestGame(preview.game, playerCount, continuedResult.result, continuedResult.intent)
+    if (continuedResult.intent === 'assassination') {
+      const postPlayers = buildRoomPlayers({
+        players: preview.room.players, numPlayers: playerCount, currentPlayerID: CURRENT_PLAYER_ID,
+        phase: 'assassination', viewerConnected: true, ownerPlayerID: null, game: postGame,
+        selectedTeam: [], selectedTarget: null, showKnownPlayerInfo: false, showPrivateRoleKnowledge: false,
+        showRoundDecorations: false, showConnectionStatus: false, interactionMode: 'none',
+      })
+      const scene: RoomAssassinationScene = {
+        kind: 'assassination', matchID: preview.room.matchID, playerCount, players: postPlayers,
+        questProgress: buildQuestProgress(playerCount, postGame, false),
+        view: { kind: 'observing', perspective: scenarioID === 'member-evil' ? 'evil' : 'good' },
+      }
+      return <RoomScreenPreviewShell actions={{ onActivatePlayer: () => undefined, onAssassinate: () => undefined, onContinue: () => undefined }} controls={controls} scene={scene} />
+    }
+    const postPlayers = buildRoomPlayers({
+      players: preview.room.players, numPlayers: playerCount, currentPlayerID: CURRENT_PLAYER_ID,
+      phase: 'finished', viewerConnected: true, ownerPlayerID: null, game: postGame,
+      selectedTeam: [], selectedTarget: null, showKnownPlayerInfo: false, showPrivateRoleKnowledge: false,
+      showRoleReveal: true, showRoundDecorations: false, showConnectionStatus: false, interactionMode: 'none',
+    })
+    const scene: RoomGameResultScene = {
+      kind: 'gameResult', matchID: preview.room.matchID, playerCount, players: postPlayers,
+      questProgress: buildQuestProgress(playerCount, postGame, false),
+      winner: 'good', reason: '完成 3 次任务', questScore: '任务 3 成功 / 0 失败',
+    }
+    return <RoomScreenPreviewShell actions={null} controls={controls} scene={scene} />
+  }
 
   if (advancedResult !== null) {
     const advancedQuestIndex = preview.game.questIndex
@@ -286,12 +360,15 @@ function QuestPreviewScenario({ scenarioID }: { scenarioID: QuestPreviewScenario
     questIndex,
     requiredSubmissionCount: preview.teamSize,
     submittedCount,
+    failThreshold,
     view: questResult !== null
       ? {
           kind: 'result',
           succeeded: questResult.succeeded,
           successCount: questResult.successCount,
           failCount: questResult.failCount,
+          failThreshold,
+          continueIntent: resultIntent,
         }
       : scenarioID === 'observer' || submittedCard !== null
         ? {
@@ -319,6 +396,12 @@ function QuestPreviewScenario({ scenarioID }: { scenarioID: QuestPreviewScenario
           if (scenarioID === 'observer' || submitting || submittedCard !== null) return
           if (scenarioID === 'member-evil' && selectedCard === null) return
           setSubmitting(true)
+        },
+        onContinue: () => {
+          if (questResult === null) return
+          if (resultIntent === 'continue') setAdvancedResult(questResult)
+          else setContinuedResult({ intent: resultIntent, result: questResult })
+          setQuestResult(null)
         },
       }}
       controls={controls}

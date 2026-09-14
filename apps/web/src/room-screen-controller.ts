@@ -95,7 +95,7 @@ export interface RoomSceneEventHandlers {
   onSelectTeamVote(vote: TeamVote): void
   onStart(): void
   onSubmitTeam(): void
-  onContinue?(): void
+  onContinue(): void
 }
 
 export type RoomSceneBinding = {
@@ -269,7 +269,7 @@ export function buildRoomSceneBinding(
           continueIntent: activeSettlement.continueIntent,
         },
       },
-      actions: { onContinue: events.onContinue ?? (() => undefined) } as unknown as RoomActionsByKind['teamVote'],
+      actions: { onSelectVote: events.onSelectTeamVote, onConfirmVote: events.onConfirmTeamVote, onContinue: events.onContinue } as RoomActionsByKind['teamVote'],
     }
   }
   if (activeSettlement?.kind === 'quest') {
@@ -282,13 +282,14 @@ export function buildRoomSceneBinding(
         questIndex: activeSettlement.questIndex,
         requiredSubmissionCount: activeSettlement.team.length,
         submittedCount: activeSettlement.team.length,
+        failThreshold: activeSettlement.failThreshold,
         view: {
           kind: 'result', succeeded: activeSettlement.succeeded,
           successCount: activeSettlement.successCount, failCount: activeSettlement.failCount,
           failThreshold: activeSettlement.failThreshold, continueIntent: activeSettlement.continueIntent,
         },
       },
-      actions: { onContinue: events.onContinue ?? (() => undefined) } as unknown as RoomActionsByKind['quest'],
+      actions: { onSelectCard: events.onSelectQuestCard, onConfirmCard: events.onConfirmQuestCard, onContinue: events.onContinue } as RoomActionsByKind['quest'],
     }
   }
   if (activeSettlement?.kind === 'assassination') {
@@ -306,7 +307,7 @@ export function buildRoomSceneBinding(
           winner: activeSettlement.winner, continueIntent: activeSettlement.continueIntent,
         },
       },
-      actions: { onContinue: events.onContinue ?? (() => undefined) } as unknown as RoomActionsByKind['assassination'],
+      actions: { onActivatePlayer: events.onActivatePlayer, onAssassinate: events.onAssassinate, onContinue: events.onContinue } as RoomActionsByKind['assassination'],
     }
   }
 
@@ -434,6 +435,7 @@ export function buildRoomSceneBinding(
       actions: {
         onSelectVote: events.onSelectTeamVote,
         onConfirmVote: events.onConfirmTeamVote,
+        onContinue: events.onContinue,
       },
     }
   }
@@ -458,6 +460,7 @@ export function buildRoomSceneBinding(
         questIndex: input.game.questIndex,
         requiredSubmissionCount: proposedTeam.length,
         submittedCount: input.game.submittedQuestCardCount,
+        failThreshold: getPlayerCountConfig(roomPlayerCount(input.room)).questFailThresholds[input.game.questIndex] ?? 1,
         view: settledQuest !== undefined
           ? {
               kind: 'result',
@@ -484,6 +487,7 @@ export function buildRoomSceneBinding(
       actions: {
         onSelectCard: events.onSelectQuestCard,
         onConfirmCard: events.onConfirmQuestCard,
+        onContinue: events.onContinue,
       },
     }
   }
@@ -532,6 +536,7 @@ export function buildRoomSceneBinding(
       actions: {
         onActivatePlayer: events.onActivatePlayer,
         onAssassinate: events.onAssassinate,
+        onContinue: events.onContinue,
       },
     }
   }

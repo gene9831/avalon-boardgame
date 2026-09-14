@@ -30,7 +30,7 @@ function cardLabel(card: QuestCard): string {
 function questPhaseContent(view: RoomQuestView, actions: RoomActionsByKind['quest']): Pick<RoomSceneContent, 'title' | 'phaseMiddle' | 'phaseAction'> {
   switch (view.kind) {
     case 'choosing': {
-      const actionLabel = view.alignment === 'good' ? '确认成功牌' : '确认任务牌'
+      const actionLabel = view.alignment === 'good' ? '提交成功牌' : '确认任务牌'
       const canConfirm = view.canChoose && (view.alignment === 'good' ? view.selectedCard === 'success' : view.selectedCard !== null)
       const successChoice = (
         <RoomChoiceButton
@@ -49,10 +49,7 @@ function questPhaseContent(view: RoomQuestView, actions: RoomActionsByKind['ques
       return {
         title: '执行任务',
         phaseMiddle: view.alignment === 'good' ? (
-          <div className="space-y-1">
-            {successChoice}
-            <p className="text-center text-xs text-emerald-100/80">正义阵营只能提交成功牌</p>
-          </div>
+          <p className="text-sm text-emerald-100/80">正义阵营只能提交成功牌</p>
         ) : (
           <div className="grid grid-cols-2 gap-2">
             {successChoice}
@@ -104,8 +101,10 @@ function questPhaseContent(view: RoomQuestView, actions: RoomActionsByKind['ques
             <p>{view.successCount} 成功 / {view.failCount} 失败</p>
           </div>
         ),
-        phaseAction: actions.onContinue === undefined ? null : (
-          <RoomActionButton onClick={actions.onContinue}>继续</RoomActionButton>
+        phaseAction: (
+          <RoomActionButton onClick={actions.onContinue}>
+            {view.continueIntent === 'assassination' ? '进入刺杀阶段' : view.continueIntent === 'gameResult' ? '查看对局结果' : '继续'}
+          </RoomActionButton>
         ),
       }
     default:
@@ -125,11 +124,13 @@ export function RoomQuestScene({ actions, geometry, scene, slots }: RoomQuestSce
         {scene.view.succeeded ? '任务成功' : '任务失败'}
       </strong>
       <span className="mt-1 block text-sm text-slate-300">{scene.view.successCount} 成功 / {scene.view.failCount} 失败</span>
+      {scene.failThreshold === 2 && <span className="block text-sm text-slate-300">需要 2 张失败牌</span>}
     </RoomCenter>
   ) : (
     <RoomCenter density="compact">
       <strong className="block text-lg font-semibold text-amber-200">第 {scene.questIndex + 1} 次任务</strong>
       <span className="mt-1 block text-sm text-slate-300">{scene.submittedCount} / {scene.requiredSubmissionCount} 已提交</span>
+      {scene.failThreshold === 2 && <span className="block text-sm text-slate-300">需要 2 张失败牌</span>}
     </RoomCenter>
   )
 

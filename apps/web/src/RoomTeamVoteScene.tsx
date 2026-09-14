@@ -87,8 +87,10 @@ function phaseContent(view: RoomTeamVoteView, actions: RoomActionsByKind['teamVo
             <p>{view.approvalCount} 同意 / {view.rejectionCount} 反对</p>
           </div>
         ),
-        phaseAction: actions.onContinue === undefined ? null : (
-          <RoomActionButton onClick={actions.onContinue}>继续</RoomActionButton>
+        phaseAction: (
+          <RoomActionButton onClick={actions.onContinue}>
+            {view.continueIntent === 'gameResult' ? '查看对局结果' : '继续'}
+          </RoomActionButton>
         ),
       }
     default:
@@ -98,7 +100,7 @@ function phaseContent(view: RoomTeamVoteView, actions: RoomActionsByKind['teamVo
 
 export function RoomTeamVoteScene({ actions, geometry, scene, slots }: RoomTeamVoteSceneProps) {
   const phase = phaseContent(scene.view, actions)
-  const finalVote = scene.consecutiveRejectedTeams === 4
+  const finalVote = scene.view.kind !== 'result' && scene.consecutiveRejectedTeams === 4
   const teamTokens = scene.teamTokens ?? []
   const framedScene = {
     ...scene,
@@ -108,15 +110,19 @@ export function RoomTeamVoteScene({ actions, geometry, scene, slots }: RoomTeamV
   return (
     <RoomSceneFrame
       content={{
-        title: finalVote ? '最终表决 · 否决即邪恶获胜' : '表决任务队伍 · 过半通过',
+        title: scene.view.kind === 'result' ? '队伍表决结果' : finalVote ? '最终表决 · 否决即邪恶获胜' : '表决任务队伍 · 过半通过',
         center: (
           <RoomCenter density="compact">
-            <strong className="block text-lg font-semibold text-amber-200">第 {scene.questIndex + 1} 次任务</strong>
+            <strong className={`block text-lg font-semibold ${scene.view.kind === 'result' ? scene.view.approved ? 'text-emerald-300' : 'text-rose-300' : 'text-amber-200'}`}>
+              {scene.view.kind === 'result' ? scene.view.approved ? '队伍通过' : '队伍被否决' : `第 ${scene.questIndex + 1} 次任务`}
+            </strong>
             <div className="mt-2 flex justify-center">
               <RoomTeamTokens requiredTeamSize={teamTokens.length} state="confirmed" tokens={teamTokens} />
             </div>
-            <span className="mt-1 block text-sm text-slate-300">已投票 {scene.submittedCount} / {scene.participantCount}</span>
-            {scene.consecutiveRejectedTeams > 0 && (
+            <span className="mt-1 block text-sm text-slate-300">
+              {scene.view.kind === 'result' ? `${scene.view.approvalCount} 同意 / ${scene.view.rejectionCount} 反对` : `已投票 ${scene.submittedCount} / ${scene.participantCount}`}
+            </span>
+            {scene.view.kind !== 'result' && scene.consecutiveRejectedTeams > 0 && (
               <span
                 className="mt-1 block text-sm text-slate-400"
                 data-critical-rejection-warning={finalVote || undefined}

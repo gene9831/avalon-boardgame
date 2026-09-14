@@ -1,16 +1,17 @@
 import { useMemo, useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
-import type { AvalonPlayerView, PlayerID, TeamVote } from '@avalon/game'
+import { getPlayerCountConfig, type AvalonPlayerView, type PlayerID, type Role, type TeamVote } from '@avalon/game'
 
 import type { AvalonMatch, LobbyPlayer } from './lobby'
 import { getQuestTeamSize } from './room-game'
 import { buildQuestProgress, buildRoomPlayers, buildRoomTeamTokens } from './room-presentation'
-import type { RoomTeamVoteScene } from './room-screen-props'
+import type { RoomGameResultScene, RoomQuestScene, RoomTeamProposalScene, RoomTeamVoteScene } from './room-screen-props'
 import { RoomScreenPreviewShell } from './RoomScreenPreviewShell'
 import { useToast } from './toast-context'
 
 const CURRENT_PLAYER_ID = '2' as PlayerID
 const PLAYER_NAMES = ['苍', '雾林守望者', '银', '来自卡美洛的无名骑士', '青岚', '暮色远征者', '白鹿', '暮鸦议会记录官', '荆棘', '霜塔守夜人']
+const PREVIEW_ROLES: readonly Role[] = ['merlin', 'percival', 'loyal_servant', 'loyal_servant', 'assassin', 'minion', 'loyal_servant', 'minion', 'loyal_servant', 'minion']
 function createPlayers(playerCount: number, disconnected: boolean): LobbyPlayer[] {
   return Array.from({ length: playerCount }, (_, id) => ({
     id,
@@ -88,6 +89,51 @@ function createPreviewState(input: Readonly<{
   }
 }
 
+function previewRoles(playerCount: number): Record<PlayerID, Role> {
+  return Object.fromEntries(Array.from({ length: playerCount }, (_, index) => [String(index), PREVIEW_ROLES[index]!])) as Record<PlayerID, Role>
+}
+
+function postVoteGame(
+  game: AvalonPlayerView,
+  playerCount: number,
+  result: Readonly<{ approved: boolean; approvalCount: number; rejectionCount: number; continueIntent: 'continue' | 'gameResult' }>,
+): AvalonPlayerView {
+  const playerIDs = Array.from({ length: playerCount }, (_, index) => String(index) as PlayerID)
+  const votes = Object.fromEntries(playerIDs.map((playerID, index) => [
+    playerID,
+    index < result.approvalCount ? 'approve' : 'reject',
+  ])) as Record<PlayerID, TeamVote>
+  const voteHistory = [...game.voteHistory, {
+    proposerID: game.leaderID ?? undefined,
+    questIndex: game.questIndex,
+    team: game.proposedTeam ?? [],
+    votes,
+    approved: result.approved,
+  }]
+  const viewer = {
+    role: game.viewer.role,
+    loyalty: game.viewer.loyalty,
+    knownEvilPlayerIDs: game.viewer.knownEvilPlayerIDs,
+    knownMerlinCandidatePlayerIDs: game.viewer.knownMerlinCandidatePlayerIDs,
+  }
+  if (result.continueIntent === 'gameResult') {
+    return {
+      ...game, status: 'finished', voteHistory, proposedTeam: null,
+      submittedTeamVotePlayerIDs: [], submittedQuestCardCount: 0,
+      consecutiveRejectedTeams: 5, viewer,
+      result: { winner: 'evil', reason: 'five_rejections' },
+      revealedRoles: previewRoles(playerCount),
+    }
+  }
+  return {
+    ...game, voteHistory, proposedTeam: result.approved ? game.proposedTeam : null,
+    submittedTeamVotePlayerIDs: [], submittedQuestCardCount: 0,
+    consecutiveRejectedTeams: result.approved ? 0 : game.consecutiveRejectedTeams + 1,
+    leaderID: result.approved ? game.leaderID : String((Number(game.leaderID) + 1) % playerCount),
+    viewer,
+  }
+}
+
 export function RoomTeamVotePreview() {
   const { scenarioID } = useParams()
   if (scenarioID !== 'voter') return <Navigate replace to="/dev/room-layout" />
@@ -104,6 +150,8 @@ function TeamVotePreviewScenario() {
   const [submittedVote, setSubmittedVote] = useState<TeamVote | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [disconnected, setDisconnected] = useState(true)
+  const [result, setResult] = useState<Readonly<{ approved: boolean; approvalCount: number; rejectionCount: number; continueIntent: 'continue' | 'gameResult' }> | null>(null)
+  const [advancedScene, setAdvancedScene] = useState<'quest' | 'proposal' | 'gameResult' | null>(null)
   const preview = useMemo(() => createPreviewState({
     playerCount,
     questIndex,
@@ -123,6 +171,8 @@ function TeamVotePreviewScenario() {
     setOtherSubmittedCount(2)
     setDisconnected(true)
     resetVote()
+    setResult(null)
+    setAdvancedScene(null)
   }
 
   const scene: RoomTeamVoteScene = {
@@ -149,7 +199,9 @@ function TeamVotePreviewScenario() {
     participantCount: playerCount,
     consecutiveRejectedTeams,
     teamTokens: buildRoomTeamTokens(preview.room, preview.game.proposedTeam ?? []),
-    view: submittedVote === null
+    view: result !== null
+      ? { kind: 'result', ...result }
+      : submittedVote === null
       ? {
           kind: 'choosing',
           selectedVote,
@@ -204,9 +256,61 @@ function TeamVotePreviewScenario() {
               <button onClick={() => { setSubmitting(false); pushToast({ message: '确认投票失败，请重试。', tone: 'error' }) }} type="button">模拟提交失败</button>
             </>
           )}
+          <fieldset>
+            <legend>结算结果</legend>
+            <button onClick={() => { setResult({ approved: true, approvalCount: Math.ceil(playerCount / 2), rejectionCount: Math.floor(playerCount / 2), continueIntent: 'continue' }); setAdvancedScene(null) }} type="button">模拟队伍通过</button>
+            <button onClick={() => { setResult({ approved: false, approvalCount: Math.floor(playerCount / 2), rejectionCount: Math.ceil(playerCount / 2), continueIntent: consecutiveRejectedTeams === 4 ? 'gameResult' : 'continue' }); setAdvancedScene(null) }} type="button">模拟队伍被否决</button>
+          </fieldset>
           <button onClick={resetPreview} type="button">重置预览</button>
     </>
   )
+
+  if (advancedScene !== null) {
+    const postGame = postVoteGame(preview.game, playerCount, result ?? {
+      approved: advancedScene === 'quest', approvalCount: 0, rejectionCount: 0,
+      continueIntent: advancedScene === 'gameResult' ? 'gameResult' : 'continue',
+    })
+    if (advancedScene === 'quest') {
+      const players = buildRoomPlayers({
+        players: preview.room.players, numPlayers: playerCount, currentPlayerID: CURRENT_PLAYER_ID,
+        phase: 'quest', viewerConnected: true, ownerPlayerID: preview.room.ownerPlayerID, game: postGame,
+        selectedTeam: [], selectedTarget: null, showKnownPlayerInfo: false, showPrivateRoleKnowledge: false,
+        showSettledTeamVoteDetails: false, interactionMode: 'none',
+      })
+      const questScene: RoomQuestScene = {
+        kind: 'quest', matchID: preview.room.matchID, playerCount, players, questProgress: buildQuestProgress(playerCount, postGame),
+        questIndex: postGame.questIndex, requiredSubmissionCount: postGame.proposedTeam?.length ?? 0, submittedCount: 0,
+        failThreshold: getPlayerCountConfig(playerCount).questFailThresholds[questIndex] ?? 1,
+        view: { kind: 'waiting', participation: 'observer', submittedCard: null },
+      }
+      return <RoomScreenPreviewShell actions={{ onSelectCard: () => undefined, onConfirmCard: () => undefined, onContinue: () => undefined }} controls={controls} scene={questScene} />
+    }
+    if (advancedScene === 'proposal') {
+      const players = buildRoomPlayers({
+        players: preview.room.players, numPlayers: playerCount, currentPlayerID: CURRENT_PLAYER_ID,
+        phase: 'teamProposal', viewerConnected: true, ownerPlayerID: preview.room.ownerPlayerID, game: postGame,
+        selectedTeam: [], selectedTarget: null, showKnownPlayerInfo: false, showPrivateRoleKnowledge: false,
+        showSettledTeamVoteDetails: false, interactionMode: 'none',
+      })
+      const proposalScene: RoomTeamProposalScene = {
+        kind: 'teamProposal', matchID: preview.room.matchID, playerCount, players, questProgress: buildQuestProgress(playerCount, postGame),
+        questIndex: postGame.questIndex, requiredTeamSize: getQuestTeamSize(playerCount, postGame.questIndex), selectedCount: 0,
+        consecutiveRejectedTeams: postGame.consecutiveRejectedTeams, perspective: 'observer', canSubmit: false, submitRequestState: 'idle',
+      }
+      return <RoomScreenPreviewShell actions={{ onActivatePlayer: () => undefined, onSubmitTeam: () => undefined }} controls={controls} scene={proposalScene} />
+    }
+    const players = buildRoomPlayers({
+      players: preview.room.players, numPlayers: playerCount, currentPlayerID: CURRENT_PLAYER_ID,
+      phase: 'finished', viewerConnected: true, ownerPlayerID: null, game: postGame,
+      selectedTeam: [], selectedTarget: null, showKnownPlayerInfo: false, showPrivateRoleKnowledge: false,
+      showRoleReveal: true, showRoundDecorations: false, showConnectionStatus: false, interactionMode: 'none',
+    })
+    const gameResult: RoomGameResultScene = {
+      kind: 'gameResult', matchID: preview.room.matchID, playerCount, players, questProgress: buildQuestProgress(playerCount, postGame, false),
+      winner: 'evil', reason: '连续否决 5 支队伍', questScore: '任务 0 成功 / 0 失败',
+    }
+    return <RoomScreenPreviewShell actions={null} controls={controls} scene={gameResult} />
+  }
 
   return (
     <RoomScreenPreviewShell
@@ -214,6 +318,10 @@ function TeamVotePreviewScenario() {
         onSelectVote: (vote) => resetVote(vote),
         onConfirmVote: () => {
           if (selectedVote !== null && submittedVote === null) setSubmitting(true)
+        },
+        onContinue: () => {
+          if (result === null) return
+          setAdvancedScene(result.continueIntent === 'gameResult' ? 'gameResult' : result.approved ? 'quest' : 'proposal')
         },
       }}
       controls={controls}

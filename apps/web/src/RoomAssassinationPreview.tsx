@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 import type { AvalonPlayerView, PlayerID, Role } from '@avalon/game'
 
@@ -113,14 +113,6 @@ function AssassinationPreviewScenario({ scenarioID }: { scenarioID: Assassinatio
   const [outcome, setOutcome] = useState<AssassinationOutcome | null>(null)
   const [finalOutcome, setFinalOutcome] = useState<AssassinationOutcome | null>(null)
 
-  useEffect(() => {
-    if (outcome === null) return
-    const timer = window.setTimeout(() => {
-      setFinalOutcome(outcome)
-      setOutcome(null)
-    }, 3_000)
-    return () => window.clearTimeout(timer)
-  }, [outcome])
 
   const preview = useMemo(() => createPreviewState({ scenarioID, disconnected, finalOutcome }), [disconnected, finalOutcome, scenarioID])
 
@@ -229,6 +221,7 @@ function AssassinationPreviewScenario({ scenarioID }: { scenarioID: Assassinatio
           targetRole: outcome.targetRole,
           hit: outcome.hit,
           winner: outcome.winner,
+          continueIntent: 'gameResult',
         }
       : scenarioID === 'assassin'
         ? {
@@ -249,6 +242,11 @@ function AssassinationPreviewScenario({ scenarioID }: { scenarioID: Assassinatio
         },
         onAssassinate: () => {
           if (scenarioID === 'assassin' && selectedTarget !== null) setSubmitting(true)
+        },
+        onContinue: () => {
+          if (outcome === null) return
+          setFinalOutcome(outcome)
+          setOutcome(null)
         },
       }}
       controls={controls}

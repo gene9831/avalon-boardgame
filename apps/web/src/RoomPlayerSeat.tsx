@@ -3,6 +3,7 @@ import {
   BadgeCheck,
   CircleCheck,
   CircleX,
+  Crosshair,
   Crown,
   HelpCircle,
   House,
@@ -98,6 +99,7 @@ function markerStatus(marker: RoomPlayerMarker): string {
     case 'vote':
       return marker.status === 'approve' ? '赞成' : marker.status === 'reject' ? '反对' : '已投票'
     case 'knownEvil': return '已知阵营信息：邪恶'
+    case 'assassinationTarget': return '刺杀目标'
     case 'merlinCandidate': return '梅林候选'
     default: return assertNever(marker)
   }
@@ -129,6 +131,12 @@ function markerDecoration(marker: RoomPlayerMarker, index: number): ReactNode {
       return (
         <span aria-label="已知邪恶阵营" className="room-seat__decoration" data-known-player-info="evil" data-seat-decoration="known-evil" key={`${marker.kind}-${index}`}>
           <ShieldAlert />
+        </span>
+      )
+    case 'assassinationTarget':
+      return (
+        <span aria-label="刺杀目标" className="room-seat__decoration" data-seat-decoration="assassination-target" key={`${marker.kind}-${index}`}>
+          <Crosshair />
         </span>
       )
     case 'merlinCandidate':

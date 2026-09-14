@@ -27,7 +27,7 @@ const player: RoomPlayerPresentation = {
   playerID: '0', relativeSeatIndex: 0, seatNumber: 1, name: 'Alice', occupied: true,
   isCurrentPlayer: false,
   portrait: { kind: 'playerAvatar', avatarID: 'merlin', connected: true },
-  markers: [], caption: { kind: 'none' }, emphasis: 'default',
+  markers: [{ kind: 'assassinationTarget' }], caption: { kind: 'none' }, emphasis: 'target',
   interaction: { kind: 'selectAssassinationTarget', disabled: false, selected: true },
 }
 
@@ -41,9 +41,20 @@ function makeScene(view: Scene['view']): Scene {
 function render(view: Scene['view']) {
   return renderToStaticMarkup(
     <RoomAssassinationScene
-      actions={{ onActivatePlayer: vi.fn(), onAssassinate: vi.fn() }}
+      actions={{ onActivatePlayer: vi.fn(), onAssassinate: vi.fn(), onContinue: vi.fn() }}
       geometry={{ stageLayout }}
       scene={makeScene(view)}
+      slots={{ back: null, toolbar: null }}
+    />,
+  )
+}
+
+function renderWithPlayerName(view: Scene['view'], name: string) {
+  return renderToStaticMarkup(
+    <RoomAssassinationScene
+      actions={{ onActivatePlayer: vi.fn(), onAssassinate: vi.fn(), onContinue: vi.fn() }}
+      geometry={{ stageLayout }}
+      scene={{ ...makeScene(view), players: [{ ...player, name }] }}
       slots={{ back: null, toolbar: null }}
     />,
   )
@@ -75,8 +86,11 @@ describe('RoomAssassinationScene', () => {
   it('gives only the selecting Assassin a target control and confirmation action', () => {
     const html = render({ kind: 'selecting', targetPlayerID: '0', canSubmit: true, submitRequestState: 'idle' })
 
+    expect(html).toContain('选择刺杀目标')
     expect(html).toContain('目标：Alice')
-    expect(html).toContain('aria-label="选择 Alice 作为刺杀目标"')
+    expect(html).toContain('data-seat-decoration="assassination-target"')
+    expect(html).toContain('aria-label="刺杀目标"')
+    expect(html).toContain('aria-label="选择 Alice 作为刺杀目标，刺杀目标"')
     expect(html).toContain('>确认刺杀</button>')
   })
 
@@ -101,21 +115,44 @@ describe('RoomAssassinationScene', () => {
   })
 
   it('keeps the public assassination result informational and reveals the supplied target role', () => {
-    const html = render({ kind: 'result', targetPlayerID: '0', targetRole: 'merlin', hit: true, winner: 'evil' })
+    const html = render({ kind: 'result', targetPlayerID: '0', targetRole: 'merlin', hit: true, winner: 'evil', continueIntent: 'gameResult' })
 
     expect(html).toMatch(/Alice.*梅林/s)
     expect(html).toContain('刺杀命中')
     expect(html).toContain('邪恶阵营获胜')
+    expect(html).toContain('>查看对局结果</button>')
     expect(html).not.toContain('确认刺杀')
     expect(html).not.toContain('<button aria-label="选择 Alice')
   })
 
   it('renders a supplied assassination miss without restoring an action', () => {
-    const html = render({ kind: 'result', targetPlayerID: '0', targetRole: 'percival', hit: false, winner: 'good' })
+    const html = render({ kind: 'result', targetPlayerID: '0', targetRole: 'percival', hit: false, winner: 'good', continueIntent: 'gameResult' })
 
     expect(html).toMatch(/Alice.*帕西维尔/s)
     expect(html).toContain('刺杀未命中')
     expect(html).toContain('正义阵营获胜')
     expect(html).not.toContain('确认刺杀')
+  })
+
+  it('keeps the result phase band to a compact target-and-role summary', () => {
+    const html = render({ kind: 'result', targetPlayerID: '0', targetRole: 'percival', hit: false, winner: 'good', continueIntent: 'gameResult' })
+    const phaseMiddle = html.match(/data-room-slot="phase-middle"[^>]*>(.*?)<\/div><div class="grid min-h-14/s)?.[1] ?? ''
+
+    expect(phaseMiddle).toContain('Alice')
+    expect(phaseMiddle).toContain('帕西维尔')
+    expect(phaseMiddle).not.toContain('刺杀未命中')
+    expect(phaseMiddle).not.toContain('正义阵营获胜')
+  })
+
+  it('truncates a valid long target name in one line while retaining its full accessible summary', () => {
+    const name = '阿瓦隆远征骑士团第七席守望者'
+    const html = renderWithPlayerName(
+      { kind: 'result', targetPlayerID: '0', targetRole: 'percival', hit: false, winner: 'good', continueIntent: 'gameResult' },
+      name,
+    )
+
+    expect(html).toContain('class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-slate-300"')
+    expect(html).toContain(`aria-label="刺杀目标：${name} · 帕西维尔"`)
+    expect(html).toContain(`title="${name} · 帕西维尔"`)
   })
 })

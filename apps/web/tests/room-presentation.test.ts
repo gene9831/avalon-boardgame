@@ -130,7 +130,7 @@ describe('room player presentation', () => {
     })
     expect(result.find(({ playerID }) => playerID === '1')).toMatchObject({
       emphasis: 'target',
-      markers: [{ kind: 'leader' }, { kind: 'questMember' }],
+      markers: [{ kind: 'leader' }, { kind: 'questMember' }, { kind: 'assassinationTarget' }],
     })
     expect(result.find(({ playerID }) => playerID === '3')).toMatchObject({
       markers: [{ kind: 'owner' }, { kind: 'knownEvil' }],

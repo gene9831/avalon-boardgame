@@ -197,10 +197,8 @@ export type RoomQuestView =
       succeeded: boolean
       successCount: number
       failCount: number
-      /** Optional during preview migration; production settlements always provide it. */
-      failThreshold?: number
-      /** Optional during preview migration; production settlements always provide it. */
-      continueIntent?: 'continue' | 'assassination' | 'gameResult'
+      failThreshold: number
+      continueIntent: 'continue' | 'assassination' | 'gameResult'
     }>
 
 export interface RoomQuestScene
@@ -208,6 +206,7 @@ export interface RoomQuestScene
   questIndex: number
   requiredSubmissionCount: number
   submittedCount: number
+  failThreshold: number
   view: RoomQuestView
 }
 
@@ -228,8 +227,7 @@ export type RoomAssassinationView =
       targetRole: Role
       hit: boolean
       winner: 'good' | 'evil'
-      /** Optional during preview migration; production settlements always provide it. */
-      continueIntent?: 'gameResult'
+      continueIntent: 'gameResult'
     }>
 
 export interface RoomAssassinationScene
@@ -280,6 +278,7 @@ export type RoomPlayerMarker =
       status: 'pending' | TeamVote
     }>
   | Readonly<{ kind: 'knownEvil' }>
+  | Readonly<{ kind: 'assassinationTarget' }>
   | Readonly<{ kind: 'merlinCandidate' }>
 
 /** 姓名牌下方最多显示一个短标签。 */
@@ -397,19 +396,19 @@ export interface RoomActionsByKind {
   teamVote: Readonly<{
     onSelectVote(vote: TeamVote): void
     onConfirmVote(): void
-    onContinue?(): void
+    onContinue(): void
   }>
 
   quest: Readonly<{
     onSelectCard(card: QuestCard): void
     onConfirmCard(): void
-    onContinue?(): void
+    onContinue(): void
   }>
 
   assassination: Readonly<{
     onActivatePlayer(playerID: PlayerID): void
     onAssassinate(): void
-    onContinue?(): void
+    onContinue(): void
   }>
 
   gameResult: null

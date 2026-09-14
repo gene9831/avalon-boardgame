@@ -162,7 +162,7 @@ describe('buildRoomSceneBinding', () => {
       teamTokens: [{ playerID: '0', seatNumber: 1 }, { playerID: '2', seatNumber: 3 }],
       view: { kind: 'choosing', selectedVote: 'approve', canChoose: true, submitRequestState: 'idle' },
     })
-    expect(Object.keys(vote.actions ?? {})).toEqual(['onSelectVote', 'onConfirmVote'])
+    expect(Object.keys(vote.actions ?? {})).toEqual(['onSelectVote', 'onConfirmVote', 'onContinue'])
     expect(vote.scene.players.find(({ playerID }) => playerID === '1')?.markers).toContainEqual({
       kind: 'vote', status: 'pending',
     })
@@ -283,7 +283,7 @@ describe('buildRoomSceneBinding', () => {
     expect(submitted.scene).toMatchObject({
       kind: 'quest', view: { kind: 'waiting', participation: 'member', submittedCard: 'fail' },
     })
-    expect(Object.keys(good.actions ?? {})).toEqual(['onSelectCard', 'onConfirmCard'])
+    expect(Object.keys(good.actions ?? {})).toEqual(['onSelectCard', 'onConfirmCard', 'onContinue'])
   })
 
   it('builds Assassin and observer views and locks target selection while pending', () => {
@@ -382,7 +382,7 @@ describe('buildRoomSceneBinding', () => {
       teamTokens: [{ playerID: '0', seatNumber: 1 }, { playerID: '2', seatNumber: 3 }],
       view: { kind: 'result', approved: true, approvalCount: 3, rejectionCount: 2, continueIntent: 'continue' },
     })
-    expect(Object.keys(binding.actions ?? {})).toEqual(['onContinue'])
+    expect(Object.keys(binding.actions ?? {})).toEqual(['onSelectVote', 'onConfirmVote', 'onContinue'])
     expect(binding.scene.players.map(({ playerID, markers }) => [
       playerID,
       markers.find((marker) => marker.kind === 'vote')?.status ?? null,
@@ -414,12 +414,12 @@ describe('buildRoomSceneBinding', () => {
       view: { kind: 'result', successCount: 2, failCount: 1, failThreshold: 1 },
     })
     expect(questBinding.scene.players.filter(({ markers }) => markers.some((marker) => marker.kind === 'questMember')).map(({ playerID }) => playerID)).toEqual(['0', '1', '2'])
-    expect(Object.keys(questBinding.actions ?? {})).toEqual(['onContinue'])
+    expect(Object.keys(questBinding.actions ?? {})).toEqual(['onSelectCard', 'onConfirmCard', 'onContinue'])
     expect(assassinationBinding.scene).toMatchObject({
       kind: 'assassination', view: { kind: 'result', targetPlayerID: '1', targetRole: 'loyal_servant', continueIntent: 'gameResult' },
     })
     expect(assassinationBinding.scene.players.filter(({ portrait }) => portrait.kind === 'roleArtwork').map(({ playerID }) => playerID)).toEqual(['1'])
-    expect(Object.keys(assassinationBinding.actions ?? {})).toEqual(['onContinue'])
+    expect(Object.keys(assassinationBinding.actions ?? {})).toEqual(['onActivatePlayer', 'onAssassinate', 'onContinue'])
   })
 })
 describe('useRoomScreenController recognition request lifecycle', () => {

@@ -72,20 +72,23 @@ function phaseContent(scene: RoomAssassinationSceneData, actions: RoomActionsByK
         phaseAction: null,
       }
     case 'result':
+      { const targetSummary = `${playerName(scene, view.targetPlayerID)} · ${ROLE_LABELS[view.targetRole]}`
       return {
         title: '刺杀结果',
         phaseMiddle: (
-          <div className="space-y-1 text-sm text-slate-300" role="status">
-            <p><strong className="text-slate-100">{playerName(scene, view.targetPlayerID)}</strong> · {ROLE_LABELS[view.targetRole]}</p>
-            <p className={view.hit ? 'text-rose-300' : 'text-emerald-300'}>{view.hit ? '刺杀命中' : '刺杀未命中'}</p>
-            <p className={view.winner === 'evil' ? 'text-rose-300' : 'text-emerald-300'}>
-              {view.winner === 'evil' ? '邪恶阵营获胜' : '正义阵营获胜'}
-            </p>
-          </div>
+          <p
+            aria-label={`刺杀目标：${targetSummary}`}
+            className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-slate-300"
+            role="status"
+            title={targetSummary}
+          >
+            <strong className="text-slate-100">{playerName(scene, view.targetPlayerID)}</strong> · {ROLE_LABELS[view.targetRole]}
+          </p>
         ),
-        phaseAction: actions.onContinue === undefined ? null : (
+        phaseAction: (
           <RoomActionButton onClick={actions.onContinue}>查看对局结果</RoomActionButton>
         ),
+      }
       }
     default:
       return assertNever(view)
@@ -105,8 +108,12 @@ export function RoomAssassinationScene({ actions, geometry, scene, slots }: Room
     </RoomCenter>
   ) : (
     <RoomCenter>
-      <strong className="block text-lg font-semibold text-amber-200">刺杀梅林</strong>
-      <span className="mt-1 block text-sm text-slate-300">等待刺客选择目标</span>
+      <strong className="block text-lg font-semibold text-amber-200">{scene.view.kind === 'selecting' ? '选择刺杀目标' : '等待刺客选择目标'}</strong>
+      <span className="mt-1 block text-sm text-slate-300">
+        {scene.view.kind === 'selecting'
+          ? scene.view.targetPlayerID === null ? '选择你认为是梅林的玩家' : `目标：${playerName(scene, scene.view.targetPlayerID)}`
+          : '等待刺客选择目标'}
+      </span>
     </RoomCenter>
   )
 
