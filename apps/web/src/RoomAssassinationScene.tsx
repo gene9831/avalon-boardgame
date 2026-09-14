@@ -83,7 +83,9 @@ function phaseContent(scene: RoomAssassinationSceneData, actions: RoomActionsByK
             </p>
           </div>
         ),
-        phaseAction: null,
+        phaseAction: actions.onContinue === undefined ? null : (
+          <RoomActionButton onClick={actions.onContinue}>查看对局结果</RoomActionButton>
+        ),
       }
     default:
       return assertNever(view)

@@ -104,7 +104,9 @@ function questPhaseContent(view: RoomQuestView, actions: RoomActionsByKind['ques
             <p>{view.successCount} 成功 / {view.failCount} 失败</p>
           </div>
         ),
-        phaseAction: null,
+        phaseAction: actions.onContinue === undefined ? null : (
+          <RoomActionButton onClick={actions.onContinue}>继续</RoomActionButton>
+        ),
       }
     default:
       return assertNever(view)

@@ -77,6 +77,20 @@ function phaseContent(view: RoomTeamVoteView, actions: RoomActionsByKind['teamVo
         ),
         phaseAction: null,
       }
+    case 'result':
+      return {
+        phaseMiddle: (
+          <div className="space-y-1 text-sm text-slate-300" role="status">
+            <p className={view.approved ? 'font-semibold text-emerald-300' : 'font-semibold text-rose-300'}>
+              {view.approved ? '队伍通过' : '队伍被否决'}
+            </p>
+            <p>{view.approvalCount} 同意 / {view.rejectionCount} 反对</p>
+          </div>
+        ),
+        phaseAction: actions.onContinue === undefined ? null : (
+          <RoomActionButton onClick={actions.onContinue}>继续</RoomActionButton>
+        ),
+      }
     default:
       return assertNever(view)
   }

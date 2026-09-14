@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type {
   AvalonResult,
   AvalonPlayerView,
@@ -6,6 +6,7 @@ import type {
   QuestCard,
   TeamVote,
 } from '@avalon/game'
+import { getPlayerCountConfig } from '@avalon/game'
 
 import {
   GAME_CLIENT_SETTINGS_KEY,
@@ -27,6 +28,17 @@ import type {
   RoomIdentityRecognitionPresentation,
   RoomScene,
 } from './room-screen-props'
+import {
+  establishSettlementBaseline,
+  findNewSettlements,
+  type RoomSettlement,
+} from './room-settlement'
+import {
+  browserSettlementReadStorage,
+  hasReadSettlement,
+  markSettlementRead,
+  type SettlementReadStorage,
+} from './settlement-read'
 
 function roomPlayerCount(room: AvalonMatch): number {
   return room.setupData?.numPlayers ?? room.players.length
@@ -69,6 +81,7 @@ export type BuildRoomSceneInput =
       assassinationSubmissionPending?: boolean
       identityRecognitionSubmissionPending?: boolean
       seatChangeTargetID?: PlayerID | null
+      activeSettlement?: RoomSettlement | null
     } & LobbyPresentationState>
 
 export interface RoomSceneEventHandlers {
@@ -82,6 +95,7 @@ export interface RoomSceneEventHandlers {
   onSelectTeamVote(vote: TeamVote): void
   onStart(): void
   onSubmitTeam(): void
+  onContinue?(): void
 }
 
 export type RoomSceneBinding = {
@@ -157,9 +171,13 @@ function buildProductionSceneBase(
     showPrivateRoleKnowledge?: boolean
     showRoleReveal?: boolean
     showRoundDecorations?: boolean
+    showLeader?: boolean
     showKnownPlayerInfo?: boolean
     showConnectionStatus?: boolean
     selectedTarget?: PlayerID | null
+    settledVotes?: Readonly<Record<PlayerID, TeamVote>>
+    resolvedQuestTeam?: readonly PlayerID[]
+    publicRevealedRolePlayerIDs?: readonly PlayerID[]
   }> = {},
 ) {
   const playerCount = roomPlayerCount(input.room)
@@ -179,7 +197,11 @@ function buildProductionSceneBase(
       showKnownPlayerInfo: options.showKnownPlayerInfo ?? false,
       showPrivateRoleKnowledge: options.showPrivateRoleKnowledge ?? false,
       showSettledTeamVoteDetails: input.showSettledTeamVoteDetails,
+      settledVotes: options.settledVotes,
+      resolvedQuestTeam: options.resolvedQuestTeam,
+      publicRevealedRolePlayerIDs: options.publicRevealedRolePlayerIDs,
       showRoundDecorations: options.showRoundDecorations,
+      showLeader: options.showLeader,
       showConnectionStatus: options.showConnectionStatus,
       showRoleReveal: options.showRoleReveal,
       interactionMode,
@@ -223,6 +245,68 @@ export function buildRoomSceneBinding(
         manualReconnectAvailable: input.manualReconnectAvailable,
       },
       actions: { onReconnect: events.onReconnect },
+    }
+  }
+
+  const activeSettlement = input.activeSettlement ?? null
+  if (activeSettlement?.kind === 'teamVote') {
+    return {
+      scene: {
+        kind: 'teamVote',
+        ...buildProductionSceneBase(input, 'none', {
+          showLeader: false,
+          settledVotes: activeSettlement.votes,
+          resolvedQuestTeam: activeSettlement.team,
+        }),
+        questIndex: activeSettlement.questIndex,
+        submittedCount: Object.keys(activeSettlement.votes).length,
+        participantCount: roomPlayerCount(input.room),
+        consecutiveRejectedTeams: input.game.consecutiveRejectedTeams,
+        teamTokens: buildRoomTeamTokens(input.room, activeSettlement.team),
+        view: {
+          kind: 'result', approved: activeSettlement.approved,
+          approvalCount: activeSettlement.approvalCount, rejectionCount: activeSettlement.rejectionCount,
+          continueIntent: activeSettlement.continueIntent,
+        },
+      },
+      actions: { onContinue: events.onContinue ?? (() => undefined) } as unknown as RoomActionsByKind['teamVote'],
+    }
+  }
+  if (activeSettlement?.kind === 'quest') {
+    return {
+      scene: {
+        kind: 'quest',
+        ...buildProductionSceneBase(input, 'none', {
+          resolvedQuestTeam: activeSettlement.team,
+        }),
+        questIndex: activeSettlement.questIndex,
+        requiredSubmissionCount: activeSettlement.team.length,
+        submittedCount: activeSettlement.team.length,
+        view: {
+          kind: 'result', succeeded: activeSettlement.succeeded,
+          successCount: activeSettlement.successCount, failCount: activeSettlement.failCount,
+          failThreshold: activeSettlement.failThreshold, continueIntent: activeSettlement.continueIntent,
+        },
+      },
+      actions: { onContinue: events.onContinue ?? (() => undefined) } as unknown as RoomActionsByKind['quest'],
+    }
+  }
+  if (activeSettlement?.kind === 'assassination') {
+    return {
+      scene: {
+        kind: 'assassination',
+        ...buildProductionSceneBase(input, 'none', {
+          showCurrentQuest: false,
+          showRoundDecorations: false,
+          publicRevealedRolePlayerIDs: [activeSettlement.targetPlayerID],
+        }),
+        view: {
+          kind: 'result', targetPlayerID: activeSettlement.targetPlayerID,
+          targetRole: activeSettlement.targetRole, hit: activeSettlement.hit,
+          winner: activeSettlement.winner, continueIntent: activeSettlement.continueIntent,
+        },
+      },
+      actions: { onContinue: events.onContinue ?? (() => undefined) } as unknown as RoomActionsByKind['assassination'],
     }
   }
 
@@ -380,6 +464,8 @@ export function buildRoomSceneBinding(
               succeeded: settledQuest.succeeded,
               successCount: settledQuest.successCount,
               failCount: settledQuest.failCount,
+              failThreshold: getPlayerCountConfig(roomPlayerCount(input.room)).questFailThresholds[settledQuest.questIndex] ?? 1,
+              continueIntent: 'continue',
             }
           : !onTeam || submittedCard !== undefined
             ? {
@@ -417,6 +503,7 @@ export function buildRoomSceneBinding(
           targetRole,
           hit: targetRole === 'merlin',
           winner: input.game.result.winner,
+          continueIntent: 'gameResult',
         }
       : null
     const canSelectTarget = isAssassin && input.activeStage === 'assassin' && !isSubmitting
@@ -492,6 +579,7 @@ export interface UseRoomScreenControllerInput extends LobbyPresentationState, Lo
   onAssassinationSubmissionError?: (error: unknown) => void
   onIdentityRecognitionSubmissionError?: (error: unknown) => void
   onStart: () => void
+  settlementReadStorage?: SettlementReadStorage | null
 }
 
 export function useRoomScreenController(input: UseRoomScreenControllerInput) {
@@ -507,7 +595,44 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
   const [roleKnowledgeOpen, setRoleKnowledgeOpen] = useState(
     () => loadGameClientSettings().roleKnowledgeOpen,
   )
+  const [activeSettlement, setActiveSettlement] = useState<RoomSettlement | null>(null)
+  const [settlementQueue, setSettlementQueue] = useState<readonly RoomSettlement[]>([])
+  const baselineRef = useRef<Readonly<{ matchID: string; baseline: ReturnType<typeof establishSettlementBaseline> }> | null>(null)
+  const settlementStorage = input.settlementReadStorage ?? browserSettlementReadStorage()
   const phase = input.game === null ? 'loading' : input.game.status === 'lobby' ? 'lobby' : input.phase
+
+  useEffect(() => {
+    if (baselineRef.current?.matchID === input.matchID) return
+    baselineRef.current = null
+    setActiveSettlement(null)
+    setSettlementQueue([])
+  }, [input.matchID])
+
+  useEffect(() => {
+    if (!input.connected || input.game === null || input.room === null) return
+    const observed = baselineRef.current
+    if (observed === null || observed.matchID !== input.matchID) {
+      baselineRef.current = { matchID: input.matchID, baseline: establishSettlementBaseline(input.game) }
+      return
+    }
+    const appended = findNewSettlements(input.game, observed.baseline)
+    baselineRef.current = { matchID: input.matchID, baseline: establishSettlementBaseline(input.game) }
+    const unread = appended.filter((settlement) => !hasReadSettlement(settlementStorage, input.matchID, settlement.key))
+    if (unread.length === 0) return
+    setSettlementQueue((currentQueue) => {
+      const known = new Set(currentQueue.map((settlement) => settlement.key))
+      const additions = unread.filter((settlement) => settlement.key !== activeSettlement?.key && !known.has(settlement.key))
+      return additions.length === 0 ? currentQueue : [...currentQueue, ...additions]
+    })
+  }, [input.connected, input.game, input.matchID, input.room, settlementStorage, activeSettlement?.key])
+
+  useEffect(() => {
+    if (activeSettlement !== null || settlementQueue.length === 0) return
+    const [next, ...remaining] = settlementQueue
+    setSettlementQueue(remaining)
+    setActiveSettlement(next)
+    markSettlementRead(settlementStorage, input.matchID, next!.key)
+  }, [activeSettlement, input.matchID, settlementQueue, settlementStorage])
 
   useEffect(() => {
     if (input.connected) return
@@ -603,6 +728,7 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
     },
     onStart: input.onStart,
     onReconnect: input.onReconnect,
+    onContinue: () => setActiveSettlement(null),
     onConfirmIdentityRecognition: () => {
       if (
         phase !== 'identityRecognition' ||
@@ -728,6 +854,7 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
         assassinationSubmissionPending,
         identityRecognitionSubmissionPending,
         seatChangeTargetID: input.seatChangeTargetID,
+        activeSettlement,
       }, events)
 
   const toggleRoleKnowledge = () => {

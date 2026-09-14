@@ -161,6 +161,13 @@ export type RoomTeamVoteView =
       kind: 'waiting'
       submittedVote: TeamVote
     }>
+  | Readonly<{
+      kind: 'result'
+      approved: boolean
+      approvalCount: number
+      rejectionCount: number
+      continueIntent: 'continue' | 'assassination' | 'gameResult'
+    }>
 
 export interface RoomTeamVoteScene
   extends RoomSceneBase<'teamVote'> {
@@ -190,6 +197,10 @@ export type RoomQuestView =
       succeeded: boolean
       successCount: number
       failCount: number
+      /** Optional during preview migration; production settlements always provide it. */
+      failThreshold?: number
+      /** Optional during preview migration; production settlements always provide it. */
+      continueIntent?: 'continue' | 'assassination' | 'gameResult'
     }>
 
 export interface RoomQuestScene
@@ -217,6 +228,8 @@ export type RoomAssassinationView =
       targetRole: Role
       hit: boolean
       winner: 'good' | 'evil'
+      /** Optional during preview migration; production settlements always provide it. */
+      continueIntent?: 'gameResult'
     }>
 
 export interface RoomAssassinationScene
@@ -384,16 +397,19 @@ export interface RoomActionsByKind {
   teamVote: Readonly<{
     onSelectVote(vote: TeamVote): void
     onConfirmVote(): void
+    onContinue?(): void
   }>
 
   quest: Readonly<{
     onSelectCard(card: QuestCard): void
     onConfirmCard(): void
+    onContinue?(): void
   }>
 
   assassination: Readonly<{
     onActivatePlayer(playerID: PlayerID): void
     onAssassinate(): void
+    onContinue?(): void
   }>
 
   gameResult: null

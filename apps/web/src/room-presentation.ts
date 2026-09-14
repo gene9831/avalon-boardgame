@@ -52,7 +52,11 @@ export function buildRoomPlayers(input: Readonly<{
   showKnownPlayerInfo: boolean
   showPrivateRoleKnowledge: boolean
   showSettledTeamVoteDetails?: boolean
+  settledVotes?: Readonly<Record<PlayerID, 'approve' | 'reject'>>
+  resolvedQuestTeam?: readonly PlayerID[]
+  publicRevealedRolePlayerIDs?: readonly PlayerID[]
   showRoundDecorations?: boolean
+  showLeader?: boolean
   showConnectionStatus?: boolean
   showRoleReveal?: boolean
   interactionMode?: RoomPlayerInteractionMode
@@ -61,9 +65,9 @@ export function buildRoomPlayers(input: Readonly<{
   const orderedPlayerIDs = Array.from({ length: input.numPlayers }, (_, index) => String(index) as PlayerID)
   const currentIndex = Math.max(0, orderedPlayerIDs.indexOf(input.currentPlayerID))
   const relativeOrder = [...orderedPlayerIDs.slice(currentIndex), ...orderedPlayerIDs.slice(0, currentIndex)]
-  const settledVotes = input.game === null || input.showSettledTeamVoteDetails === false
+  const settledVotes = input.settledVotes ?? (input.game === null || input.showSettledTeamVoteDetails === false
     ? undefined
-    : getDisplayedTeamVoteResult(input.game, input.phase)?.votes
+    : getDisplayedTeamVoteResult(input.game, input.phase)?.votes)
 
   return relativeOrder.map((playerID, relativeSeatIndex) => {
     const seatIndex = Number(playerID)
@@ -71,8 +75,9 @@ export function buildRoomPlayers(input: Readonly<{
     const occupied = lobbyPlayer?.name != null
     const isCurrentPlayer = playerID === input.currentPlayerID
     const revealedRole = input.game?.revealedRoles?.[playerID]
+    const publiclyRevealed = input.publicRevealedRolePlayerIDs === undefined || input.publicRevealedRolePlayerIDs.includes(playerID)
     const privateRole = input.showPrivateRoleKnowledge && isCurrentPlayer ? input.game?.viewer.role ?? null : null
-    const role: FilteredSeatRole = revealedRole !== undefined
+    const role: FilteredSeatRole = revealedRole !== undefined && publiclyRevealed
       ? input.showRoleReveal === true ? { kind: 'settledReveal', role: revealedRole } : { kind: 'viewerVisible', role: revealedRole }
       : privateRole === null ? { kind: 'none' } : { kind: 'viewerVisible', role: privateRole }
     const knownEvil = input.showKnownPlayerInfo && input.game?.viewer.knownEvilPlayerIDs.includes(playerID) === true
@@ -92,8 +97,8 @@ export function buildRoomPlayers(input: Readonly<{
       avatarID: getSeatAvatarID(lobbyPlayer?.data, seatIndex), occupied,
       connected: occupied && (input.showConnectionStatus === false || (isCurrentPlayer ? input.viewerConnected && lobbyPlayer?.isConnected === true : lobbyPlayer?.isConnected === true)),
       isCurrentPlayer, role, isOwner: playerID === input.ownerPlayerID,
-      isLeader: input.showRoundDecorations !== false && input.game?.leaderID === playerID,
-      isQuestMember: input.showRoundDecorations !== false && input.game?.proposedTeam?.includes(playerID) === true,
+      isLeader: input.showRoundDecorations !== false && input.showLeader !== false && input.game?.leaderID === playerID,
+      isQuestMember: input.showRoundDecorations !== false && (input.resolvedQuestTeam ?? input.game?.proposedTeam ?? []).includes(playerID),
       isSelected: input.selectedTeam.includes(playerID), isSelectedTarget: input.selectedTarget === playerID,
       knownEvil, knownMerlinCandidate, voteStatus, recognition: { kind: 'none' }, interaction,
     })

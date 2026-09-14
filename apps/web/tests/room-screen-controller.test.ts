@@ -11,6 +11,7 @@ import {
   type UseRoomScreenControllerInput,
   useRoomScreenController,
 } from '../src/room-screen-controller'
+import type { RoomSettlement } from '../src/room-settlement'
 
 const room: AvalonMatch = {
   matchID: 'room-123456789',
@@ -364,6 +365,62 @@ describe('buildRoomSceneBinding', () => {
       player.interaction.kind === 'none'
     ))).toBe(true)
   })
+
+  it('binds a settled vote without mixing in a later proposed team', () => {
+    const settlement: Extract<RoomSettlement, { kind: 'teamVote' }> = {
+      kind: 'teamVote', key: 'teamVote:0', voteHistoryIndex: 0, questIndex: 0,
+      team: ['0', '2'], votes: { '0': 'approve', '1': 'reject', '2': 'approve', '3': 'reject', '4': 'approve' },
+      approved: true, approvalCount: 3, rejectionCount: 2, continueIntent: 'continue',
+    }
+    const binding = buildRoomSceneBinding({
+      ...readyInput('teamProposal', { proposedTeam: ['3', '4'] }),
+      activeSettlement: settlement,
+    }, eventHandlers)
+
+    expect(binding.scene).toMatchObject({
+      kind: 'teamVote', questIndex: 0,
+      teamTokens: [{ playerID: '0', seatNumber: 1 }, { playerID: '2', seatNumber: 3 }],
+      view: { kind: 'result', approved: true, approvalCount: 3, rejectionCount: 2, continueIntent: 'continue' },
+    })
+    expect(Object.keys(binding.actions ?? {})).toEqual(['onContinue'])
+    expect(binding.scene.players.map(({ playerID, markers }) => [
+      playerID,
+      markers.find((marker) => marker.kind === 'vote')?.status ?? null,
+    ])).toEqual([
+      ['0', 'approve'], ['1', 'reject'], ['2', 'approve'], ['3', 'reject'], ['4', 'approve'],
+    ])
+    expect(binding.scene.players.filter(({ markers }) => (
+      markers.some((marker) => marker.kind === 'questMember')
+    )).map(({ playerID }) => playerID)).toEqual(['0', '2'])
+  })
+
+  it('binds a settled quest team and target-only assassination role reveal', () => {
+    const quest: Extract<RoomSettlement, { kind: 'quest' }> = {
+      kind: 'quest', key: 'quest:1', questIndex: 1, team: ['0', '1', '2'], succeeded: false,
+      successCount: 2, failCount: 1, failThreshold: 1, continueIntent: 'continue',
+    }
+    const assassination: Extract<RoomSettlement, { kind: 'assassination' }> = {
+      kind: 'assassination', key: 'assassination:good:1', targetPlayerID: '1', targetRole: 'loyal_servant',
+      hit: false, winner: 'good', continueIntent: 'gameResult',
+    }
+    const questBinding = buildRoomSceneBinding({ ...readyInput('assassination'), activeSettlement: quest }, eventHandlers)
+    const assassinationBinding = buildRoomSceneBinding({
+      ...readyInput('finished', { status: 'finished', revealedRoles: { '0': 'merlin', '1': 'loyal_servant', '2': 'minion' }, result: { winner: 'good', reason: 'assassination', targetID: '1' } }),
+      activeSettlement: assassination,
+    }, eventHandlers)
+
+    expect(questBinding.scene).toMatchObject({
+      kind: 'quest', questIndex: 1, requiredSubmissionCount: 3,
+      view: { kind: 'result', successCount: 2, failCount: 1, failThreshold: 1 },
+    })
+    expect(questBinding.scene.players.filter(({ markers }) => markers.some((marker) => marker.kind === 'questMember')).map(({ playerID }) => playerID)).toEqual(['0', '1', '2'])
+    expect(Object.keys(questBinding.actions ?? {})).toEqual(['onContinue'])
+    expect(assassinationBinding.scene).toMatchObject({
+      kind: 'assassination', view: { kind: 'result', targetPlayerID: '1', targetRole: 'loyal_servant', continueIntent: 'gameResult' },
+    })
+    expect(assassinationBinding.scene.players.filter(({ portrait }) => portrait.kind === 'roleArtwork').map(({ playerID }) => playerID)).toEqual(['1'])
+    expect(Object.keys(assassinationBinding.actions ?? {})).toEqual(['onContinue'])
+  })
 })
 describe('useRoomScreenController recognition request lifecycle', () => {
   it('clears a confirmed request when the server advances to another recognition step', async () => {
@@ -456,6 +513,52 @@ describe('useRoomScreenController recognition request lifecycle', () => {
     expect(controller.binding.scene).toMatchObject({
       presentation: { kind: 'roleReveal', confirmRequestState: 'idle' },
     })
+
+    await act(async () => root.unmount())
+    container.remove()
+  })
+})
+
+describe('useRoomScreenController settlement queue', () => {
+  it('keeps an appended vote visible until continue, then returns to the authoritative phase', async () => {
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    let controller: ReturnType<typeof useRoomScreenController> | null = null
+    const receipts = new Map<string, string>()
+    const settlementReadStorage = {
+      getItem: (key: string) => receipts.get(key) ?? null,
+      setItem: (key: string, value: string) => { receipts.set(key, value) },
+    }
+    const onProposeTeam = vi.fn()
+    const input = (currentGame: AvalonPlayerView): UseRoomScreenControllerInput => ({
+      activeStage: 'leader', canStart: false, connected: true,
+      currentPlayerID: '0', game: currentGame, manualReconnectAvailable: false,
+      matchID: room.matchID, onAssassinate: () => undefined, onCastTeamVote: () => undefined,
+      onChangeSeat: () => undefined, onConfirmIdentityRecognition: () => undefined,
+      onPlayQuestCard: () => undefined, onProposeTeam,
+      onReconnect: () => undefined, onStart: () => undefined, phase: 'teamProposal',
+      room, seatChangeTargetID: null, startPending: false, settlementReadStorage,
+    })
+    function Harness({ value }: { value: UseRoomScreenControllerInput }) {
+      controller = useRoomScreenController(value)
+      return null
+    }
+
+    await act(async () => root.render(createElement(Harness, { value: input(game()) })))
+    await act(async () => root.render(createElement(Harness, { value: input(game({
+      voteHistory: [{ questIndex: 0, team: ['0', '1'], votes: { '0': 'reject', '1': 'reject', '2': 'reject', '3': 'approve', '4': 'approve' }, approved: false }],
+      consecutiveRejectedTeams: 1,
+    })) })))
+
+    expect(controller?.binding.scene).toMatchObject({
+      kind: 'teamVote', view: { kind: 'result', approved: false },
+    })
+    expect([...receipts.keys()]).toHaveLength(1)
+    await act(async () => controller?.binding.scene.kind === 'teamVote' && controller.binding.actions.onContinue?.())
+    expect(controller?.binding.scene).toMatchObject({ kind: 'teamProposal' })
+    expect(onProposeTeam).not.toHaveBeenCalled()
 
     await act(async () => root.unmount())
     container.remove()
