@@ -43,15 +43,18 @@ async function expectRecognitionLayerCoversStage({
 }) {
   await page.setViewportSize(viewport)
 
-  const recognitionLayer = page.getByLabel('身份辨认', { exact: true })
-  const confirmationButton = page.getByRole('button', { name: /我已辨认/ })
+  const recognitionOverlay = page.locator('[data-room-slot="stage-atmosphere"]')
+  const recognitionLayer = page.locator('[data-identity-recognition-atmosphere]')
+  const confirmationButton = page.getByRole('button', { exact: true, name: '我已辨认' })
 
+  await expect(recognitionOverlay).toBeVisible()
   await expect(recognitionLayer).toBeVisible()
-  await expect(recognitionLayer.getByRole('button')).toHaveCount(0)
+  await expect(recognitionOverlay.getByRole('button')).toHaveCount(0)
   await expect(confirmationButton).toBeVisible()
 
-  const geometry = await recognitionLayer.evaluate((layer) => {
-    const stage = layer.closest('.avalon-room-layout__stage-content')
+  const geometry = await recognitionOverlay.evaluate((layer) => {
+    const stage = layer.closest('[data-room-slot="stage"]')
+      ?.querySelector('.avalon-room-layout__stage-content')
     const stageRect = stage?.getBoundingClientRect()
     const layerRect = layer.getBoundingClientRect()
 
@@ -94,7 +97,7 @@ test('recognition overlay covers the measured stage in every business shell', as
       await confirmRecognitionParticipants(harness.pages, 'roleReveal')
 
       const participantIndex = await Promise.all(harness.pages.map(async (page, index) => (
-        await page.locator('[data-identity-step="evilRecognition"][data-curtain-state="raised"]').count() === 1
+        await page.getByRole('button', { exact: true, name: '我已辨认' }).count() === 1
           ? index
           : -1
       ))).then((indices) => indices.find((index) => index >= 0))
@@ -121,8 +124,11 @@ test('recognition overlay covers the measured stage in every business shell', as
         await confirmRecognitionParticipants(harness.pages, step)
       }
       for (const page of harness.pages) {
-        await expect(page.locator('[data-identity-step="percivalRecognition"]')).toHaveCount(0)
-        await expect(page.locator('[data-identity-step]')).toHaveCount(0)
+        await expect(page.locator('[data-room-screen="true"]')).toHaveAttribute(
+          'data-room-scene',
+          'teamProposal',
+        )
+        await expect(page.locator('[data-identity-recognition-atmosphere]')).toHaveCount(0)
       }
     } finally {
       await harness.close()
@@ -195,10 +201,13 @@ test('players complete the curtain-based identity recognition ceremony', async (
 
       if (step !== 'roleReveal') {
         for (const [index, page] of harness.pages.entries()) {
-          await expect(page.locator(`[data-identity-step="${step}"]`)).toHaveAttribute(
-            'data-curtain-state',
-            expectedParticipantIDs.includes(String(index)) ? 'raised' : 'closed',
-          )
+          const confirmation = page.getByRole('button', { exact: true, name: '我已辨认' })
+          if (expectedParticipantIDs.includes(String(index))) {
+            await expect(confirmation).toBeVisible()
+          } else {
+            await expect(confirmation).toHaveCount(0)
+            await expect(page.locator('[data-identity-recognition-label]')).toHaveCount(0)
+          }
         }
       }
 
@@ -207,8 +216,7 @@ test('players complete the curtain-based identity recognition ceremony', async (
           (_, index) => !expectedParticipantIDs.includes(String(index)),
         )
         if (nonParticipantPage === undefined) throw new Error('Expected an Evil-recognition nonparticipant')
-        const closedCurtain = nonParticipantPage.locator('[data-curtain-state="closed"]')
-        await expect(closedCurtain).toHaveCSS('animation-name', 'none')
+        await expect(nonParticipantPage.locator('[data-identity-recognition-atmosphere]')).toHaveCount(0)
         const backButton = nonParticipantPage.getByRole('button', { name: '返回主页' })
         await expect(backButton).toBeVisible()
         expect(await backButton.evaluate((button) => {
@@ -219,15 +227,15 @@ test('players complete the curtain-based identity recognition ceremony', async (
           )
           return topmost === button || button.contains(topmost)
         })).toBe(true)
-        await expect(
-          harness.pages[Number(expectedParticipantIDs[0])]
-            .locator('[data-known-player-info]'),
-        ).toHaveCount(1)
+        const evilPage = harness.pages[Number(expectedParticipantIDs[0])]
+        await expect(evilPage.locator('[data-identity-recognition-label][data-recognition-tone="ally"]'))
+          .toHaveCount(expectedParticipantIDs.length - 1)
       }
 
       if (step === 'merlinRecognition') {
         await expect(
-          harness.pages[Number(expectedParticipantIDs[0])].locator('[data-known-player-info]'),
+          harness.pages[Number(expectedParticipantIDs[0])]
+            .locator('[data-identity-recognition-label][data-recognition-tone="evil"]'),
         ).toHaveCount(2)
       }
 
@@ -237,7 +245,9 @@ test('players complete the curtain-based identity recognition ceremony', async (
           .filter(([, role]) => role === 'merlin' || role === 'morgana')
           .map(([playerID]) => playerID)
           .sort()
-        const candidateBadges = percivalPage.getByLabel('Merlin 候选', { exact: true })
+        const candidateBadges = percivalPage.locator(
+          '[data-identity-recognition-label][data-recognition-tone="candidate"]',
+        )
         await expect(candidateBadges).toHaveCount(2)
         const markedPlayerIDs = await candidateBadges.evaluateAll((badges) => badges.map((badge) => (
           badge.closest('[data-player-id]')?.getAttribute('data-player-id') ?? ''
@@ -245,7 +255,8 @@ test('players complete the curtain-based identity recognition ceremony', async (
         expect(markedPlayerIDs).toEqual(candidateIDs)
         for (const [index, page] of harness.pages.entries()) {
           if (String(index) === expectedParticipantIDs[0]) continue
-          await expect(page.getByLabel('Merlin 候选', { exact: true })).toHaveCount(0)
+          await expect(page.locator('[data-identity-recognition-label][data-recognition-tone="candidate"]'))
+            .toHaveCount(0)
         }
       }
 
@@ -259,7 +270,10 @@ test('players complete the curtain-based identity recognition ceremony', async (
     const percivalID = Array.from(roleByPlayer.entries()).find(([, role]) => role === 'percival')?.[0]
     if (percivalID === undefined) throw new Error('Expected Percival in paired-role room')
     for (const page of harness.pages) {
-      await expect(page.locator('[data-identity-step]')).toHaveCount(0)
+      await expect(page.locator('[data-room-screen="true"]')).toHaveAttribute(
+        'data-room-scene',
+        'teamProposal',
+      )
       await expect(page.getByRole('button', {
         name: '查看我的身份与已知信息',
       })).toBeVisible()
@@ -363,7 +377,8 @@ test('players complete the curtain-based identity recognition ceremony', async (
       }).click()
     }
     await leaderPage.getByRole('button', {
-      name: `确认队伍 ${proposalTeam.length}/${proposalTeam.length}`,
+      exact: true,
+      name: '确认队伍',
     }).click()
 
     await harness.dispatch({

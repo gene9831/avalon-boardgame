@@ -108,7 +108,7 @@ test('the IndexedDB lock fallback serializes two tabs and recovers a transient c
     })
 
     await stalePage.getByRole('button', { name: '房间操作' }).click()
-    await stalePage.getByRole('button', { name: '退出房间' }).click()
+    await stalePage.getByRole('menuitem', { name: '退出房间' }).click()
     const exitDialog = stalePage.getByRole('dialog', { name: '确认退出房间' })
     await exitDialog.getByRole('button', { name: '退出房间' }).click()
     await exitRequestStarted
@@ -120,7 +120,7 @@ test('the IndexedDB lock fallback serializes two tabs and recovers a transient c
       if (raw === null) return null
       return (JSON.parse(raw) as { status?: unknown }).status ?? null
     }, seatTransitionKey(matchID))).toBe('requesting')
-    await expect(stalePage.getByRole('button', { name: /^移至 / }).first()).toBeDisabled()
+    await expect(stalePage.getByRole('button', { name: '重新连接' })).toBeVisible()
     expect(seatChangeRequestCount).toBe(1)
     const contender = await stalePage.evaluate(async (roomID) => {
       const modulePath = '/src/room-participation.ts'
@@ -170,7 +170,7 @@ test('the IndexedDB lock fallback serializes two tabs and recovers a transient c
     }, seatTransitionKey(matchID))).toBe('uncertain')
 
     for (const page of [movingPage, stalePage]) {
-      const exitButton = page.getByRole('button', { name: '退出房间' })
+      const exitButton = page.getByRole('menuitem', { name: '退出房间' })
       const roomMenu = page.getByRole('button', { name: '房间操作' })
       if (await roomMenu.count() === 0) {
         await expect(exitButton).toHaveCount(0)
@@ -249,7 +249,7 @@ test('refresh restores the unified room and keeps pending choices private', asyn
     await expect(leaderPage.locator('[data-room-screen="true"]')).toHaveCount(1)
     await expect(leaderPage.getByLabel('5 人游戏圆桌')).toBeVisible()
     await expect(
-      leaderPage.getByRole('button', { name: /^确认队伍 0\// }),
+      leaderPage.getByRole('button', { exact: true, name: '确认队伍' }),
     ).toBeDisabled()
 
     await harness.dispatch(run.transcript[proposeIndex]!)
@@ -260,7 +260,7 @@ test('refresh restores the unified room and keeps pending choices private', asyn
 
     const votePage = harness.pages[Number(firstVote.actor)]
     await expect(votePage.locator('[data-room-screen="true"]')).toHaveAttribute(
-      'data-room-mode',
+      'data-room-scene',
       'teamVote',
     )
     await expect(votePage.getByLabel('5 人游戏圆桌')).toHaveAttribute(
@@ -287,8 +287,8 @@ test('refresh restores the unified room and keeps pending choices private', asyn
     await harness.dispatch(firstVote)
     for (const [index, page] of harness.pages.entries()) {
       await expect(
-        page.locator('[data-room-slot="phase-middle"]'),
-      ).toContainText('1/5 已投票')
+        page.getByLabel('5 人游戏圆桌'),
+      ).toContainText('已投票 1 / 5')
       const publicSubmitterSeat = page.locator(
         `[data-round-table-player][data-player-id="${firstVote.actor}"]`,
       )
@@ -299,17 +299,17 @@ test('refresh restores the unified room and keeps pending choices private', asyn
 
       if (String(index) === firstVote.actor) {
         await expect(
-          page.locator('[data-room-slot="phase-action"]'),
+          page.locator('[data-room-slot="phase-middle"]'),
         ).toContainText(
-          `你已选择：${firstVote.payload.vote === 'approve' ? '赞成' : '反对'}`,
+          `你已提交${firstVote.payload.vote === 'approve' ? '同意票' : '反对票'}`,
         )
       } else {
         await expect(
-          page.getByRole('button', { name: '赞成队伍' }),
+          page.getByRole('button', { exact: true, name: '同意任务队伍' }),
         ).toBeEnabled()
       }
       if (String(index) !== firstVote.actor) {
-        await expect(page.getByText(/你已选择：/)).toHaveCount(0)
+        await expect(page.getByText(/你已提交(?:同意票|反对票)/)).toHaveCount(0)
       }
     }
 
@@ -334,12 +334,12 @@ test('refresh restores the unified room and keeps pending choices private', asyn
 
     await votePage.reload()
     await expect(
-      votePage.locator('[data-room-slot="phase-action"]'),
+      votePage.locator('[data-room-slot="phase-middle"]'),
     ).toContainText(
-      `你已选择：${firstVote.payload.vote === 'approve' ? '赞成' : '反对'}`,
+      `你已提交${firstVote.payload.vote === 'approve' ? '同意票' : '反对票'}`,
     )
     await expect(
-      votePage.getByRole('button', { name: '赞成队伍' }),
+      votePage.getByRole('button', { exact: true, name: '同意任务队伍' }),
     ).toHaveCount(0)
 
     for (let index = firstVoteIndex + 1; index < firstQuestCardIndex; index += 1) {
@@ -373,15 +373,15 @@ test('refresh restores the unified room and keeps pending choices private', asyn
     const pendingTeammatePage = harness.pages[Number(nextCard.actor)]
 
     await expect(
-      cardPage.locator('[data-room-slot="phase-action"]'),
+      cardPage.locator('[data-room-slot="phase-middle"]'),
     ).toContainText(
-      `你已提交${firstQuestCard.payload.card === 'success' ? '成功' : '失败'}，等待任务结算。`,
+      `你已提交${firstQuestCard.payload.card === 'success' ? '成功牌' : '失败牌'}`,
     )
     await expect(
-      cardPage.getByRole('button', { name: /让任务(成功|失败)/ }),
+      cardPage.getByRole('button', { name: /^(提交成功牌|确认任务牌|选择成功任务牌|选择失败任务牌)$/ }),
     ).toHaveCount(0)
     await expect(
-      pendingTeammatePage.getByRole('button', { name: '让任务成功' }),
+      pendingTeammatePage.getByRole('button', { name: /^(提交成功牌|选择成功任务牌)$/ }),
     ).toBeEnabled()
     for (const [index, page] of harness.pages.entries()) {
       if (String(index) === firstQuestCard.actor) continue
@@ -390,12 +390,12 @@ test('refresh restores the unified room and keeps pending choices private', asyn
 
     await cardPage.reload()
     await expect(
-      cardPage.locator('[data-room-slot="phase-action"]'),
+      cardPage.locator('[data-room-slot="phase-middle"]'),
     ).toContainText(
-      `你已提交${firstQuestCard.payload.card === 'success' ? '成功' : '失败'}，等待任务结算。`,
+      `你已提交${firstQuestCard.payload.card === 'success' ? '成功牌' : '失败牌'}`,
     )
     await expect(
-      cardPage.getByRole('button', { name: /让任务(成功|失败)/ }),
+      cardPage.getByRole('button', { name: /^(提交成功牌|确认任务牌|选择成功任务牌|选择失败任务牌)$/ }),
     ).toHaveCount(0)
 
     for (

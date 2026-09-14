@@ -68,7 +68,7 @@ async function expectRoundTableFits(page: Page, tableLabel: string) {
       const centerY = center.top + center.height / 2
       const avatarX = rect.left + rect.width / 2
       const avatarY = rect.top + rect.height / 2
-      return Math.hypot(avatarX - centerX, avatarY - centerY) < 80 + rect.width - 1
+      return Math.hypot(avatarX - centerX, avatarY - centerY) < center.width / 2 + rect.width - 1
     }
     const maxAvatarWidth = Math.max(
       ...Array.from(table.querySelectorAll('[data-round-table-avatar]'))
@@ -115,8 +115,8 @@ async function expectRoundTableFits(page: Page, tableLabel: string) {
   expect(geometry.layoutStatus, `${tableLabel} @ ${geometry.viewport}`).toBe('ready')
   expect(geometry.maxAvatarWidth, `${tableLabel} @ ${geometry.viewport}`).toBeGreaterThanOrEqual(35.5)
   expect(geometry.maxAvatarWidth, `${tableLabel} @ ${geometry.viewport}`).toBeLessThanOrEqual(56.5)
-  expect(geometry.centerSize?.[0], `${tableLabel} center width`).toBeCloseTo(152, 1)
-  expect(geometry.centerSize?.[1], `${tableLabel} center height`).toBeCloseTo(152, 1)
+  expect(geometry.centerSize?.[0], `${tableLabel} center width`).toBeCloseTo(128, 1)
+  expect(geometry.centerSize?.[1], `${tableLabel} center height`).toBeCloseTo(128, 1)
   expect(geometry.seatsOutsideViewport, `${tableLabel} @ ${geometry.viewport}`).toEqual([])
   expect(geometry.clippedSeatParts, `${tableLabel} @ ${geometry.viewport}`).toEqual([])
   expect(geometry.overlappingSeatPairs, `${tableLabel} @ ${geometry.viewport}`).toEqual([])
@@ -127,7 +127,7 @@ async function expectRoundTableFits(page: Page, tableLabel: string) {
     .evaluateAll((buttons) => (
     buttons
       .filter((button) => {
-        if (button.hasAttribute('data-round-table-player')) return false
+        if (button.closest('[data-round-table-seat], [data-team-token]') !== null) return false
         const rect = button.getBoundingClientRect()
         const minimumSize = button.closest('[aria-label="任务计分板"]') === null ? 44 : 40
         return rect.width < minimumSize || rect.height < minimumSize
@@ -290,7 +290,7 @@ test('five, seven, and ten-player rooms keep one measured shell across lobby and
 
       await expect(roomScreen).toHaveCount(1)
       await expect(ownerPage.locator('[data-room-stage="true"]')).toHaveCount(1)
-      await expect(roomScreen).toHaveAttribute('data-room-mode', 'lobby')
+      await expect(roomScreen).toHaveAttribute('data-room-scene', 'lobby')
       await expect(ownerPage.getByTitle(harness.matchID, { exact: true })).toHaveText(
         `房间 ${harness.matchID.slice(0, 7)}`,
       )
@@ -384,7 +384,7 @@ test('five, seven, and ten-player rooms keep one measured shell across lobby and
       await expect(roomScreen).toHaveCount(1)
       await expect(ownerPage.locator('[data-room-stage="true"]')).toHaveCount(1)
       await expect(roomScreen).toHaveAttribute(
-        'data-room-mode',
+        'data-room-scene',
         'identityRecognition',
       )
       await expect(ownerPage.locator('[data-curtain-state]')).toBeVisible()
@@ -399,9 +399,9 @@ test('five, seven, and ten-player rooms keep one measured shell across lobby and
       }
       const leaderPage = harness.pages[Number(proposal.actor)]
       const leaderScreen = leaderPage.locator('[data-room-screen="true"]')
-      await expect(leaderScreen).toHaveAttribute('data-room-mode', 'teamProposal')
+      await expect(leaderScreen).toHaveAttribute('data-room-scene', 'teamProposal')
       await expect(leaderPage.getByRole('button', { name: '打开帮助说明' })).toBeVisible()
-      await expect(leaderPage.getByRole('button', { name: '查看对局记录' })).toBeVisible()
+      await expect(leaderPage.getByRole('button', { name: '房间操作' })).toBeVisible()
       await expect(
         leaderPage.getByRole('button', { name: '查看我的身份与已知信息' }),
       ).toBeVisible()
@@ -414,6 +414,11 @@ test('five, seven, and ten-player rooms keep one measured shell across lobby and
         const selectableSeat = leaderPage.getByRole('button', {
           name: /加入任务队伍/,
         }).first()
+        const selectablePlayerID = await selectableSeat.getAttribute('data-player-id')
+        if (selectablePlayerID === null) throw new Error('Selectable seat has no player ID')
+        const selectedSeat = leaderPage.locator(
+          `[data-round-table-player][data-player-id="${selectablePlayerID}"]`,
+        )
         const hitRegions = await selectableSeat.evaluate((button) => {
           const avatar = button.querySelector<HTMLElement>(
             '[data-seat-pointer-target="avatar"]',
@@ -434,23 +439,23 @@ test('five, seven, and ten-player rooms keep one measured shell across lobby and
         })
         expect(hitRegions).toBe(false)
 
-        await selectableSeat
-          .locator('[data-seat-pointer-target="avatar"]')
+        await selectedSeat
+          .locator('[data-seat-pointer-target="name"]')
           .click()
-        await expect(selectableSeat).toHaveAttribute('aria-pressed', 'true')
+        await expect(selectedSeat).toHaveAttribute('aria-pressed', 'true')
         await expect(
           leaderPage.locator('[data-room-slot="phase-middle"]'),
         ).toContainText('已选 1 /')
 
         await leaderPage.setViewportSize({ width: 667, height: 375 })
         await expect(leaderPage.locator('.avalon-room-layout__stage-content')).toHaveCount(1)
-        await expect(selectableSeat).toHaveAttribute('aria-pressed', 'true')
+        await expect(selectedSeat).toHaveAttribute('aria-pressed', 'true')
         await expectRoundTableFits(leaderPage, tableLabel)
 
-        await selectableSeat
+        await selectedSeat
           .locator('[data-seat-pointer-target="name"]')
           .click()
-        await expect(selectableSeat).toHaveAttribute('aria-pressed', 'false')
+        await expect(selectedSeat).toHaveAttribute('aria-pressed', 'false')
       }
     } finally {
       await harness.close()

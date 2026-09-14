@@ -79,9 +79,9 @@ export async function joinRoom(
 
 const RECOGNITION_CONFIRMATION_LABELS: Record<BrowserRecognitionStep, string> = {
   roleReveal: '我已确认身份',
-  evilRecognition: '我已辨认同伴',
-  merlinRecognition: '我已辨认邪恶阵营',
-  percivalRecognition: '我已辨认梅林候选',
+  evilRecognition: '我已辨认',
+  merlinRecognition: '我已辨认',
+  percivalRecognition: '我已辨认',
 }
 
 export async function confirmRecognitionParticipants(
@@ -92,13 +92,19 @@ export async function confirmRecognitionParticipants(
   const participants: { page: Page; playerID: string }[] = []
 
   for (const [index, page] of pages.entries()) {
-    const layer = page.locator(`[data-identity-step="${step}"]`)
-    await expect(layer).toBeVisible()
-    const confirmation = page.getByRole('button', {
-      exact: true,
-      name: confirmationLabel,
-    })
-    if (await confirmation.count() === 1) {
+    if (step === 'roleReveal') {
+      await expect(page.locator('[data-identity-step="roleReveal"]')).toBeVisible()
+    }
+    const reveal = page.getByRole('button', { exact: true, name: '查看线索' })
+    if (await reveal.count() === 1) {
+      await reveal.click()
+      await expect(page.getByRole('button', {
+        exact: true,
+        name: confirmationLabel,
+      })).toBeVisible()
+    }
+    const confirmation = page.getByRole('button', { exact: true, name: confirmationLabel })
+    if (await confirmation.count() === 1 && await confirmation.isVisible()) {
       participants.push({ page, playerID: String(index) })
     }
   }
@@ -123,6 +129,9 @@ export async function createBrowserReplayHarness(options: {
   roleConfiguration?: BrowserRoleConfiguration
 }): Promise<BrowserReplayHarness> {
   const contexts: BrowserContext[] = []
+  let submittedTeamVotes = 0
+  let submittedQuestCards = 0
+  let requiredQuestCards = 0
 
   try {
     for (let index = 0; index < options.playerCount; index += 1) {
@@ -141,6 +150,12 @@ export async function createBrowserReplayHarness(options: {
     await expect(
       pages[0].getByRole('button', { name: '开始游戏' }),
     ).toBeEnabled()
+    const continueSettlement = async (name: RegExp) => {
+      await Promise.all(pages.map((currentPage) => currentPage.getByRole('button', {
+        exact: true,
+        name,
+      }).click()))
+    }
 
     return {
       matchID,
@@ -159,9 +174,18 @@ export async function createBrowserReplayHarness(options: {
             ).toBeVisible()
             return
           case 'confirmIdentityRecognition':
-            const confirmationButton = page.getByRole('button', {
-              name: /^我已(确认身份|辨认同伴|辨认邪恶阵营|辨认梅林候选)$/,
+            let confirmationButton = page.getByRole('button', {
+              exact: true,
+              name: /^(我已确认身份|我已辨认|我已了解)$/,
             })
+            if (await confirmationButton.count() === 0) {
+              await page.getByRole('button', { exact: true, name: '查看线索' }).click()
+              confirmationButton = page.getByRole('button', {
+                exact: true,
+                name: /^(我已确认身份|我已辨认|我已了解)$/,
+              })
+              await expect(confirmationButton).toBeVisible()
+            }
             const confirmationLabel = await confirmationButton.textContent()
             if (confirmationLabel === null) {
               throw new Error('Identity confirmation button has no label')
@@ -179,26 +203,57 @@ export async function createBrowserReplayHarness(options: {
               }).click()
             }
             await page.getByRole('button', {
-              name: `确认队伍 ${command.payload.team.length}/${command.payload.team.length}`,
+              exact: true,
+              name: '确认队伍',
             }).click()
+            requiredQuestCards = command.payload.team.length
             return
           case 'castTeamVote':
             await page.getByRole('button', {
-              name: command.payload.vote === 'approve' ? '赞成队伍' : '反对队伍',
+              exact: true,
+              name: command.payload.vote === 'approve' ? '同意任务队伍' : '反对任务队伍',
             }).click()
+            await page.getByRole('button', { exact: true, name: '确认投票' }).click()
+            submittedTeamVotes += 1
+            if (submittedTeamVotes === options.playerCount) {
+              await continueSettlement(/^(继续|查看对局结果)$/)
+              submittedTeamVotes = 0
+            }
             return
           case 'playQuestCard':
-            await page.getByRole('button', {
-              name: command.payload.card === 'success'
-                ? '让任务成功'
-                : '让任务失败',
-            }).click()
+            if (command.payload.card === 'success') {
+              const goodSubmission = page.getByRole('button', {
+                exact: true,
+                name: '提交成功牌',
+              })
+              if (await goodSubmission.count() === 1) {
+                await goodSubmission.click()
+              } else {
+                await page.getByRole('button', {
+                  exact: true,
+                  name: '选择成功任务牌',
+                }).click()
+                await page.getByRole('button', { exact: true, name: '确认任务牌' }).click()
+              }
+            } else {
+              await page.getByRole('button', {
+                exact: true,
+                name: '选择失败任务牌',
+              }).click()
+              await page.getByRole('button', { exact: true, name: '确认任务牌' }).click()
+            }
+            submittedQuestCards += 1
+            if (submittedQuestCards === requiredQuestCards) {
+              await continueSettlement(/^(继续|进入刺杀阶段|查看对局结果)$/)
+              submittedQuestCards = 0
+            }
             return
           case 'assassinate':
             await page.getByRole('button', {
               name: `选择 ${playerName(command.payload.targetID)} 作为刺杀目标`,
             }).click()
-            await page.getByRole('button', { name: '确认目标' }).click()
+            await page.getByRole('button', { exact: true, name: '确认刺杀' }).click()
+            await continueSettlement(/^查看对局结果$/)
         }
       },
       async snapshot() {
