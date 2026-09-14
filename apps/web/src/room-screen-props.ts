@@ -111,16 +111,10 @@ export type RoomIdentityClue =
 /**
  * 身份辨认阶段只接收已经过 playerView 授权的私密呈现。
  *
- * roleReveal 保留完整角色资料；clue 只携带当前玩家获准看到的线索；
- * observer 不携带任何私密内容，并始终显示闭合幕布。
+ * clue 只携带当前玩家获准看到的线索；observer 不携带任何私密内容，
+ * 并始终显示闭合幕布。首次角色揭示由 identityConfirmation 场景负责。
  */
 export type RoomIdentityRecognitionPresentation =
-  | Readonly<{
-      kind: 'roleReveal'
-      role: Role
-      view: 'revealed' | 'waiting'
-      confirmRequestState: RoomRequestState
-    }>
   | Readonly<{
       kind: 'clue'
       clue: RoomIdentityClue

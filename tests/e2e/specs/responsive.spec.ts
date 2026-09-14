@@ -385,9 +385,16 @@ test('five, seven, and ten-player rooms keep one measured shell across lobby and
       await expect(ownerPage.locator('[data-room-stage="true"]')).toHaveCount(1)
       await expect(roomScreen).toHaveAttribute(
         'data-room-scene',
-        'identityRecognition',
+        'identityConfirmation',
       )
-      await expect(ownerPage.locator('[data-curtain-state]')).toBeVisible()
+      await expect(
+        ownerPage.locator('[data-identity-confirmation-stage="concealed"]'),
+      ).toBeVisible()
+      await expect(
+        ownerPage.locator('[data-room-slot="phase-action"]')
+          .getByRole('button', { name: '揭示身份', exact: true }),
+      ).toBeVisible()
+      await expect(ownerPage.locator('[data-identity-role-artwork]')).toHaveCount(0)
 
       for (let index = startIndex + 1; index < proposeIndex; index += 1) {
         await harness.dispatch(generated.transcript[index]!)

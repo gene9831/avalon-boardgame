@@ -777,7 +777,7 @@ describe('RoomView playing layout', () => {
     expect(html).toContain('font-sans')
   })
 
-  it('shows the full live role card only to the role-reveal participant and closes the curtain for others', () => {
+  it('starts live role confirmation concealed and keeps unauthorized viewers behind the curtain', () => {
     const state = playingGameState()!
     state.ctx.phase = 'identityRecognition'
     state.ctx.activePlayers = { '0': 'identityRecognition' }
@@ -797,13 +797,11 @@ describe('RoomView playing layout', () => {
     }
     const nonparticipant = renderRoomView({ gameState: state, room: fullRoom() }, true)
 
-    expect(participant).toContain('data-room-scene="identityRecognition"')
-    expect(participant).toContain('data-curtain-state="lowered"')
-    expect(participant).toContain('data-role-card="merlin"')
-    expect(participant).toContain('data-role-avatar="merlin"')
-    expect(participant).toContain('aria-label="我的身份：梅林"')
-    expect(participant).toContain('本局目标：')
-    expect(participant).toContain('>我已确认身份<')
+    expect(participant).toContain('data-room-scene="identityConfirmation"')
+    expect(participant).toContain('data-identity-confirmation-state="concealed"')
+    expect(participant).toContain('aria-label="揭示身份"')
+    expect(participant).not.toContain('data-identity-role-artwork')
+    expect(participant).not.toContain('aria-label="查看我的身份与已知信息"')
     expect(nonparticipant).toContain('data-room-scene="identityRecognition"')
     expect(nonparticipant).toContain('data-curtain-state="closed"')
     expect(nonparticipant).toContain('等待参与玩家完成辨认')

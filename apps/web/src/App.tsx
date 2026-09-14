@@ -1439,6 +1439,7 @@ export function RoomView({
       gameState?.G.status === 'finished',
     showIdentityKnowledge:
       gameState?.G.status === 'playing' &&
+      controller.binding.scene.kind !== 'identityConfirmation' &&
       controller.binding.scene.kind !== 'identityRecognition' &&
       controller.binding.scene.kind !== 'connectionRecovery',
     roleKnowledgeOpen: controller.roleKnowledgeOpen,
