@@ -1,10 +1,11 @@
 import { getPlayerCountConfig, type AvalonPlayerView, type PlayerID } from '@avalon/game'
 
-import type { LobbyPlayer } from './lobby'
+import type { AvalonMatch, LobbyPlayer } from './lobby'
 import { getDisplayedTeamVoteResult } from './room-game'
 import { buildRoomPlayerPresentation, type FilteredSeatRole } from './room-player-presentation'
 import type { RoomPlayerInteraction, RoomPlayerPresentation } from './room-screen-props'
 import { getSeatAvatarID } from './seat-avatar'
+import type { RoomTeamToken } from './RoomTeamTokens'
 
 export type RoomPlayerInteractionMode =
   | 'none'
@@ -18,6 +19,24 @@ export type QuestProgressNode = Readonly<{
   failThreshold: number | null
   state: 'upcoming' | 'current' | 'success' | 'failure'
 }>
+
+/** Builds selected-team display tokens from lobby seats, never from role presentation. */
+export function buildRoomTeamTokens(
+  room: AvalonMatch,
+  playerIDs: readonly PlayerID[],
+): readonly RoomTeamToken[] {
+  const selectedPlayerIDs = new Set(playerIDs)
+
+  return room.players
+    .filter((player) => selectedPlayerIDs.has(String(player.id) as PlayerID) && player.name !== undefined)
+    .map((player) => ({
+      playerID: String(player.id) as PlayerID,
+      seatNumber: player.id + 1,
+      name: player.name!,
+      avatarID: getSeatAvatarID(player.data, player.id),
+    }))
+    .sort((left, right) => left.seatNumber - right.seatNumber)
+}
 
 /** Builds display-only seat data from the player-filtered room snapshot. */
 export function buildRoomPlayers(input: Readonly<{

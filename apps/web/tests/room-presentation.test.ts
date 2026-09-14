@@ -4,7 +4,9 @@ import type { AvalonPlayerView } from '@avalon/game'
 import {
   buildQuestProgress,
   buildRoomPlayers,
+  buildRoomTeamTokens,
 } from '../src/room-presentation'
+import type { AvalonMatch } from '../src/lobby'
 
 const players = [
   { id: 0, name: 'Alice', isConnected: true },
@@ -66,6 +68,24 @@ function gameView(overrides: Partial<AvalonPlayerView> = {}): AvalonPlayerView {
 }
 
 describe('room player presentation', () => {
+  it('builds team tokens in stable lobby-seat order with cosmetic avatars', () => {
+    const room: AvalonMatch = {
+      matchID: 'room-team-tokens', gameName: 'avalon', ownerPlayerID: '0',
+      occupiedPlayerIDs: ['0', '1', '2'], roleConfiguration: { percivalMorgana: false },
+      players: [
+        { id: 0, name: 'Alice', data: { avatarID: 'assassin' } },
+        { id: 1, name: 'Bob', data: { avatarID: 'merlin' } },
+        { id: 2, name: 'Caro', data: { avatarID: 'percival' } },
+      ],
+    }
+
+    expect(buildRoomTeamTokens(room, ['2', '0', '1'])).toEqual([
+      { playerID: '0', seatNumber: 1, name: 'Alice', avatarID: 'assassin' },
+      { playerID: '1', seatNumber: 2, name: 'Bob', avatarID: 'merlin' },
+      { playerID: '2', seatNumber: 3, name: 'Caro', avatarID: 'percival' },
+    ])
+  })
+
   it('orders seats from the viewer without carrying renderer geometry', () => {
     const result = buildRoomPlayers(baseInput)
 

@@ -302,6 +302,9 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
           >
             {portraitContent(player.portrait)}
           </span>
+          <span aria-hidden="true" className="room-seat__seat-number" data-seat-number-badge="true">
+            {player.seatNumber}
+          </span>
           {player.portrait.kind === 'playerAvatar' && !player.portrait.connected && (
             <span className="room-seat__disconnected" data-seat-disconnected-badge="true">掉线</span>
           )}

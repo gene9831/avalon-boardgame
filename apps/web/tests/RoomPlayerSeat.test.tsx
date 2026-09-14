@@ -87,6 +87,19 @@ describe('RoomPlayerSeat', () => {
     expect(html).not.toContain('<button')
   })
 
+  it('keeps an occupied seat number badge when terminal role artwork replaces the avatar', () => {
+    const html = renderToStaticMarkup(
+      <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
+        ...player,
+        portrait: { kind: 'roleArtwork', role: 'merlin' },
+        caption: { kind: 'role', role: 'merlin' },
+      }} />,
+    )
+
+    expect(html).toContain('data-seat-number-badge="true"')
+    expect(html).toMatch(/data-seat-number-badge="true"[^>]*>1<\/span>/)
+  })
+
   it('keeps a disabled occupied lobby seat grouped while an enabled empty destination is actionable', () => {
     const occupiedHtml = renderToStaticMarkup(
       <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
