@@ -4,10 +4,14 @@ import { webConfig } from './config'
 import { createDevToolsClient } from './dev-tools'
 import { FloatingDevTools } from './FloatingDevTools'
 import type { LobbyPlayer } from './lobby'
+import { formatRoomID } from './room-id'
+import type { RoomLayoutDiagnosticsMode } from './useRoomLayout'
 import { useDevTools } from './use-dev-tools'
 
 interface RoomDevToolsProps {
   matchID: string
+  layoutDiagnosticsMode: RoomLayoutDiagnosticsMode
+  onLayoutDiagnosticsModeChange: (mode: RoomLayoutDiagnosticsMode) => void
   onClearLocalSession: () => void
   onDeleteRoom: (token: string) => Promise<void>
   onKickPlayer: (playerID: string, token: string) => Promise<void>
@@ -17,6 +21,8 @@ interface RoomDevToolsProps {
 
 export function RoomDevTools({
   matchID,
+  layoutDiagnosticsMode,
+  onLayoutDiagnosticsModeChange,
   onClearLocalSession,
   onDeleteRoom,
   onKickPlayer,
@@ -27,7 +33,17 @@ export function RoomDevTools({
   const { enabled, error, run, setToken, token } = useDevTools(client)
 
   return (
-    <FloatingDevTools
+    <>
+      {import.meta.env.DEV && (
+        <fieldset aria-label="布局诊断" className="fixed bottom-2 left-2 z-[90] flex rounded-lg bg-slate-950/90 p-1 text-xs shadow-xl">
+          {(['off', 'metrics', 'geometry'] as const).map((value) => (
+            <button aria-pressed={layoutDiagnosticsMode === value} className="min-h-11 px-2 text-slate-200 aria-pressed:bg-violet-500/30" key={value} onClick={() => onLayoutDiagnosticsModeChange(value)} type="button">
+              {{ off: '关闭', metrics: '尺寸', geometry: '完整边界' }[value]}
+            </button>
+          ))}
+        </fieldset>
+      )}
+      <FloatingDevTools
       enabled={enabled}
       error={error}
       onTokenChange={setToken}
@@ -50,7 +66,7 @@ export function RoomDevTools({
       <button
         className="w-full rounded-xl border border-rose-300/30 px-4 py-3 font-semibold text-rose-200 transition hover:border-rose-300/70"
         onClick={() => {
-          if (window.confirm(`确定删除房间 ${matchID} 吗？`)) {
+          if (window.confirm(`确定删除房间 ${formatRoomID(matchID)} 吗？`)) {
             void run(() => onDeleteRoom(token))
           }
         }}
@@ -81,6 +97,7 @@ export function RoomDevTools({
             ))}
         </div>
       )}
-    </FloatingDevTools>
+      </FloatingDevTools>
+    </>
   )
 }

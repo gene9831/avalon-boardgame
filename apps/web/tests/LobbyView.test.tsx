@@ -124,7 +124,8 @@ describe('LobbyView room access', () => {
     expect(html).toContain('等待玩家')
     expect(html).toContain('对局中')
     expect(html).toContain('已结束')
-    expect(html).toContain('房间 room-finished')
+    expect(html).toContain('title="room-finished"')
+    expect(html).toContain('data-room-match-id="room-finished"')
     expect(html).toContain('1/5 人已入座')
     expect(html).toContain('5/5 人已入座')
     expect(html).not.toContain('局域网')
@@ -168,7 +169,7 @@ describe('LobbyView room access', () => {
     expect(html).not.toContain('>加入游戏<')
     expect(html).not.toContain('aria-label="选择 room-open 的座位"')
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>创建房间<\/button>/)
-    expect(html.indexOf('房间 room-current')).toBeLessThan(html.indexOf('房间 room-open'))
+    expect(html.indexOf('data-room-match-id="room-current"')).toBeLessThan(html.indexOf('data-room-match-id="room-open"'))
   })
 
   it('keeps room entry points closed while saved sessions are being checked', () => {
@@ -214,7 +215,7 @@ describe('LobbyView room access', () => {
   it('does not offer joining an ownerless legacy room', () => {
     const html = renderLobby({ matches: [ownerlessLegacyRoom] })
 
-    expect(html).toContain('房间 room-ownerless')
+    expect(html).toContain('data-room-match-id="room-ownerless"')
     expect(html).not.toContain('>加入游戏<')
   })
 })

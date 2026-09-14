@@ -11,6 +11,9 @@
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@avalon/ui-layout": "workspace:*"
+  },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
     "@tailwindcss/vite": "^4.3.3",

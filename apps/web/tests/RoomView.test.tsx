@@ -1,9 +1,35 @@
 import { renderToStaticMarkup } from 'react-dom/server'
+import type { PlayerID } from '@avalon/game'
 import { describe, expect, it, vi } from 'vitest'
 
-import { canRequestRoomExit, getUpdatedRoomRouteSession, recoverRoomRouteSession, resolveRecoverySeatValidation, resolveRoomRouteSnapshotSession, shouldWakeRoomRouteForSeatTransitionChange, RoomAccessView, RoomView, type RoomViewProps } from '../src/App'
+import { canRequestRoomExit, executeRoomSeatChangeOperation, executeRoomStartOperation, getUpdatedRoomRouteSession, recoverRoomRouteSession, resolveRecoverySeatValidation, resolveRoomRouteSnapshotSession, shouldWakeRoomRouteForSeatTransitionChange, RoomAccessView, RoomView, type RoomViewProps } from '../src/App'
+import type { AvalonMatch } from '../src/lobby'
 import { RoomParticipationHttpError, type SeatTransitionReplayClient } from '../src/room-participation'
-import { beginSeatTransition, loadRoomSession, loadSeatTransition, markSeatTransitionUncertain, saveRoomSession, type RoomSessionStorage } from '../src/room-session'
+import { beginSeatTransition, loadRoomSession, loadSeatTransition, markSeatTransitionUncertain, saveRoomSession, type RoomSession, type RoomSessionStorage } from '../src/room-session'
+import { ToastProvider } from '../src/toast'
+
+const roomLayoutHarness = vi.hoisted(() => ({ measured: false }))
+
+vi.mock('../src/useRoomLayout', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/useRoomLayout')>()
+  return {
+    ...actual,
+    useRoomLayout(playerCount: number | null, diagnosticsMode: 'off' | 'metrics' | 'geometry') {
+      const result = actual.useRoomLayout(playerCount, diagnosticsMode)
+      if (!roomLayoutHarness.measured || playerCount === null) return result
+
+      return {
+        ...result,
+        snapshot: actual.resolveRoomLayoutSnapshot({
+          canvasSize: { height: 600, width: 800 },
+          playerCount,
+          stageSize: { height: 600, width: 800 },
+          viewportSize: { height: 600, width: 800 },
+        }),
+      }
+    },
+  }
+})
 
 vi.mock('../src/config', () => ({
   webConfig: {
@@ -12,13 +38,17 @@ vi.mock('../src/config', () => ({
   },
 }))
 
-function renderRoomView(overrides: Partial<RoomViewProps> = {}) {
+function renderRoomView(
+  overrides: Partial<RoomViewProps> = {},
+  measuredStage = false,
+) {
   const props: RoomViewProps = {
     gameState: null,
     onAssassinate: vi.fn(),
     onBackHome: vi.fn(),
     onCastTeamVote: vi.fn(),
     onConfirmIdentityRecognition: vi.fn(),
+    onChangeSeat: vi.fn(),
     onClearLocalSession: vi.fn(),
     onDeleteRoom: vi.fn(),
     onKickPlayer: vi.fn(),
@@ -35,6 +65,8 @@ function renderRoomView(overrides: Partial<RoomViewProps> = {}) {
     },
     roomExitBlocked: false,
     roomExitBusy: false,
+    seatChangeTargetID: null,
+    startPending: false,
     session: {
       credentials: 'credential',
       matchID: 'room-123',
@@ -44,7 +76,48 @@ function renderRoomView(overrides: Partial<RoomViewProps> = {}) {
     ...overrides,
   }
 
-  return renderToStaticMarkup(<RoomView {...props} />)
+  roomLayoutHarness.measured = measuredStage
+  try {
+    return renderToStaticMarkup(
+      <ToastProvider>
+        <RoomView {...props} />
+      </ToastProvider>,
+    )
+  } finally {
+    roomLayoutHarness.measured = false
+  }
+}
+
+function incompleteRoomWithEmptySeat(emptyPlayerID: PlayerID): AvalonMatch {
+  return {
+    gameName: 'avalon',
+    matchID: 'room-123',
+    ownerPlayerID: '0',
+    occupiedPlayerIDs: ['0', '1', '2', '4'],
+    players: [
+      { id: 0, name: 'Alice', isConnected: true },
+      { id: 1, name: 'Bob', isConnected: true },
+      { id: 2, name: 'Claire', isConnected: true },
+      { id: Number(emptyPlayerID), name: null, isConnected: false },
+      { id: 4, name: 'Eve', isConnected: true },
+    ],
+    roleConfiguration: { percivalMorgana: true },
+    setupData: { numPlayers: 5 },
+  }
+}
+
+function fullRoom(): AvalonMatch {
+  return {
+    ...incompleteRoomWithEmptySeat('3'),
+    occupiedPlayerIDs: ['0', '1', '2', '3', '4'],
+    players: [
+      { id: 0, name: 'Alice', isConnected: true },
+      { id: 1, name: 'Bob', isConnected: true },
+      { id: 2, name: 'Claire', isConnected: true },
+      { id: 3, name: 'Dylan', isConnected: true },
+      { id: 4, name: 'Eve', isConnected: true },
+    ],
+  }
 }
 
 const replayTarget: SeatTransitionReplayClient = {
@@ -59,6 +132,14 @@ const rejectOccupiedTarget: SeatTransitionReplayClient = {
   changeSeat: async () => {
     throw new RoomParticipationHttpError(409, 'seat_unavailable')
   },
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
 }
 
 function playingGameState(): RoomViewProps['gameState'] {
@@ -103,6 +184,237 @@ function playingGameState(): RoomViewProps['gameState'] {
   } as RoomViewProps['gameState']
 }
 
+function lobbyGameState(): RoomViewProps['gameState'] {
+  const state = playingGameState()!
+  state.G.status = 'lobby'
+  state.G.lobby = {
+    occupiedPlayerIDs: ['0', '1', '2', '3', '4'],
+    ownerPlayerID: '0',
+  }
+  state.ctx.phase = 'lobby'
+  state.ctx.activePlayers = null
+  return state
+}
+
+describe('RoomRoute async operation isolation', () => {
+  it.each(['generation', 'match', 'session', 'client'] as const)(
+    'requires the deferred start operation %s identity to remain current',
+    async (changedIdentity) => {
+      const sourceSession = {
+        credentials: 'credential-a', matchID: 'room-a', playerID: '0', playerName: 'Alice',
+      }
+      const sourceStart = vi.fn()
+      const sourceClient = { moves: { startGame: sourceStart } }
+      const operation = {
+        client: sourceClient, generation: 1, matchID: sourceSession.matchID,
+        session: sourceSession, startGame: sourceStart, token: Symbol('start-a'),
+      }
+      const operationRef = { current: operation }
+      let currentRoute = {
+        client: sourceClient,
+        generation: operation.generation,
+        matchID: operation.matchID,
+        session: sourceSession,
+      }
+      const pending = deferred<void>()
+      const onError = vi.fn()
+      const onSettled = vi.fn()
+      const request = executeRoomStartOperation({
+        getCurrentRoute: () => currentRoute,
+        onError,
+        onSettled,
+        operation,
+        operationRef,
+        prepareStart: () => pending.promise,
+      })
+
+      if (changedIdentity === 'generation') {
+        currentRoute = { ...currentRoute, generation: 2 }
+      } else if (changedIdentity === 'match') {
+        currentRoute = { ...currentRoute, matchID: 'room-b' }
+      } else if (changedIdentity === 'session') {
+        currentRoute = {
+          ...currentRoute,
+          session: { ...sourceSession, credentials: 'credential-rebound' },
+        }
+      } else {
+        currentRoute = {
+          ...currentRoute,
+          client: { moves: { startGame: vi.fn() } },
+        }
+      }
+      pending.resolve()
+      await request
+
+      expect(sourceStart).not.toHaveBeenCalled()
+      expect(onError).not.toHaveBeenCalled()
+      expect(onSettled).not.toHaveBeenCalled()
+      expect(operationRef.current).toBeNull()
+    },
+  )
+
+  it('does not let a deferred start completion act on or clear a newer room operation', async () => {
+    const sourceSession = {
+      credentials: 'credential-a', matchID: 'room-a', playerID: '0', playerName: 'Alice',
+    }
+    const nextSession = {
+      credentials: 'credential-b', matchID: 'room-b', playerID: '1', playerName: 'Bob',
+    }
+    const sourceStart = vi.fn()
+    const nextStart = vi.fn()
+    const sourceClient = { moves: { startGame: sourceStart } }
+    const nextClient = { moves: { startGame: nextStart } }
+    const sourceOperation = {
+      client: sourceClient, generation: 1, matchID: sourceSession.matchID,
+      session: sourceSession, startGame: sourceStart, token: Symbol('start-a'),
+    }
+    const nextOperation = {
+      client: nextClient, generation: 2, matchID: nextSession.matchID,
+      session: nextSession, startGame: nextStart, token: Symbol('start-b'),
+    }
+    const operationRef = { current: sourceOperation }
+    let currentRoute = {
+      client: sourceClient, generation: 1, matchID: sourceSession.matchID, session: sourceSession,
+    }
+    const pending = deferred<void>()
+    const sourceSettled = vi.fn()
+
+    const sourceRequest = executeRoomStartOperation({
+      getCurrentRoute: () => currentRoute,
+      onError: vi.fn(),
+      onSettled: sourceSettled,
+      operation: sourceOperation,
+      operationRef,
+      prepareStart: () => pending.promise,
+    })
+    currentRoute = {
+      client: nextClient, generation: 2, matchID: nextSession.matchID, session: nextSession,
+    }
+    operationRef.current = nextOperation
+    pending.resolve()
+    await sourceRequest
+
+    expect(sourceStart).not.toHaveBeenCalled()
+    expect(nextStart).not.toHaveBeenCalled()
+    expect(operationRef.current).toBe(nextOperation)
+    expect(sourceSettled).not.toHaveBeenCalled()
+
+    const nextSettled = vi.fn()
+    await executeRoomStartOperation({
+      getCurrentRoute: () => currentRoute,
+      onError: vi.fn(),
+      onSettled: nextSettled,
+      operation: nextOperation,
+      operationRef,
+      prepareStart: async () => undefined,
+    })
+    expect(nextStart).toHaveBeenCalledTimes(1)
+    expect(nextSettled).toHaveBeenCalledTimes(1)
+    expect(operationRef.current).toBeNull()
+  })
+
+  it('does not let a deferred seat completion update or clear a newer room operation', async () => {
+    const sourceSession = {
+      credentials: 'credential-a', matchID: 'room-a', playerID: '0', playerName: 'Alice',
+    }
+    const nextSession = {
+      credentials: 'credential-b', matchID: 'room-b', playerID: '1', playerName: 'Bob',
+    }
+    const sourceClient = { moves: { startGame: vi.fn() } }
+    const nextClient = { moves: { startGame: vi.fn() } }
+    const sourceOperation = {
+      client: sourceClient, generation: 1, matchID: sourceSession.matchID,
+      session: sourceSession, targetPlayerID: '3', token: Symbol('seat-a'),
+    }
+    const nextOperation = {
+      client: nextClient, generation: 2, matchID: nextSession.matchID,
+      session: nextSession, targetPlayerID: '4', token: Symbol('seat-b'),
+    }
+    const operationRef = { current: sourceOperation }
+    let currentRoute = {
+      client: sourceClient, generation: 1, matchID: sourceSession.matchID, session: sourceSession,
+    }
+    const pending = deferred<RoomSession>()
+    const setSession = vi.fn()
+    const sourceSettled = vi.fn()
+
+    const sourceRequest = executeRoomSeatChangeOperation({
+      changeSeat: () => pending.promise,
+      getCurrentRoute: () => currentRoute,
+      onError: vi.fn(),
+      onSession: setSession,
+      onSettled: sourceSettled,
+      operation: sourceOperation,
+      operationRef,
+    })
+    currentRoute = {
+      client: nextClient, generation: 2, matchID: nextSession.matchID, session: nextSession,
+    }
+    operationRef.current = nextOperation
+    pending.resolve({ ...sourceSession, playerID: '3' })
+    await sourceRequest
+
+    expect(setSession).not.toHaveBeenCalled()
+    expect(operationRef.current).toBe(nextOperation)
+    expect(sourceSettled).not.toHaveBeenCalled()
+
+    const nextSettled = vi.fn()
+    await executeRoomSeatChangeOperation({
+      changeSeat: async () => ({ ...nextSession, playerID: '4' }),
+      getCurrentRoute: () => currentRoute,
+      onError: vi.fn(),
+      onSession: setSession,
+      onSettled: nextSettled,
+      operation: nextOperation,
+      operationRef,
+    })
+    expect(setSession).toHaveBeenLastCalledWith({ ...nextSession, playerID: '4' })
+    expect(nextSettled).toHaveBeenCalledTimes(1)
+    expect(operationRef.current).toBeNull()
+  })
+
+  it('does not apply a deferred seat result after the exact route identity changes', async () => {
+    const sourceSession = {
+      credentials: 'credential-a', matchID: 'room-a', playerID: '0', playerName: 'Alice',
+    }
+    const nextSession = {
+      credentials: 'credential-b', matchID: 'room-b', playerID: '1', playerName: 'Bob',
+    }
+    const sourceClient = { moves: { startGame: vi.fn() } }
+    const nextClient = { moves: { startGame: vi.fn() } }
+    const operation = {
+      client: sourceClient, generation: 1, matchID: sourceSession.matchID,
+      session: sourceSession, targetPlayerID: '3', token: Symbol('seat-a'),
+    }
+    const operationRef = { current: operation }
+    let currentRoute = {
+      client: sourceClient, generation: 1, matchID: sourceSession.matchID, session: sourceSession,
+    }
+    const pending = deferred<RoomSession>()
+    const setSession = vi.fn()
+    const onSettled = vi.fn()
+    const request = executeRoomSeatChangeOperation({
+      changeSeat: () => pending.promise,
+      getCurrentRoute: () => currentRoute,
+      onError: vi.fn(),
+      onSession: setSession,
+      onSettled,
+      operation,
+      operationRef,
+    })
+
+    currentRoute = {
+      client: nextClient, generation: 2, matchID: nextSession.matchID, session: nextSession,
+    }
+    pending.resolve({ ...sourceSession, playerID: '3' })
+    await request
+
+    expect(setSession).not.toHaveBeenCalled()
+    expect(onSettled).not.toHaveBeenCalled()
+    expect(operationRef.current).toBeNull()
+  })
+})
+
 describe('RoomView connection state', () => {
   it('uses player-facing access and loading copy', () => {
     const accessHtml = renderToStaticMarkup(
@@ -110,7 +422,7 @@ describe('RoomView connection state', () => {
     )
     const loadingHtml = renderRoomView()
 
-    expect(accessHtml).toContain('房间 room-123')
+    expect(accessHtml).toContain('房间 room-12')
     expect(accessHtml).toContain('你尚未加入这个房间')
     expect(accessHtml).toContain('>返回房间列表<')
     expect(accessHtml).toContain('选择一个房间后加入')
@@ -387,7 +699,7 @@ describe('RoomView connection state', () => {
 describe('RoomView viewport sizing', () => {
   it('uses only the dynamic viewport height and suppresses room overscroll', () => {
     const html = renderRoomView()
-    const mainClasses = /<main class="([^"]+)"/.exec(html)?.[1]?.split(' ') ?? []
+    const mainClasses = /<div class="([^"]+)" data-room-shell-variant="game"/.exec(html)?.[1]?.split(' ') ?? []
 
     expect(mainClasses).toContain('h-dvh')
     expect(mainClasses).toContain('overscroll-none')
@@ -396,7 +708,7 @@ describe('RoomView viewport sizing', () => {
 })
 
 describe('RoomView playing layout', () => {
-  it('keeps the players around a round table with the quest board in its center', () => {
+  it('keeps one room screen while its round-table stage is being measured', () => {
     const html = renderRoomView({
       gameState: playingGameState(),
       room: {
@@ -413,8 +725,119 @@ describe('RoomView playing layout', () => {
       },
     })
 
-    expect(html).toContain('aria-label="阿瓦隆游戏圆桌"')
-    expect(html).toContain('aria-label="任务计分板"')
+    expect(html).toContain('aria-label="5 人游戏圆桌"')
+    expect(html).toContain('data-stage-layout-status="measuring"')
+    expect(html).toContain('aria-label="五次任务进度"')
+    expect(html).toContain('data-room-shell-variant="game"')
+    expect(html.match(/data-room-scene="teamProposal"/g)).toHaveLength(1)
+    expect(html.match(/data-room-stage="true"/g)).toHaveLength(1)
+    expect(html).not.toContain('data-room-mode=')
+    expect(html).toContain('请选择 <strong class="text-amber-200">2 名玩家</strong>')
+    expect(html).toContain('已选 <strong class="text-cyan-200">0 / 2</strong>')
+    expect(html).toContain('aria-label="确认队伍"')
     expect(html).not.toContain('>玩家座位<')
+  })
+
+  it('uses the same room screen for the waiting lobby', () => {
+    const state = lobbyGameState()!
+    const html = renderRoomView({
+      gameState: state,
+      room: {
+        gameName: 'avalon', matchID: 'room-123', ownerPlayerID: '0',
+        occupiedPlayerIDs: ['0', '1', '2', '3', '4'],
+        players: [
+          { id: 0, name: 'Alice', isConnected: true }, { id: 1, name: 'Bob', isConnected: true },
+          { id: 2, name: 'Claire', isConnected: true }, { id: 3, name: 'Dylan', isConnected: true },
+          { id: 4, name: 'Eve', isConnected: true },
+        ],
+        roleConfiguration: { percivalMorgana: true }, setupData: { numPlayers: 5 },
+      },
+    })
+
+    expect(html.match(/data-room-scene="lobby"/g)).toHaveLength(1)
+    expect(html).not.toContain('data-room-mode=')
+    expect(html).toContain('>开始游戏<')
+    expect(html).toContain('aria-label="打开帮助说明"')
+  })
+
+  it('keeps lobby room actions in the complete toolbar during connection recovery', () => {
+    const state = lobbyGameState()!
+    state.isConnected = false
+    const html = renderRoomView({ gameState: state, room: fullRoom() })
+
+    expect(html).toContain('data-room-scene="connectionRecovery"')
+    expect(html).toContain('data-room-toolbar-item="room"')
+  })
+
+  it('composes exactly one back control and one complete toolbar outside the observed scene', () => {
+    const html = renderRoomView({ gameState: playingGameState(), room: fullRoom() })
+
+    expect(html.match(/aria-label="返回主页"/g)).toHaveLength(1)
+    expect(html.match(/aria-label="房间工具"/g)).toHaveLength(1)
+    expect(html).toContain('font-sans')
+  })
+
+  it('shows the full live role card only to the role-reveal participant and closes the curtain for others', () => {
+    const state = playingGameState()!
+    state.ctx.phase = 'identityRecognition'
+    state.ctx.activePlayers = { '0': 'identityRecognition' }
+    state.G.identityRecognition = {
+      step: 'roleReveal', deadlineAt: 1000, confirmedCount: 0, participantCount: 5,
+    }
+    state.G.viewer.identityRecognition = {
+      isParticipant: true, confirmed: false, deadlineRefreshRequired: false, serverNow: 0,
+    }
+    const participant = renderRoomView({ gameState: state, room: fullRoom() }, true)
+
+    state.G.viewer = {
+      role: null, loyalty: null, knownEvilPlayerIDs: [], knownMerlinCandidatePlayerIDs: [],
+      identityRecognition: {
+        isParticipant: false, confirmed: false, deadlineRefreshRequired: false, serverNow: 0,
+      },
+    }
+    const nonparticipant = renderRoomView({ gameState: state, room: fullRoom() }, true)
+
+    expect(participant).toContain('data-room-scene="identityRecognition"')
+    expect(participant).toContain('data-curtain-state="lowered"')
+    expect(participant).toContain('data-role-card="merlin"')
+    expect(participant).toContain('data-role-avatar="merlin"')
+    expect(participant).toContain('aria-label="我的身份：梅林"')
+    expect(participant).toContain('本局目标：')
+    expect(participant).toContain('>我已确认身份<')
+    expect(nonparticipant).toContain('data-room-scene="identityRecognition"')
+    expect(nonparticipant).toContain('data-curtain-state="closed"')
+    expect(nonparticipant).toContain('等待参与玩家完成辨认')
+    expect(nonparticipant).not.toContain('data-role-card=')
+    expect(nonparticipant).not.toContain('data-role-avatar=')
+    expect(nonparticipant).not.toContain('你的线索已确认')
+  })
+
+  it('marks only the requested empty seat as pending during a seat change', () => {
+    const html = renderRoomView(
+      {
+        gameState: lobbyGameState(),
+        room: incompleteRoomWithEmptySeat('3'),
+        seatChangeTargetID: '3',
+        startPending: false,
+      },
+      true,
+    )
+
+    expect(html).toContain('data-player-id="3"')
+    expect(html).toContain('data-seat-state="pending"')
+    expect(html).toContain('换座中')
+    expect(html.match(/data-seat-state="pending"/g)).toHaveLength(1)
+  })
+
+  it('keeps the original start label while the pending request disables it', () => {
+    const html = renderRoomView({
+      gameState: lobbyGameState(),
+      room: fullRoom(),
+      seatChangeTargetID: null,
+      startPending: true,
+    })
+
+    expect(html).toContain('>开始游戏<')
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>开始游戏<\/button>/)
   })
 })

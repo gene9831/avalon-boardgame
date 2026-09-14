@@ -48,14 +48,10 @@ test('business dialogs remain centered within a narrow viewport', async ({ page 
   await createGameDialog.getByRole('button', { name: '创建房间' }).click()
   await expect(page).toHaveURL(/\/rooms\/[^/]+$/)
 
-  await page.getByRole('button', { name: '房间操作' }).evaluate((button) => {
-    (button as HTMLButtonElement).click()
-  })
-  const dissolveRoom = page.getByRole('button', { name: '解散房间' })
+  await page.getByRole('button', { name: '房间操作' }).click()
+  const dissolveRoom = page.getByRole('menuitem', { name: '解散房间' })
   await expect(dissolveRoom).toBeVisible()
-  await dissolveRoom.evaluate((button) => {
-    (button as HTMLButtonElement).click()
-  })
+  await dissolveRoom.click()
   await expectCenteredWithinViewport(
     page.getByRole('dialog', { name: '确认解散房间' }),
   )
@@ -85,8 +81,9 @@ test('user center and room log contain focus and restore it after closing', asyn
   await expect(profileTrigger).toBeFocused()
 
   await createRoom(page, 5, 'Keyboard Host')
-  const logTrigger = page.getByRole('button', { name: '查看对局记录' })
+  const logTrigger = page.getByRole('button', { name: '房间操作' })
   await logTrigger.click()
+  await page.getByRole('menuitem', { name: '对局记录' }).click()
   const roomLog = page.getByRole('dialog', { name: '对局记录' })
   const logClose = roomLog.getByRole('button', { name: '关闭对局记录' })
 

@@ -9,17 +9,17 @@ test.describe('browser victory outcomes', () => {
     {
       scenario: 'three-failed-quests',
       heading: '邪恶阵营获胜',
-      reason: '邪恶阵营破坏了三次任务',
+      reason: '破坏 3 次任务',
     },
     {
       scenario: 'assassination-hit',
       heading: '邪恶阵营获胜',
-      reason: '刺客命中了梅林',
+      reason: '刺杀命中梅林：',
     },
     {
       scenario: 'assassination-miss',
       heading: '正义阵营获胜',
-      reason: '刺杀未命中梅林',
+      reason: '刺杀未命中：',
     },
   ] as const) {
     test(`${scenario} settles consistently in five browsers`, async ({ browser }) => {

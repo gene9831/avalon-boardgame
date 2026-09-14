@@ -26,13 +26,13 @@ type PresentedRole =
   | 'minion'
 
 const recognitionViewports = [
-  { width: 320, height: 568 },
+  { width: 375, height: 667 },
   { width: 390, height: 844 },
-  { width: 568, height: 320 },
+  { width: 667, height: 375 },
   { width: 1339, height: 786 },
 ]
 
-async function expectRecognitionControlsAvoidSeats({
+async function expectRecognitionLayerCoversStage({
   page,
   playerCount,
   viewport,
@@ -43,79 +43,44 @@ async function expectRecognitionControlsAvoidSeats({
 }) {
   await page.setViewportSize(viewport)
 
-  const recognitionLayer = page.getByLabel('身份辨认', { exact: true })
-  const questBoard = page.getByLabel('任务计分板', { exact: true })
-  const landscape = viewport.width > viewport.height
+  const recognitionOverlay = page.locator('[data-room-slot="stage-atmosphere"]')
+  const recognitionLayer = page.locator('[data-identity-recognition-atmosphere]')
+  const confirmationButton = page.getByRole('button', { exact: true, name: '我已辨认' })
 
+  await expect(recognitionOverlay).toBeVisible()
   await expect(recognitionLayer).toBeVisible()
-  await expect(recognitionLayer.getByRole('button')).toHaveCount(1)
-  if (landscape) {
-    await expect(questBoard).toBeHidden()
-  } else {
-    await expect(questBoard).toBeVisible()
-  }
+  await expect(recognitionOverlay.getByRole('button')).toHaveCount(0)
+  await expect(confirmationButton).toBeVisible()
 
-  const geometry = await recognitionLayer.evaluate((layer, options) => {
-    const table = document.querySelector(
-      `[aria-label="${options.playerCount} 人游戏圆桌"]`,
-    )
-    const center = table?.querySelector('[data-round-table-center]')
-    const visualSurfaces = options.landscape
-      ? [layer.querySelector('.identity-recognition-responsive-panel')]
-      : [
-          layer.querySelector('.identity-recognition-header'),
-          layer.querySelector('.identity-recognition-confirmation'),
-        ]
-    const surfaces = visualSurfaces.filter((element): element is Element => element !== null)
-    const seatParts = Array.from(
-      table?.querySelectorAll('[data-round-table-avatar], [data-round-table-nameplate]') ?? [],
-    )
-    const intersects = (left: DOMRect, right: DOMRect, tolerance = 1) => (
-      Math.min(left.right, right.right) - Math.max(left.left, right.left) > tolerance
-      && Math.min(left.bottom, right.bottom) - Math.max(left.top, right.top) > tolerance
-    )
-    const centerRect = center?.getBoundingClientRect()
-    const buttonRect = layer.querySelector('button')?.getBoundingClientRect()
+  const geometry = await recognitionOverlay.evaluate((layer) => {
+    const stage = layer.closest('[data-room-slot="stage"]')
+      ?.querySelector('.avalon-room-layout__stage-content')
+    const stageRect = stage?.getBoundingClientRect()
+    const layerRect = layer.getBoundingClientRect()
 
     return {
-      buttonSize: buttonRect === undefined
-        ? null
-        : { height: buttonRect.height, width: buttonRect.width },
-      controlsInsideCenter: centerRect !== undefined && surfaces.every((surface) => {
-        const rect = surface.getBoundingClientRect()
-        return rect.left >= centerRect.left - 1
-          && rect.right <= centerRect.right + 1
-          && rect.top >= centerRect.top - 1
-          && rect.bottom <= centerRect.bottom + 1
-      }),
-      controlSeatOverlaps: surfaces.flatMap((surface, controlIndex) => {
-        const controlRect = surface.getBoundingClientRect()
-        return seatParts.flatMap((seatPart, seatIndex) => (
-          intersects(controlRect, seatPart.getBoundingClientRect())
-            ? [`${controlIndex + 1}:${seatIndex + 1}`]
-            : []
-        ))
-      }),
+      coversStage: stageRect !== undefined
+        && Math.abs(layerRect.left - stageRect.left) <= 1
+        && Math.abs(layerRect.right - stageRect.right) <= 1
+        && Math.abs(layerRect.top - stageRect.top) <= 1
+        && Math.abs(layerRect.bottom - stageRect.bottom) <= 1,
     }
-  }, { landscape, playerCount })
+  })
 
-  expect(geometry.buttonSize).not.toBeNull()
-  expect(geometry.buttonSize!.height).toBeGreaterThanOrEqual(44)
-  expect(geometry.buttonSize!.width).toBeGreaterThanOrEqual(44)
+  const buttonSize = await confirmationButton.evaluate((button) => {
+    const bounds = button.getBoundingClientRect()
+    return { height: bounds.height, width: bounds.width }
+  })
+  expect(buttonSize.height).toBeGreaterThanOrEqual(44)
+  expect(buttonSize.width).toBeGreaterThanOrEqual(44)
   expect(
-    geometry.controlSeatOverlaps,
+    geometry.coversStage,
     `${playerCount} players @ ${viewport.width}x${viewport.height}`,
-  ).toEqual([])
-  if (landscape) {
-    expect(
-      geometry.controlsInsideCenter,
-      `${playerCount} players @ ${viewport.width}x${viewport.height}`,
-    ).toBe(true)
-  }
+  ).toBe(true)
 
 }
 
-test('recognition controls float in portrait and replace the quest board in landscape', async ({
+test('recognition overlay covers the measured stage in every business shell', async ({
   browser,
 }) => {
   test.setTimeout(180_000)
@@ -132,14 +97,14 @@ test('recognition controls float in portrait and replace the quest board in land
       await confirmRecognitionParticipants(harness.pages, 'roleReveal')
 
       const participantIndex = await Promise.all(harness.pages.map(async (page, index) => (
-        await page.locator('[data-identity-step="evilRecognition"][data-curtain-state="raised"]').count() === 1
+        await page.getByRole('button', { exact: true, name: '我已辨认' }).count() === 1
           ? index
           : -1
       ))).then((indices) => indices.find((index) => index >= 0))
       if (participantIndex === undefined) throw new Error('Expected an Evil-recognition participant')
       const responsiveParticipantPage = harness.pages[participantIndex]!
       for (const viewport of recognitionViewports) {
-        await expectRecognitionControlsAvoidSeats({
+        await expectRecognitionLayerCoversStage({
           page: responsiveParticipantPage,
           playerCount,
           viewport,
@@ -159,8 +124,11 @@ test('recognition controls float in portrait and replace the quest board in land
         await confirmRecognitionParticipants(harness.pages, step)
       }
       for (const page of harness.pages) {
-        await expect(page.locator('[data-identity-step="percivalRecognition"]')).toHaveCount(0)
-        await expect(page.locator('[data-identity-step]')).toHaveCount(0)
+        await expect(page.locator('[data-room-screen="true"]')).toHaveAttribute(
+          'data-room-scene',
+          'teamProposal',
+        )
+        await expect(page.locator('[data-identity-recognition-atmosphere]')).toHaveCount(0)
       }
     } finally {
       await harness.close()
@@ -201,13 +169,15 @@ test('players complete the curtain-based identity recognition ceremony', async (
         name: '查看我的身份与已知信息',
       })).toHaveCount(0)
 
-      const headerZIndex = await page.locator('.round-table-header').evaluate(
-        (header) => Number.parseInt(getComputedStyle(header).zIndex, 10) || 0,
-      )
-      const recognitionZIndex = await recognitionLayer.evaluate(
-        (layer) => Number.parseInt(getComputedStyle(layer).zIndex, 10) || 0,
-      )
-      expect(headerZIndex).toBeGreaterThan(recognitionZIndex)
+      const backButton = page.getByRole('button', { name: '返回主页' })
+      expect(await backButton.evaluate((button) => {
+        const bounds = button.getBoundingClientRect()
+        const topmost = document.elementFromPoint(
+          bounds.left + bounds.width / 2,
+          bounds.top + bounds.height / 2,
+        )
+        return topmost === button || button.contains(topmost)
+      })).toBe(true)
     }
     for (const [index, page] of harness.pages.entries()) {
       const role = await page.locator('[data-role-card]').getAttribute('data-role-card')
@@ -231,10 +201,13 @@ test('players complete the curtain-based identity recognition ceremony', async (
 
       if (step !== 'roleReveal') {
         for (const [index, page] of harness.pages.entries()) {
-          await expect(page.locator(`[data-identity-step="${step}"]`)).toHaveAttribute(
-            'data-curtain-state',
-            expectedParticipantIDs.includes(String(index)) ? 'raised' : 'closed',
-          )
+          const confirmation = page.getByRole('button', { exact: true, name: '我已辨认' })
+          if (expectedParticipantIDs.includes(String(index))) {
+            await expect(confirmation).toBeVisible()
+          } else {
+            await expect(confirmation).toHaveCount(0)
+            await expect(page.locator('[data-identity-recognition-label]')).toHaveCount(0)
+          }
         }
       }
 
@@ -243,8 +216,7 @@ test('players complete the curtain-based identity recognition ceremony', async (
           (_, index) => !expectedParticipantIDs.includes(String(index)),
         )
         if (nonParticipantPage === undefined) throw new Error('Expected an Evil-recognition nonparticipant')
-        const closedCurtain = nonParticipantPage.locator('[data-curtain-state="closed"]')
-        await expect(closedCurtain).toHaveCSS('animation-name', 'none')
+        await expect(nonParticipantPage.locator('[data-identity-recognition-atmosphere]')).toHaveCount(0)
         const backButton = nonParticipantPage.getByRole('button', { name: '返回主页' })
         await expect(backButton).toBeVisible()
         expect(await backButton.evaluate((button) => {
@@ -255,15 +227,15 @@ test('players complete the curtain-based identity recognition ceremony', async (
           )
           return topmost === button || button.contains(topmost)
         })).toBe(true)
-        await expect(
-          harness.pages[Number(expectedParticipantIDs[0])]
-            .locator('[data-known-player-info]'),
-        ).toHaveCount(1)
+        const evilPage = harness.pages[Number(expectedParticipantIDs[0])]
+        await expect(evilPage.locator('[data-identity-recognition-label][data-recognition-tone="ally"]'))
+          .toHaveCount(expectedParticipantIDs.length - 1)
       }
 
       if (step === 'merlinRecognition') {
         await expect(
-          harness.pages[Number(expectedParticipantIDs[0])].locator('[data-known-player-info]'),
+          harness.pages[Number(expectedParticipantIDs[0])]
+            .locator('[data-identity-recognition-label][data-recognition-tone="evil"]'),
         ).toHaveCount(2)
       }
 
@@ -273,7 +245,9 @@ test('players complete the curtain-based identity recognition ceremony', async (
           .filter(([, role]) => role === 'merlin' || role === 'morgana')
           .map(([playerID]) => playerID)
           .sort()
-        const candidateBadges = percivalPage.getByLabel('Merlin 候选', { exact: true })
+        const candidateBadges = percivalPage.locator(
+          '[data-identity-recognition-label][data-recognition-tone="candidate"]',
+        )
         await expect(candidateBadges).toHaveCount(2)
         const markedPlayerIDs = await candidateBadges.evaluateAll((badges) => badges.map((badge) => (
           badge.closest('[data-player-id]')?.getAttribute('data-player-id') ?? ''
@@ -281,7 +255,8 @@ test('players complete the curtain-based identity recognition ceremony', async (
         expect(markedPlayerIDs).toEqual(candidateIDs)
         for (const [index, page] of harness.pages.entries()) {
           if (String(index) === expectedParticipantIDs[0]) continue
-          await expect(page.getByLabel('Merlin 候选', { exact: true })).toHaveCount(0)
+          await expect(page.locator('[data-identity-recognition-label][data-recognition-tone="candidate"]'))
+            .toHaveCount(0)
         }
       }
 
@@ -295,7 +270,10 @@ test('players complete the curtain-based identity recognition ceremony', async (
     const percivalID = Array.from(roleByPlayer.entries()).find(([, role]) => role === 'percival')?.[0]
     if (percivalID === undefined) throw new Error('Expected Percival in paired-role room')
     for (const page of harness.pages) {
-      await expect(page.locator('[data-identity-step]')).toHaveCount(0)
+      await expect(page.locator('[data-room-screen="true"]')).toHaveAttribute(
+        'data-room-scene',
+        'teamProposal',
+      )
       await expect(page.getByRole('button', {
         name: '查看我的身份与已知信息',
       })).toBeVisible()
@@ -308,7 +286,6 @@ test('players complete the curtain-based identity recognition ceremony', async (
       name: '查看我的身份与已知信息',
     }).click()
     await expect(percivalPage.getByLabel('Merlin 候选', { exact: true })).toHaveCount(2)
-    await expect(percivalPage.getByRole('button', { name: /Merlin 候选/ })).toHaveCount(2)
     await percivalPage.getByRole('button', {
       name: '隐藏我的身份与已知信息',
     }).click()
@@ -334,26 +311,19 @@ test('players complete the curtain-based identity recognition ceremony', async (
     }).click()
     const evilAvatar = evilPage.locator('#current-player-avatar')
     const evilSeat = evilAvatar.locator('xpath=ancestor::*[@data-round-table-player]')
-    await expect(evilPage.getByLabel('任务计分板', { exact: true })).toBeVisible()
+    await expect(evilPage.getByLabel('五次任务进度', { exact: true })).toBeVisible()
     await expect(evilPage.locator('[data-role-card]')).toHaveCount(0)
     await expect(evilAvatar.locator('[data-role-avatar]')).toBeVisible()
-    await expect(evilSeat.locator('[data-current-role-label]')).toBeVisible()
     const evilSeatGeometryAfter = await evilSeat.evaluate((seat) => {
       const avatar = seat.querySelector('[data-round-table-avatar]')!.getBoundingClientRect()
       const nameplate = seat.querySelector('[data-round-table-nameplate]')!.getBoundingClientRect()
-      const roleLabel = seat.querySelector('[data-current-role-label]')!.getBoundingClientRect()
       return {
         avatar: [avatar.x, avatar.y, avatar.width, avatar.height],
-        labelTop: roleLabel.top,
         nameplate: [nameplate.x, nameplate.y, nameplate.width, nameplate.height],
-        nameplateBottom: nameplate.bottom,
       }
     })
     expect(evilSeatGeometryAfter.avatar).toEqual(evilSeatGeometryBefore.avatar)
     expect(evilSeatGeometryAfter.nameplate).toEqual(evilSeatGeometryBefore.nameplate)
-    expect(evilSeatGeometryAfter.labelTop).toBeGreaterThanOrEqual(
-      evilSeatGeometryAfter.nameplateBottom + 1,
-    )
     await expect(evilPage.locator('[data-known-player-info]')).toHaveCount(1)
     await evilPage.keyboard.press('Escape')
     await expect(evilAvatar.locator('[data-role-avatar]')).toBeVisible()
@@ -397,7 +367,7 @@ test('players complete the curtain-based identity recognition ceremony', async (
       name: '查看我的身份与已知信息',
     }).click()
     await expect(leaderPage.locator('#current-player-avatar [data-role-avatar]')).toBeVisible()
-    await expect(leaderPage.getByLabel('任务计分板', { exact: true })).toBeVisible()
+    await expect(leaderPage.getByLabel('五次任务进度', { exact: true })).toBeVisible()
     await expect(preservedSeat).toBeEnabled()
     await expect(preservedSeat).toHaveAttribute('aria-pressed', 'true')
 
@@ -407,7 +377,8 @@ test('players complete the curtain-based identity recognition ceremony', async (
       }).click()
     }
     await leaderPage.getByRole('button', {
-      name: `确认队伍 ${proposalTeam.length}/${proposalTeam.length}`,
+      exact: true,
+      name: '确认队伍',
     }).click()
 
     await harness.dispatch({
@@ -434,7 +405,7 @@ test('players complete the curtain-based identity recognition ceremony', async (
       })
     }
     await expect(submittedVotePage.locator('#current-player-avatar [data-role-avatar]')).toBeVisible()
-    await expect(submittedVotePage.getByLabel('任务计分板', { exact: true })).toBeVisible()
+    await expect(submittedVotePage.getByLabel('五次任务进度', { exact: true })).toBeVisible()
     expect(consoleErrors).toEqual([])
   } finally {
     await harness.close()

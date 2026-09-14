@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -48,8 +49,25 @@ import { classifyJoinError } from './join-error'
 import { LobbyView } from './LobbyView'
 import { RoomDevTools } from './RoomDevTools'
 import { RoomExitDialog } from './RoomExitDialog'
-import { RoomGamePanel } from './RoomGamePanel'
-import { RoomLobbyPanel } from './RoomLobbyPanel'
+import { formatRoomID } from './room-id'
+import { RoomLayoutBasePreview, RoomLayoutPreview } from './RoomLayoutPreview'
+import { RoomIdentityConfirmationPreview } from './RoomIdentityConfirmationPreview'
+import { RoomIdentityRecognitionPreview } from './RoomIdentityRecognitionPreview'
+import { RoomAssassinationPreview } from './RoomAssassinationPreview'
+import { RoomLobbyPreview } from './RoomLobbyPreview'
+import { RoomLoadingPreview } from './RoomLoadingPreview'
+import { RoomQuestPreview } from './RoomQuestPreview'
+import { RoomResultPreview } from './RoomResultPreview'
+import { RoomBackButton } from './RoomBackButton'
+import { ObservedRoomScreen } from './ObservedRoomScreen'
+import { RoomUtilities } from './RoomUtilities'
+import { RoomTeamProposalPreview } from './RoomTeamProposalPreview'
+import { RoomTeamVotePreview } from './RoomTeamVotePreview'
+import { useRoomScreenController } from './room-screen-controller'
+import {
+  resolveRoomLayoutDiagnosticsMode,
+  setRoomLayoutDiagnosticsMode,
+} from './room-layout-diagnostics'
 import {
   dissolveRoom,
   changeRoomSeat,
@@ -82,7 +100,6 @@ import {
   savePlayerProfile,
   type PlayerProfile,
 } from './player-profile'
-import { getSeatAvatarID } from './seat-avatar'
 import {
   buildGameLogEntries,
   buildPresenceLogChanges,
@@ -123,6 +140,135 @@ export const BOARDGAME_CLIENT_DEBUG = false as const
 type AvalonRawClientState = NonNullable<ReturnType<AvalonClient['getState']>>
 type AvalonClientState = Omit<AvalonRawClientState, 'G'> & {
   G: AvalonPlayerView
+}
+
+type CurrentRoomRouteSnapshot<Client> = Readonly<{
+  client: Client | null
+  generation: number
+  matchID: string
+  session: RoomSession | null
+}>
+
+type RoomRouteOperation<Client> = Omit<CurrentRoomRouteSnapshot<Client>, 'client' | 'session'> & Readonly<{
+  client: Client
+  session: RoomSession
+  token: symbol
+}>
+
+type RoomStartOperation<Client> = RoomRouteOperation<Client> & Readonly<{
+  startGame: () => unknown
+}>
+
+type RoomSeatChangeOperation<Client> = RoomRouteOperation<Client> & Readonly<{
+  targetPlayerID: PlayerID
+}>
+
+type OperationRef<Operation> = { current: Operation | null }
+
+function isSameRoomRouteSession(
+  current: RoomSession | null,
+  expected: RoomSession,
+) {
+  return current?.matchID === expected.matchID &&
+    current.playerID === expected.playerID &&
+    current.credentials === expected.credentials &&
+    current.sessionID === expected.sessionID
+}
+
+function doesRoomRouteMatchOperation<Client, Operation extends RoomRouteOperation<Client>>(
+  current: CurrentRoomRouteSnapshot<Client>,
+  operation: Operation,
+) {
+  return current.generation === operation.generation &&
+    current.matchID === operation.matchID &&
+    current.client === operation.client &&
+    isSameRoomRouteSession(current.session, operation.session)
+}
+
+function isRoomRouteOperationCurrent<Client, Operation extends RoomRouteOperation<Client>>(
+  current: CurrentRoomRouteSnapshot<Client>,
+  operation: Operation,
+  operationRef: OperationRef<Operation>,
+) {
+  return operationRef.current?.token === operation.token &&
+    doesRoomRouteMatchOperation(current, operation)
+}
+
+// oxlint-disable-next-line react/only-export-components
+export async function executeRoomStartOperation<Client>({
+  getCurrentRoute,
+  onError,
+  onSettled,
+  operation,
+  operationRef,
+  prepareStart,
+}: {
+  getCurrentRoute: () => CurrentRoomRouteSnapshot<Client>
+  onError: (error: unknown) => void
+  onSettled: () => void
+  operation: RoomStartOperation<Client>
+  operationRef: OperationRef<RoomStartOperation<Client>>
+  prepareStart: () => Promise<unknown>
+}) {
+  try {
+    await prepareStart()
+    if (!isRoomRouteOperationCurrent(getCurrentRoute(), operation, operationRef)) return
+    operation.startGame()
+  } catch (error) {
+    if (isRoomRouteOperationCurrent(getCurrentRoute(), operation, operationRef)) {
+      onError(error)
+    }
+  } finally {
+    if (operationRef.current?.token === operation.token) {
+      const routeStillCurrent = doesRoomRouteMatchOperation(
+        getCurrentRoute(),
+        operation,
+      )
+      operationRef.current = null
+      if (routeStillCurrent) onSettled()
+    }
+  }
+}
+
+// oxlint-disable-next-line react/only-export-components
+export async function executeRoomSeatChangeOperation<Client>({
+  changeSeat: requestSeatChange,
+  getCurrentRoute,
+  onError,
+  onSession,
+  onSettled,
+  operation,
+  operationRef,
+}: {
+  changeSeat: () => Promise<RoomSession>
+  getCurrentRoute: () => CurrentRoomRouteSnapshot<Client>
+  onError: (error: unknown) => void
+  onSession: (session: RoomSession) => void
+  onSettled: () => void
+  operation: RoomSeatChangeOperation<Client>
+  operationRef: OperationRef<RoomSeatChangeOperation<Client>>
+}) {
+  try {
+    const nextSession = await requestSeatChange()
+    if (!isRoomRouteOperationCurrent(getCurrentRoute(), operation, operationRef)) return
+    onSession(nextSession)
+  } catch (error) {
+    if (isRoomRouteOperationCurrent(getCurrentRoute(), operation, operationRef)) {
+      onError(error)
+    }
+  } finally {
+    if (
+      operationRef.current?.token === operation.token &&
+      operationRef.current.targetPlayerID === operation.targetPlayerID
+    ) {
+      const routeStillCurrent = doesRoomRouteMatchOperation(
+        getCurrentRoute(),
+        operation,
+      )
+      operationRef.current = null
+      if (routeStillCurrent) onSettled()
+    }
+  }
 }
 
 function roomInvalidationNotice(error: unknown) {
@@ -268,6 +414,25 @@ function AppRoutes() {
       <Routes>
         <Route element={<LobbyRoute onSaveProfile={handleSaveProfile} profile={profile} />} path="/" />
         <Route element={<RoomRoute onSaveProfile={handleSaveProfile} profile={profile} />} path="/rooms/:matchID" />
+        {import.meta.env.DEV && <Route element={<RoomLayoutPreview />} path="/dev/room-layout" />}
+        {import.meta.env.DEV && <Route element={<RoomLoadingPreview />} path="/dev/room-layout/loading" />}
+        {import.meta.env.DEV && <Route element={<RoomLayoutBasePreview />} path="/dev/room-layout/base" />}
+        {import.meta.env.DEV && <Route element={<RoomIdentityConfirmationPreview />} path="/dev/room-layout/identity-confirmation" />}
+        {import.meta.env.DEV && <Route element={<RoomIdentityConfirmationPreview />} path="/dev/room-layout/identity-confirmation/:scenarioID" />}
+        {import.meta.env.DEV && <Route element={<RoomIdentityRecognitionPreview />} path="/dev/room-layout/identity-recognition" />}
+        {import.meta.env.DEV && <Route element={<RoomIdentityRecognitionPreview />} path="/dev/room-layout/identity-recognition/:scenarioID" />}
+        {import.meta.env.DEV && <Route element={<RoomLobbyPreview />} path="/dev/room-layout/lobby" />}
+        {import.meta.env.DEV && <Route element={<RoomLobbyPreview />} path="/dev/room-layout/lobby/:scenarioID" />}
+        {import.meta.env.DEV && <Route element={<RoomTeamProposalPreview />} path="/dev/room-layout/team-proposal" />}
+        {import.meta.env.DEV && <Route element={<RoomTeamProposalPreview />} path="/dev/room-layout/team-proposal/:scenarioID" />}
+        {import.meta.env.DEV && <Route element={<RoomTeamVotePreview />} path="/dev/room-layout/team-vote" />}
+        {import.meta.env.DEV && <Route element={<RoomTeamVotePreview />} path="/dev/room-layout/team-vote/:scenarioID" />}
+        {import.meta.env.DEV && <Route element={<RoomQuestPreview />} path="/dev/room-layout/quest" />}
+        {import.meta.env.DEV && <Route element={<RoomQuestPreview />} path="/dev/room-layout/quest/:scenarioID" />}
+        {import.meta.env.DEV && <Route element={<RoomAssassinationPreview />} path="/dev/room-layout/assassination" />}
+        {import.meta.env.DEV && <Route element={<RoomAssassinationPreview />} path="/dev/room-layout/assassination/:scenarioID" />}
+        {import.meta.env.DEV && <Route element={<RoomResultPreview />} path="/dev/room-layout/result" />}
+        {import.meta.env.DEV && <Route element={<RoomResultPreview />} path="/dev/room-layout/result/:scenarioID" />}
         <Route element={<Navigate replace to="/" />} path="*" />
       </Routes>
     </BrowserRouter>
@@ -430,7 +595,7 @@ function LobbyRoute({
 
   const handleDeleteRoom = async (matchID: string) => {
     if (!devToolsEnabled || devToken.length === 0) return
-    if (!window.confirm(`确定删除房间 ${matchID} 吗？`)) return
+    if (!window.confirm(`确定删除房间 ${formatRoomID(matchID)} 吗？`)) return
 
     await runDevTool(async () => {
       await devTools.deleteRoom(matchID, devToken)
@@ -502,7 +667,12 @@ function RoomRoute({
   const [gameState, setGameState] = useState<AvalonClientState | null>(null)
   const [roomExitDialogOpen, setRoomExitDialogOpen] = useState(false)
   const [roomExitBusy, setRoomExitBusy] = useState(false)
-  const [seatChangePending, setSeatChangePending] = useState(false)
+  const [seatChangeTargetID, setSeatChangeTargetID] = useState<PlayerID | null>(null)
+  const startOperationRef = useRef<RoomStartOperation<AvalonClient> | null>(null)
+  const seatChangeOperationRef = useRef<RoomSeatChangeOperation<AvalonClient> | null>(null)
+  const currentMatchIDRef = useRef(matchID)
+  const currentRouteSessionRef = useRef<RoomSession | null>(null)
+  const [startPending, setStartPending] = useState(false)
   const [seatTransitionRevision, setSeatTransitionRevision] = useState(0)
   const [, setSeatTransitionGuardRevision] = useState(0)
   const seatTransitionChangeRevisionRef = useRef(0)
@@ -608,8 +778,26 @@ function RoomRoute({
   }, [matchID])
 
   const routeSession = session?.matchID === matchID ? session : null
-  const persistedSeatTransitionPending = routeSession !== null &&
-    loadSeatTransition(matchID) !== null
+  const getCurrentRoomRoute = () => ({
+    client: clientRef.current,
+    generation: routeGenerationRef.current,
+    matchID: currentMatchIDRef.current,
+    session: currentRouteSessionRef.current,
+  })
+  useLayoutEffect(() => {
+    currentMatchIDRef.current = matchID
+    currentRouteSessionRef.current = routeSession
+    startOperationRef.current = null
+    seatChangeOperationRef.current = null
+    setSeatChangeTargetID(null)
+    setStartPending(false)
+  }, [matchID, routeSession])
+  const persistedSeatTransition = routeSession === null
+    ? null
+    : loadSeatTransition(matchID)
+  const effectiveSeatChangeTargetID =
+    seatChangeTargetID ?? persistedSeatTransition?.targetPlayerID ?? null
+  const seatChangePending = effectiveSeatChangeTargetID !== null
 
   useEffect(() => {
     const handleRoomSessionStorage = (event: StorageEvent) => {
@@ -783,6 +971,10 @@ function RoomRoute({
 
     return () => {
       active = false
+      startOperationRef.current = null
+      seatChangeOperationRef.current = null
+      setSeatChangeTargetID(null)
+      setStartPending(false)
       if (isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) {
         routeGenerationRef.current += 1
       }
@@ -793,62 +985,121 @@ function RoomRoute({
   }, [invalidateSession, lobby, matchID, pushToast, refreshRoom, roomParticipation, routeSession, seatTransitionRevision])
 
   const handleStart = async () => {
-    if (gameState?.isActive !== true || routeSession === null || gameState.G.lobby.ownerPlayerID !== routeSession.playerID) return
-    try {
-      await roomParticipation.prepareStart(matchID, routeSession.playerID, routeSession.credentials)
-      clientRef.current?.moves.startGame()
-    } catch (error) {
-      pushToast({ message: getStartErrorMessage(error), tone: 'error' })
+    const targetPlayerCount = room === null ? null : getMatchPlayerCount(room)
+    const occupiedCount = room === null ? 0 : getOccupiedPlayerIDs(room).length
+    const sourceClient = clientRef.current
+    if (
+      startOperationRef.current !== null ||
+      gameState?.isActive !== true ||
+      gameState.isConnected !== true ||
+      gameState.ctx.phase !== 'lobby' ||
+      routeSession === null ||
+      sourceClient === null ||
+      room?.ownerPlayerID !== routeSession.playerID ||
+      targetPlayerCount === null ||
+      occupiedCount !== targetPlayerCount
+    ) return
+    const operation: RoomStartOperation<AvalonClient> = {
+      client: sourceClient,
+      generation: routeGenerationRef.current,
+      matchID,
+      session: routeSession,
+      startGame: () => sourceClient.moves.startGame(),
+      token: Symbol('room-start'),
     }
+    startOperationRef.current = operation
+    setStartPending(true)
+    await executeRoomStartOperation({
+      getCurrentRoute: getCurrentRoomRoute,
+      onError: (error) => {
+        pushToast({ message: getStartErrorMessage(error), tone: 'error' })
+      },
+      onSettled: () => setStartPending(false),
+      operation,
+      operationRef: startOperationRef,
+      prepareStart: () => roomParticipation.prepareStart(
+        operation.matchID,
+        operation.session.playerID,
+        operation.session.credentials,
+      ),
+    })
   }
 
-  const handleChangeSeat = async (targetPlayerID: string) => {
+  const handleChangeSeat = async (targetPlayerID: PlayerID) => {
+    const sourceClient = clientRef.current
     if (
       routeSession === null ||
+      sourceClient === null ||
       gameState?.ctx.phase !== 'lobby' ||
       seatChangePending ||
+      seatChangeOperationRef.current !== null ||
       loadSeatTransition(routeSession.matchID) !== null ||
       targetPlayerID === routeSession.playerID
     ) return
-    setSeatChangePending(true)
-    try {
-      const nextSession = await changeRoomSeat(roomParticipation, routeSession, targetPlayerID)
-      setSession(nextSession)
-    } catch (error) {
-      pushToast({ message: getSeatChangeErrorMessage(error), tone: 'error' })
-    } finally {
-      setSeatChangePending(false)
+    const operation: RoomSeatChangeOperation<AvalonClient> = {
+      client: sourceClient,
+      generation: routeGenerationRef.current,
+      matchID,
+      session: routeSession,
+      targetPlayerID,
+      token: Symbol('room-seat-change'),
     }
+    seatChangeOperationRef.current = operation
+    setSeatChangeTargetID(targetPlayerID)
+    await executeRoomSeatChangeOperation({
+      changeSeat: () => changeRoomSeat(
+        roomParticipation,
+        operation.session,
+        operation.targetPlayerID,
+      ),
+      getCurrentRoute: getCurrentRoomRoute,
+      onError: (error) => {
+        pushToast({ message: getSeatChangeErrorMessage(error), tone: 'error' })
+      },
+      onSession: setSession,
+      onSettled: () => {
+        setSeatChangeTargetID((currentTarget) => (
+          currentTarget === operation.targetPlayerID ? null : currentTarget
+        ))
+      },
+      operation,
+      operationRef: seatChangeOperationRef,
+    })
   }
 
   const handleProposeTeam = (team: PlayerID[]) => {
-    if (gameState?.isActive) {
-      clientRef.current?.moves.proposeTeam(team)
+    if (!gameState?.isActive || clientRef.current === null) {
+      throw new Error('Team proposal client is unavailable')
     }
+    clientRef.current.moves.proposeTeam(team)
   }
 
   const handleCastTeamVote = (vote: TeamVote) => {
-    if (gameState?.isActive) {
-      clientRef.current?.moves.castTeamVote(vote)
+    if (!gameState?.isActive || clientRef.current === null) {
+      throw new Error('Team vote client is unavailable')
     }
+    clientRef.current.moves.castTeamVote(vote)
   }
 
   const handleConfirmIdentityRecognition = () => {
-    if (gameState?.isActive) {
-      clientRef.current?.moves.confirmIdentityRecognition()
+    if (!gameState?.isActive || clientRef.current === null) {
+      throw new Error('Identity recognition client is unavailable')
     }
+    clientRef.current.moves.confirmIdentityRecognition()
   }
 
   const handlePlayQuestCard = (card: QuestCard) => {
-    if (gameState?.isActive) {
-      clientRef.current?.moves.playQuestCard(card)
+    if (!gameState?.isActive || clientRef.current === null) {
+      throw new Error('Quest card client is unavailable')
     }
+    clientRef.current.moves.playQuestCard(card)
   }
 
   const handleAssassinate = (targetID: PlayerID) => {
-    if (gameState?.isActive) {
-      clientRef.current?.moves.assassinate(targetID)
+    if (!gameState?.isActive || clientRef.current === null) {
+      throw new Error('Assassination client is unavailable')
     }
+    clientRef.current.moves.assassinate(targetID)
   }
 
   const handleReconnect = () => {
@@ -877,7 +1128,7 @@ function RoomRoute({
         gameState?.ctx.phase,
         roomExitBusy,
         seatChangePending,
-        loadSeatTransition(routeSession.matchID) !== null,
+        persistedSeatTransition !== null,
       )
     ) return
 
@@ -898,7 +1149,7 @@ function RoomRoute({
         gameState.ctx.phase,
         roomExitBusy,
         seatChangePending,
-        loadSeatTransition(routeSession.matchID) !== null,
+        persistedSeatTransition !== null,
       )
     ) return
 
@@ -992,7 +1243,7 @@ function RoomRoute({
     return <RoomAccessView matchID={matchID} onBackHome={() => navigate('/')} />
   }
 
-  const roomExitBlocked = seatChangePending || persistedSeatTransitionPending
+  const roomExitBlocked = startPending || seatChangePending
 
   return (
     <>
@@ -1017,8 +1268,9 @@ function RoomRoute({
         room={room}
         roomExitBlocked={roomExitBlocked}
         roomExitBusy={roomExitBusy}
-        seatChangePending={seatChangePending || persistedSeatTransitionPending}
+        seatChangeTargetID={effectiveSeatChangeTargetID}
         session={routeSession}
+        startPending={startPending}
       />
       <RoomExitDialog
         busy={roomExitBusy}
@@ -1039,7 +1291,7 @@ export function RoomAccessView({
   onBackHome: () => void
 }) {
   return (
-    <PageShell eyebrow={`房间 ${matchID}`} title="进入房间">
+    <PageShell eyebrow={`房间 ${formatRoomID(matchID)}`} title="进入房间">
       <section className="mx-auto max-w-xl rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8">
         <p className="text-sm leading-6 text-slate-300">
           你尚未加入这个房间。请返回房间列表，选择一个房间后加入。
@@ -1053,35 +1305,6 @@ export function RoomAccessView({
         </button>
       </section>
     </PageShell>
-  )
-}
-
-function RoomLoadingContent({
-  matchID,
-  onBackHome,
-}: {
-  matchID: string
-  onBackHome: () => void
-}) {
-  return (
-    <section className="flex h-full min-h-0 items-center justify-center overflow-hidden rounded-3xl border border-white/10 bg-white/[0.06] p-4 shadow-2xl shadow-black/20 backdrop-blur sm:p-8">
-      <div className="w-full max-w-xl rounded-3xl border border-white/10 bg-slate-950/35 p-6 sm:p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-300">
-          房间 {matchID}
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">正在进入房间</h1>
-        <p className="text-sm leading-6 text-slate-300">
-          正在准备游戏，请稍候。
-        </p>
-        <button
-          className="mt-6 rounded-xl border border-white/15 px-4 py-3 font-semibold text-slate-200 transition hover:border-amber-300/60 hover:text-white"
-          onClick={onBackHome}
-          type="button"
-        >
-          返回主页
-        </button>
-      </div>
-    </section>
   )
 }
 
@@ -1106,8 +1329,9 @@ export interface RoomViewProps {
   room: AvalonMatch | null
   roomExitBlocked: boolean
   roomExitBusy: boolean
-  seatChangePending: boolean
+  seatChangeTargetID: PlayerID | null
   session: RoomSession
+  startPending: boolean
 }
 
 export function RoomView({
@@ -1126,133 +1350,138 @@ export function RoomView({
   onStart,
   onDeleteRoom,
   onKickPlayer,
-  onSaveProfile,
-  profile,
   room,
   roomExitBusy,
   roomExitBlocked,
-  seatChangePending,
+  seatChangeTargetID,
   session,
+  startPending,
 }: RoomViewProps) {
+  const { pushToast } = useToast()
+  const [layoutDiagnosticsMode, setLayoutDiagnosticsMode] = useState(() =>
+    resolveRoomLayoutDiagnosticsMode(
+      typeof window === 'undefined' ? '' : window.location.search,
+      import.meta.env.DEV,
+    ),
+  )
   const connected = gameState?.isConnected === true
   const logEntries = useRoomLogEntries(room, gameState)
   const {
     beginManualReconnect,
     manualReconnectAvailable,
   } = useDelayedManualReconnect(connected, gameState !== null)
+  const manualReconnectRequestedRef = useRef(false)
   const handleManualReconnect = useCallback(() => {
+    manualReconnectRequestedRef.current = true
     beginManualReconnect()
     onReconnect()
   }, [beginManualReconnect, onReconnect])
-
-  if (room === null || gameState === null) {
-    return (
-      <ImmersiveLobbyShell developmentControls={null}>
-        <RoomLoadingContent
-          matchID={session.matchID}
-          onBackHome={onBackHome}
-        />
-      </ImmersiveLobbyShell>
-    )
-  }
-
-  const numPlayers = getMatchPlayerCount(room)
-  const occupiedPlayerIDs = getOccupiedPlayerIDs(room)
-  const isFull = occupiedPlayerIDs.length === numPlayers
-  const phase = gameState?.ctx.phase
+  useEffect(() => {
+    manualReconnectRequestedRef.current = false
+  }, [session.credentials, session.matchID, session.playerID])
+  useEffect(() => {
+    if (!connected || !manualReconnectRequestedRef.current) return
+    manualReconnectRequestedRef.current = false
+    pushToast({ message: '已重新连接房间。', tone: 'success' })
+  }, [connected, pushToast])
+  const numPlayers = room === null ? null : getMatchPlayerCount(room)
+  const occupiedPlayerIDs = room === null ? [] : getOccupiedPlayerIDs(room)
+  const isFull = numPlayers !== null && occupiedPlayerIDs.length === numPlayers
+  const phase = gameState?.ctx.phase ?? 'loading'
   const activeStage = gameState?.ctx.activePlayers?.[session.playerID]
   const canStart =
     connected &&
     gameState?.isActive === true &&
-    room.ownerPlayerID === session.playerID &&
+    room?.ownerPlayerID === session.playerID &&
     phase === 'lobby' &&
     isFull
-  const currentRoomPlayer = room.players.find(
-    ({ id }) => String(id) === session.playerID,
-  )
-  const roomProfile: PlayerProfile = {
-    avatarID: getSeatAvatarID(
-      currentRoomPlayer?.data,
-      Number(session.playerID),
-    ),
-    name: currentRoomPlayer?.name ?? session.playerName ?? profile.name,
-  }
+  const controller = useRoomScreenController({
+    activeStage,
+    canStart,
+    connected,
+    currentPlayerID: session.playerID,
+    game: gameState?.G ?? null,
+    manualReconnectAvailable,
+    matchID: session.matchID,
+    onAssassinate,
+    onCastTeamVote,
+    onChangeSeat,
+    onConfirmIdentityRecognition,
+    onPlayQuestCard,
+    onProposeTeam,
+    onAssassinationSubmissionError: () => pushToast({ message: '确认刺杀失败，请重试。', tone: 'error' }),
+    onIdentityRecognitionSubmissionError: () => pushToast({ message: '确认身份辨认失败，请重试。', tone: 'error' }),
+    onQuestCardSubmissionError: () => pushToast({ message: '确认任务牌失败，请重试。', tone: 'error' }),
+    onTeamSubmissionError: () => pushToast({ message: '确认队伍失败，请重试。', tone: 'error' }),
+    onTeamVoteSubmissionError: () => pushToast({ message: '确认投票失败，请重试。', tone: 'error' }),
+    onReconnect: handleManualReconnect,
+    onStart,
+    phase,
+    room,
+    seatChangeTargetID,
+    startPending,
+  })
+  const handleLayoutDiagnosticsModeChange = useCallback((mode: typeof layoutDiagnosticsMode) => {
+    setLayoutDiagnosticsMode(mode)
+    if (typeof window === 'undefined') return
+    const nextURL = setRoomLayoutDiagnosticsMode(new URL(window.location.href), mode)
+    window.history.replaceState(window.history.state, '', nextURL)
+  }, [])
 
-  if (phase === 'lobby') {
-    return (
-      <ImmersiveLobbyShell
-        developmentControls={(
-          <RoomDevTools
-            matchID={room.matchID}
-            onClearLocalSession={onClearLocalSession}
-            onDeleteRoom={onDeleteRoom}
-            onKickPlayer={onKickPlayer}
-            phase={phase}
-            players={room.players}
-          />
-        )}
-      >
-        <RoomLobbyPanel
-          canStart={canStart}
-          connected={connected}
-          currentPlayerID={session.playerID}
-          manualReconnectAvailable={manualReconnectAvailable}
-          logEntries={logEntries}
-          matchID={room.matchID}
-          numPlayers={numPlayers}
-          occupiedPlayerIDs={occupiedPlayerIDs}
-          ownerPlayerID={room.ownerPlayerID}
-          onBackHome={onBackHome}
-          onChangeSeat={onChangeSeat}
-          onReconnect={handleManualReconnect}
-          onOpenHelp={() => onOpenHelp(numPlayers)}
-          onRequestRoomExit={onRequestRoomExit}
-          onStart={onStart}
-          onSaveProfile={onSaveProfile}
-          players={room.players}
-          profile={roomProfile}
-          roomExitBusy={roomExitBusy}
-          roomExitBlocked={roomExitBlocked}
-          seatChangePending={seatChangePending}
-        />
-      </ImmersiveLobbyShell>
-    )
-  }
+  const utilityModel = {
+    variant: gameState === null || room === null
+      ? 'loading'
+      : gameState.G.status === 'lobby'
+        ? 'lobby'
+        : 'game',
+    showRoomExit:
+      gameState?.G.status === 'lobby' ||
+      gameState?.G.status === 'finished',
+    showIdentityKnowledge:
+      gameState?.G.status === 'playing' &&
+      controller.binding.scene.kind !== 'identityRecognition' &&
+      controller.binding.scene.kind !== 'connectionRecovery',
+    roleKnowledgeOpen: controller.roleKnowledgeOpen,
+  } as const
 
   return (
     <ImmersiveLobbyShell
+      variant="game"
       developmentControls={(
         <RoomDevTools
-          matchID={room.matchID}
+          matchID={session.matchID}
+          layoutDiagnosticsMode={layoutDiagnosticsMode}
           onClearLocalSession={onClearLocalSession}
           onDeleteRoom={onDeleteRoom}
           onKickPlayer={onKickPlayer}
+          onLayoutDiagnosticsModeChange={handleLayoutDiagnosticsModeChange}
           phase={phase}
-          players={room.players}
+          players={room?.players ?? []}
         />
       )}
     >
-      <RoomGamePanel
-        activeStage={activeStage}
-        connected={connected}
-        game={gameState.G}
-        manualReconnectAvailable={manualReconnectAvailable}
-        logEntries={logEntries}
-        matchID={room.matchID}
-        onAssassinate={onAssassinate}
-        onBackHome={onBackHome}
-        onCastTeamVote={onCastTeamVote}
-        onConfirmIdentityRecognition={onConfirmIdentityRecognition}
-        onPlayQuestCard={onPlayQuestCard}
-        onProposeTeam={onProposeTeam}
-        onOpenHelp={() => onOpenHelp(numPlayers)}
-        onReconnect={handleManualReconnect}
-        onSaveProfile={onSaveProfile}
-        phase={phase ?? 'teamProposal'}
-        playerID={session.playerID}
-        players={room.players}
-        profile={roomProfile}
-        ownerPlayerID={room.ownerPlayerID}
+      <ObservedRoomScreen
+        {...controller.binding}
+        diagnosticsMode={layoutDiagnosticsMode}
+        slots={{
+          back: <RoomBackButton onBack={onBackHome} />,
+          toolbar: (
+            <RoomUtilities
+              model={utilityModel}
+              tools={{
+                connected,
+                isOwner: room?.ownerPlayerID === session.playerID,
+                logEntries,
+                onOpenHelp: () => onOpenHelp(numPlayers ?? 5),
+                onRequestRoomExit,
+                onToggleRoleKnowledge: controller.toggleRoleKnowledge,
+                roomExitBlocked,
+                roomExitBusy,
+                seatChangePending: seatChangeTargetID !== null,
+              }}
+            />
+          ),
+        }}
       />
     </ImmersiveLobbyShell>
   )
@@ -1317,15 +1546,21 @@ function useRoomLogEntries(
 function ImmersiveLobbyShell({
   children,
   developmentControls,
+  variant = 'framed',
 }: {
   children: ReactNode
   developmentControls: ReactNode
+  variant?: 'framed' | 'game'
 }) {
+  const Root = variant === 'game' ? 'div' : 'main'
   return (
-    <main className="relative h-dvh overflow-hidden overscroll-none bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.16),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(34,211,238,0.14),_transparent_35%),#07111f] p-2 text-slate-200 sm:p-3 lg:p-4">
-      <div className="mx-auto h-full min-h-0 max-w-7xl">{children}</div>
+    <Root
+      className={`relative h-dvh overflow-hidden overscroll-none bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.16),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(34,211,238,0.14),_transparent_35%),#07111f] text-slate-200 ${variant === 'game' ? 'p-0' : 'p-2 sm:p-3 lg:p-4'}`}
+      data-room-shell-variant={variant}
+    >
+      <div className={`h-full min-h-0 ${variant === 'game' ? 'w-full' : 'mx-auto max-w-7xl'}`}>{children}</div>
       {developmentControls}
-    </main>
+    </Root>
   )
 }
 

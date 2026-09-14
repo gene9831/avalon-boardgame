@@ -1,4 +1,15 @@
+import '@avalon/ui-layout/room-shell.css'
 import './styles.css'
+
+import {
+  ROOM_SHELL_CLASSES,
+  resolveRoomShellMetrics,
+  type RoomShellMode,
+} from '@avalon/ui-layout'
+import {
+  solveRoundTableStageLayoutWithDiagnostics,
+  type DetailedRoundTableStageLayoutResult,
+} from '@avalon/ui-layout/diagnostics'
 
 import { createSettingsDialog } from './app/settings-dialog'
 import {
@@ -7,8 +18,6 @@ import {
 } from './app/render-layout'
 import {
   applyPreviewRoomShell,
-  resolvePreviewRoomShell,
-  type PreviewRoomShellMode,
 } from './app/preview-room-shell'
 import {
   parseLabState,
@@ -16,15 +25,13 @@ import {
   type LabState,
 } from './app/url-state'
 import { createViewportAdapter, type ViewportSize } from './app/viewport-adapter'
-import { solveRoundTableStageLayoutWithDiagnostics } from './layout/solve-round-table-stage-layout'
-import type { DetailedRoundTableStageLayoutResult } from './layout/types'
 
 const app = document.querySelector<HTMLElement>('#app')!
 app.innerHTML = `
   <div class="lab-shell" data-viewport-mode="simulated">
     <div class="preview-workbench">
       <div class="preview-frame">
-        <div class="room-canvas" aria-label="Avalon 房间布局预览"></div>
+        <div class="${ROOM_SHELL_CLASSES.root}" aria-label="Avalon 房间布局预览"></div>
       </div>
     </div>
   </div>`
@@ -32,10 +39,10 @@ app.innerHTML = `
 const shell = app.querySelector<HTMLElement>('.lab-shell')!
 const workbench = app.querySelector<HTMLElement>('.preview-workbench')!
 const previewFrame = app.querySelector<HTMLElement>('.preview-frame')!
-const canvas = app.querySelector<HTMLElement>('.room-canvas')!
+const canvas = app.querySelector<HTMLElement>(`.${ROOM_SHELL_CLASSES.root}`)!
 const roomShell = renderRoomShell(canvas)
 const readout = roomShell.stageInfoReadout
-const roomShellModeLabel: Record<PreviewRoomShellMode, string> = {
+const roomShellModeLabel: Record<RoomShellMode, string> = {
   vertical: '竖版',
   'compact-landscape': '紧凑横版',
   'normal-landscape': '普通横版',
@@ -85,12 +92,12 @@ function render(): void {
   canvas.dataset.canvasWidth = String(size.width)
   canvas.dataset.canvasHeight = String(size.height)
   updatePreviewScale(size)
-  const previewRoomShell = resolvePreviewRoomShell(size)
+  const previewRoomShell = resolveRoomShellMetrics(size)
   applyPreviewRoomShell(canvas, previewRoomShell)
   renderStage(previewRoomShell.mode)
 }
 
-function renderStage(mode: PreviewRoomShellMode = canvas.dataset.roomLayoutMode as PreviewRoomShellMode): void {
+function renderStage(mode: RoomShellMode = canvas.dataset.roomLayoutMode as RoomShellMode): void {
   const stageSize = {
     width: roomShell.stage.clientWidth,
     height: roomShell.stage.clientHeight,

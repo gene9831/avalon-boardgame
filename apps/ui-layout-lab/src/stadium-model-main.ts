@@ -1,9 +1,14 @@
 import './stadium-model.css'
 
+import {
+  closestCircleBoundarySegment,
+  solveStadiumPlayerLayout,
+  type StadiumPlayerLayoutInput,
+  type StadiumPlayerLayoutResult,
+  type StadiumRect as Rect,
+} from '@avalon/ui-layout/diagnostics'
+
 import { lucideIcon } from './app/lucide-icons'
-import { closestCircleBoundarySegment } from './stadium-model/geometry'
-import { solveStadiumPlayerLayout } from './stadium-model/solve-stadium-player-layout'
-import type { Rect, StadiumPlayerLayoutInput, StadiumPlayerLayoutResult } from './stadium-model/types'
 import { MAX_STAGE_HEIGHT, MAX_STAGE_WIDTH } from './stage-dimensions'
 
 type ValidState = StadiumPlayerLayoutInput & Readonly<{ showDiagnostics: boolean }>

@@ -1,6 +1,12 @@
-import type { Circle, Rect } from '../layout'
-import type { DetailedRoundTableStageLayoutResult } from '../layout/types'
-import { closestCircleBoundarySegment } from '../stadium-model/geometry'
+import {
+  ROOM_SHELL_CLASSES,
+  type Circle,
+  type Rect,
+} from '@avalon/ui-layout'
+import {
+  closestCircleBoundarySegment,
+  type DetailedRoundTableStageLayoutResult,
+} from '@avalon/ui-layout/diagnostics'
 import { lucideIcon } from './lucide-icons'
 
 const PLAYER_NAMES = ['你', '青岚', '松石', '山雀', '长夜', '银杏', '渡鸦', '晨星', '白榆', '雾岛']
@@ -27,12 +33,17 @@ export function renderRoomShell(canvas: HTMLElement): RoomShellElements {
       <b>${taskNumber}</b><small>${taskNumber === 4 ? '3·2' : taskNumber + 1}</small>
     </span>`).join('')
   canvas.innerHTML = `
-    <header class="room-topbar">
-      <button class="back-button" aria-label="返回">${lucideIcon('chevron-left')}</button>
-      <button class="room-code" aria-label="复制房间号"><span>房间</span><b>7A3C9EF</b><i></i></button>
-      <div class="task-track" aria-label="任务进度">${taskTrack}</div>
+    <header class="${ROOM_SHELL_CLASSES.topBar}">
+      <button class="${ROOM_SHELL_CLASSES.back} back-button" aria-label="返回">${lucideIcon('chevron-left')}</button>
+      <button class="${ROOM_SHELL_CLASSES.roomStatus} room-code" aria-label="复制房间号"><span>房间</span><b>7A3C9EF</b><i></i></button>
+      <div class="${ROOM_SHELL_CLASSES.questProgress} task-track" aria-label="任务进度">${taskTrack}</div>
+      <nav class="${ROOM_SHELL_CLASSES.utilities} room-tools" aria-label="房间工具">
+        <button type="button" aria-label="身份" title="身份">${lucideIcon('eye')}</button>
+        <button type="button" aria-label="记录" title="记录">${lucideIcon('history')}</button>
+        <button type="button" aria-label="帮助" title="帮助">${lucideIcon('circle-help')}</button>
+      </nav>
     </header>
-    <main class="round-table-stage-region">
+    <main class="${ROOM_SHELL_CLASSES.stageRegion} round-table-stage-region">
       <div class="stage-info">
         <button
           class="stage-info-trigger"
@@ -45,21 +56,14 @@ export function renderRoomShell(canvas: HTMLElement): RoomShellElements {
         </button>
         <output id="layout-readout" class="layout-readout" aria-live="polite" hidden></output>
       </div>
-      <div class="round-table-stage"></div>
+      <div class="${ROOM_SHELL_CLASSES.stageContent} round-table-stage"></div>
     </main>
-    <footer class="phase-panel">
-      <div class="phase-content">
-        <div class="phase-header"><div class="phase-title"><small>领袖行动</small><strong>选择任务队员</strong></div>
-          <nav class="room-tools" aria-label="房间工具">
-            <button type="button" aria-label="身份" title="身份">${lucideIcon('eye')}</button>
-            <button type="button" aria-label="记录" title="记录">${lucideIcon('history')}</button>
-            <button type="button" aria-label="帮助" title="帮助">${lucideIcon('circle-help')}</button>
-          </nav>
-        </div>
-        <div class="phase-middle"><button class="selected">青岚</button><button>松石</button></div>
-        <div class="phase-action"><button>确认队伍 · 2/4</button></div>
-      </div>
-      <div class="phase-bottom-clearance" aria-hidden="true"></div>
+    <footer class="${ROOM_SHELL_CLASSES.phasePanel}">
+      <div class="${ROOM_SHELL_CLASSES.phaseTitle} phase-title"><small>领袖行动</small><strong>选择任务队员</strong></div>
+      <div class="${ROOM_SHELL_CLASSES.phaseTools} phase-tools"></div>
+      <div class="${ROOM_SHELL_CLASSES.phaseMiddle} phase-middle"><button class="selected">青岚</button><button>松石</button></div>
+      <div class="${ROOM_SHELL_CLASSES.phaseAction} phase-action"><button>确认队伍 · 2/4</button></div>
+      <div class="${ROOM_SHELL_CLASSES.phaseClearance} phase-bottom-clearance" aria-hidden="true"></div>
     </footer>`
   const stage = canvas.querySelector<HTMLElement>('.round-table-stage')
   if (stage === null) throw new Error('Round-table stage was not rendered')

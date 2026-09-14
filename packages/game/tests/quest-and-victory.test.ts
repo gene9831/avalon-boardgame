@@ -164,13 +164,15 @@ describe('Avalon quest and victory flow', () => {
     expect(getGame(client).secret.pendingQuestCards).toEqual({})
 
     client.moves.playQuestCard('success')
-    expect(
-      getAvalonPlayerView(getGame(client), goodPlayerID).viewer
-        .submittedQuestCard,
-    ).toBe('success')
-    expect(
-      getAvalonPlayerView(getGame(client), team[1]).viewer.submittedQuestCard,
-    ).toBeUndefined()
+    const submitterView = getAvalonPlayerView(getGame(client), goodPlayerID)
+    const teammateView = getAvalonPlayerView(getGame(client), team[1])
+    const anonymousView = getAvalonPlayerView(getGame(client), null)
+    expect(submitterView.viewer.submittedQuestCard).toBe('success')
+    expect(teammateView.viewer.submittedQuestCard).toBeUndefined()
+    expect(anonymousView.viewer.submittedQuestCard).toBeUndefined()
+    expect(submitterView.submittedQuestCardCount).toBe(1)
+    expect(teammateView.submittedQuestCardCount).toBe(1)
+    expect(anonymousView.submittedQuestCardCount).toBe(1)
     const stateIDAfterFirstCard = client.store.getState()._stateID
     client.moves.playQuestCard('success')
 

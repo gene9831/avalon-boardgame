@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { solveRoundTableStageLayout } from '../layout'
+import {
+  ROOM_SHELL_CLASSES,
+  resolveRoomShellMetrics,
+  solveRoundTableStageLayout,
+} from '@avalon/ui-layout'
 import {
   applyPreviewRoomShell,
-  resolvePreviewRoomShell,
 } from './preview-room-shell'
 
 const confirmedViewports = [
@@ -30,7 +33,7 @@ function expectContainedInStage(
 
 describe('preview room shell', () => {
   it('uses vertical mode for tall portrait-like layouts', () => {
-    expect(resolvePreviewRoomShell({ width: 375, height: 667 })).toMatchObject({
+    expect(resolveRoomShellMetrics({ width: 375, height: 667 })).toMatchObject({
       mode: 'vertical',
       topBarHeight: 48,
       topBarPadding: 8,
@@ -41,7 +44,7 @@ describe('preview room shell', () => {
   })
 
   it('keeps vertical layout dual mode at high portrait sizes', () => {
-    expect(resolvePreviewRoomShell({ width: 390, height: 844 })).toMatchObject({
+    expect(resolveRoomShellMetrics({ width: 390, height: 844 })).toMatchObject({
       mode: 'vertical',
       topBarHeight: 56,
       topBarPadding: 12,
@@ -52,7 +55,7 @@ describe('preview room shell', () => {
   })
 
   it('uses compact-landscape for short landscape layouts', () => {
-    expect(resolvePreviewRoomShell({ width: 667, height: 375 })).toMatchObject({
+    expect(resolveRoomShellMetrics({ width: 667, height: 375 })).toMatchObject({
       mode: 'compact-landscape',
       topBarHeight: 0,
       stageMargin: 8,
@@ -60,23 +63,23 @@ describe('preview room shell', () => {
       sidebarWidth: 192,
     })
 
-    expect(resolvePreviewRoomShell({ width: 900, height: 514 })).toMatchObject({
+    expect(resolveRoomShellMetrics({ width: 900, height: 514 })).toMatchObject({
       mode: 'compact-landscape',
     })
 
-    expect(resolvePreviewRoomShell({ width: 844, height: 390 })).toMatchObject({
+    expect(resolveRoomShellMetrics({ width: 844, height: 390 })).toMatchObject({
       mode: 'compact-landscape',
       sidebarWidth: 236,
     })
 
-    expect(resolvePreviewRoomShell({ width: 932, height: 430 })).toMatchObject({
+    expect(resolveRoomShellMetrics({ width: 932, height: 430 })).toMatchObject({
       mode: 'compact-landscape',
       sidebarWidth: 261,
     })
   })
 
   it('uses normal-landscape for wider landscape layouts', () => {
-    expect(resolvePreviewRoomShell({ width: 1024, height: 768 })).toMatchObject({
+    expect(resolveRoomShellMetrics({ width: 1024, height: 768 })).toMatchObject({
       mode: 'normal-landscape',
       topBarHeight: 56,
       topBarPadding: 12,
@@ -85,7 +88,7 @@ describe('preview room shell', () => {
       sidebarWidth: 288,
     })
 
-    expect(resolvePreviewRoomShell({ width: 900, height: 515 })).toMatchObject({
+    expect(resolveRoomShellMetrics({ width: 900, height: 515 })).toMatchObject({
       mode: 'normal-landscape',
       topBarHeight: 48,
       topBarPadding: 8,
@@ -95,14 +98,14 @@ describe('preview room shell', () => {
   })
 
   it('keeps the normal-landscape height boundary adjacent and explicit', () => {
-    expect(resolvePreviewRoomShell({ width: 1000, height: 679 })).toMatchObject({
+    expect(resolveRoomShellMetrics({ width: 1000, height: 679 })).toMatchObject({
       mode: 'normal-landscape',
       topBarHeight: 48,
       topBarPadding: 8,
       stageMargin: 12,
     })
 
-    expect(resolvePreviewRoomShell({ width: 1000, height: 680 })).toMatchObject({
+    expect(resolveRoomShellMetrics({ width: 1000, height: 680 })).toMatchObject({
       mode: 'normal-landscape',
       topBarHeight: 56,
       topBarPadding: 12,
@@ -111,36 +114,42 @@ describe('preview room shell', () => {
   })
 
   it('uses vertical mode for square layouts', () => {
-    expect(resolvePreviewRoomShell({ width: 667, height: 667 })).toMatchObject({
+    expect(resolveRoomShellMetrics({ width: 667, height: 667 })).toMatchObject({
       mode: 'vertical',
     })
   })
 
   it('applies shell layout values to canvas as css vars and data attribute', () => {
-    const shell = resolvePreviewRoomShell({ width: 1024, height: 768 })
+    const shell = resolveRoomShellMetrics({ width: 667, height: 375 })
     const properties: Record<string, string> = {}
+    const classes = new Set<string>()
     const canvas = {
+      classList: {
+        add: (...classNames: string[]): void => {
+          for (const className of classNames) classes.add(className)
+        },
+        contains: (className: string): boolean => classes.has(className),
+      },
       style: {
         setProperty: (name: string, value: string): void => {
           properties[name] = value
         },
+        getPropertyValue: (name: string): string => properties[name] ?? '',
       },
       dataset: {},
     } as unknown as HTMLElement
 
     applyPreviewRoomShell(canvas, shell)
 
-    expect(canvas.dataset.roomLayoutMode).toBe('normal-landscape')
-    expect(properties['--room-topbar-height']).toBe('56px')
-    expect(properties['--room-topbar-padding']).toBe('12px')
-    expect(properties['--round-table-stage-margin']).toBe('16px')
-    expect(properties['--task-rail-width']).toBe('0px')
-    expect(properties['--phase-sidebar-width']).toBe('288px')
+    expect(canvas.classList.contains(ROOM_SHELL_CLASSES.root)).toBe(true)
+    expect(canvas.dataset.roomLayoutMode).toBe('compact-landscape')
+    expect(canvas.style.getPropertyValue('--task-rail-width')).toBe('56px')
+    expect(canvas.style.getPropertyValue('--phase-sidebar-width')).toBe('192px')
   })
 
   for (const [viewport, expectedMode, stageWidth, stageHeight] of confirmedViewports) {
     it(`resolves ${viewport.width} by ${viewport.height} as ${expectedMode}`, () => {
-      expect(resolvePreviewRoomShell(viewport).mode).toBe(expectedMode)
+      expect(resolveRoomShellMetrics(viewport).mode).toBe(expectedMode)
     })
 
     for (let playerCount = 5; playerCount <= 10; playerCount += 1) {

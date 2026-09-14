@@ -43,23 +43,20 @@ test('creation enters the owner, seat zero is reusable, and concurrent joins fil
       .toContainText('Automatic Seat Owner')
     await expect(
       ownerPage.locator('[data-round-table-player][data-player-id="0"]')
-        .getByLabel('房间拥有者'),
-    ).toBeVisible()
+    ).toHaveAttribute('aria-label', /房间拥有者/)
 
     await ownerPage.getByRole('button', { name: '移至 5 号空座位' }).click()
     await expect.poll(() => storedPlayerID(ownerPage, matchID)).toBe('4')
     await expect(
       ownerPage.locator('[data-round-table-player][data-player-id="4"]')
-        .getByLabel('房间拥有者'),
-    ).toBeVisible()
+    ).toHaveAttribute('aria-label', /房间拥有者/)
 
     await ownerPage.reload()
     await expect(ownerPage).toHaveURL(new RegExp(`/rooms/${matchID}$`))
     await expect.poll(() => storedPlayerID(ownerPage, matchID)).toBe('4')
     await expect(
       ownerPage.locator('[data-round-table-player][data-player-id="4"]')
-        .getByLabel('房间拥有者'),
-    ).toBeVisible()
+    ).toHaveAttribute('aria-label', /房间拥有者/)
 
     await joinRoom(seatZeroPage, matchID, '0', 'Seat Zero Reuse')
     await expect.poll(() => storedPlayerID(seatZeroPage, matchID)).toBe('0')
@@ -77,7 +74,7 @@ test('creation enters the owner, seat zero is reusable, and concurrent joins fil
     const fullRoomPage = remainingPages[3]
     await fullRoomPage.goto('/')
     const fullRoomCard = fullRoomPage
-      .getByText(`房间 ${matchID}`, { exact: true })
+      .getByTitle(matchID, { exact: true })
       .locator('xpath=ancestor::article')
     await expect(fullRoomCard.getByText('5/5 人已入座', { exact: false })).toBeVisible()
     await expect(fullRoomCard.getByText('已满', { exact: true })).toBeVisible()
@@ -103,11 +100,11 @@ test('five isolated browser players complete a rejected-team game', {
   try {
     await harness.pages[4].reload()
     await expect(
-      harness.pages[4].getByText('等待房间创建者开始游戏', { exact: true }),
+      harness.pages[4].getByText('所有玩家已入座，等待房主开始游戏', { exact: true }),
     ).toBeVisible()
     await harness.pages[4].getByRole('button', { name: '房间操作' }).click()
     await expect(
-      harness.pages[4].getByRole('button', { name: '退出房间' }),
+      harness.pages[4].getByRole('menuitem', { name: '退出房间' }),
     ).toBeVisible()
     await harness.pages[4].getByRole('button', { name: '房间操作' }).click()
 
@@ -120,7 +117,7 @@ test('five isolated browser players complete a rejected-team game', {
       await expect(
         page
           .locator('p:visible')
-          .filter({ hasText: '连续五次队伍提案被否决' })
+          .filter({ hasText: '连续否决 5 支队伍' })
           .first(),
       ).toBeVisible()
     }

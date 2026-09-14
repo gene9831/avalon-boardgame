@@ -5,6 +5,11 @@ test('preserves shell state while rotating', async ({ page }) => {
   await page.goto('http://127.0.0.1:14175/?viewport=simulated&width=390&height=844&players=10&geometry=0')
 
   const canvas = page.getByLabel('Avalon 房间布局预览')
+  await expect(page.locator('.avalon-room-shell')).toHaveAttribute(
+    'data-room-layout-mode',
+    'vertical',
+  )
+  await expect(page.locator('.avalon-room-shell__stage-content')).toHaveCount(1)
   const infoTrigger = page.getByRole('button', { name: '显示布局信息' })
   await infoTrigger.click()
   await page.locator('.stage-info').evaluate((element) => {
@@ -43,7 +48,7 @@ test('landscape shell uses one compact grid for the short 667 by 375 room', asyn
 
   const placement = await page.evaluate(() => {
     const bounds = (selector: string) => document.querySelector(selector)!.getBoundingClientRect()
-    const canvasBounds = bounds('.room-canvas')
+    const canvasBounds = bounds('.avalon-room-shell')
     const rail = bounds('.task-track')
     const stage = bounds('.round-table-stage-region')
     const phase = bounds('.phase-middle')
@@ -69,7 +74,7 @@ test('landscape shell uses one compact grid for the short 667 by 375 room', asyn
   await expect(readout).toBeVisible()
   const infoPlacement = await page.evaluate(() => {
     const bounds = (selector: string) => document.querySelector(selector)!.getBoundingClientRect()
-    const canvas = bounds('.room-canvas')
+    const canvas = bounds('.avalon-room-shell')
     const button = bounds('.stage-info-trigger')
     const readout = bounds('.layout-readout')
     return {
@@ -180,7 +185,7 @@ test('uses the actual mobile viewport and keeps device controls concise', async 
   await expect(infoButton.locator('svg')).toBeVisible()
   await expect(readout).toBeHidden()
   const infoPlacement = await page.evaluate(() => {
-    const topbarBounds = document.querySelector('.room-topbar')!.getBoundingClientRect()
+    const topbarBounds = document.querySelector('.avalon-room-shell__room-status')!.getBoundingClientRect()
     const stageBounds = document.querySelector('.round-table-stage-region')!.getBoundingClientRect()
     const buttonBounds = document.querySelector('.stage-info-trigger')!.getBoundingClientRect()
     return {
@@ -225,13 +230,13 @@ test('uses the actual mobile viewport and keeps device controls concise', async 
   await expect(readout).toBeHidden()
 
   const phaseSectionHeights = await page
-    .locator('.phase-header, .phase-middle, .phase-action')
+    .locator('.phase-title, .phase-middle, .phase-action')
     .evaluateAll((sections) => sections.map((section) => section.getBoundingClientRect().height))
   expect(phaseSectionHeights).toEqual([48, 56, 56])
   await expect(page.locator('.phase-bottom-clearance')).toHaveCSS('height', '8px')
   const bottomActionClearance = await page.evaluate(() => {
     const canvasBounds = document
-      .querySelector('.room-canvas')!
+      .querySelector('.avalon-room-shell')!
       .getBoundingClientRect()
     const buttonBounds = document
       .querySelector('.phase-action button')!
@@ -242,7 +247,7 @@ test('uses the actual mobile viewport and keeps device controls concise', async 
   const phaseTitleHeight = await page
     .locator('.phase-title')
     .evaluate((title) => title.getBoundingClientRect().height)
-  expect(phaseTitleHeight).toBeLessThanOrEqual(24)
+  expect(phaseTitleHeight).toBe(48)
 
   const layoutBeforeSettingsOpen = await page.evaluate(() => ({
     shellTop: document.querySelector('.lab-shell')!.getBoundingClientRect().top,

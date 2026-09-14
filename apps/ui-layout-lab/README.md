@@ -24,7 +24,7 @@ pnpm dev:ui-layout
 
 ## 布局接口
 
-`src/layout/` 是 DOM-free 的纯 TypeScript 边界。业务侧先完成顶栏、底栏、安全区和舞台外边距布局，再把最终舞台内容盒交给唯一公共入口：
+DOM-free 的纯 TypeScript 边界与框架无关的业务外壳结构统一归属 `@avalon/ui-layout`。Lab 分别从包根入口、`@avalon/ui-layout/diagnostics` 和 `@avalon/ui-layout/room-shell.css` 消费生产求解器、详细数学诊断和结构样式。Lab 只拥有预览控件、演示数据和诊断绘制，不维护第二套算法或业务外壳。业务侧先完成顶栏、底栏、安全区和舞台外边距布局，再把最终舞台内容盒交给唯一公共入口：
 
 ```ts
 solveRoundTableStageLayout({
@@ -45,7 +45,7 @@ solveRoundTableStageLayout({
 
 实验室页面本身是 API 的业务调用示例：设置面板可以修改玩家边界圆的最小间距、最大头像尺寸和头像递减步长，并把它们保存在 URL 中；面板打开时不增加背景蒙层或模糊。底部内容固定为 `48 + 56 + 56 = 160`，另加 8px 的业务留白；业务根布局通过 `safe-area-inset-left`、`safe-area-inset-right` 和 `safe-area-inset-bottom` 避让设备安全区。页面在业务舞台区域中居中放置最大 `744×800` 的求解盒；`ResizeObserver` 测量该盒的实际尺寸后重新求解，因此 1024×1366 等高设备视口不会把超限高度直接传给纯函数，宽舞台也无需业务侧传递额外方向参数。
 
-完整算法与职责边界见[圆桌舞台布局规范](../../docs/ui-layout/round-table-stage-layout.md)、[竖向房间业务外壳规范](../../docs/ui-layout/vertical-layout.md)和[横向房间布局规范](../../docs/ui-layout/horizontal-layout.md)。当前 Lab 已实现三种业务外壳模式；正式 `apps/web` 迁移仍是后续工作。
+完整算法与职责边界见[圆桌舞台布局规范](../../docs/ui-layout/round-table-stage-layout.md)、[竖向房间业务外壳规范](../../docs/ui-layout/vertical-layout.md)和[横向房间布局规范](../../docs/ui-layout/horizontal-layout.md)。Lab 与正式 `apps/web` 完整房间生命周期共用 `@avalon/ui-layout` 的三模式结构契约和圆桌舞台求解器；Lab 通过 `/diagnostics` 子路径额外读取数学诊断。
 
 独立数学模型见[跑道玩家圆形布局模型](../../docs/ui-layout/stadium-player-layout-model.md)。`/stadium-layout-lab.html` 和业务求解器共享圆形玩家边界模型；独立页面允许调整保护半径，业务求解器固定使用 80px。
 
