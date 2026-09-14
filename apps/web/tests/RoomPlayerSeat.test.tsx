@@ -189,7 +189,16 @@ describe('RoomPlayerSeat', () => {
         ...player, markers: [{ kind: 'owner' }],
       }} />,
     )
-    expect(html).toMatch(/class="room-seat__name absolute font-avalon-serif"[^>]*>.*data-seat-decoration="owner".*Alice.*<\/span>/s)
+    expect(html).toMatch(/class="room-seat__name absolute"[^>]*>.*data-seat-decoration="owner".*Alice.*<\/span>/s)
+  })
+
+  it('lets the player name inherit the default sans-serif font', () => {
+    const html = renderToStaticMarkup(
+      <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={player} />,
+    )
+
+    expect(html).toContain('class="room-seat__name absolute"')
+    expect(html).not.toMatch(/class="room-seat__name[^"]*font-avalon-serif/)
   })
 
   it('counts a two-digit seat number and places it before the owner marker and player name', () => {

@@ -33,10 +33,63 @@ export function RoomTeamTokens({
   disabled = false,
   onActivatePlayer,
 }: RoomTeamTokensProps) {
-  const layout = layoutForTokenCount(Math.max(tokens.length, requiredTeamSize))
   const placeholderCount = state === 'preview'
     ? Math.max(0, requiredTeamSize - tokens.length)
     : 0
+  const layout = layoutForTokenCount(tokens.length + placeholderCount)
+  const tokenElements = tokens.map((token) => {
+    const label = tokenLabel(token)
+    const content = (
+      <>
+        <span className="room-team-token__avatar" aria-hidden="true">
+          <PlayerAvatar avatarID={token.avatarID} className="size-full object-contain p-[12%]" />
+        </span>
+        <span aria-hidden="true" className="room-team-token__seat-number" data-team-token-seat-number="true">
+          {token.seatNumber}
+        </span>
+      </>
+    )
+
+    return onActivatePlayer === undefined ? (
+      <span
+        aria-label={label}
+        className="room-team-token"
+        data-team-token="filled"
+        key={token.playerID}
+        role="listitem"
+        title={label}
+      >
+        {content}
+      </span>
+    ) : (
+      <button
+        aria-label={label}
+        className="room-team-token"
+        data-team-token="filled"
+        disabled={disabled}
+        key={token.playerID}
+        onClick={() => onActivatePlayer(token.playerID)}
+        title={label}
+        type="button"
+      >
+        {content}
+      </button>
+    )
+  })
+  const placeholderElements = Array.from({ length: placeholderCount }, (_, index) => (
+    <span
+      aria-hidden="true"
+      className="room-team-token room-team-token--placeholder"
+      data-team-token-placeholder="true"
+      key={`placeholder-${index}`}
+    >
+      +
+    </span>
+  ))
+  const elements = [...tokenElements, ...placeholderElements]
+  const rows = layout === 'single-row'
+    ? [elements]
+    : [elements.slice(0, 3), elements.slice(3)]
 
   return (
     <div
@@ -46,54 +99,15 @@ export function RoomTeamTokens({
       data-team-token-state={state}
       role={onActivatePlayer === undefined ? 'list' : 'group'}
     >
-      {tokens.map((token) => {
-        const label = tokenLabel(token)
-        const content = (
-          <>
-            <span className="room-team-token__avatar" aria-hidden="true">
-              <PlayerAvatar avatarID={token.avatarID} className="size-full object-contain p-[12%]" />
-            </span>
-            <span aria-hidden="true" className="room-team-token__seat-number" data-team-token-seat-number="true">
-              {token.seatNumber}
-            </span>
-          </>
-        )
-
-        return onActivatePlayer === undefined ? (
-          <span
-            aria-label={label}
-            className="room-team-token"
-            data-team-token="filled"
-            key={token.playerID}
-            role="listitem"
-            title={label}
-          >
-            {content}
-          </span>
-        ) : (
-          <button
-            aria-label={label}
-            className="room-team-token"
-            data-team-token="filled"
-            disabled={disabled}
-            key={token.playerID}
-            onClick={() => onActivatePlayer(token.playerID)}
-            title={label}
-            type="button"
-          >
-            {content}
-          </button>
-        )
-      })}
-      {Array.from({ length: placeholderCount }, (_, index) => (
-        <span
-          aria-hidden="true"
-          className="room-team-token room-team-token--placeholder"
-          data-team-token-placeholder="true"
-          key={`placeholder-${index}`}
+      {rows.map((row, index) => (
+        <div
+          className="room-team-token-row"
+          data-team-token-row-size={row.length}
+          key={`row-${index}`}
+          role="presentation"
         >
-          +
-        </span>
+          {row}
+        </div>
       ))}
     </div>
   )

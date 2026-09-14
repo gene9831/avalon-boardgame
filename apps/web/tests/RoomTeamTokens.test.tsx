@@ -47,11 +47,11 @@ describe('RoomTeamTokens', () => {
   })
 
   it.each([
-    [2, 'single-row'],
-    [3, 'single-row'],
-    [4, 'three-two'],
-    [5, 'three-two'],
-  ] as const)('uses the stable %s layout for %s selected members', (count, layout) => {
+    [2, 'single-row', [2]],
+    [3, 'single-row', [3]],
+    [4, 'three-two', [3, 1]],
+    [5, 'three-two', [3, 2]],
+  ] as const)('centers %s selected members in the stable %s row layout', (count, layout, rowSizes) => {
     const selected = Array.from({ length: count }, (_, index) => ({
       playerID: String(index), seatNumber: index + 1, name: `Player ${index + 1}`, avatarID: 'merlin' as const,
     }))
@@ -60,6 +60,7 @@ describe('RoomTeamTokens', () => {
     )
 
     expect(html).toContain(`data-team-token-layout="${layout}"`)
+    expect(Array.from(html.matchAll(/data-team-token-row-size="(\d+)"/g), ([, size]) => Number(size))).toEqual(rowSizes)
   })
 
   it('adds noninteractive plus placeholders only while previewing an incomplete team', () => {
