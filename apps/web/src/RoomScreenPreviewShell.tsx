@@ -6,7 +6,6 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useHelp } from './help-context'
 import { ObservedRoomScreen } from './ObservedRoomScreen'
 import { RoomBackButton } from './RoomBackButton'
-import { RoomLogControl } from './RoomLogControl'
 import { RoomMoreMenu } from './RoomMoreMenu'
 import { RoomToolbar, type RoomToolbarItem } from './RoomToolbar'
 import { resolveRoomLayoutDiagnosticsMode } from './room-layout-diagnostics'
@@ -111,7 +110,6 @@ export function RoomScreenPreviewShell(props: RoomScreenPreviewShellProps) {
     toolbar: (
       <>
         <RoomToolbar items={tools}>
-          <RoomLogControl entries={[]} />
           <RoomMoreMenu
             connected
             entries={[]}
@@ -120,6 +118,7 @@ export function RoomScreenPreviewShell(props: RoomScreenPreviewShellProps) {
             roomExitBlocked
             roomExitBusy={false}
             seatChangePending={false}
+            showRoomExit={false}
           />
         </RoomToolbar>
         <span aria-live="polite" className="sr-only font-sans">

@@ -28,11 +28,11 @@ export function RoomIdentityConfirmationCenterSurface({
 }: Pick<RoomIdentityConfirmationSurfaceProps, 'scene'>) {
   return (
     <RoomCenter data-identity-confirmation-center="true" density="compact" role="status">
-      <strong className="block text-2xl font-semibold text-amber-100">
+      <strong className="block text-lg font-semibold text-amber-100">
         {scene.confirmedCount} / {scene.participantCount}
       </strong>
       <span className="mt-1 block text-sm text-slate-200">玩家已确认身份</span>
-      <span className="mt-1 block text-xs text-slate-400">等待其他玩家确认</span>
+      <span className="mt-1 block text-sm text-slate-400">等待其他玩家确认</span>
     </RoomCenter>
   )
 }

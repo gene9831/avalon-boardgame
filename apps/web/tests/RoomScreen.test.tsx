@@ -49,7 +49,9 @@ describe('RoomScreen', () => {
     )
 
     expect(html).toContain('正在重新连接')
-    expect(html).toContain('正在恢复与房间的连接。')
+    expect(html.match(/正在恢复与房间的连接/g)).toHaveLength(2)
+    expect(html).not.toContain('正在恢复与房间的连接。')
+    expect(html).toMatch(/data-room-slot="phase-middle"[^>]*><p[^>]*>正在恢复与房间的连接<\/p>/)
     expect(html).not.toContain('>重新连接</button>')
   })
 
@@ -70,6 +72,23 @@ describe('RoomScreen', () => {
 
     expect(reconnectButton).toContain('>重新连接</button>')
     expect(reconnectButton).not.toMatch(/\sdisabled(?:=|(?=\s|>))/)
+  })
+
+  it('strips trailing Chinese punctuation from the loading center text', () => {
+    const html = renderToStaticMarkup(
+      <RoomLoadingScene
+        actions={{ onReconnect: () => {} }}
+        geometry={{ stageLayout: null }}
+        scene={{
+          kind: 'connectionRecovery', matchID: 'ABC123456', playerCount: null, players: [], questProgress: [],
+          manualReconnectAvailable: false,
+        }}
+        slots={{ back: null, toolbar: null }}
+      />,
+    )
+
+    expect(html).toMatch(/<p role="status">正在恢复与房间的连接<\/p>/)
+    expect(html).not.toMatch(/<p role="status">正在恢复与房间的连接。<\/p>/)
   })
 
   it('renders a public loading scene with one frame and one complete toolbar slot', () => {
@@ -165,6 +184,8 @@ describe('RoomScreen', () => {
     expect(html).toContain('data-identity-recognition-state="revealed"')
     expect(html).toContain('data-identity-recognition-center="evilAllies"')
     expect(html).toContain('暗影中的同伴')
+    expect(html).toContain('这些玩家与你同属邪恶阵营')
+    expect(html).not.toContain('这些玩家与你同属邪恶阵营。')
     expect(html).not.toContain('data-identity-role-artwork')
   })
 })

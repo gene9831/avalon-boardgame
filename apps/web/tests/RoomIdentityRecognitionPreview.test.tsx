@@ -33,7 +33,13 @@ describe('RoomIdentityRecognitionPreview', () => {
     expect(html).toContain('data-room-screen="true"')
     expect(html).toContain(`data-identity-recognition-scene="${scenarioID}"`)
     expect(html).toContain('data-identity-recognition-state="concealed"')
-    expect(html).toContain('查看线索')
+    if (scenarioID === 'none') {
+      expect(html).toContain('我已了解')
+      expect(html).not.toContain('查看线索')
+    } else {
+      expect(html).toContain('查看线索')
+      expect(html).not.toContain('我已了解')
+    }
     expect(html).not.toContain('data-identity-role-artwork')
     expect(html).not.toContain('仅你可见')
   })

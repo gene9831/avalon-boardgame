@@ -97,7 +97,7 @@ export function RoomTeamVoteScene({ actions, geometry, scene, slots }: RoomTeamV
             <strong className="block text-lg font-semibold text-amber-200">第 {scene.questIndex + 1} 次任务</strong>
             <span className="mt-1 block text-sm text-slate-300">{scene.submittedCount} / {scene.participantCount} 已投票</span>
             {scene.consecutiveRejectedTeams > 0 && (
-              <span className="mt-1 block text-xs text-slate-400">连续否决 {scene.consecutiveRejectedTeams} / 5</span>
+              <span className="mt-1 block text-sm text-slate-400">连续否决 {scene.consecutiveRejectedTeams} / 5</span>
             )}
           </RoomCenter>
         ),

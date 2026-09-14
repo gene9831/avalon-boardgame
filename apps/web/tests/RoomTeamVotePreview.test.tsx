@@ -69,6 +69,12 @@ describe('RoomTeamVoteScene', () => {
     expect(selected).not.toMatch(/aria-label="确认投票"[^>]*disabled=""/)
   })
 
+  it('uses the shared secondary-text size for the rejection counter in the center summary', () => {
+    const html = render({ kind: 'choosing', selectedVote: null, canChoose: true, submitRequestState: 'idle' })
+
+    expect(html).toContain('class="mt-1 block text-sm text-slate-400">连续否决 1 / 5</span>')
+  })
+
   it('keeps the original label and disables both choices while pending', () => {
     const html = render({ kind: 'choosing', selectedVote: 'reject', canChoose: true, submitRequestState: 'pending' })
 

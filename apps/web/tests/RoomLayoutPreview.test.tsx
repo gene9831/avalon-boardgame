@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 
-import { RoomLayoutPreview } from '../src/RoomLayoutPreview'
+import { RoomLayoutBasePreview, RoomLayoutPreview } from '../src/RoomLayoutPreview'
 import { RoomAssassinationPreview } from '../src/RoomAssassinationPreview'
 import { RoomLobbyPreview } from '../src/RoomLobbyPreview'
 import { RoomLoadingPreview } from '../src/RoomLoadingPreview'
@@ -55,8 +55,8 @@ describe('RoomLayoutPreview', () => {
     expect(html.match(/aria-label="系统通知"/g)).toHaveLength(1)
     expect(html).toContain('data-room-toolbar-item="identity"')
     expect(html).toContain('data-room-toolbar-item="help"')
-    expect(html).toContain('aria-label="查看对局记录"')
     expect(html).toContain('data-room-toolbar-item="room"')
+    expect(html).not.toContain('aria-label="查看对局记录"')
     expect(html).toContain('aria-label="打开开发预览控制"')
     expect(html).not.toContain('data-room-slot="stage-atmosphere"')
   })
@@ -91,6 +91,15 @@ describe('RoomLayoutPreview', () => {
     expect(html).toContain('href="/dev/room-layout/result/evil-assassination"')
     expect(html).toContain('href="/dev/room-layout/result/evil-quests"')
     expect(html).toContain('href="/dev/room-layout/result/evil-rejections"')
+  })
+
+  it('uses the More menu rather than a direct log control in the base preview toolbar', () => {
+    const html = renderToStaticMarkup(
+      <MemoryRouter><RoomLayoutBasePreview /></MemoryRouter>,
+    )
+
+    expect(html).toContain('data-room-toolbar-item="room"')
+    expect(html).not.toContain('aria-label="查看对局记录"')
   })
 
   it.each([

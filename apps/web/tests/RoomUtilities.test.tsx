@@ -29,18 +29,28 @@ describe('RoomUtilities', () => {
     expect(html).not.toContain('data-room-toolbar-item="identity"')
   })
 
-  it('keeps identity first, followed by help and the direct log control during the game', () => {
+  it('keeps identity first, followed by help and More during the game', () => {
     const html = renderToStaticMarkup(<RoomUtilities model={{
       variant: 'game', showRoomExit: true, showIdentityKnowledge: true, roleKnowledgeOpen: false,
     }} tools={tools} />)
 
     const identityIndex = html.indexOf('data-room-toolbar-item="identity"')
     const helpIndex = html.indexOf('aria-label="打开帮助说明"')
-    const logIndex = html.indexOf('aria-label="查看对局记录"')
+    const moreIndex = html.indexOf('data-room-toolbar-item="room"')
 
     expect(identityIndex).toBeGreaterThanOrEqual(0)
     expect(helpIndex).toBeGreaterThan(identityIndex)
-    expect(logIndex).toBeGreaterThan(helpIndex)
+    expect(moreIndex).toBeGreaterThan(helpIndex)
+    expect(html).not.toContain('aria-label="查看对局记录"')
+  })
+
+  it('keeps More available for the game log when room exit is unavailable', () => {
+    const html = renderToStaticMarkup(<RoomUtilities model={{
+      variant: 'game', showRoomExit: false, showIdentityKnowledge: false, roleKnowledgeOpen: false,
+    }} tools={tools} />)
+
+    expect(html).toContain('data-room-toolbar-item="room"')
+    expect(html).not.toContain('aria-label="查看对局记录"')
   })
 
   it('owns an explicit sans-serif boundary for every complete toolbar', () => {

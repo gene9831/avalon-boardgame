@@ -120,10 +120,34 @@ describe('RoomIdentityRecognitionScene', () => {
     expect(html).not.toContain('正在确认')
   })
 
+  it.each(['concealed', 'revealing', 'revealed'] as const)(
+    'shows no-clue confirmation directly when view is %s', (view) => {
+      const html = renderScene(view, { kind: 'none', targetPlayerIDs: [] })
+
+      expect(html).toContain('data-identity-recognition-center="none"')
+      expect(html).toContain('没有额外线索')
+      expect(html).toContain('你没有需要辨认的玩家')
+      expect(html).toContain('class="block text-lg font-semibold text-amber-100"')
+      expect(html).toContain('class="mt-1 block text-sm leading-5 text-slate-300"')
+      expect(html).toMatch(/<button[^>]*>我已了解<\/button>/)
+      expect(html).not.toContain('查看线索')
+      expect(html).not.toContain('data-identity-recognition-atmosphere="')
+    },
+  )
+
+  it('does not include a trailing period in no-clue center text', () => {
+    const html = renderScene('revealed', { kind: 'none', targetPlayerIDs: [] })
+
+    expect(html).toContain('没有额外线索')
+    expect(html).not.toContain('通过其他玩家的发言和投票判断阵营。')
+  })
+
   it('clears every private clue before showing aggregate waiting progress', () => {
     const html = renderScene('waiting')
 
     expect(html).toMatch(/3 \/ 5.*玩家已完成辨认.*等待其他玩家/s)
+    expect(html).toContain('class="block text-lg font-semibold text-amber-100"')
+    expect(html).toContain('class="mt-1 block text-sm text-slate-400"')
     expect(html).not.toContain('奥术视野')
     expect(html).not.toContain('data-identity-recognition-label')
     expect(html).not.toContain('data-recognition-seat-state="target"')

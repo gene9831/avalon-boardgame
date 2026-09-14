@@ -39,7 +39,7 @@ describe('RoomResultPreview', () => {
           },
         }}
         scene={{
-          kind: 'gameResult', matchID: 'ABC123456', playerCount: 5, questProgress: [], winner: 'good', reason: '刺杀未命中', questScore: '3 : 2',
+          kind: 'gameResult', matchID: 'ABC123456', playerCount: 5, questProgress: [], winner: 'good', reason: '刺杀未命中。', questScore: '3 : 2',
           players: [{
             playerID: '0', relativeSeatIndex: 0, seatNumber: 1, name: 'Alice', occupied: true, isCurrentPlayer: false,
             portrait: { kind: 'roleArtwork', role: 'merlin' }, markers: [], caption: { kind: 'role', role: 'merlin' }, emphasis: 'default', interaction: { kind: 'none' },
@@ -50,6 +50,9 @@ describe('RoomResultPreview', () => {
     )
 
     expect(html).toContain('正义阵营获胜')
+    expect(html).toContain('text-lg font-semibold')
+    expect(html).toContain('刺杀未命中')
+    expect(html).not.toContain('刺杀未命中。')
     expect(html).toContain('data-room-role-revealed="true"')
     expect(html).toContain('>梅林</span>')
     expect(html).not.toContain('data-seat-decoration=')
@@ -68,6 +71,7 @@ describe('RoomResultPreview', () => {
 
     expect(html).toContain('data-room-screen="true"')
     expect(html).toContain('所有玩家身份已公开，可查看对局记录')
+    expect(html).not.toContain('所有玩家身份已公开，可查看对局记录。')
     expect(html).toContain('打开开发预览控制')
     expect(scene.winner).toBe(winner)
     expect(scene.reason).toContain(reason)

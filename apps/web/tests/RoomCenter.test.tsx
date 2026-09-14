@@ -15,6 +15,12 @@ describe('RoomCenter', () => {
     expect(html).toContain('role="status"')
   })
 
+  it('sets the center baseline to the shared main-title size', () => {
+    const html = renderToStaticMarkup(<RoomCenter>正在加载房间</RoomCenter>)
+
+    expect(html).toContain('text-lg')
+  })
+
   it.each([
     ['compact', 'w-[152px]'],
     ['regular', 'w-[168px]'],

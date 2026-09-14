@@ -53,7 +53,9 @@ describe('RoomLobbyPreview', () => {
 
     expect(html).toContain('5 / 5')
     expect(html).toContain('开始游戏')
-    expect(html).toContain('所有玩家已入座')
+    expect(html).toContain('class="block text-lg text-white"')
+    expect(html).toContain('class="mt-1 block text-sm text-slate-400"')
+    expect(html).toMatch(/data-room-slot="phase-middle"[^>]*><p[^>]*>所有玩家已入座，可以开始游戏<\/p>/)
   })
 
   it('gives the demo root a definite viewport-sized room container', () => {

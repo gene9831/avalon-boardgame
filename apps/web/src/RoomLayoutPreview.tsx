@@ -1,4 +1,4 @@
-import { CircleHelp, Ellipsis, Eye, Ruler, ScrollText } from 'lucide-react'
+import { CircleHelp, Eye, Ruler } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
@@ -7,6 +7,7 @@ import { RoomBackButton } from './RoomBackButton'
 import { RoomLayout } from './RoomLayout'
 import './RoomLayoutPreview.css'
 import { RoomNumber } from './RoomNumber'
+import { RoomMoreMenu } from './RoomMoreMenu'
 import { RoomPhaseLabel } from './RoomPhaseLabel'
 import { RoomToolbar, type RoomToolbarItem } from './RoomToolbar'
 import type { QuestProgressNode } from './room-presentation'
@@ -141,8 +142,6 @@ export function RoomLayoutBasePreview() {
   const tools: readonly RoomToolbarItem[] = [
     { id: 'identity', icon: Eye, label: '身份信息', onActivate: () => setLastTool('身份信息') },
     { id: 'help', icon: CircleHelp, label: '帮助', onActivate: () => setLastTool('帮助') },
-    { id: 'log', icon: ScrollText, label: '对局记录', onActivate: () => setLastTool('对局记录') },
-    { id: 'room', icon: Ellipsis, label: '更多操作', onActivate: () => setLastTool('更多操作') },
   ]
 
   const toggleDiagnostics = () => {
@@ -191,7 +190,18 @@ export function RoomLayoutBasePreview() {
           phase: <RoomPhaseLabel phase="组建任务队伍" />,
           questProgress: <QuestProgressTrack nodes={previewQuestNodes} />,
           roomNumber: <RoomNumber matchID="7A3C9EF" />,
-          toolbar: <><RoomToolbar items={tools} /><span aria-live="polite" className="sr-only">{lastTool === '' ? '' : `已触发${lastTool}`}</span></>,
+          toolbar: <><RoomToolbar items={tools}>
+            <RoomMoreMenu
+              connected
+              entries={[]}
+              isOwner={false}
+              onRequestRoomExit={() => undefined}
+              roomExitBlocked
+              roomExitBusy={false}
+              seatChangePending={false}
+              showRoomExit={false}
+            />
+          </RoomToolbar><span aria-live="polite" className="sr-only">{lastTool === '' ? '' : `已触发${lastTool}`}</span></>,
         }}
         layoutRef={layout.ref}
         phasePanel={<PreviewRegion label="阶段操作区" tone="phase" />}

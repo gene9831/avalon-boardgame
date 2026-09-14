@@ -85,6 +85,12 @@ describe('RoomTeamProposalScene', () => {
     expect(complete).not.toMatch(/aria-label="确认队伍"[^>]*disabled=""/)
   })
 
+  it('uses the shared secondary-text size for the rejection counter in the center summary', () => {
+    const html = render(makeScene())
+
+    expect(html).toContain('class="mt-1 block text-sm text-slate-400">连续否决 2 / 5</span>')
+  })
+
   it('locks the original team action and every seat selection while pending', () => {
     const html = render(makeScene({ selectedCount: 3, canSubmit: true, submitRequestState: 'pending' }))
 

@@ -1,6 +1,5 @@
 import { CircleHelp, Eye, EyeOff } from 'lucide-react'
 
-import { RoomLogControl } from './RoomLogControl'
 import { RoomMoreMenu } from './RoomMoreMenu'
 import { RoomToolbar, type RoomToolbarItem } from './RoomToolbar'
 import type { RoomLogEntry } from './room-log'
@@ -59,18 +58,16 @@ export function RoomUtilities({ model, tools }: { model: RoomUtilitiesModel; too
 
   return (
     <RoomToolbar items={items}>
-      <RoomLogControl entries={tools.logEntries} />
-      {model.showRoomExit && (
-        <RoomMoreMenu
-          connected={tools.connected}
-          entries={tools.logEntries}
-          isOwner={tools.isOwner}
-          onRequestRoomExit={tools.onRequestRoomExit}
-          roomExitBlocked={tools.roomExitBlocked}
-          roomExitBusy={tools.roomExitBusy}
-          seatChangePending={tools.seatChangePending}
-        />
-      )}
+      <RoomMoreMenu
+        connected={tools.connected}
+        entries={tools.logEntries}
+        isOwner={tools.isOwner}
+        onRequestRoomExit={tools.onRequestRoomExit}
+        roomExitBlocked={tools.roomExitBlocked}
+        roomExitBusy={tools.roomExitBusy}
+        seatChangePending={tools.seatChangePending}
+        showRoomExit={model.showRoomExit}
+      />
     </RoomToolbar>
   )
 }

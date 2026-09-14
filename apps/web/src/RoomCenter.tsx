@@ -23,7 +23,7 @@ export function RoomCenter({
   return (
     <div
       {...props}
-      className={`room-center-summary font-avalon-serif shrink-0 text-center ${centerWidthByDensity[density]}`}
+      className={`room-center-summary font-avalon-serif shrink-0 text-center text-lg ${centerWidthByDensity[density]}`}
     >
       {children}
     </div>

@@ -47,6 +47,10 @@ function clueSummary(clue: RoomIdentityClue) {
   return '你没有需要辨认的玩家'
 }
 
+function stripTableCenterPeriod(value: string) {
+  return value.replace(/。+$/, '')
+}
+
 function confirmationLabel(clue: RoomIdentityClue) {
   return clue.kind === 'none' ? '我已了解' : '我已辨认'
 }
@@ -54,8 +58,8 @@ function confirmationLabel(clue: RoomIdentityClue) {
 function CenterMessage({ description, title, kind }: { description: string; title: string; kind: string }) {
   return (
     <RoomCenter data-identity-recognition-center={kind} density="compact" role="status">
-      <strong className="block text-base font-semibold text-amber-100">{title}</strong>
-      <span className="mt-1 block text-xs leading-5 text-slate-300">{description}</span>
+      <strong className="block text-lg font-semibold text-amber-100">{title}</strong>
+      <span className="mt-1 block text-sm leading-5 text-slate-300">{stripTableCenterPeriod(description)}</span>
     </RoomCenter>
   )
 }
@@ -66,11 +70,11 @@ function WaitingProgress({ scene, label }: {
 }) {
   return (
     <RoomCenter data-identity-recognition-center="waiting" density="compact" role="status">
-      <strong className="block text-2xl font-semibold text-amber-100">
+      <strong className="block text-lg font-semibold text-amber-100">
         {scene.confirmedCount} / {scene.participantCount}
       </strong>
       <span className="mt-1 block text-sm text-slate-200">{label}</span>
-      <span className="mt-1 block text-xs text-slate-400">等待其他玩家</span>
+      <span className="mt-1 block text-sm text-slate-400">等待其他玩家</span>
     </RoomCenter>
   )
 }
@@ -89,6 +93,12 @@ export function RoomIdentityRecognitionCenterSurface({
     case 'roleReveal':
       return <WaitingProgress label="玩家已确认身份" scene={scene} />
     case 'clue': {
+      if (presentation.clue.kind === 'none') {
+        if (presentation.view === 'waiting') {
+          return <WaitingProgress label="玩家已完成辨认" scene={scene} />
+        }
+        return <CenterMessage description={CLUE_COPY.none.description} title={CLUE_COPY.none.title} kind={presentation.clue.kind} />
+      }
       if (presentation.view === 'concealed' || presentation.view === 'revealing') {
         return <CenterMessage description="准备查看你的线索" title="夜幕降临" kind="concealed" />
       }
@@ -133,6 +143,24 @@ export function RoomIdentityRecognitionPhaseContentSurface({
         ),
       }
     case 'clue':
+      if (presentation.clue.kind === 'none') {
+        if (presentation.view === 'waiting') {
+          return {
+            title: '等待其他玩家',
+            middle: <p className="text-sm text-slate-300">你的线索已确认</p>,
+            action: null,
+          }
+        }
+        return {
+          title: '辨认你的线索',
+          middle: <p className="text-sm text-slate-300">你没有需要辨认的玩家</p>,
+          action: (
+            <RoomActionButton onClick={actions.onConfirm} requestState={presentation.confirmRequestState}>
+              {confirmationLabel(presentation.clue)}
+            </RoomActionButton>
+          ),
+        }
+      }
       if (presentation.view === 'waiting') {
         return {
           title: '等待其他玩家',
@@ -212,6 +240,11 @@ export function RoomIdentityRecognitionStageSurface({
       </section>
     )
   }
+
+  if (presentation.kind === 'clue' && presentation.clue.kind === 'none') {
+    return null
+  }
+
   if (presentation.view === 'waiting') return null
 
   const handleAnimationEnd = (event: AnimationEvent<HTMLDivElement>) => {
