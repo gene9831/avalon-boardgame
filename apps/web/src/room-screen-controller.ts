@@ -264,18 +264,22 @@ export function buildRoomSceneBinding(
     }
   }
 
+  const activeSettlement = input.activeSettlement ?? null
   if (!input.connected) {
     return {
       scene: {
         kind: 'connectionRecovery',
-        ...buildProductionSceneBase(input, 'none'),
+        ...buildProductionSceneBase(input, 'none', {
+          publicRevealedRolePlayerIDs: activeSettlement?.kind === 'assassination'
+            ? [activeSettlement.targetPlayerID]
+            : [],
+        }),
         manualReconnectAvailable: input.manualReconnectAvailable,
       },
       actions: { onReconnect: events.onReconnect },
     }
   }
 
-  const activeSettlement = input.activeSettlement ?? null
   if (activeSettlement?.kind === 'teamVote') {
     return {
       scene: {
@@ -639,6 +643,13 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
   const [settlementQueue, setSettlementQueue] = useState<readonly RoomSettlement[]>([])
   const baselineRef = useRef<Readonly<{ matchID: string; baseline: ReturnType<typeof establishSettlementBaseline> }> | null>(null)
   const settlementStorage = input.settlementReadStorage ?? browserSettlementReadStorage()
+  const observedBaseline = baselineRef.current
+  const pendingSettlement = input.game !== null && input.room !== null && observedBaseline?.matchID === input.matchID
+    ? findNewSettlements(input.game, observedBaseline.baseline).find(
+        (settlement) => !hasReadSettlement(settlementStorage, input.matchID, settlement.key),
+      ) ?? null
+    : null
+  const presentedSettlement = activeSettlement ?? settlementQueue[0] ?? pendingSettlement
   const phase = input.game === null ? 'loading' : input.game.status === 'lobby' ? 'lobby' : input.phase
 
   useEffect(() => {
@@ -894,7 +905,7 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
         assassinationSubmissionPending,
         identityRecognitionSubmissionPending,
         seatChangeTargetID: input.seatChangeTargetID,
-        activeSettlement,
+        activeSettlement: presentedSettlement,
       }, events)
 
   const toggleRoleKnowledge = () => {

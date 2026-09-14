@@ -131,6 +131,30 @@ describe('buildRoomSceneBinding', () => {
     expect(binding.actions).toEqual({ onReconnect: eventHandlers.onReconnect })
   })
 
+  it('keeps recovery reachable with only an active terminal settlement role reveal', () => {
+    const settlement: Extract<RoomSettlement, { kind: 'assassination' }> = {
+      kind: 'assassination', key: 'assassination:good:1', targetPlayerID: '1', targetRole: 'loyal_servant',
+      hit: false, winner: 'good', continueIntent: 'gameResult',
+    }
+    const binding = buildRoomSceneBinding({
+      ...readyInput('finished', {
+        status: 'finished',
+        result: { winner: 'good', reason: 'assassination', targetID: '1' },
+        revealedRoles: { '0': 'merlin', '1': 'loyal_servant', '2': 'percival', '3': 'assassin', '4': 'morgana' },
+      }),
+      connected: false,
+      manualReconnectAvailable: true,
+      activeSettlement: settlement,
+    }, eventHandlers)
+
+    expect(binding.scene).toMatchObject({
+      kind: 'connectionRecovery',
+      manualReconnectAvailable: true,
+    })
+    expect(binding.scene.players.filter(({ portrait }) => portrait.kind === 'roleArtwork').map(({ playerID }) => playerID)).toEqual(['1'])
+    expect(binding.actions).toEqual({ onReconnect: eventHandlers.onReconnect })
+  })
+
   it('correlates lobby, proposal, and vote scenes with only their own actions', () => {
     const lobby = buildRoomSceneBinding(readyInput('lobby', { status: 'lobby' }), eventHandlers)
     const proposal = buildRoomSceneBinding({
@@ -606,6 +630,114 @@ describe('useRoomScreenController recognition request lifecycle', () => {
 })
 
 describe('useRoomScreenController settlement queue', () => {
+  it('shows a terminal settlement before the final result first exposes all roles', async () => {
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    const observedScenes: Array<ReturnType<typeof useRoomScreenController>['binding']['scene']> = []
+    const receipts = new Map<string, string>()
+    const settlementReadStorage = {
+      getItem: (key: string) => receipts.get(key) ?? null,
+      setItem: (key: string, value: string) => { receipts.set(key, value) },
+    }
+    const input = (currentGame: AvalonPlayerView): UseRoomScreenControllerInput => ({
+      activeStage: undefined, canStart: false, connected: true,
+      currentPlayerID: '0', game: currentGame, manualReconnectAvailable: false,
+      matchID: room.matchID, onAssassinate: () => undefined, onCastTeamVote: () => undefined,
+      onChangeSeat: () => undefined, onConfirmIdentityRecognition: () => undefined,
+      onPlayQuestCard: () => undefined, onProposeTeam: () => undefined,
+      onReconnect: () => undefined, onStart: () => undefined, phase: 'finished',
+      room, seatChangeTargetID: null, startPending: false, settlementReadStorage,
+    })
+    function Harness({ value, observe }: { value: UseRoomScreenControllerInput; observe: boolean }) {
+      const controller = useRoomScreenController(value)
+      if (observe) observedScenes.push(controller.binding.scene)
+      return null
+    }
+
+    await act(async () => root.render(createElement(Harness, { value: input(game()), observe: false })))
+    await act(async () => root.render(createElement(Harness, {
+      observe: true,
+      value: input(game({
+        status: 'finished',
+        voteHistory: [{
+          questIndex: 0, team: ['0', '1'],
+          votes: { '0': 'reject', '1': 'reject', '2': 'reject', '3': 'approve', '4': 'approve' },
+          approved: false,
+        }],
+        consecutiveRejectedTeams: 5,
+        result: { winner: 'evil', reason: 'five_rejections' },
+        revealedRoles: { '0': 'merlin', '1': 'loyal_servant', '2': 'percival', '3': 'assassin', '4': 'morgana' },
+      })),
+    })))
+
+    expect(observedScenes[0]).toMatchObject({
+      kind: 'teamVote', view: { kind: 'result', approved: false, continueIntent: 'gameResult' },
+    })
+    expect(observedScenes[0]?.players.every(({ portrait }) => portrait.kind === 'playerAvatar')).toBe(true)
+
+    await act(async () => root.unmount())
+    container.remove()
+  })
+
+  it('keeps recovery reachable and all terminal roles concealed when a snapshot and disconnect arrive together', async () => {
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    const observedBindings: Array<ReturnType<typeof useRoomScreenController>['binding']> = []
+    const receipts = new Map<string, string>()
+    const settlementReadStorage = {
+      getItem: (key: string) => receipts.get(key) ?? null,
+      setItem: (key: string, value: string) => { receipts.set(key, value) },
+    }
+    const onReconnect = vi.fn()
+    const input = (currentGame: AvalonPlayerView, connected: boolean): UseRoomScreenControllerInput => ({
+      activeStage: undefined, canStart: false, connected,
+      currentPlayerID: '0', game: currentGame, manualReconnectAvailable: !connected,
+      matchID: room.matchID, onAssassinate: () => undefined, onCastTeamVote: () => undefined,
+      onChangeSeat: () => undefined, onConfirmIdentityRecognition: () => undefined,
+      onPlayQuestCard: () => undefined, onProposeTeam: () => undefined,
+      onReconnect, onStart: () => undefined, phase: 'finished',
+      room, seatChangeTargetID: null, startPending: false, settlementReadStorage,
+    })
+    function Harness({ value, observe }: { value: UseRoomScreenControllerInput; observe: boolean }) {
+      const controller = useRoomScreenController(value)
+      if (observe) observedBindings.push(controller.binding)
+      return null
+    }
+
+    await act(async () => root.render(createElement(Harness, { value: input(game(), true), observe: false })))
+    await act(async () => root.render(createElement(Harness, {
+      observe: true,
+      value: input(game({
+        status: 'finished',
+        voteHistory: [{
+          questIndex: 0, team: ['0', '1'],
+          votes: { '0': 'reject', '1': 'reject', '2': 'reject', '3': 'approve', '4': 'approve' },
+          approved: false,
+        }],
+        consecutiveRejectedTeams: 5,
+        result: { winner: 'evil', reason: 'five_rejections' },
+        revealedRoles: { '0': 'merlin', '1': 'loyal_servant', '2': 'percival', '3': 'assassin', '4': 'morgana' },
+      }), false),
+    })))
+
+    expect(observedBindings[0]?.scene).toMatchObject({
+      kind: 'connectionRecovery', manualReconnectAvailable: true,
+    })
+    expect(observedBindings[0]?.scene.players.every(({ portrait }) => portrait.kind === 'playerAvatar')).toBe(true)
+    expect(observedBindings[0]?.actions).toEqual({ onReconnect })
+    if (observedBindings[0]?.actions !== null && 'onReconnect' in observedBindings[0].actions) {
+      observedBindings[0].actions.onReconnect()
+    }
+    expect(onReconnect).toHaveBeenCalledOnce()
+
+    await act(async () => root.unmount())
+    container.remove()
+  })
+
   it('keeps an appended vote visible until continue, then returns to the authoritative phase', async () => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true
     const container = document.createElement('div')
