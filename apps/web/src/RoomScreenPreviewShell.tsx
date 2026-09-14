@@ -9,7 +9,7 @@ import { RoomBackButton } from './RoomBackButton'
 import { RoomMoreMenu } from './RoomMoreMenu'
 import { RoomToolbar, type RoomToolbarItem } from './RoomToolbar'
 import { resolveRoomLayoutDiagnosticsMode } from './room-layout-diagnostics'
-import type { RoomScene, RoomScreenProps, RoomScreenSlots } from './room-screen-props'
+import type { RoomScreenProps, RoomScreenSlots } from './room-screen-props'
 
 /** Distributive omit preserves the scene/actions discriminated pair. */
 type WithoutObservedShell<Props> = Props extends unknown ? Omit<Props, 'geometry' | 'slots'> : never
@@ -18,76 +18,12 @@ export type RoomScreenPreviewShellProps = WithoutObservedShell<RoomScreenProps> 
   controls: ReactNode
 }>
 
-function assertNever(value: never): never {
-  throw new Error(`Unhandled preview scene: ${String(value)}`)
-}
-
-function hasSceneKind<Kind extends RoomScene['kind']>(
-  props: RoomScreenPreviewShellProps,
-  kind: Kind,
-): props is Extract<RoomScreenPreviewShellProps, Readonly<{ scene: Readonly<{ kind: Kind }> }>> {
-  return props.scene.kind === kind
-}
-
 function renderObserved(
   props: RoomScreenPreviewShellProps,
   diagnosticsMode: ReturnType<typeof resolveRoomLayoutDiagnosticsMode>,
   slots: RoomScreenSlots,
 ) {
-  switch (props.scene.kind) {
-    case 'loading':
-      if (hasSceneKind(props, 'loading')) {
-        return <ObservedRoomScreen actions={props.actions} diagnosticsMode={diagnosticsMode} scene={props.scene} slots={slots} />
-      }
-      throw new Error('Preview scene binding did not match loading')
-    case 'connectionRecovery':
-      if (hasSceneKind(props, 'connectionRecovery')) {
-        return <ObservedRoomScreen actions={props.actions} diagnosticsMode={diagnosticsMode} scene={props.scene} slots={slots} />
-      }
-      throw new Error('Preview scene binding did not match connectionRecovery')
-    case 'lobby':
-      if (hasSceneKind(props, 'lobby')) {
-        return <ObservedRoomScreen actions={props.actions} diagnosticsMode={diagnosticsMode} scene={props.scene} slots={slots} />
-      }
-      throw new Error('Preview scene binding did not match lobby')
-    case 'identityConfirmation':
-      if (hasSceneKind(props, 'identityConfirmation')) {
-        return <ObservedRoomScreen actions={props.actions} diagnosticsMode={diagnosticsMode} scene={props.scene} slots={slots} />
-      }
-      throw new Error('Preview scene binding did not match identityConfirmation')
-    case 'identityRecognition':
-      if (hasSceneKind(props, 'identityRecognition')) {
-        return <ObservedRoomScreen actions={props.actions} diagnosticsMode={diagnosticsMode} scene={props.scene} slots={slots} />
-      }
-      throw new Error('Preview scene binding did not match identityRecognition')
-    case 'teamProposal':
-      if (hasSceneKind(props, 'teamProposal')) {
-        return <ObservedRoomScreen actions={props.actions} diagnosticsMode={diagnosticsMode} scene={props.scene} slots={slots} />
-      }
-      throw new Error('Preview scene binding did not match teamProposal')
-    case 'teamVote':
-      if (hasSceneKind(props, 'teamVote')) {
-        return <ObservedRoomScreen actions={props.actions} diagnosticsMode={diagnosticsMode} scene={props.scene} slots={slots} />
-      }
-      throw new Error('Preview scene binding did not match teamVote')
-    case 'quest':
-      if (hasSceneKind(props, 'quest')) {
-        return <ObservedRoomScreen actions={props.actions} diagnosticsMode={diagnosticsMode} scene={props.scene} slots={slots} />
-      }
-      throw new Error('Preview scene binding did not match quest')
-    case 'assassination':
-      if (hasSceneKind(props, 'assassination')) {
-        return <ObservedRoomScreen actions={props.actions} diagnosticsMode={diagnosticsMode} scene={props.scene} slots={slots} />
-      }
-      throw new Error('Preview scene binding did not match assassination')
-    case 'gameResult':
-      if (hasSceneKind(props, 'gameResult')) {
-        return <ObservedRoomScreen actions={props.actions} diagnosticsMode={diagnosticsMode} scene={props.scene} slots={slots} />
-      }
-      throw new Error('Preview scene binding did not match gameResult')
-    default:
-      return assertNever(props.scene)
-  }
+  return <ObservedRoomScreen {...props} diagnosticsMode={diagnosticsMode} slots={slots} />
 }
 
 /**

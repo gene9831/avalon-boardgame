@@ -195,7 +195,7 @@ roundTableFootprintCenter.y = maxStageHeight / 2
 
 实验室可以通过非公共详细入口取得圆桌基准框、完整占用包络、放置引导框 `placementGuide`、固定 `centerProtectionCircle`、跑道直线段、请求的玩家圆 gap、相邻视觉顺序的欧氏边界 gap，以及桌面中心补偿。渲染的 gap 线从每对相邻玩家圆的真实最近边界点开始，以其欧氏距离和旋转角显示。
 
-这些字段只用于原型绘制和算法检查，不从 `src/layout/index.ts` 导出，也不属于正式 Web 的稳定消费契约。
+这些字段只用于原型绘制和算法检查，不从 `packages/ui-layout/src/index.ts` 这个稳定入口导出；详细诊断字段仅通过 `packages/ui-layout/src/diagnostics.ts` 子入口提供，也不属于正式 Web 的稳定消费契约。
 
 ## 10. 代表结果
 

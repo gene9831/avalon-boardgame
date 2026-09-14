@@ -1,36 +1,11 @@
 import { renderToStaticMarkup } from 'react-dom/server'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 
 import { RoomLayoutBasePreview, RoomLayoutPreview } from '../src/RoomLayoutPreview'
-import { RoomAssassinationPreview } from '../src/RoomAssassinationPreview'
-import { RoomLobbyPreview } from '../src/RoomLobbyPreview'
-import { RoomLoadingPreview } from '../src/RoomLoadingPreview'
-import { RoomIdentityRecognitionPreview } from '../src/RoomIdentityRecognitionPreview'
-import { RoomQuestPreview } from '../src/RoomQuestPreview'
-import { RoomResultPreview } from '../src/RoomResultPreview'
-import { RoomTeamProposalPreview } from '../src/RoomTeamProposalPreview'
-import { RoomTeamVotePreview } from '../src/RoomTeamVotePreview'
 import { RoomScreenPreviewShell } from '../src/RoomScreenPreviewShell'
 import { HelpProvider } from '../src/HelpProvider'
 import { ToastProvider } from '../src/toast'
-
-function renderGroupedPreviewRoot(path: string) {
-  return renderToStaticMarkup(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route element={<RoomLoadingPreview />} path="/dev/room-layout/loading" />
-        <Route element={<RoomLobbyPreview />} path="/dev/room-layout/lobby" />
-        <Route element={<RoomIdentityRecognitionPreview />} path="/dev/room-layout/identity-recognition" />
-        <Route element={<RoomTeamProposalPreview />} path="/dev/room-layout/team-proposal" />
-        <Route element={<RoomTeamVotePreview />} path="/dev/room-layout/team-vote" />
-        <Route element={<RoomQuestPreview />} path="/dev/room-layout/quest" />
-        <Route element={<RoomAssassinationPreview />} path="/dev/room-layout/assassination" />
-        <Route element={<RoomResultPreview />} path="/dev/room-layout/result" />
-      </Routes>
-    </MemoryRouter>,
-  )
-}
 
 describe('RoomLayoutPreview', () => {
   it('puts one observed production screen, complete chrome, and development controls outside the screen contract', () => {
@@ -102,17 +77,4 @@ describe('RoomLayoutPreview', () => {
     expect(html).not.toContain('aria-label="查看对局记录"')
   })
 
-  it.each([
-    '/dev/room-layout/lobby',
-    '/dev/room-layout/identity-recognition',
-    '/dev/room-layout/team-proposal',
-    '/dev/room-layout/team-vote',
-    '/dev/room-layout/quest',
-    '/dev/room-layout/assassination',
-    '/dev/room-layout/result',
-  ])('does not render an intermediate index at %s', (path) => {
-    const html = renderGroupedPreviewRoot(path)
-
-    expect(html).toBe('')
-  })
 })

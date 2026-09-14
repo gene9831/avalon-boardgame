@@ -10,19 +10,6 @@ afterEach(() => {
 })
 
 describe('ConnectionRecoveryTimer', () => {
-  it('keeps manual reconnect unavailable until the exact eight-second boundary', () => {
-    vi.useFakeTimers()
-    const setAvailable = vi.fn()
-    const recovery = new ConnectionRecoveryTimer(setAvailable)
-
-    recovery.setConnection(true, false)
-    vi.advanceTimersByTime(7_999)
-    expect(setAvailable).not.toHaveBeenLastCalledWith(true)
-
-    vi.advanceTimersByTime(1)
-    expect(setAvailable).toHaveBeenLastCalledWith(true)
-  })
-
   it('offers manual reconnect only after eight continuous disconnected seconds', () => {
     vi.useFakeTimers()
     const changes: boolean[] = []

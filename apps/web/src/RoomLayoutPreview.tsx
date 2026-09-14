@@ -5,7 +5,9 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { QuestProgressTrack } from './QuestProgressTrack'
 import { RoomBackButton } from './RoomBackButton'
 import { RoomLayout } from './RoomLayout'
-import './RoomLayoutPreview.css'
+if (import.meta.env.DEV) {
+  void import('./RoomLayoutPreview.css')
+}
 import { RoomNumber } from './RoomNumber'
 import { RoomMoreMenu } from './RoomMoreMenu'
 import { RoomPhaseLabel } from './RoomPhaseLabel'
