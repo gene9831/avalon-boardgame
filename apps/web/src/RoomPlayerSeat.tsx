@@ -324,6 +324,7 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
       )}
       <span
         className="room-seat__name absolute font-avalon-serif"
+        data-nameplate-emphasis={player.emphasis === 'selected' || player.emphasis === 'questMember' ? 'cyan' : undefined}
         data-nameplate-size={nameSize}
         data-round-table-nameplate="true"
         data-seat-pointer-target="name"

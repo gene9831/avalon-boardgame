@@ -35,7 +35,7 @@ function makeScene(overrides: Partial<Scene> = {}): Scene {
   return {
     kind: 'teamProposal', matchID: 'proposal-room', playerCount: 5,
     players: [player], questProgress: [], questIndex: 1, requiredTeamSize: 3,
-    selectedCount: 0, consecutiveRejectedTeams: 2, perspective: 'leader',
+    selectedCount: 0, consecutiveRejectedTeams: 2, perspective: 'leader', teamTokens: [],
     canSubmit: false, submitRequestState: 'idle', ...overrides,
   }
 }
@@ -85,6 +85,26 @@ describe('RoomTeamProposalScene', () => {
     expect(complete).not.toMatch(/aria-label="确认队伍"[^>]*disabled=""/)
   })
 
+  it('renders a leader preselection as cancellable tokens with remaining placeholders', () => {
+    const html = render(makeScene({
+      selectedCount: 1,
+      teamTokens: [{ playerID: '0', seatNumber: 1, name: 'Alice', avatarID: 'merlin' }],
+    }))
+
+    expect(html).toContain('预选队伍 · 1 / 3')
+    expect(html).toContain('aria-label="1 号座位：Alice"')
+    expect(html.match(/data-team-token-placeholder="true"/g)).toHaveLength(2)
+    expect(html).not.toContain('需要 3 名队员')
+  })
+
+  it('keeps observer preselection empty and shows the observer center variant', () => {
+    const html = render(makeScene({ perspective: 'observer', teamTokens: [] }))
+
+    expect(html).toContain('等待队长提议队伍')
+    expect(html).toContain('需要 3 名队员')
+    expect(html).not.toContain('data-team-token')
+  })
+
   it('uses the shared secondary-text size for the rejection counter in the center summary', () => {
     const html = render(makeScene())
 
@@ -92,12 +112,18 @@ describe('RoomTeamProposalScene', () => {
   })
 
   it('locks the original team action and every seat selection while pending', () => {
-    const html = render(makeScene({ selectedCount: 3, canSubmit: true, submitRequestState: 'pending' }))
+    const html = render(makeScene({
+      selectedCount: 3,
+      canSubmit: true,
+      submitRequestState: 'pending',
+      teamTokens: [{ playerID: '0', seatNumber: 1, name: 'Alice', avatarID: 'merlin' }],
+    }))
 
     expect(html).toMatch(/aria-label="确认队伍"[^>]*disabled=""/)
     expect(html).toContain('>确认队伍</button>')
     expect(html).not.toContain('正在确认')
     expect(html).not.toContain('<button aria-label="选择 Alice 加入任务队伍')
+    expect(html).toMatch(/aria-label="1 号座位：Alice"[^>]*disabled=""/)
   })
 
   it('normalizes observer seats to non-actionable groups and removes the bottom action', () => {

@@ -1,6 +1,7 @@
 import { RoomActionButton } from './RoomActionButton'
 import { RoomCenter } from './RoomCenter'
 import { RoomSceneFrame } from './RoomSceneFrame'
+import { RoomTeamTokens } from './RoomTeamTokens'
 import type {
   RoomActionsByKind,
   RoomPlayerPresentation,
@@ -34,6 +35,7 @@ function proposalPlayers(scene: RoomTeamProposalSceneData): readonly RoomPlayerP
 
 export function RoomTeamProposalScene({ actions, geometry, scene, slots }: RoomTeamProposalSceneProps) {
   const leader = scene.perspective === 'leader'
+  const teamTokens = scene.teamTokens ?? []
   const framedScene = { ...scene, players: proposalPlayers(scene) }
 
   return (
@@ -43,7 +45,25 @@ export function RoomTeamProposalScene({ actions, geometry, scene, slots }: RoomT
         center: (
           <RoomCenter density="compact">
             <strong className="block text-lg font-semibold text-amber-200">第 {scene.questIndex + 1} 次任务</strong>
-            <span className="mt-1 block text-sm text-slate-300">需要 {scene.requiredTeamSize} 名队员</span>
+            {leader ? (
+              <>
+                <span className="mt-1 block text-sm text-slate-300">预选队伍 · {teamTokens.length} / {scene.requiredTeamSize}</span>
+                <div className="mt-2 flex justify-center">
+                  <RoomTeamTokens
+                    disabled={scene.submitRequestState === 'pending'}
+                    onActivatePlayer={actions.onActivatePlayer}
+                    requiredTeamSize={scene.requiredTeamSize}
+                    state="preview"
+                    tokens={teamTokens}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="mt-1 block text-sm text-slate-300">等待队长提议队伍</span>
+                <span className="mt-1 block text-sm text-slate-300">需要 {scene.requiredTeamSize} 名队员</span>
+              </>
+            )}
             {scene.consecutiveRejectedTeams > 0 && (
               <span className="mt-1 block text-sm text-slate-400">连续否决 {scene.consecutiveRejectedTeams} / 5</span>
             )}

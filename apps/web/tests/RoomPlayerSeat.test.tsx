@@ -70,6 +70,19 @@ describe('RoomPlayerSeat', () => {
     expect(html).toContain('data-seat-decoration="selected"')
     expect(html).toMatch(/<svg[^>]*fill="#0f172a"[^>]*class="lucide lucide-circle-check"/)
     expect(html).toMatch(/data-seat-decoration="leader"[^>]*>.*lucide-crown/s)
+    expect(html).toContain('data-nameplate-emphasis="cyan"')
+  })
+
+  it('gives submitted quest members the same cyan nameplate emphasis', () => {
+    const html = renderToStaticMarkup(
+      <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
+        ...player, emphasis: 'questMember', markers: [{ kind: 'questMember' }],
+      }} />,
+    )
+
+    expect(html).toContain('data-avatar-state="quest-member"')
+    expect(html).toContain('data-nameplate-emphasis="cyan"')
+    expect(html).toContain('data-seat-decoration="quest-member"')
   })
 
   it('uses the shared people icon for an explicit quest-member marker', () => {

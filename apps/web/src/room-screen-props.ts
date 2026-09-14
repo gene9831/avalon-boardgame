@@ -8,6 +8,7 @@ import type {
 import type { RoundTableStageLayoutResult } from '@avalon/ui-layout'
 
 import type { PlayerAvatarID } from './player-profile'
+import type { RoomTeamToken } from './RoomTeamTokens'
 
 /**
  * 所有网络提交统一使用这一状态。
@@ -146,6 +147,7 @@ export interface RoomTeamProposalScene
   perspective: 'leader' | 'observer'
   canSubmit: boolean
   submitRequestState: RoomRequestState
+  teamTokens?: readonly RoomTeamToken[]
 }
 
 export type RoomTeamVoteView =
@@ -166,6 +168,7 @@ export interface RoomTeamVoteScene
   submittedCount: number
   participantCount: number
   consecutiveRejectedTeams: number
+  teamTokens?: readonly RoomTeamToken[]
   view: RoomTeamVoteView
 }
 

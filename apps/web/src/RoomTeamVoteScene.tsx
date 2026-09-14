@@ -3,6 +3,7 @@ import type { TeamVote } from '@avalon/game'
 import { RoomActionButton, RoomChoiceButton } from './RoomActionButton'
 import { RoomCenter } from './RoomCenter'
 import { RoomSceneFrame, type RoomSceneContent } from './RoomSceneFrame'
+import { RoomTeamTokens } from './RoomTeamTokens'
 import type {
   RoomActionsByKind,
   RoomScreenGeometry,
@@ -83,6 +84,8 @@ function phaseContent(view: RoomTeamVoteView, actions: RoomActionsByKind['teamVo
 
 export function RoomTeamVoteScene({ actions, geometry, scene, slots }: RoomTeamVoteSceneProps) {
   const phase = phaseContent(scene.view, actions)
+  const finalVote = scene.consecutiveRejectedTeams === 4
+  const teamTokens = scene.teamTokens ?? []
   const framedScene = {
     ...scene,
     players: scene.players.map((player) => ({ ...player, interaction: { kind: 'none' } as const })),
@@ -91,13 +94,22 @@ export function RoomTeamVoteScene({ actions, geometry, scene, slots }: RoomTeamV
   return (
     <RoomSceneFrame
       content={{
-        title: scene.view.kind === 'waiting' ? '等待投票结果' : '表决任务队伍',
+        title: finalVote ? '最终表决 · 否决即邪恶获胜' : '表决任务队伍 · 过半通过',
         center: (
           <RoomCenter density="compact">
             <strong className="block text-lg font-semibold text-amber-200">第 {scene.questIndex + 1} 次任务</strong>
-            <span className="mt-1 block text-sm text-slate-300">{scene.submittedCount} / {scene.participantCount} 已投票</span>
+            <div className="mt-2 flex justify-center">
+              <RoomTeamTokens requiredTeamSize={teamTokens.length} state="confirmed" tokens={teamTokens} />
+            </div>
+            <span className="mt-1 block text-sm text-slate-300">已投票 {scene.submittedCount} / {scene.participantCount}</span>
             {scene.consecutiveRejectedTeams > 0 && (
-              <span className="mt-1 block text-sm text-slate-400">连续否决 {scene.consecutiveRejectedTeams} / 5</span>
+              <span
+                className="mt-1 block text-sm text-slate-400"
+                data-critical-rejection-warning={finalVote || undefined}
+              >
+                {finalVote && <span aria-label="最终否决风险" role="img">⚠️ </span>}
+                连续否决 {scene.consecutiveRejectedTeams} / 5
+              </span>
             )}
           </RoomCenter>
         ),

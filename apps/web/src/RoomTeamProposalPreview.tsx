@@ -4,7 +4,7 @@ import type { AvalonPlayerView, PlayerID } from '@avalon/game'
 
 import type { AvalonMatch, LobbyPlayer } from './lobby'
 import { getQuestTeamSize, toggleTeamMember } from './room-game'
-import { buildQuestProgress, buildRoomPlayers } from './room-presentation'
+import { buildQuestProgress, buildRoomPlayers, buildRoomTeamTokens } from './room-presentation'
 import type { RoomTeamProposalScene } from './room-screen-props'
 import { RoomScreenPreviewShell } from './RoomScreenPreviewShell'
 import { useToast } from './toast-context'
@@ -138,6 +138,7 @@ function TeamProposalPreviewScenario({ scenarioID }: { scenarioID: TeamProposalP
     perspective: isLeader ? 'leader' : 'observer',
     canSubmit: isLeader && !submitting && selectedTeam.length === requiredTeamSize,
     submitRequestState: submitting ? 'pending' : 'idle',
+    teamTokens: isLeader ? buildRoomTeamTokens(preview.room, selectedTeam) : [],
   }
   const controls = (
     <>

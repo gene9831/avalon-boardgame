@@ -19,7 +19,8 @@ const stageLayout = {
 function makeScene(view: Scene['view']): Scene {
   return {
     kind: 'teamVote', matchID: 'vote-room', playerCount: 5, players: [], questProgress: [],
-    questIndex: 2, submittedCount: 2, participantCount: 5, consecutiveRejectedTeams: 1, view,
+    questIndex: 2, submittedCount: 2, participantCount: 5, consecutiveRejectedTeams: 1,
+    teamTokens: [{ playerID: '1', seatNumber: 2, name: 'Bob', avatarID: 'merlin' }], view,
   }
 }
 
@@ -61,7 +62,10 @@ describe('RoomTeamVoteScene', () => {
     const unselected = render({ kind: 'choosing', selectedVote: null, canChoose: true, submitRequestState: 'idle' })
     const selected = render({ kind: 'choosing', selectedVote: 'approve', canChoose: true, submitRequestState: 'idle' })
 
-    expect(unselected).toContain('2 / 5')
+    expect(unselected).toContain('已投票 2 / 5')
+    expect(unselected).toContain('表决任务队伍 · 过半通过')
+    expect(unselected).toContain('data-team-token="filled"')
+    expect(unselected).toContain('aria-label="2 号座位：Bob"')
     expect(unselected).toContain('aria-label="同意任务队伍"')
     expect(unselected).toContain('aria-label="反对任务队伍"')
     expect(unselected).toMatch(/aria-label="确认投票"[^>]*disabled=""/)
@@ -90,5 +94,21 @@ describe('RoomTeamVoteScene', () => {
     expect(html).toContain('等待其他玩家投票')
     expect(html).not.toContain('确认投票')
     expect(html).not.toContain('aria-label="同意任务队伍"')
+    expect(html).toContain('data-team-token="filled"')
+  })
+
+  it('uses the final-vote title and text/icon rejection warning at four rejections', () => {
+    const html = renderToStaticMarkup(
+      <RoomTeamVoteScene
+        actions={{ onSelectVote: vi.fn(), onConfirmVote: vi.fn() }}
+        geometry={{ stageLayout }}
+        scene={{ ...makeScene({ kind: 'choosing', selectedVote: null, canChoose: true, submitRequestState: 'idle' }), consecutiveRejectedTeams: 4 }}
+        slots={{ back: null, toolbar: null }}
+      />,
+    )
+
+    expect(html).toContain('最终表决 · 否决即邪恶获胜')
+    expect(html).toContain('连续否决 4 / 5')
+    expect(html).toContain('data-critical-rejection-warning="true"')
   })
 })

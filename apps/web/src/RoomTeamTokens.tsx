@@ -44,7 +44,7 @@ export function RoomTeamTokens({
       className="room-team-tokens"
       data-team-token-layout={layout}
       data-team-token-state={state}
-      role="group"
+      role={onActivatePlayer === undefined ? 'list' : 'group'}
     >
       {tokens.map((token) => {
         const label = tokenLabel(token)
@@ -60,7 +60,14 @@ export function RoomTeamTokens({
         )
 
         return onActivatePlayer === undefined ? (
-          <span className="room-team-token" data-team-token="filled" key={token.playerID} title={label}>
+          <span
+            aria-label={label}
+            className="room-team-token"
+            data-team-token="filled"
+            key={token.playerID}
+            role="listitem"
+            title={label}
+          >
             {content}
           </span>
         ) : (

@@ -17,6 +17,7 @@ import { canSubmitTeam, getQuestTeamSize, toggleTeamMember } from './room-game'
 import {
   buildQuestProgress,
   buildRoomPlayers,
+  buildRoomTeamTokens,
   type RoomPlayerInteractionMode,
 } from './room-presentation'
 import type {
@@ -313,6 +314,7 @@ export function buildRoomSceneBinding(
           selectedTeam: input.selectedTeam,
         }),
         submitRequestState: isSubmitting ? 'pending' : 'idle',
+        teamTokens: isLeader ? buildRoomTeamTokens(input.room, input.selectedTeam) : [],
       },
       actions: {
         onActivatePlayer: events.onActivatePlayer,
@@ -335,6 +337,7 @@ export function buildRoomSceneBinding(
         submittedCount: input.game.submittedTeamVotePlayerIDs.length,
         participantCount: roomPlayerCount(input.room),
         consecutiveRejectedTeams: input.game.consecutiveRejectedTeams,
+        teamTokens: buildRoomTeamTokens(input.room, input.game.proposedTeam ?? []),
         view: submittedVote === undefined
           ? {
               kind: 'choosing',

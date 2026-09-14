@@ -135,7 +135,7 @@ describe('buildRoomSceneBinding', () => {
     const proposal = buildRoomSceneBinding({
       ...readyInput('teamProposal'),
       activeStage: 'leader',
-      selectedTeam: ['0', '1'],
+      selectedTeam: ['1', '0'],
     }, eventHandlers)
     const vote = buildRoomSceneBinding({
       ...readyInput('teamVote', {
@@ -153,10 +153,12 @@ describe('buildRoomSceneBinding', () => {
     expect(proposal.scene).toMatchObject({
       kind: 'teamProposal', perspective: 'leader', requiredTeamSize: 2,
       selectedCount: 2, canSubmit: true, submitRequestState: 'idle',
+      teamTokens: [{ playerID: '0', seatNumber: 1 }, { playerID: '1', seatNumber: 2 }],
     })
     expect(Object.keys(proposal.actions ?? {})).toEqual(['onActivatePlayer', 'onSubmitTeam'])
     expect(vote.scene).toMatchObject({
       kind: 'teamVote', submittedCount: 2, participantCount: 5,
+      teamTokens: [{ playerID: '0', seatNumber: 1 }, { playerID: '2', seatNumber: 3 }],
       view: { kind: 'choosing', selectedVote: 'approve', canChoose: true, submitRequestState: 'idle' },
     })
     expect(Object.keys(vote.actions ?? {})).toEqual(['onSelectVote', 'onConfirmVote'])
@@ -183,7 +185,7 @@ describe('buildRoomSceneBinding', () => {
 
     expect(lobbyPlayer.scene).toMatchObject({ kind: 'lobby', viewer: 'player', canStart: false })
     expect(proposalObserver.scene).toMatchObject({
-      kind: 'teamProposal', perspective: 'observer', canSubmit: false,
+      kind: 'teamProposal', perspective: 'observer', canSubmit: false, teamTokens: [],
     })
     expect(proposalObserver.scene.players.every(({ interaction }) => interaction.kind === 'none')).toBe(true)
     expect(submittedVoter.scene).toMatchObject({

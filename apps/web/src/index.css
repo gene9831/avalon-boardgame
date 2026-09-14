@@ -88,6 +88,7 @@ select {
   line-height: 1.1;
   box-shadow: 0 5px 12px rgb(0 0 0 / 40%);
 }
+.room-seat__name[data-nameplate-emphasis='cyan'] { border-color: rgb(103 232 249 / 62%); box-shadow: 0 0 12px rgb(34 211 238 / 30%), 0 5px 12px rgb(0 0 0 / 40%); }
 .room-seat__decoration {
   position: absolute;
   z-index: 4;

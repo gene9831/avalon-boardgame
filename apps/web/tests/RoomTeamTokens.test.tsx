@@ -34,6 +34,18 @@ describe('RoomTeamTokens', () => {
     expect(html).not.toMatch(/>Alice</)
   })
 
+  it('exposes every confirmed read-only member identity without making tokens interactive', () => {
+    const html = renderToStaticMarkup(
+      <RoomTeamTokens requiredTeamSize={2} state="confirmed" tokens={tokens} />,
+    )
+
+    expect(html).toContain('aria-label="1 号座位：Alice"')
+    expect(html).toContain('aria-label="3 号座位：Caro"')
+    expect(html).toContain('role="list"')
+    expect(html.match(/role="listitem"/g)).toHaveLength(2)
+    expect(html).not.toContain('<button')
+  })
+
   it.each([
     [2, 'single-row'],
     [3, 'single-row'],
