@@ -173,7 +173,9 @@
 
 ## 当前验证基线
 
-最近一次验证日期：2026-09-13
+最近一次验证日期：2026-09-14
+
+2026-09-14 房间场景复审收口：共享圆桌现在以明确的 1-based 座位号区分玩家，组队队长在桌心使用仅显示头像与编号的本地预选槽位，投票阶段沿用已提交队伍；非队长组队时只显示“等待队长提议队伍”和所需人数，不接收未提交选择。投票、任务与刺杀结算改为浏览器标签页内的公开结算队列：首次快照只建立基线，新事件按顺序逐条呈现，继续按钮仅关闭本地结算而不发送服务端 move；历史回放会截断到对应任务进度，投票/任务结算不会提前显示后续任务结果或终局全员身份，刺杀结算只揭示目标，真正的对局结果才揭示全部角色。进行中的结算仍支持查看本人身份及 `playerView` 已授权线索。最终 Sol 整分支复审无 P0–P3；实际自动化验证为根级 **792 tests passed**（Web 62 files / 439 tests）、`pnpm typecheck`、`pnpm lint`、`pnpm build` 与两个 `git diff --check` 全部 exit 0。Vite 仅保留单个 614.03 kB minified / 183.29 kB gzip JavaScript chunk 超过 500 kB 的建议性警告。应用内浏览器人工复核覆盖 5、7、10 人竖屏及紧凑横屏的组队、投票、任务、刺杀和终局代表场景，未发现页面或内部滚动溢出；本次仍未执行真实 5–10 台设备 LAN、多房间隔离、PostgreSQL 重启或凭据重连人工验收。
 
 2026-09-13 房间场景重构清理：先完成遗留 consumer 搜索，再删除无消费者的旧入口、模型、中心、阶段内容、overlay 和仅覆盖其内部结构的测试；保留并继续运行 scene controller 的隐藏信息与请求状态回归。新增 loading preview 的测试先因模块缺失 RED，随后实现 development-only `/dev/room-layout/loading` 路由和索引入口后 GREEN。最终复审将正式身份辨认 scene 的私密呈现收敛为 `roleReveal`、`clue`、`observer` 判别联合：获授权的第一幕参与者始终看到完整 `RoleCard`，确认等待期间也保留角色资料；非参与者不携带私密内容并保持静态闭幕。控制器在连接丢失时清除身份、提案、投票、任务和刺杀五类本地 pending，同时保留队伍、投票、任务牌和刺杀目标选择，允许同阶段重连后重试。实际自动化验证：聚焦 4 files / 59 tests 通过；`pnpm --filter @avalon/web test` 为 **59 files / 391 passed**；`pnpm --filter @avalon/web exec tsc -p tsconfig.app.json --noEmit`、`pnpm --filter @avalon/web build`、`pnpm --filter @avalon/web lint` 与 `git diff --check` 均 exit 0。Vite 保留单个 603.20 kB minified / 181.31 kB gzip JavaScript chunk 超过 500 kB 的建议性警告。Chromium 本地预览已完成 390×844 竖屏、844×390 紧凑横屏、1280×720 标准横屏三视口矩阵：10 条顶层场景代表路由共 30 个组合通过，控制台为 0 error / 0 warning；该检查早于最终复审修复，且仅覆盖本地 preview 和 5 人代表场景，未覆盖 6–10 人密度、Firefox、Safari/iOS 安全区、浏览器缩放或系统文字缩放。真实 5–10 台设备 LAN、多房间隔离、PostgreSQL 重启或凭据重连验收仍未执行。
 
