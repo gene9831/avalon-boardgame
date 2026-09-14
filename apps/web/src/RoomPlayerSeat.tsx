@@ -9,7 +9,6 @@ import {
   House,
   LoaderCircle,
   ShieldAlert,
-  UserRound,
 } from 'lucide-react'
 import { loyaltyForRole, type Role, type TeamVote } from '@avalon/game'
 import type { PlayerSeatLayout, Rect } from '@avalon/ui-layout'
@@ -17,6 +16,7 @@ import type { PlayerSeatLayout, Rect } from '@avalon/ui-layout'
 import { PlayerAvatar } from './player-avatars'
 import { RoleAvatar } from './RoleCard'
 import { ROLE_LABELS } from './room-game'
+import { RoomSeatNumberBadge } from './RoomSeatNumberBadge'
 import type {
   RoomPlayerCaption,
   RoomPlayerInteraction,
@@ -51,10 +51,9 @@ function localRectStyle(rect: Rect, bounds: Rect): CSSProperties {
 
 type NameplateSize = 'short' | 'medium' | 'max'
 
-function nameplateSize(label: string, hasOwnerIcon: boolean, seatNumber: number | null): NameplateSize {
+function nameplateSize(label: string, hasOwnerIcon: boolean): NameplateSize {
   const visualLength = Array.from(label.replace(/\s/g, '')).length +
-    (hasOwnerIcon ? 1 : 0) +
-    (seatNumber === null ? 0 : String(seatNumber).length)
+    (hasOwnerIcon ? 1 : 0)
   if (visualLength <= 4) return 'short'
   if (visualLength <= 7) return 'medium'
   return 'max'
@@ -118,11 +117,7 @@ function markerDecoration(marker: RoomPlayerMarker, index: number): ReactNode {
         </span>
       )
     case 'questMember':
-      return (
-        <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="quest-member" key={`${marker.kind}-${index}`}>
-          <UserRound />
-        </span>
-      )
+      return null
     case 'vote':
       return (
         <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="vote" key={`${marker.kind}-${index}`}>
@@ -274,7 +269,7 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
   const avatarStyle = localRectStyle(layout.avatarRect, layout.playerSeatBounds)
   const visibleName = player.occupied ? player.name : interaction.pending ? '换座中' : '空位'
   const owner = player.markers.some((marker) => marker.kind === 'owner')
-  const nameSize = nameplateSize(visibleName, owner, player.occupied ? player.seatNumber : null)
+  const nameSize = nameplateSize(visibleName, owner)
   const nameStyle = localNameStyle(layout.nameRect, layout.playerSeatBounds, nameSize)
   const roleStyle = localRoleStyle(layout.nameRect, layout.playerSeatBounds)
   const role = portraitRole(player.portrait)
@@ -326,7 +321,7 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
         >
           {interaction.pending
             ? <LoaderCircle aria-hidden="true" className="size-5 animate-spin" />
-            : player.seatNumber}
+            : <span aria-hidden="true" data-empty-seat-symbol="true">+</span>}
         </span>
       )}
       <span
@@ -338,16 +333,12 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
         style={nameStyle}
         title={player.occupied ? player.name : `${player.seatNumber} 号空座位`}
       >
-        {player.occupied && (
-          <span aria-hidden="true" className="room-seat__seat-number" data-seat-number="true">
-            {player.seatNumber}
-          </span>
-        )}
         {owner && <RoomOwnerIcon />}
         <span className="min-w-0 truncate">{visibleName}</span>
       </span>
       {captionContent(player.caption, roleStyle)}
       <span className="room-seat__decorations absolute" style={avatarStyle}>
+        <RoomSeatNumberBadge seatNumber={player.seatNumber} />
         {selected && (
           <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="selected">
             <CircleCheck fill="#0f172a" />

@@ -28,7 +28,7 @@ describe('RoomTeamTokens', () => {
     )
 
     expect(html).toContain('data-player-avatar="merlin"')
-    expect(html).toContain('data-team-token-seat-number="true"')
+    expect(html).toContain('data-room-seat-number-badge="true"')
     expect(html).toContain('aria-label="1 号座位：Alice"')
     expect(html).toContain('title="1 号座位：Alice"')
     expect(html).not.toMatch(/>Alice</)

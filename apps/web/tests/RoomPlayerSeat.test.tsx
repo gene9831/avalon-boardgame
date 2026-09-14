@@ -82,16 +82,8 @@ describe('RoomPlayerSeat', () => {
 
     expect(html).toContain('data-avatar-state="quest-member"')
     expect(html).toContain('data-nameplate-emphasis="cyan"')
-    expect(html).toContain('data-seat-decoration="quest-member"')
-  })
-
-  it('uses the shared people icon for an explicit quest-member marker', () => {
-    const html = renderToStaticMarkup(
-      <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
-        ...player, markers: [{ kind: 'questMember' }],
-      }} />,
-    )
-    expect(html).toMatch(/data-seat-decoration="quest-member"[^>]*>.*lucide-user-round/s)
+    expect(html).toContain('aria-label="1. Alice，任务队员"')
+    expect(html).not.toContain('data-seat-decoration="quest-member"')
   })
 
   it('renders a non-button group when the seat has no interaction', () => {
@@ -100,7 +92,7 @@ describe('RoomPlayerSeat', () => {
     expect(html).not.toContain('<button')
   })
 
-  it('keeps the occupied seat number directly before the name when terminal role artwork replaces the avatar', () => {
+  it('keeps the shared seat-number badge when terminal role artwork replaces the avatar', () => {
     const html = renderToStaticMarkup(
       <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
         ...player,
@@ -109,8 +101,9 @@ describe('RoomPlayerSeat', () => {
       }} />,
     )
 
-    expect(html).toMatch(/data-round-table-nameplate="true"[^>]*>.*data-seat-number="true"[^>]*>1<\/span>.*Alice.*<\/span>/s)
-    expect(html).not.toContain('data-seat-number-badge="true"')
+    expect(html).toContain('data-room-seat-number-badge="true">1</span>')
+    expect(html).toMatch(/data-round-table-nameplate="true"[^>]*>.*Alice.*<\/span>/s)
+    expect(html).not.toContain('data-seat-number="true"')
   })
 
   it('keeps a disabled occupied lobby seat grouped while an enabled empty destination is actionable', () => {
@@ -132,6 +125,8 @@ describe('RoomPlayerSeat', () => {
     expect(emptyHtml).toContain('<button')
     expect(emptyHtml).toContain('aria-label="移至 2 号空座位"')
     expect(emptyHtml).toContain('data-seat-state="empty"')
+    expect(emptyHtml).toContain('data-room-seat-number-badge="true">2</span>')
+    expect(emptyHtml).toContain('data-empty-seat-symbol="true">+</span>')
     expect(emptyHtml).toContain('>空位</span>')
   })
 
@@ -201,15 +196,17 @@ describe('RoomPlayerSeat', () => {
     expect(html).not.toMatch(/class="room-seat__name[^"]*font-avalon-serif/)
   })
 
-  it('counts a two-digit seat number and places it before the owner marker and player name', () => {
+  it('keeps a two-digit seat number in the avatar badge and out of the nameplate', () => {
     const html = renderToStaticMarkup(
       <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
         ...player, seatNumber: 10, name: '银月', markers: [{ kind: 'owner' }],
       }} />,
     )
 
-    expect(html).toContain('data-nameplate-size="medium"')
-    expect(html).toMatch(/data-round-table-nameplate="true"[^>]*>.*data-seat-number="true"[^>]*>10<\/span>.*data-seat-decoration="owner".*银月.*<\/span>/s)
+    expect(html).toContain('data-room-seat-number-badge="true">10</span>')
+    expect(html).toContain('data-nameplate-size="short"')
+    expect(html).toMatch(/data-round-table-nameplate="true"[^>]*>.*data-seat-decoration="owner".*银月.*<\/span>/s)
+    expect(html).not.toContain('data-seat-number="true"')
   })
 
   it('assigns short, medium, and maximum nameplate width tiers', () => {
@@ -222,7 +219,7 @@ describe('RoomPlayerSeat', () => {
     expect(renderNameplate('林 1')).toContain('data-nameplate-size="short" data-round-table-nameplate="true" data-seat-pointer-target="name" style="left:14px;top:64px;width:64px')
     expect(renderNameplate('暮色森林 7')).toContain('data-nameplate-size="medium" data-round-table-nameplate="true" data-seat-pointer-target="name" style="left:2px;top:64px;width:88px')
     expect(renderNameplate('阿瓦隆远征骑士 10')).toContain('data-nameplate-size="max" data-round-table-nameplate="true" data-seat-pointer-target="name" style="left:0;top:64px;width:92px')
-    expect(renderNameplate('银月 3', true)).toContain('data-nameplate-size="medium" data-round-table-nameplate="true" data-seat-pointer-target="name" style="left:2px;top:64px;width:88px')
+    expect(renderNameplate('银月 3', true)).toContain('data-nameplate-size="short" data-round-table-nameplate="true" data-seat-pointer-target="name" style="left:14px;top:64px;width:64px')
   })
 
   it.each([

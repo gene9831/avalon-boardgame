@@ -57,9 +57,9 @@ select {
 }
 .room-seat__portrait { display: grid; width: 100%; height: 100%; place-items: center; overflow: hidden; border-radius: inherit; }
 .room-seat__portrait[data-seat-portrait-connected='false'] { filter: grayscale(1); opacity: 0.45; }
-.room-seat__seat-number { flex: none; color: #fbbf24; font-size: 0.625rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
 .room-seat__disconnected { position: absolute; inset-inline: 0; bottom: 0; padding-block: 1px; color: #cbd5e1; background: rgb(15 23 42 / 88%); font-size: 0.625rem; line-height: 1rem; }
 .room-seat__avatar--empty { border-style: dashed; border-color: rgb(148 163 184 / 38%); color: #94a3b8; background: rgb(15 23 42 / 30%); }
+.room-seat__avatar--empty [data-empty-seat-symbol='true'] { font-size: 1.25rem; line-height: 1; }
 .room-seat:not(:disabled):hover .room-seat__avatar--empty,
 .room-seat:focus-visible .room-seat__avatar--empty { border-color: rgb(226 232 240 / 72%); color: #e2e8f0; background: rgb(30 41 59 / 58%); }
 .room-seat__avatar[data-avatar-state='selected'],
@@ -99,7 +99,7 @@ select {
   border-radius: 9999px;
   pointer-events: none;
 }
-.room-seat__decorations { z-index: 4; pointer-events: none; }
+.room-seat__decorations { z-index: 4; container-name: room-seat-decorations; container-type: inline-size; pointer-events: none; }
 .room-seat__decoration svg { width: 0.75rem; height: 0.75rem; }
 .room-seat__owner-icon { display: grid; width: 0.75rem; height: 0.75rem; flex: none; place-items: center; color: #94a3b8; }
 .room-seat__owner-icon svg { width: 0.75rem; height: 0.75rem; stroke-width: 2; }
@@ -108,9 +108,9 @@ select {
 .room-seat__decoration[data-seat-decoration='leader'] svg path:last-child { display: none; }
 .room-seat__decoration[data-seat-decoration='vote'] { right: -0.3rem; bottom: -0.3rem; color: #e2e8f0; background: #0f172a; }
 .room-seat__decoration[data-seat-decoration='selected'] { right: -0.3rem; top: -0.3rem; color: #67e8f9; }
-.room-seat__decoration[data-seat-decoration='quest-member'] { left: 50%; bottom: -0.3rem; color: #f3e5c3; background: #5b4630; transform: translateX(-50%); }
 .room-seat__decoration[data-seat-decoration='known-evil'] { right: -0.3rem; top: -0.3rem; color: #ffe4e6; background: #881337; }
 .room-seat__decoration[data-seat-decoration='merlin-candidate'] { right: -0.3rem; top: -0.3rem; color: #fef3c7; background: #78350f; }
+.room-seat__decoration[data-seat-decoration='assassination-target'] { left: -0.3rem; bottom: -0.3rem; color: #fecdd3; background: #881337; }
 .room-seat:focus-visible { outline: none; }
 .room-seat:focus-visible .room-seat__avatar,
 .room-seat:focus-visible .room-seat__name { outline: 2px solid currentColor; outline-offset: 2px; }
@@ -121,7 +121,11 @@ select {
 button.room-team-token { cursor: pointer; }
 button.room-team-token:disabled { cursor: default; opacity: 0.55; }
 .room-team-token__avatar { display: grid; width: 100%; height: 100%; place-items: center; overflow: hidden; border-radius: inherit; }
-.room-team-token__seat-number { position: absolute; top: -0.2rem; left: -0.2rem; display: grid; min-width: 1rem; height: 1rem; padding-inline: 0.2rem; place-items: center; border: 1px solid rgb(255 255 255 / 35%); border-radius: 9999px; color: #f8fafc; background: rgb(15 23 42 / 88%); font: 600 0.625rem/1 Inter, ui-sans-serif, system-ui, sans-serif; }
+.room-seat-number-badge { position: absolute; top: -0.1rem; left: -0.4rem; display: grid; min-width: 0.875rem; height: 0.875rem; padding-inline: 0.1rem; place-items: center; border: 1px solid rgb(255 255 255 / 35%); border-radius: 9999px; color: #f8fafc; background: rgb(15 23 42 / 88%); font: 600 0.55rem/1 Inter, ui-sans-serif, system-ui, sans-serif; }
+@container room-seat-decorations (max-width: 40px) {
+  .room-seat__decoration[data-seat-decoration='leader'] { left: 55%; top: -0.65rem; width: 1.1rem; height: 1.1rem; }
+  .room-seat__decoration[data-seat-decoration='leader'] svg { width: 0.8rem; height: 0.8rem; }
+}
 .room-team-token--placeholder { border-style: dashed; border-color: rgb(216 198 159 / 50%); color: #d6c69f; background: rgb(15 23 42 / 30%); font: 400 1.5rem/1 var(--font-avalon-serif); }
 @media (prefers-reduced-motion: reduce) { .room-team-token { scroll-behavior: auto; } }
 

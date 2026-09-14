@@ -1,6 +1,7 @@
 import type { PlayerID } from '@avalon/game'
 
 import { PlayerAvatar } from './player-avatars'
+import { RoomSeatNumberBadge } from './RoomSeatNumberBadge'
 import type { PlayerAvatarID } from './player-profile'
 
 export type RoomTeamToken = Readonly<{
@@ -44,9 +45,7 @@ export function RoomTeamTokens({
         <span className="room-team-token__avatar" aria-hidden="true">
           <PlayerAvatar avatarID={token.avatarID} className="size-full object-contain p-[12%]" />
         </span>
-        <span aria-hidden="true" className="room-team-token__seat-number" data-team-token-seat-number="true">
-          {token.seatNumber}
-        </span>
+        <RoomSeatNumberBadge seatNumber={token.seatNumber} />
       </>
     )
 
