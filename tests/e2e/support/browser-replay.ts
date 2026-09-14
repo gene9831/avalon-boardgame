@@ -78,7 +78,7 @@ export async function joinRoom(
 }
 
 const RECOGNITION_CONFIRMATION_LABELS: Record<BrowserRecognitionStep, string> = {
-  roleReveal: '我已确认身份',
+  roleReveal: '我已记住身份',
   evilRecognition: '我已辨认',
   merlinRecognition: '我已辨认',
   percivalRecognition: '我已辨认',
@@ -93,7 +93,20 @@ export async function confirmRecognitionParticipants(
 
   for (const [index, page] of pages.entries()) {
     if (step === 'roleReveal') {
-      await expect(page.locator('[data-identity-step="roleReveal"]')).toBeVisible()
+      await expect(page.locator('[data-room-scene="identityConfirmation"]')).toBeVisible()
+      const revealIdentity = page.locator('[data-room-slot="phase-action"]')
+        .getByRole('button', { exact: true, name: '揭示身份' })
+      if (
+        await revealIdentity.count() === 1 &&
+        await revealIdentity.isVisible() &&
+        await revealIdentity.isEnabled()
+      ) {
+        await revealIdentity.click()
+      }
+      const confirmation = page.getByRole('button', { exact: true, name: confirmationLabel })
+      await expect(confirmation).toBeVisible()
+      participants.push({ page, playerID: String(index) })
+      continue
     }
     const reveal = page.getByRole('button', { exact: true, name: '查看线索' })
     if (await reveal.count() === 1) {
@@ -170,19 +183,31 @@ export async function createBrowserReplayHarness(options: {
           case 'startGame':
             await page.getByRole('button', { name: '开始游戏' }).click()
             await expect(
-              pages[0].locator('[data-curtain-state="lowered"]'),
+              pages[0].locator('[data-room-scene="identityConfirmation"]'),
             ).toBeVisible()
+            await expect(pages[0].locator('[data-identity-confirmation-state="concealed"]')).toBeVisible()
             return
           case 'confirmIdentityRecognition':
             let confirmationButton = page.getByRole('button', {
               exact: true,
-              name: /^(我已确认身份|我已辨认|我已了解)$/,
+              name: /^(我已记住身份|我已辨认|我已了解)$/,
             })
             if (await confirmationButton.count() === 0) {
-              await page.getByRole('button', { exact: true, name: '查看线索' }).click()
+              const revealIdentity = page.locator('[data-room-slot="phase-action"]')
+                .getByRole('button', { exact: true, name: '揭示身份' })
+              if (
+                await revealIdentity.count() === 1 &&
+                await revealIdentity.isVisible() &&
+                await revealIdentity.isEnabled()
+              ) {
+                await revealIdentity.click()
+              } else {
+                const revealClue = page.getByRole('button', { exact: true, name: '查看线索' })
+                if (await revealIdentity.count() === 0) await revealClue.click()
+              }
               confirmationButton = page.getByRole('button', {
                 exact: true,
-                name: /^(我已确认身份|我已辨认|我已了解)$/,
+                name: /^(我已记住身份|我已辨认|我已了解)$/,
               })
               await expect(confirmationButton).toBeVisible()
             }

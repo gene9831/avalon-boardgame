@@ -1,7 +1,6 @@
 import type { AnimationEvent, ReactNode } from 'react'
 import { RoomActionButton } from './RoomActionButton'
 import { RoomCenter } from './RoomCenter'
-import { RoleCard } from './RoleCard'
 import type {
   RoomActionsByKind,
   RoomIdentityClue,
@@ -90,8 +89,6 @@ export function RoomIdentityRecognitionCenterSurface({
   switch (presentation.kind) {
     case 'observer':
       return <WaitingProgress label="玩家正在完成辨认" scene={scene} />
-    case 'roleReveal':
-      return <WaitingProgress label="玩家已确认身份" scene={scene} />
     case 'clue': {
       if (presentation.clue.kind === 'none') {
         if (presentation.view === 'waiting') {
@@ -124,23 +121,6 @@ export function RoomIdentityRecognitionPhaseContentSurface({
         title: '等待其他玩家',
         middle: <p className="text-sm text-slate-300">等待参与玩家完成辨认</p>,
         action: null,
-      }
-    case 'roleReveal':
-      if (presentation.view === 'waiting') {
-        return {
-          title: '等待其他玩家',
-          middle: <p className="text-sm text-slate-300">你的身份已确认，等待其他玩家</p>,
-          action: null,
-        }
-      }
-      return {
-        title: '确认你的身份',
-        middle: <p className="text-sm text-slate-300">记住角色能力与本局目标</p>,
-        action: (
-          <RoomActionButton onClick={actions.onConfirm} requestState={presentation.confirmRequestState}>
-            我已确认身份
-          </RoomActionButton>
-        ),
       }
     case 'clue':
       if (presentation.clue.kind === 'none') {
@@ -221,26 +201,6 @@ export function RoomIdentityRecognitionStageSurface({
       </section>
     )
   }
-  if (presentation.kind === 'roleReveal') {
-    return (
-      <section
-        aria-label="身份辨认"
-        className="pointer-events-none absolute inset-0 z-[30] overflow-hidden"
-        data-curtain-state="lowered"
-        data-identity-step="roleReveal"
-        data-table-visibility="hidden"
-      >
-        <div aria-hidden="true" className="identity-curtain identity-curtain--lowering absolute inset-0">
-          <CurtainDecoration />
-        </div>
-        <div className="identity-role-reveal-content relative z-10 flex h-full flex-col items-center justify-center gap-4 p-3">
-          <h2 className="font-serif text-xl font-semibold text-amber-50">查看你的身份</h2>
-          <RoleCard role={presentation.role} />
-        </div>
-      </section>
-    )
-  }
-
   if (presentation.kind === 'clue' && presentation.clue.kind === 'none') {
     return null
   }

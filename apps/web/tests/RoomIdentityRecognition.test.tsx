@@ -156,27 +156,6 @@ describe('RoomIdentityRecognitionScene', () => {
     expect(html).not.toContain('data-avatar-state="known-evil"')
   })
 
-  it('shows the complete authorized role card and retains it after confirmation', () => {
-    const roleReveal = (view: 'revealed' | 'waiting'): RoomIdentityRecognitionSceneData => ({
-      kind: 'identityRecognition', matchID: 'ABC123456', playerCount: 3, players, questProgress: [],
-      presentation: { kind: 'roleReveal', role: 'merlin', view, confirmRequestState: 'idle' },
-      confirmedCount: view === 'waiting' ? 1 : 0, participantCount: 3,
-    })
-
-    const revealed = renderSceneData(roleReveal('revealed'))
-    const waiting = renderSceneData(roleReveal('waiting'))
-
-    for (const html of [revealed, waiting]) {
-      expect(html).toContain('data-curtain-state="lowered"')
-      expect(html).toContain('data-role-card="merlin"')
-      expect(html).toContain('aria-label="我的身份：梅林"')
-      expect(html).toContain('本局目标：')
-    }
-    expect(revealed).toContain('>我已确认身份<')
-    expect(waiting).toContain('你的身份已确认，等待其他玩家')
-    expect(waiting).not.toContain('>我已确认身份<')
-  })
-
   it('keeps observers behind a closed opaque curtain without private content or actions', () => {
     const html = renderSceneData({
       kind: 'identityRecognition', matchID: 'ABC123456', playerCount: 3, players, questProgress: [],

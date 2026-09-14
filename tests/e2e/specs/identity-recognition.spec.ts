@@ -45,12 +45,12 @@ async function expectRecognitionLayerCoversStage({
 
   const recognitionOverlay = page.locator('[data-room-slot="stage-atmosphere"]')
   const recognitionLayer = page.locator('[data-identity-recognition-atmosphere]')
-  const confirmationButton = page.getByRole('button', { exact: true, name: '我已辨认' })
+  const revealButton = page.getByRole('button', { exact: true, name: '查看线索' })
 
   await expect(recognitionOverlay).toBeVisible()
   await expect(recognitionLayer).toBeVisible()
   await expect(recognitionOverlay.getByRole('button')).toHaveCount(0)
-  await expect(confirmationButton).toBeVisible()
+  await expect(revealButton).toBeVisible()
 
   const geometry = await recognitionOverlay.evaluate((layer) => {
     const stage = layer.closest('[data-room-slot="stage"]')
@@ -67,7 +67,7 @@ async function expectRecognitionLayerCoversStage({
     }
   })
 
-  const buttonSize = await confirmationButton.evaluate((button) => {
+  const buttonSize = await revealButton.evaluate((button) => {
     const bounds = button.getBoundingClientRect()
     return { height: bounds.height, width: bounds.width }
   })
@@ -96,12 +96,16 @@ test('recognition overlay covers the measured stage in every business shell', as
       await harness.dispatch({ actor: '0', command: 'startGame' })
       await confirmRecognitionParticipants(harness.pages, 'roleReveal')
 
-      const participantIndex = await Promise.all(harness.pages.map(async (page, index) => (
-        await page.getByRole('button', { exact: true, name: '我已辨认' }).count() === 1
-          ? index
-          : -1
-      ))).then((indices) => indices.find((index) => index >= 0))
-      if (participantIndex === undefined) throw new Error('Expected an Evil-recognition participant')
+      let participantIndex = -1
+      await expect.poll(async () => {
+        const indices = await Promise.all(harness.pages.map(async (page, index) => (
+          await page.getByRole('button', { exact: true, name: '查看线索' }).count() === 1
+            ? index
+            : -1
+        )))
+        participantIndex = indices.find((index) => index >= 0) ?? -1
+        return participantIndex
+      }).toBeGreaterThanOrEqual(0)
       const responsiveParticipantPage = harness.pages[participantIndex]!
       for (const viewport of recognitionViewports) {
         await expectRecognitionLayerCoversStage({
@@ -112,9 +116,14 @@ test('recognition overlay covers the measured stage in every business shell', as
       }
 
       await responsiveParticipantPage.setViewportSize({ width: 390, height: 844 })
+      await responsiveParticipantPage.getByRole('button', {
+        exact: true,
+        name: '查看线索',
+      }).click()
       const confirmationButton = responsiveParticipantPage.getByRole('button', {
         name: /我已辨认/,
       })
+      await expect(confirmationButton).toBeVisible()
       await confirmationButton.focus()
       await expect(confirmationButton).toBeFocused()
       await responsiveParticipantPage.setViewportSize({ width: 1339, height: 786 })
@@ -158,12 +167,15 @@ test('players complete the curtain-based identity recognition ceremony', async (
     await harness.dispatch({ actor: '0', command: 'startGame' })
     const roleByPlayer = new Map<string, PresentedRole>()
     for (const page of harness.pages) {
-      const recognitionLayer = page.locator('[data-identity-step="roleReveal"]')
-      await expect(recognitionLayer).toHaveAttribute(
-        'data-curtain-state',
-        'lowered',
-      )
-      await expect(page.getByText('本局目标：')).toBeVisible()
+      const confirmationScene = page.locator('[data-room-scene="identityConfirmation"]')
+      await expect(confirmationScene).toBeVisible()
+      await expect(page.locator('[data-identity-confirmation-state="concealed"]')).toBeVisible()
+      await expect(page.locator('[data-identity-role-artwork]')).toHaveCount(0)
+      await page.locator('[data-room-slot="phase-action"]')
+        .getByRole('button', { exact: true, name: '揭示身份' })
+        .click()
+      await expect(page.locator('[data-identity-role-artwork]')).toBeVisible()
+      await expect(page.getByText('你的目标', { exact: true })).toBeVisible()
       await expect(page.getByText(/\d+ 秒/)).toHaveCount(0)
       await expect(page.getByRole('button', {
         name: '查看我的身份与已知信息',
@@ -180,7 +192,7 @@ test('players complete the curtain-based identity recognition ceremony', async (
       })).toBe(true)
     }
     for (const [index, page] of harness.pages.entries()) {
-      const role = await page.locator('[data-role-card]').getAttribute('data-role-card')
+      const role = await page.locator('[data-identity-role-artwork]').getAttribute('data-identity-role-artwork')
       if (role === null) throw new Error(`Player ${index} has no role card`)
       roleByPlayer.set(String(index), role as PresentedRole)
     }
@@ -203,6 +215,9 @@ test('players complete the curtain-based identity recognition ceremony', async (
         for (const [index, page] of harness.pages.entries()) {
           const confirmation = page.getByRole('button', { exact: true, name: '我已辨认' })
           if (expectedParticipantIDs.includes(String(index))) {
+            const reveal = page.getByRole('button', { exact: true, name: '查看线索' })
+            await expect(reveal).toBeVisible()
+            await reveal.click()
             await expect(confirmation).toBeVisible()
           } else {
             await expect(confirmation).toHaveCount(0)
