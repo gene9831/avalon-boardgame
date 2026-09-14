@@ -100,7 +100,7 @@ describe('RoomPlayerSeat', () => {
     expect(html).not.toContain('<button')
   })
 
-  it('keeps an occupied seat number badge when terminal role artwork replaces the avatar', () => {
+  it('keeps the occupied seat number directly before the name when terminal role artwork replaces the avatar', () => {
     const html = renderToStaticMarkup(
       <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
         ...player,
@@ -109,8 +109,8 @@ describe('RoomPlayerSeat', () => {
       }} />,
     )
 
-    expect(html).toContain('data-seat-number-badge="true"')
-    expect(html).toMatch(/data-seat-number-badge="true"[^>]*>1<\/span>/)
+    expect(html).toMatch(/data-round-table-nameplate="true"[^>]*>.*data-seat-number="true"[^>]*>1<\/span>.*Alice.*<\/span>/s)
+    expect(html).not.toContain('data-seat-number-badge="true"')
   })
 
   it('keeps a disabled occupied lobby seat grouped while an enabled empty destination is actionable', () => {
@@ -192,6 +192,17 @@ describe('RoomPlayerSeat', () => {
     expect(html).toMatch(/class="room-seat__name absolute font-avalon-serif"[^>]*>.*data-seat-decoration="owner".*Alice.*<\/span>/s)
   })
 
+  it('counts a two-digit seat number and places it before the owner marker and player name', () => {
+    const html = renderToStaticMarkup(
+      <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
+        ...player, seatNumber: 10, name: '银月', markers: [{ kind: 'owner' }],
+      }} />,
+    )
+
+    expect(html).toContain('data-nameplate-size="medium"')
+    expect(html).toMatch(/data-round-table-nameplate="true"[^>]*>.*data-seat-number="true"[^>]*>10<\/span>.*data-seat-decoration="owner".*银月.*<\/span>/s)
+  })
+
   it('assigns short, medium, and maximum nameplate width tiers', () => {
     const renderNameplate = (name: string, owner = false) => renderToStaticMarkup(
       <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
@@ -202,7 +213,7 @@ describe('RoomPlayerSeat', () => {
     expect(renderNameplate('林 1')).toContain('data-nameplate-size="short" data-round-table-nameplate="true" data-seat-pointer-target="name" style="left:14px;top:64px;width:64px')
     expect(renderNameplate('暮色森林 7')).toContain('data-nameplate-size="medium" data-round-table-nameplate="true" data-seat-pointer-target="name" style="left:2px;top:64px;width:88px')
     expect(renderNameplate('阿瓦隆远征骑士 10')).toContain('data-nameplate-size="max" data-round-table-nameplate="true" data-seat-pointer-target="name" style="left:0;top:64px;width:92px')
-    expect(renderNameplate('银月 3', true)).toContain('data-nameplate-size="short" data-round-table-nameplate="true" data-seat-pointer-target="name" style="left:14px;top:64px;width:64px')
+    expect(renderNameplate('银月 3', true)).toContain('data-nameplate-size="medium" data-round-table-nameplate="true" data-seat-pointer-target="name" style="left:2px;top:64px;width:88px')
   })
 
   it.each([

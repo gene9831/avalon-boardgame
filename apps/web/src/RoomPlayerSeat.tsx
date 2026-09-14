@@ -51,8 +51,10 @@ function localRectStyle(rect: Rect, bounds: Rect): CSSProperties {
 
 type NameplateSize = 'short' | 'medium' | 'max'
 
-function nameplateSize(label: string, hasOwnerIcon: boolean): NameplateSize {
-  const visualLength = Array.from(label.replace(/\s/g, '')).length + (hasOwnerIcon ? 1 : 0)
+function nameplateSize(label: string, hasOwnerIcon: boolean, seatNumber: number | null): NameplateSize {
+  const visualLength = Array.from(label.replace(/\s/g, '')).length +
+    (hasOwnerIcon ? 1 : 0) +
+    (seatNumber === null ? 0 : String(seatNumber).length)
   if (visualLength <= 4) return 'short'
   if (visualLength <= 7) return 'medium'
   return 'max'
@@ -272,7 +274,7 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
   const avatarStyle = localRectStyle(layout.avatarRect, layout.playerSeatBounds)
   const visibleName = player.occupied ? player.name : interaction.pending ? '换座中' : '空位'
   const owner = player.markers.some((marker) => marker.kind === 'owner')
-  const nameSize = nameplateSize(visibleName, owner)
+  const nameSize = nameplateSize(visibleName, owner, player.occupied ? player.seatNumber : null)
   const nameStyle = localNameStyle(layout.nameRect, layout.playerSeatBounds, nameSize)
   const roleStyle = localRoleStyle(layout.nameRect, layout.playerSeatBounds)
   const role = portraitRole(player.portrait)
@@ -310,9 +312,6 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
           >
             {portraitContent(player.portrait)}
           </span>
-          <span aria-hidden="true" className="room-seat__seat-number" data-seat-number-badge="true">
-            {player.seatNumber}
-          </span>
           {player.portrait.kind === 'playerAvatar' && !player.portrait.connected && (
             <span className="room-seat__disconnected" data-seat-disconnected-badge="true">掉线</span>
           )}
@@ -339,6 +338,11 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
         style={nameStyle}
         title={player.occupied ? player.name : `${player.seatNumber} 号空座位`}
       >
+        {player.occupied && (
+          <span aria-hidden="true" className="room-seat__seat-number" data-seat-number="true">
+            {player.seatNumber}
+          </span>
+        )}
         {owner && <RoomOwnerIcon />}
         <span className="min-w-0 truncate">{visibleName}</span>
       </span>
