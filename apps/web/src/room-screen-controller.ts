@@ -19,6 +19,7 @@ import {
   buildQuestProgress,
   buildRoomPlayers,
   buildRoomTeamTokens,
+  type QuestProgressNode,
   type RoomPlayerInteractionMode,
 } from './room-presentation'
 import type {
@@ -163,6 +164,33 @@ function identityClue(game: AvalonPlayerView): RoomIdentityClue {
   return { kind: 'none', targetPlayerIDs: [] }
 }
 
+/**
+ * Builds the public task track as it stood when a settlement occurred, rather
+ * than replaying later tasks that happen to be present in the newest snapshot.
+ */
+function buildSettlementQuestProgress(
+  playerCount: number,
+  game: AvalonPlayerView,
+  settlement: Extract<RoomSettlement, { kind: 'teamVote' | 'quest' }>,
+): readonly QuestProgressNode[] {
+  return buildQuestProgress(playerCount, null, false).map((quest) => {
+    if (quest.questIndex > settlement.questIndex) return quest
+    if (quest.questIndex === settlement.questIndex) {
+      return {
+        ...quest,
+        state: settlement.kind === 'teamVote'
+          ? 'current'
+          : settlement.succeeded ? 'success' : 'failure',
+      }
+    }
+
+    const result = game.questHistory.find(({ questIndex }) => questIndex === quest.questIndex)
+    return result === undefined
+      ? quest
+      : { ...quest, state: result.succeeded ? 'success' : 'failure' }
+  })
+}
+
 function buildProductionSceneBase(
   input: ReadyRoomSceneInput,
   interactionMode: RoomPlayerInteractionMode,
@@ -178,6 +206,7 @@ function buildProductionSceneBase(
     settledVotes?: Readonly<Record<PlayerID, TeamVote>>
     resolvedQuestTeam?: readonly PlayerID[]
     publicRevealedRolePlayerIDs?: readonly PlayerID[]
+    questProgress?: readonly QuestProgressNode[]
   }> = {},
 ) {
   const playerCount = roomPlayerCount(input.room)
@@ -207,10 +236,8 @@ function buildProductionSceneBase(
       interactionMode,
       seatChangeTargetID: input.seatChangeTargetID,
     }),
-    questProgress: buildQuestProgress(
-      playerCount,
-      input.game,
-      options.showCurrentQuest ?? true,
+    questProgress: options.questProgress ?? buildQuestProgress(
+      playerCount, input.game, options.showCurrentQuest ?? true,
     ),
   }
 }
@@ -255,8 +282,12 @@ export function buildRoomSceneBinding(
         kind: 'teamVote',
         ...buildProductionSceneBase(input, 'none', {
           showLeader: false,
+          showPrivateRoleKnowledge: input.roleKnowledgeOpen,
+          showKnownPlayerInfo: input.roleKnowledgeOpen,
           settledVotes: activeSettlement.votes,
           resolvedQuestTeam: activeSettlement.team,
+          publicRevealedRolePlayerIDs: [],
+          questProgress: buildSettlementQuestProgress(roomPlayerCount(input.room), input.game, activeSettlement),
         }),
         questIndex: activeSettlement.questIndex,
         submittedCount: Object.keys(activeSettlement.votes).length,
@@ -277,7 +308,11 @@ export function buildRoomSceneBinding(
       scene: {
         kind: 'quest',
         ...buildProductionSceneBase(input, 'none', {
+          showPrivateRoleKnowledge: input.roleKnowledgeOpen,
+          showKnownPlayerInfo: input.roleKnowledgeOpen,
           resolvedQuestTeam: activeSettlement.team,
+          publicRevealedRolePlayerIDs: [],
+          questProgress: buildSettlementQuestProgress(roomPlayerCount(input.room), input.game, activeSettlement),
         }),
         questIndex: activeSettlement.questIndex,
         requiredSubmissionCount: activeSettlement.team.length,

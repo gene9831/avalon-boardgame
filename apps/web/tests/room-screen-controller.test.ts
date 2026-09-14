@@ -394,6 +394,92 @@ describe('buildRoomSceneBinding', () => {
     )).map(({ playerID }) => playerID)).toEqual(['0', '2'])
   })
 
+  it('keeps vote and quest settlement replay progress at the settled quest', () => {
+    const vote: Extract<RoomSettlement, { kind: 'teamVote' }> = {
+      kind: 'teamVote', key: 'teamVote:1', voteHistoryIndex: 1, questIndex: 1,
+      team: ['0', '1', '2'], votes: { '0': 'approve', '1': 'approve', '2': 'approve', '3': 'reject', '4': 'reject' },
+      approved: true, approvalCount: 3, rejectionCount: 2, continueIntent: 'continue',
+    }
+    const quest: Extract<RoomSettlement, { kind: 'quest' }> = {
+      kind: 'quest', key: 'quest:1', questIndex: 1, team: ['0', '1', '2'], succeeded: false,
+      successCount: 2, failCount: 1, failThreshold: 1, continueIntent: 'continue',
+    }
+    const latestSnapshot = {
+      questIndex: 2,
+      questHistory: [
+        { questIndex: 0, team: ['0', '1'], successCount: 2, failCount: 0, succeeded: true },
+        { questIndex: 1, team: ['0', '1', '2'], successCount: 2, failCount: 1, succeeded: false },
+      ],
+    }
+
+    const voteBinding = buildRoomSceneBinding({
+      ...readyInput('teamProposal', latestSnapshot), activeSettlement: vote,
+    }, eventHandlers)
+    const questBinding = buildRoomSceneBinding({
+      ...readyInput('teamProposal', latestSnapshot), activeSettlement: quest,
+    }, eventHandlers)
+
+    expect(voteBinding.scene.questProgress.map(({ state }) => state)).toEqual([
+      'success', 'current', 'upcoming', 'upcoming', 'upcoming',
+    ])
+    expect(questBinding.scene.questProgress.map(({ state }) => state)).toEqual([
+      'success', 'failure', 'upcoming', 'upcoming', 'upcoming',
+    ])
+  })
+
+  it('keeps roles concealed during terminal vote and quest settlement replay', () => {
+    const terminalGame = {
+      status: 'finished' as const,
+      result: { winner: 'good' as const, reason: 'assassination' as const, targetID: '1' },
+      revealedRoles: { '0': 'merlin' as const, '1': 'loyal_servant' as const, '2': 'percival' as const, '3': 'assassin' as const, '4': 'morgana' as const },
+    }
+    const vote: Extract<RoomSettlement, { kind: 'teamVote' }> = {
+      kind: 'teamVote', key: 'teamVote:2', voteHistoryIndex: 2, questIndex: 2,
+      team: ['0', '1', '2'], votes: { '0': 'approve', '1': 'approve', '2': 'approve', '3': 'reject', '4': 'reject' },
+      approved: true, approvalCount: 3, rejectionCount: 2, continueIntent: 'gameResult',
+    }
+    const quest: Extract<RoomSettlement, { kind: 'quest' }> = {
+      kind: 'quest', key: 'quest:2', questIndex: 2, team: ['0', '1', '2'], succeeded: true,
+      successCount: 3, failCount: 0, failThreshold: 1, continueIntent: 'assassination',
+    }
+
+    const voteBinding = buildRoomSceneBinding({
+      ...readyInput('finished', terminalGame), activeSettlement: vote,
+    }, eventHandlers)
+    const questBinding = buildRoomSceneBinding({
+      ...readyInput('finished', terminalGame), activeSettlement: quest,
+    }, eventHandlers)
+
+    expect(voteBinding.scene.players.every(({ portrait }) => portrait.kind === 'playerAvatar')).toBe(true)
+    expect(questBinding.scene.players.every(({ portrait }) => portrait.kind === 'playerAvatar')).toBe(true)
+  })
+
+  it.each([
+    ['teamVote', {
+      kind: 'teamVote', key: 'teamVote:0', voteHistoryIndex: 0, questIndex: 0,
+      team: ['0', '1'], votes: { '0': 'approve', '1': 'approve', '2': 'approve', '3': 'reject', '4': 'reject' },
+      approved: true, approvalCount: 3, rejectionCount: 2, continueIntent: 'continue',
+    }],
+    ['quest', {
+      kind: 'quest', key: 'quest:0', questIndex: 0, team: ['0', '1'], succeeded: true,
+      successCount: 2, failCount: 0, failThreshold: 1, continueIntent: 'continue',
+    }],
+  ] as const)('shows private role knowledge only while the %s settlement replay toggle is open', (_kind, settlement) => {
+    const input = {
+      ...readyInput('teamProposal', {
+        viewer: { role: 'merlin', loyalty: 'good', knownEvilPlayerIDs: ['3'], knownMerlinCandidatePlayerIDs: [] },
+      }),
+      activeSettlement: settlement,
+    }
+    const concealed = buildRoomSceneBinding({ ...input, roleKnowledgeOpen: false }, eventHandlers)
+    const revealed = buildRoomSceneBinding({ ...input, roleKnowledgeOpen: true }, eventHandlers)
+
+    expect(concealed.scene.players.find(({ playerID }) => playerID === '0')?.portrait.kind).toBe('playerAvatar')
+    expect(concealed.scene.players.find(({ playerID }) => playerID === '3')?.markers).not.toContainEqual({ kind: 'knownEvil' })
+    expect(revealed.scene.players.find(({ playerID }) => playerID === '0')?.portrait).toEqual({ kind: 'roleArtwork', role: 'merlin' })
+    expect(revealed.scene.players.find(({ playerID }) => playerID === '3')?.markers).toContainEqual({ kind: 'knownEvil' })
+  })
+
   it('binds a settled quest team and target-only assassination role reveal', () => {
     const quest: Extract<RoomSettlement, { kind: 'quest' }> = {
       kind: 'quest', key: 'quest:1', questIndex: 1, team: ['0', '1', '2'], succeeded: false,
