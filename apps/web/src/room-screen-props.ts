@@ -82,10 +82,8 @@ export interface RoomIdentityConfirmationScene
     | 'revealing'
     | 'revealed'
     | 'hiding'
-    | 'waiting'
-    | 'reviewing'
 
-  confirmedCount: number
+  completedCount: number
   participantCount: number
   confirmRequestState: RoomRequestState
 }
@@ -103,32 +101,28 @@ export type RoomIdentityClue =
       kind: 'percivalCandidates'
       targetPlayerIDs: readonly [PlayerID, PlayerID]
     }>
-  | Readonly<{
-      kind: 'none'
-      targetPlayerIDs: readonly []
-    }>
 
 /**
  * 身份辨认阶段只接收已经过 playerView 授权的私密呈现。
  *
- * clue 只携带当前玩家获准看到的线索；observer 不携带任何私密内容，
- * 并始终显示闭合幕布。首次角色揭示由 identityConfirmation 场景负责。
+ * clue 只携带当前玩家获准看到的线索；waiting 是已完成玩家的正常桌面。
+ * 首次角色揭示由 identityConfirmation 场景负责。
  */
 export type RoomIdentityRecognitionPresentation =
   | Readonly<{
       kind: 'clue'
       clue: RoomIdentityClue
-      view: 'concealed' | 'revealing' | 'revealed' | 'waiting'
+      view: 'concealed' | 'revealing' | 'revealed'
       confirmRequestState: RoomRequestState
     }>
   | Readonly<{
-      kind: 'observer'
+      kind: 'waiting'
     }>
 
 export interface RoomIdentityRecognitionScene
   extends RoomSceneBase<'identityRecognition'> {
   presentation: RoomIdentityRecognitionPresentation
-  confirmedCount: number
+  completedCount: number
   participantCount: number
 }
 
@@ -372,13 +366,12 @@ export interface RoomActionsByKind {
     onHide(): void
     onHideComplete(): void
     onConfirm(): void
-    onReview(): void
-    onCloseReview(): void
   }>
 
   identityRecognition: Readonly<{
     onReveal(): void
     onRevealComplete(): void
+    onHide(): void
     onConfirm(): void
   }>
 

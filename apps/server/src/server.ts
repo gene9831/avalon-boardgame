@@ -134,10 +134,6 @@ export interface AvalonServerOptions {
   config?: AvalonServerConfig
   db?: StorageAPI.Sync | StorageAPI.Async
   gameSeed?: string | number
-  identityRecognitionDeadlineEnabled?: boolean
-  identityRecognitionNow?: () => number
-  identityRecognitionStepMs?: number
-  serverInstanceID?: string
 }
 
 export interface RunningAvalonServer {
@@ -248,12 +244,7 @@ export function createAvalonServer(options: AvalonServerOptions = {}) {
     throw new Error('Avalon lobby requires atomic lobby storage')
   }
   const game = createAvalonGame({
-    identityRecognitionDeadlineEnabled:
-      options.identityRecognitionDeadlineEnabled,
-    identityRecognitionStepMs: options.identityRecognitionStepMs,
-    now: options.identityRecognitionNow,
     seed: options.gameSeed ?? config.testGameSeed,
-    serverInstanceID: options.serverInstanceID ?? randomUUID(),
   })
   const boardgame = createBoardgameServer({
     games: [

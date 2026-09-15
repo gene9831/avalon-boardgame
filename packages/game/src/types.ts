@@ -24,16 +24,13 @@ export type Loyalty = 'good' | 'evil'
 
 export type QuestCard = 'success' | 'fail'
 
-export type IdentityRecognitionStep =
-  | 'roleReveal'
-  | 'evilRecognition'
-  | 'merlinRecognition'
-  | 'percivalRecognition'
+export type PersonalRecognitionStage =
+  | 'identityConfirmation'
+  | 'clueRecognition'
+  | 'complete'
 
 export interface IdentityRecognitionState {
-  step: IdentityRecognitionStep
-  deadlineAt: number
-  confirmedCount: number
+  completedCount: number
   participantCount: number
 }
 
@@ -89,8 +86,7 @@ export interface AvalonResult {
 
 export interface AvalonSecret {
   roleByPlayer: Record<PlayerID, Role>
-  identityRecognitionConfirmedPlayerIDs: PlayerID[]
-  identityRecognitionServerInstanceID: string | null
+  identityRecognitionStageByPlayerID: Record<PlayerID, PersonalRecognitionStage>
   pendingVotes: Partial<Record<PlayerID, TeamVote>>
   pendingQuestCards: Partial<Record<PlayerID, QuestCard>>
 }
@@ -143,10 +139,7 @@ export interface AvalonViewer {
   knownMerlinCandidatePlayerIDs: PlayerID[]
   knownEvilRoles?: never
   identityRecognition?: {
-    isParticipant: boolean
-    confirmed: boolean
-    deadlineRefreshRequired: boolean
-    serverNow: number
+    personalStage: PersonalRecognitionStage
   }
   submittedVote?: TeamVote
   submittedQuestCard?: QuestCard

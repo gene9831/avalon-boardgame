@@ -91,18 +91,17 @@ export type BuildRoomSceneInput =
 export interface RoomSceneEventHandlers {
   onActivatePlayer(playerID: PlayerID): void
   onAssassinate(): void
-  onCloseIdentityReview(): void
   onConfirmIdentityRecognition(): void
   onConfirmQuestCard(): void
   onConfirmTeamVote(): void
   onHideIdentity(): void
   onHideIdentityComplete(): void
+  onHideIdentityClue(): void
   onReconnect(): void
   onRevealIdentity(): void
   onRevealIdentityComplete(): void
   onRevealIdentityClue(): void
   onRevealIdentityClueComplete(): void
-  onReviewIdentity(): void
   onSelectQuestCard(card: QuestCard): void
   onSelectTeamVote(vote: TeamVote): void
   onStart(): void
@@ -154,25 +153,20 @@ function resolveSceneKind(game: AvalonPlayerView, phase: string): Exclude<RoomSc
 type ReadyRoomSceneInput = Extract<BuildRoomSceneInput, { kind: 'ready' }>
 
 function identityClue(game: AvalonPlayerView): RoomIdentityClue {
-  const recognition = game.identityRecognition
   const viewer = game.viewer
-  if (recognition === null || viewer.identityRecognition?.isParticipant !== true) {
-    return { kind: 'none', targetPlayerIDs: [] }
-  }
-
-  if (recognition.step === 'evilRecognition' && viewer.loyalty === 'evil') {
+  if (viewer.loyalty === 'evil') {
     return { kind: 'evilAllies', targetPlayerIDs: viewer.knownEvilPlayerIDs }
   }
-  if (recognition.step === 'merlinRecognition' && viewer.role === 'merlin') {
+  if (viewer.role === 'merlin') {
     return { kind: 'merlinEvil', targetPlayerIDs: viewer.knownEvilPlayerIDs }
   }
-  if (recognition.step === 'percivalRecognition' && viewer.role === 'percival') {
+  if (viewer.role === 'percival') {
     const [first, second, extra] = viewer.knownMerlinCandidatePlayerIDs
     if (first !== undefined && second !== undefined && extra === undefined) {
       return { kind: 'percivalCandidates', targetPlayerIDs: [first, second] }
     }
   }
-  return { kind: 'none', targetPlayerIDs: [] }
+  throw new Error('Clue recognition requires an authorized clue role')
 }
 
 /**
@@ -388,15 +382,9 @@ export function buildRoomSceneBinding(
 
   if (mode === 'identityRecognition') {
     const recognition = input.game.identityRecognition
-    const viewer = input.game.viewer.identityRecognition
-    const isParticipant = viewer?.isParticipant === true
+    const personalStage = input.game.viewer.identityRecognition?.personalStage
     const confirmRequestState = input.identityRecognitionSubmissionPending === true ? 'pending' : 'idle'
-    if (recognition?.step === 'roleReveal' && isParticipant && input.game.viewer.role !== null) {
-      const view = viewer.confirmed
-        ? input.identityConfirmationView === 'reviewing' ? 'reviewing' : 'waiting'
-        : input.identityConfirmationView === 'waiting' || input.identityConfirmationView === 'reviewing'
-          ? 'concealed'
-          : input.identityConfirmationView
+    if (personalStage === 'identityConfirmation' && input.game.viewer.role !== null) {
       return {
         scene: {
           kind: 'identityConfirmation',
@@ -405,9 +393,9 @@ export function buildRoomSceneBinding(
             showKnownPlayerInfo: false,
           }),
           role: input.game.viewer.role,
-          view,
-          confirmedCount: recognition.confirmedCount,
-          participantCount: recognition.participantCount,
+          view: input.identityConfirmationView,
+          completedCount: recognition?.completedCount ?? 0,
+          participantCount: recognition?.participantCount ?? 0,
           confirmRequestState,
         },
         actions: {
@@ -416,38 +404,35 @@ export function buildRoomSceneBinding(
           onHide: events.onHideIdentity,
           onHideComplete: events.onHideIdentityComplete,
           onConfirm: events.onConfirmIdentityRecognition,
-          onReview: events.onReviewIdentity,
-          onCloseReview: events.onCloseIdentityReview,
         },
       }
     }
-    let presentation: RoomIdentityRecognitionPresentation
-    if (!isParticipant) {
-      presentation = { kind: 'observer' }
-    } else if (recognition?.step === 'roleReveal') {
-      presentation = { kind: 'observer' }
-    } else {
-      presentation = {
-        kind: 'clue',
-        clue: identityClue(input.game),
-        view: viewer?.confirmed === true ? 'waiting' : input.identityRecognitionView,
-        confirmRequestState,
-      }
-    }
+    const presentation: RoomIdentityRecognitionPresentation =
+      personalStage === 'clueRecognition'
+        ? {
+            kind: 'clue',
+            clue: identityClue(input.game),
+            view: input.identityRecognitionView,
+            confirmRequestState,
+          }
+        : { kind: 'waiting' }
     return {
       scene: {
         kind: 'identityRecognition',
         ...buildProductionSceneBase(input, 'none', {
-          showRoundDecorations: false,
-          showKnownPlayerInfo: false,
+          showPrivateRoleKnowledge:
+            personalStage === 'complete' && input.roleKnowledgeOpen,
+          showKnownPlayerInfo:
+            personalStage === 'complete' && input.roleKnowledgeOpen,
         }),
         presentation,
-        confirmedCount: recognition?.confirmedCount ?? 0,
+        completedCount: recognition?.completedCount ?? 0,
         participantCount: recognition?.participantCount ?? 0,
       },
       actions: {
         onReveal: events.onRevealIdentityClue,
         onRevealComplete: events.onRevealIdentityClueComplete,
+        onHide: events.onHideIdentityClue,
         onConfirm: events.onConfirmIdentityRecognition,
       },
     }
@@ -662,6 +647,7 @@ export interface UseRoomScreenControllerInput extends LobbyPresentationState, Lo
   onQuestCardSubmissionError?: (error: unknown) => void
   onAssassinationSubmissionError?: (error: unknown) => void
   onIdentityRecognitionSubmissionError?: (error: unknown) => void
+  onIdentityRecognitionSubmissionSuccess?: () => void
   onStart: () => void
   settlementReadStorage?: SettlementReadStorage | null
 }
@@ -670,8 +656,16 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
   type IdentityRecognitionView = Extract<RoomIdentityRecognitionPresentation, { kind: 'clue' }>['view']
   const identityPresentationKey = [
     input.matchID,
-    input.game?.identityRecognition?.step ?? 'none',
-    input.game?.viewer.role ?? 'observer',
+    input.currentPlayerID,
+    input.game?.viewer.role ?? 'anonymous',
+    input.connected ? 'connected' : 'disconnected',
+    input.game?.viewer.identityRecognition?.personalStage ?? 'none',
+  ].join(':')
+  const identitySubmissionScopeKey = [
+    input.matchID,
+    input.currentPlayerID,
+    input.game?.viewer.role ?? 'anonymous',
+    input.connected ? 'connected' : 'disconnected',
   ].join(':')
   const [identityPresentation, setIdentityPresentation] = useState<Readonly<{
     key: string
@@ -712,6 +706,10 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
   const [selectedQuestCard, setSelectedQuestCard] = useState<QuestCard | null>(null)
   const [questCardSubmissionPending, setQuestCardSubmissionPending] = useState(false)
   const [identityRecognitionSubmissionPending, setIdentityRecognitionSubmissionPending] = useState(false)
+  const previousPersonalRecognitionRef = useRef({
+    scopeKey: identitySubmissionScopeKey,
+    stage: input.game?.viewer.identityRecognition?.personalStage,
+  })
   const [assassinationSubmissionPending, setAssassinationSubmissionPending] = useState(false)
   const [selectedTarget, setSelectedTarget] = useState<PlayerID | null>(null)
   const [roleKnowledgeOpen, setRoleKnowledgeOpen] = useState(
@@ -729,6 +727,8 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
     : null
   const presentedSettlement = activeSettlement ?? settlementQueue[0] ?? pendingSettlement
   const phase = input.game === null ? 'loading' : input.game.status === 'lobby' ? 'lobby' : input.phase
+  const personalRecognitionStage = input.game?.viewer.identityRecognition?.personalStage
+  const onIdentityRecognitionSubmissionSuccess = input.onIdentityRecognitionSubmissionSuccess
 
   useEffect(() => {
     if (baselineRef.current?.matchID === input.matchID) return
@@ -809,14 +809,28 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
     setQuestCardSubmissionPending(false)
   }, [input.game?.viewer.submittedQuestCard])
   useEffect(() => {
-    if (phase !== 'identityRecognition') {
-      setIdentityRecognitionSubmissionPending(false)
-      return
+    const previousRecognition = previousPersonalRecognitionRef.current
+    const recognitionAdvanced = identityRecognitionSubmissionPending &&
+      previousRecognition.scopeKey === identitySubmissionScopeKey &&
+      previousRecognition.stage !== undefined &&
+      (personalRecognitionStage !== previousRecognition.stage || phase !== 'identityRecognition')
+    if (recognitionAdvanced) {
+      onIdentityRecognitionSubmissionSuccess?.()
     }
-    if (input.game?.viewer.identityRecognition?.confirmed === true) {
+    if (recognitionAdvanced || phase !== 'identityRecognition') {
       setIdentityRecognitionSubmissionPending(false)
     }
-  }, [input.game?.viewer.identityRecognition?.confirmed, phase])
+    previousPersonalRecognitionRef.current = {
+      scopeKey: identitySubmissionScopeKey,
+      stage: personalRecognitionStage,
+    }
+  }, [
+    identityRecognitionSubmissionPending,
+    identitySubmissionScopeKey,
+    onIdentityRecognitionSubmissionSuccess,
+    personalRecognitionStage,
+    phase,
+  ])
   useEffect(() => {
     setIdentityRecognitionSubmissionPending(false)
     setIdentityPresentation({
@@ -872,15 +886,14 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
     onRevealIdentityComplete: () => setIdentityConfirmationView('revealed'),
     onHideIdentity: () => setIdentityConfirmationView('hiding'),
     onHideIdentityComplete: () => setIdentityConfirmationView('concealed'),
-    onReviewIdentity: () => setIdentityConfirmationView('reviewing'),
-    onCloseIdentityReview: () => setIdentityConfirmationView('waiting'),
     onRevealIdentityClue: () => setIdentityRecognitionView('revealing'),
     onRevealIdentityClueComplete: () => setIdentityRecognitionView('revealed'),
+    onHideIdentityClue: () => setIdentityRecognitionView('concealed'),
     onConfirmIdentityRecognition: () => {
       if (
         phase !== 'identityRecognition' ||
-        input.game?.viewer.identityRecognition?.isParticipant !== true ||
-        input.game.viewer.identityRecognition.confirmed ||
+        input.game?.viewer.identityRecognition === undefined ||
+        input.game.viewer.identityRecognition.personalStage === 'complete' ||
         identityRecognitionSubmissionPending
       ) return
       setIdentityRecognitionSubmissionPending(true)

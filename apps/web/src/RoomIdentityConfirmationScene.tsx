@@ -38,9 +38,7 @@ export function RoomIdentityConfirmationScene({
       <RoomSceneFrame
         content={{
           title: phase.title,
-          center: scene.view === 'waiting'
-            ? <RoomIdentityConfirmationCenterSurface scene={scene} />
-            : null,
+          center: <RoomIdentityConfirmationCenterSurface scene={scene} />,
           phaseMiddle: phase.middle,
           phaseAction: phase.action,
           stageAtmosphere: <RoomIdentityConfirmationStageSurface actions={actions} scene={scene} />,

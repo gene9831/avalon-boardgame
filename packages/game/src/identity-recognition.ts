@@ -1,26 +1,36 @@
 import { loyaltyForRole } from './roles'
-import type { IdentityRecognitionStep, PlayerID, Role } from './types'
+import type {
+  AvalonRoleConfiguration,
+  PersonalRecognitionStage,
+  PlayerID,
+  Role,
+} from './types'
 
-export function getIdentityRecognitionParticipantIDs(
-  step: IdentityRecognitionStep,
-  roleByPlayer: Record<PlayerID, Role>,
-) {
-  const roleEntries = Object.entries(roleByPlayer)
+export function roleRequiresClueRecognition(
+  role: Role,
+  roleConfiguration: AvalonRoleConfiguration,
+): boolean {
+  return loyaltyForRole(role) === 'evil' ||
+    role === 'merlin' ||
+    (role === 'percival' && roleConfiguration.percivalMorgana)
+}
 
-  switch (step) {
-    case 'roleReveal':
-      return roleEntries.map(([playerID]) => playerID)
-    case 'evilRecognition':
-      return roleEntries
-        .filter(([, role]) => loyaltyForRole(role) === 'evil')
-        .map(([playerID]) => playerID)
-    case 'merlinRecognition':
-      return roleEntries
-        .filter(([, role]) => role === 'merlin')
-        .map(([playerID]) => playerID)
-    case 'percivalRecognition':
-      return roleEntries
-        .filter(([, role]) => role === 'percival')
-        .map(([playerID]) => playerID)
-  }
+export function createPersonalRecognitionStages(
+  playerIDs: readonly PlayerID[],
+): Record<PlayerID, PersonalRecognitionStage> {
+  return Object.fromEntries(
+    playerIDs.map((playerID) => [playerID, 'identityConfirmation']),
+  )
+}
+
+export function nextPersonalRecognitionStage(
+  currentStage: PersonalRecognitionStage,
+  role: Role,
+  roleConfiguration: AvalonRoleConfiguration,
+): PersonalRecognitionStage | null {
+  if (currentStage === 'complete') return null
+  if (currentStage === 'clueRecognition') return 'complete'
+  return roleRequiresClueRecognition(role, roleConfiguration)
+    ? 'clueRecognition'
+    : 'complete'
 }

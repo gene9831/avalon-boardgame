@@ -27,11 +27,7 @@ export function createAvalonRuleDriver(options: AvalonRuleDriverOptions) {
     { length: options.playerCount },
     (_, index) => String(index),
   )
-  const game = createAvalonGame({
-    now: () => 0,
-    seed: gameSeed,
-    serverInstanceID: 'replay-server',
-  })
+  const game = createAvalonGame({ seed: gameSeed })
   const client = Client({
     game: {
       ...game,

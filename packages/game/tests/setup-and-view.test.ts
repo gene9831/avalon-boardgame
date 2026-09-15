@@ -6,7 +6,7 @@ import { getAvalonPlayerView } from '../src/player-view'
 import type {
   AvalonG,
   AvalonSetupData,
-  IdentityRecognitionStep,
+  Role,
 } from '../src/types'
 import { loyaltyForRole } from '../src/roles'
 
@@ -44,63 +44,33 @@ function completeIdentityRecognition(
 ) {
   while (client.store.getState().ctx.phase === 'identityRecognition') {
     const game = getAuthoritativeGame(client)
-    const step = game.identityRecognition?.step
-    const participantIDs = step === 'roleReveal'
-      ? client.store.getState().ctx.playOrder
-      : step === 'evilRecognition'
-        ? Object.entries(game.secret.roleByPlayer)
-          .filter(([, role]) => loyaltyForRole(role) === 'evil')
-          .map(([playerID]) => playerID)
-        : step === 'merlinRecognition'
-          ? Object.entries(game.secret.roleByPlayer)
-            .filter(([, role]) => role === 'merlin')
-            .map(([playerID]) => playerID)
-          : Object.entries(game.secret.roleByPlayer)
-            .filter(([, role]) => role === 'percival')
-            .map(([playerID]) => playerID)
+    const pendingPlayerIDs = Object.entries(
+      game.secret.identityRecognitionStageByPlayerID,
+    )
+      .filter(([, stage]) => stage !== 'complete')
+      .map(([playerID]) => playerID)
 
-    for (const playerID of participantIDs) {
+    for (const playerID of pendingPlayerIDs) {
       client.updatePlayerID(playerID)
       client.moves.confirmIdentityRecognition()
     }
   }
 }
 
-function createRecognitionStateAt(step: IdentityRecognitionStep) {
+function createRecognitionStateWithRoleAtClue(role: Role) {
   const client = createLocalClient(5, {
     ownerPlayerID: '0',
     occupiedPlayerIDs: ['0', '1', '2', '3', '4'],
     roleConfiguration: { percivalMorgana: true },
   })
   client.moves.startGame()
-
-  while (
-    client.store.getState().ctx.phase === 'identityRecognition' &&
-    getAuthoritativeGame(client).identityRecognition?.step !== step
-  ) {
-    const game = getAuthoritativeGame(client)
-    const currentStep = game.identityRecognition?.step
-    const participantIDs = currentStep === 'roleReveal'
-      ? client.store.getState().ctx.playOrder
-      : currentStep === 'evilRecognition'
-        ? Object.entries(game.secret.roleByPlayer)
-          .filter(([, role]) => loyaltyForRole(role) === 'evil')
-          .map(([playerID]) => playerID)
-        : currentStep === 'merlinRecognition'
-          ? Object.entries(game.secret.roleByPlayer)
-            .filter(([, role]) => role === 'merlin')
-            .map(([playerID]) => playerID)
-          : Object.entries(game.secret.roleByPlayer)
-            .filter(([, role]) => role === 'percival')
-            .map(([playerID]) => playerID)
-
-    for (const playerID of participantIDs) {
-      client.updatePlayerID(playerID)
-      client.moves.confirmIdentityRecognition()
-    }
-  }
-
-  return getAuthoritativeGame(client)
+  const game = getAuthoritativeGame(client)
+  const playerID = Object.entries(game.secret.roleByPlayer)
+    .find(([, assignedRole]) => assignedRole === role)?.[0]
+  if (playerID === undefined) throw new Error(`Expected role ${role}`)
+  client.updatePlayerID(playerID)
+  client.moves.confirmIdentityRecognition()
+  return { G: getAuthoritativeGame(client), playerID }
 }
 
 describe('Avalon setup and player views', () => {
@@ -357,12 +327,9 @@ describe('Avalon setup and player views', () => {
     expect(anonymousView.viewer.knownEvilPlayerIDs).toEqual([])
   })
 
-  it('shows exactly Merlin and Morgana to Percival after the Percival step begins', () => {
-    const G = createRecognitionStateAt('percivalRecognition')
-    const percivalID = Object.entries(G.secret.roleByPlayer)
-      .find(([, role]) => role === 'percival')?.[0]
-    expect(percivalID).toBeDefined()
-    const view = getAvalonPlayerView(G, percivalID ?? null)
+  it('shows exactly Merlin and Morgana after Percival confirms their identity', () => {
+    const { G, playerID: percivalID } = createRecognitionStateWithRoleAtClue('percival')
+    const view = getAvalonPlayerView(G, percivalID)
     expect(view.viewer.role).toBe('percival')
     const expectedCandidates = Object.entries(G.secret.roleByPlayer)
       .filter(([, role]) => role === 'merlin' || role === 'morgana')
@@ -372,29 +339,49 @@ describe('Avalon setup and player views', () => {
     expect(view.viewer.knownEvilPlayerIDs).toEqual([])
   })
 
-  it('keeps Merlin evil-seat knowledge during paired Percival recognition', () => {
-    const G = createRecognitionStateAt('percivalRecognition')
+  it('keeps Merlin evil-seat knowledge while Percival also recognizes independently', () => {
+    const client = createLocalClient(5, {
+      ownerPlayerID: '0',
+      occupiedPlayerIDs: ['0', '1', '2', '3', '4'],
+      roleConfiguration: { percivalMorgana: true },
+    })
+    client.moves.startGame()
+    let G = getAuthoritativeGame(client)
     const merlinID = Object.entries(G.secret.roleByPlayer)
       .find(([, role]) => role === 'merlin')?.[0]
+    const percivalID = Object.entries(G.secret.roleByPlayer)
+      .find(([, role]) => role === 'percival')?.[0]
+    expect(merlinID).toBeDefined()
+    expect(percivalID).toBeDefined()
+    client.updatePlayerID(merlinID ?? '')
+    client.moves.confirmIdentityRecognition()
+    client.updatePlayerID(percivalID ?? '')
+    client.moves.confirmIdentityRecognition()
+    G = getAuthoritativeGame(client)
     const evilIDs = Object.entries(G.secret.roleByPlayer)
       .filter(([, role]) => loyaltyForRole(role) === 'evil')
       .map(([playerID]) => playerID)
 
-    expect(merlinID).toBeDefined()
     expect(getAvalonPlayerView(G, merlinID ?? null).viewer.knownEvilPlayerIDs)
       .toEqual(evilIDs)
   })
 
   it('does not send Percival candidates to any other role', () => {
-    const G = createRecognitionStateAt('percivalRecognition')
+    const { G } = createRecognitionStateWithRoleAtClue('percival')
     const loyalServantID = Object.entries(G.secret.roleByPlayer)
       .find(([, role]) => role === 'loyal_servant')?.[0]
     const view = getAvalonPlayerView(G, loyalServantID ?? null)
     expect(view.viewer.knownMerlinCandidatePlayerIDs).toEqual([])
   })
 
-  it('withholds Merlin candidates from Percival before the Percival step', () => {
-    const G = createRecognitionStateAt('merlinRecognition')
+  it('withholds Merlin candidates from Percival before personal identity confirmation', () => {
+    const client = createLocalClient(5, {
+      ownerPlayerID: '0',
+      occupiedPlayerIDs: ['0', '1', '2', '3', '4'],
+      roleConfiguration: { percivalMorgana: true },
+    })
+    client.moves.startGame()
+    const G = getAuthoritativeGame(client)
     const percivalID = Object.entries(G.secret.roleByPlayer)
       .find(([, role]) => role === 'percival')?.[0]
 

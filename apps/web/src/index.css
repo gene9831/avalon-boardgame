@@ -151,26 +151,6 @@ button.room-team-token:disabled { cursor: default; opacity: 0.55; }
 .room-layout-geometry [data-layout-boundary='avatar'] { stroke: #fb7185; }
 .room-layout-geometry [data-layout-boundary='name'] { stroke: #c084fc; }
 
-.identity-curtain {
-  transform-origin: top;
-}
-
-.identity-curtain--closed {
-  transform: translateY(0);
-}
-
-.identity-curtain--lowering {
-  animation: identity-curtain-lower 500ms ease-out both;
-}
-
-.identity-curtain--raising {
-  animation: identity-curtain-raise 500ms ease-in both;
-}
-
-.identity-role-reveal-content {
-  animation: identity-role-reveal-content 200ms ease-out 500ms both;
-}
-
 .role-card--recognition {
   width: calc(100% - 1.5rem);
   max-width: 28rem;
@@ -202,38 +182,6 @@ button.room-team-token:disabled { cursor: default; opacity: 0.55; }
   .role-card--recognition .role-card__name {
     font-size: 1.875rem;
     line-height: 2.25rem;
-  }
-}
-
-@keyframes identity-curtain-lower {
-  from {
-    transform: translateY(-102%);
-  }
-
-  to {
-    transform: translateY(0);
-  }
-}
-
-@keyframes identity-curtain-raise {
-  from {
-    transform: translateY(0);
-  }
-
-  to {
-    transform: translateY(-102%);
-  }
-}
-
-@keyframes identity-role-reveal-content {
-  from {
-    opacity: 0;
-    transform: translateY(0.5rem);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -286,13 +234,6 @@ button.room-team-token:disabled { cursor: default; opacity: 0.55; }
   }
   .help-role-card--pulse {
     animation: none;
-  }
-  .identity-curtain,
-  .identity-curtain *,
-  .identity-role-reveal-content {
-    animation: none !important;
-    scroll-behavior: auto !important;
-    transition: none !important;
   }
 }
 

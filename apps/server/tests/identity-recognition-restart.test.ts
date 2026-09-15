@@ -2,7 +2,12 @@ import { Client } from 'boardgame.io/client'
 import { SocketIO } from 'boardgame.io/multiplayer'
 import { describe, expect, it } from 'vitest'
 
-import { AvalonGame, type AvalonG } from '@avalon/game'
+import {
+  AvalonGame,
+  type AvalonG,
+  type AvalonPlayerView,
+  type PlayerID,
+} from '@avalon/game'
 
 import { startAvalonServer } from '../src/server'
 import { MemoryStorage } from '../src/storage/memory'
@@ -17,6 +22,10 @@ const testConfig = {
 
 type AvalonClient = ReturnType<typeof Client>
 type AvalonClientState = NonNullable<ReturnType<AvalonClient['getState']>>
+
+function gameState(state: AvalonClientState): AvalonPlayerView {
+  return state.G as AvalonPlayerView
+}
 
 function waitForClientState(
   client: AvalonClient,
@@ -43,115 +52,158 @@ function waitForClientState(
   })
 }
 
+function createSocketClient(
+  gamePort: number,
+  matchID: string,
+  playerID: PlayerID,
+  credentials: string,
+) {
+  return Client({
+    game: AvalonGame,
+    numPlayers: 5,
+    multiplayer: SocketIO({ server: `http://127.0.0.1:${gamePort}` }),
+    matchID,
+    playerID,
+    credentials,
+  })
+}
+
 describe('identity recognition server recovery', () => {
-  it('restarts the persisted current step with a fresh deadline', async () => {
+  it('preserves each personal stage and aggregate completion across restart', async () => {
     const storage = new MemoryStorage()
-    let now = 1_000
-    let running = await startAvalonServer({
-      config: testConfig,
-      db: storage,
-      identityRecognitionDeadlineEnabled: true,
-      identityRecognitionNow: () => now,
-      serverInstanceID: 'server-one',
-    })
+    let running = await startAvalonServer({ config: testConfig, db: storage })
     const lobby = new LobbyClient({
       server: `http://127.0.0.1:${running.lobbyPort}`,
     })
     const { matchID } = await lobby.createMatch('avalon', { numPlayers: 5 })
-    const joined = await lobby.joinMatch('avalon', matchID, {
-      playerID: '0',
-      playerName: 'Alice',
-    })
-    await Promise.all(
-      Array.from({ length: 4 }, (_, index) => lobby.joinMatch(
-        'avalon',
-        matchID,
-        {
-          playerID: String(index + 1),
-          playerName: `Player ${index + 2}`,
-        },
-      )),
-    )
-    let client = Client({
-      game: AvalonGame,
-      numPlayers: 5,
-      multiplayer: SocketIO({
-        server: `http://127.0.0.1:${running.gamePort}`,
-      }),
-      matchID,
-      playerID: '0',
-      credentials: joined.playerCredentials,
-    })
+    const credentialsByPlayerID: Record<PlayerID, string> = {}
+    for (let index = 0; index < 5; index += 1) {
+      const playerID = String(index)
+      const joined = await lobby.joinMatch('avalon', matchID, {
+        playerID,
+        playerName: index === 0 ? 'Alice' : `Player ${index + 1}`,
+      })
+      credentialsByPlayerID[playerID] = joined.playerCredentials
+    }
 
+    let clients: AvalonClient[] = []
     try {
-      client.start()
-      await waitForClientState(client, (state) => state.isConnected)
-      client.moves.startGame()
-      await waitForClientState(
-        client,
-        (state) => state.ctx.phase === 'identityRecognition',
-      )
-      client.moves.confirmIdentityRecognition()
-      await waitForClientState(
-        client,
-        (state) =>
-          (state.G as AvalonG).identityRecognition?.confirmedCount === 1,
-      )
-      expect(
-        client.getState()?.log.some(
-          (entry) =>
-            entry.action.payload.type === 'confirmIdentityRecognition',
-        ),
-      ).toBe(false)
-      expect(
-        storage.fetch(matchID, { log: true }).log.some(
-          (entry) =>
-            entry.action.payload.type === 'confirmIdentityRecognition',
-        ),
-      ).toBe(false)
-
-      let persisted = storage.fetch(matchID, { state: true }).state
-        .G as AvalonG
-      expect(persisted.identityRecognition?.deadlineAt).toBe(11_000)
-
-      client.stop()
-      await running.close()
-      now = 5_000
-      running = await startAvalonServer({
-        config: testConfig,
-        db: storage,
-        identityRecognitionDeadlineEnabled: true,
-        identityRecognitionNow: () => now,
-        serverInstanceID: 'server-two',
-      })
-      client = Client({
-        game: AvalonGame,
-        numPlayers: 5,
-        multiplayer: SocketIO({
-          server: `http://127.0.0.1:${running.gamePort}`,
-        }),
+      const owner = createSocketClient(
+        running.gamePort,
         matchID,
-        playerID: '0',
-        credentials: joined.playerCredentials,
-      })
-      client.start()
-      await waitForClientState(client, (state) => state.isConnected)
-      client.moves.confirmIdentityRecognition()
+        '0',
+        credentialsByPlayerID['0'],
+      )
+      clients.push(owner)
+      owner.start()
+      await waitForClientState(owner, (state) => state.isConnected)
+      owner.moves.startGame()
+      await waitForClientState(owner, (state) => state.ctx.phase === 'identityRecognition')
+
+      let persisted = storage.fetch(matchID, { state: true }).state.G as AvalonG
+      const merlinID = Object.entries(persisted.secret.roleByPlayer)
+        .find(([, role]) => role === 'merlin')?.[0]
+      const servantID = Object.entries(persisted.secret.roleByPlayer)
+        .find(([, role]) => role === 'loyal_servant')?.[0]
+      expect(merlinID).toBeDefined()
+      expect(servantID).toBeDefined()
+
+      const merlin = createSocketClient(
+        running.gamePort,
+        matchID,
+        merlinID ?? '',
+        credentialsByPlayerID[merlinID ?? ''],
+      )
+      const servant = createSocketClient(
+        running.gamePort,
+        matchID,
+        servantID ?? '',
+        credentialsByPlayerID[servantID ?? ''],
+      )
+      clients.push(merlin, servant)
+      merlin.start()
+      servant.start()
+      await Promise.all([
+        waitForClientState(merlin, (state) => state.isConnected),
+        waitForClientState(servant, (state) => state.isConnected),
+      ])
+      const servantStateIDBeforeMerlin = servant.getState()?._stateID ?? 0
+      merlin.moves.confirmIdentityRecognition()
+      await Promise.all([
+        waitForClientState(
+          merlin,
+          (state) => gameState(state).viewer.identityRecognition?.personalStage === 'clueRecognition',
+        ),
+        waitForClientState(
+          servant,
+          (state) => state._stateID > servantStateIDBeforeMerlin,
+        ),
+      ])
+      servant.moves.confirmIdentityRecognition()
       await waitForClientState(
-        client,
-        (state) =>
-          (state.G as AvalonG).identityRecognition?.confirmedCount === 0,
+        servant,
+        (state) => gameState(state).viewer.identityRecognition?.personalStage === 'complete',
       )
 
       persisted = storage.fetch(matchID, { state: true }).state.G as AvalonG
       expect(persisted.identityRecognition).toEqual({
-        step: 'roleReveal',
-        deadlineAt: 15_000,
-        confirmedCount: 0,
+        completedCount: 1,
         participantCount: 5,
       })
+      expect(persisted.secret.identityRecognitionStageByPlayerID[merlinID ?? ''])
+        .toBe('clueRecognition')
+      expect(persisted.secret.identityRecognitionStageByPlayerID[servantID ?? ''])
+        .toBe('complete')
+      expect(
+        storage.fetch(matchID, { log: true }).log.some(
+          (entry) => entry.action.payload.type === 'confirmIdentityRecognition',
+        ),
+      ).toBe(false)
+
+      for (const client of clients) client.stop()
+      clients = []
+      await running.close()
+      running = await startAvalonServer({ config: testConfig, db: storage })
+
+      const resumedMerlin = createSocketClient(
+        running.gamePort,
+        matchID,
+        merlinID ?? '',
+        credentialsByPlayerID[merlinID ?? ''],
+      )
+      const resumedServant = createSocketClient(
+        running.gamePort,
+        matchID,
+        servantID ?? '',
+        credentialsByPlayerID[servantID ?? ''],
+      )
+      clients.push(resumedMerlin, resumedServant)
+      resumedMerlin.start()
+      resumedServant.start()
+      const [merlinState, servantState] = await Promise.all([
+        waitForClientState(
+          resumedMerlin,
+          (state) => gameState(state).viewer.identityRecognition?.personalStage === 'clueRecognition',
+        ),
+        waitForClientState(
+          resumedServant,
+          (state) => gameState(state).viewer.identityRecognition?.personalStage === 'complete',
+        ),
+      ])
+      expect(gameState(merlinState).identityRecognition?.completedCount).toBe(1)
+      expect(gameState(servantState).identityRecognition?.completedCount).toBe(1)
+
+      resumedMerlin.moves.confirmIdentityRecognition()
+      await waitForClientState(
+        resumedMerlin,
+        (state) => gameState(state).viewer.identityRecognition?.personalStage === 'complete',
+      )
+      persisted = storage.fetch(matchID, { state: true }).state.G as AvalonG
+      expect(persisted.identityRecognition?.completedCount).toBe(2)
+      expect(persisted.secret.identityRecognitionStageByPlayerID[servantID ?? ''])
+        .toBe('complete')
     } finally {
-      client.stop()
+      for (const client of clients) client.stop()
       await running.close()
     }
   })

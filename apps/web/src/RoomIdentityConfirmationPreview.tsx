@@ -12,14 +12,13 @@ import { useToast } from './toast-context'
 type RoomIdentityConfirmationPreviewState = RoomIdentityConfirmationScene['view'] | 'confirming'
 type IdentityConfirmationPreviewScenarioID = Extract<
   RoomIdentityConfirmationPreviewState,
-  'concealed' | 'revealed' | 'confirming' | 'waiting'
+  'concealed' | 'revealed' | 'confirming'
 >
 
 const SCENARIO_IDS: readonly IdentityConfirmationPreviewScenarioID[] = [
   'concealed',
   'revealed',
   'confirming',
-  'waiting',
 ]
 const ROLES: readonly Role[] = ['merlin', 'percival', 'loyal_servant', 'assassin', 'morgana', 'minion']
 const CURRENT_PLAYER_ID = '2' as PlayerID
@@ -45,8 +44,6 @@ function createPreviewState(input: Readonly<{
   const ownerPlayerID = '0' as PlayerID
   const occupiedPlayerIDs = players.map(({ id }) => String(id) as PlayerID)
   const roleConfiguration = { percivalMorgana: true }
-  const confirmed = input.confirmedCount > 0
-
   return {
     room: {
       gameName: 'avalon',
@@ -62,9 +59,7 @@ function createPreviewState(input: Readonly<{
       lobby: { authorityVersion: 1, ownerPlayerID, occupiedPlayerIDs },
       players: Object.fromEntries(players.map((player) => [String(player.id), { name: player.name! }])),
       identityRecognition: {
-        step: 'roleReveal',
-        deadlineAt: 0,
-        confirmedCount: input.confirmedCount,
+        completedCount: input.confirmedCount,
         participantCount: input.playerCount,
       },
       leaderID: '0',
@@ -84,10 +79,7 @@ function createPreviewState(input: Readonly<{
         knownEvilPlayerIDs: [],
         knownMerlinCandidatePlayerIDs: [],
         identityRecognition: {
-          isParticipant: true,
-          confirmed,
-          deadlineRefreshRequired: false,
-          serverNow: 0,
+          personalStage: 'identityConfirmation',
         },
       },
     },
@@ -108,7 +100,7 @@ function IdentityConfirmationPreviewScenario({
   const { pushToast } = useToast()
   const [playerCount, setPlayerCount] = useState(5)
   const [role, setRole] = useState<Role>('merlin')
-  const [confirmedCount, setConfirmedCount] = useState(scenarioID === 'waiting' ? 3 : 0)
+  const [confirmedCount, setConfirmedCount] = useState(0)
   const [state, setState] = useState<RoomIdentityConfirmationPreviewState>(scenarioID)
   const preview = useMemo(
     () => createPreviewState({ playerCount, role, confirmedCount }),
@@ -116,9 +108,6 @@ function IdentityConfirmationPreviewScenario({
   )
   const setPreviewState = (next: RoomIdentityConfirmationPreviewState) => {
     setState(next)
-    if (next === 'waiting' || next === 'reviewing') {
-      setConfirmedCount((count) => Math.max(1, count))
-    }
   }
 
   const scene: RoomIdentityConfirmationScene = {
@@ -143,7 +132,7 @@ function IdentityConfirmationPreviewScenario({
     questProgress: buildQuestProgress(playerCount, preview.game),
     role,
     view: state === 'confirming' ? 'revealed' : state,
-    confirmedCount,
+    completedCount: confirmedCount,
     participantCount: playerCount,
     confirmRequestState: state === 'confirming' ? 'pending' : 'idle',
   }
@@ -177,15 +166,13 @@ function IdentityConfirmationPreviewScenario({
             <button onClick={() => setPreviewState('concealed')} type="button">未揭示</button>
             <button onClick={() => setPreviewState('revealed')} type="button">已揭示</button>
             <button onClick={() => setPreviewState('confirming')} type="button">正在确认</button>
-            <button onClick={() => setPreviewState('waiting')} type="button">已确认等待</button>
-            <button onClick={() => setPreviewState('reviewing')} type="button">再次查看</button>
           </fieldset>
           {state === 'confirming' && (
             <fieldset>
               <legend>确认请求结果</legend>
               <button onClick={() => {
                 setConfirmedCount((count) => Math.min(playerCount, Math.max(1, count + 1)))
-                setPreviewState('waiting')
+                pushToast({ message: '身份确认成功。', tone: 'success' })
               }} type="button">模拟确认成功</button>
               <button onClick={() => {
                 setPreviewState('revealed')
@@ -200,13 +187,11 @@ function IdentityConfirmationPreviewScenario({
     <div className="size-full" data-identity-confirmation-state={state}>
       <RoomScreenPreviewShell
         actions={{
-          onCloseReview: () => setPreviewState('waiting'),
           onConfirm: () => setPreviewState('confirming'),
           onHide: () => setPreviewState('hiding'),
           onHideComplete: () => setPreviewState('concealed'),
           onReveal: () => setPreviewState('revealing'),
           onRevealComplete: () => setPreviewState('revealed'),
-          onReview: () => setPreviewState('reviewing'),
         }}
         controls={controls}
         scene={scene}

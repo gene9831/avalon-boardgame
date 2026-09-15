@@ -373,13 +373,15 @@ describe('Avalon server', () => {
         clients.map((client) =>
           waitForClientState(
             client,
-            (state) =>
-              (state.G as AvalonPlayerView).identityRecognition
-                ?.confirmedCount === 1,
+            (state) => state._stateID > states[0]._stateID,
           ),
         ),
       )
 
+      expect(
+        (confirmedStates[2].G as AvalonPlayerView).viewer
+          .identityRecognition?.personalStage,
+      ).not.toBe('identityConfirmation')
       for (const state of confirmedStates) {
         expect(state.ctx._activePlayersNumMoves).toEqual({
           '0': 0,

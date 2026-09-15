@@ -34,17 +34,12 @@ function createStartedClient(numPlayers = 5) {
   client.moves.startGame()
   while (client.store.getState().ctx.phase === 'identityRecognition') {
     const game = client.store.getState().G as AvalonG
-    const step = game.identityRecognition?.step
-    const participantIDs = step === 'roleReveal'
-      ? client.store.getState().ctx.playOrder
-      : step === 'evilRecognition'
-        ? Object.entries(game.secret.roleByPlayer)
-          .filter(([, role]) => loyaltyForRole(role) === 'evil')
-          .map(([playerID]) => playerID)
-        : Object.entries(game.secret.roleByPlayer)
-          .filter(([, role]) => role === 'merlin')
-          .map(([playerID]) => playerID)
-    for (const playerID of participantIDs) {
+    const pendingPlayerIDs = Object.entries(
+      game.secret.identityRecognitionStageByPlayerID,
+    )
+      .filter(([, stage]) => stage !== 'complete')
+      .map(([playerID]) => playerID)
+    for (const playerID of pendingPlayerIDs) {
       client.updatePlayerID(playerID)
       client.moves.confirmIdentityRecognition()
     }

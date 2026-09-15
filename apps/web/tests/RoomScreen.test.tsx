@@ -137,13 +137,13 @@ describe('RoomScreen', () => {
     const html = renderToStaticMarkup(
       <RoomIdentityConfirmationScene
         actions={{
-          onCloseReview: vi.fn(), onConfirm: vi.fn(), onHide: vi.fn(), onHideComplete: vi.fn(),
-          onReveal: vi.fn(), onRevealComplete: vi.fn(), onReview: vi.fn(),
+          onConfirm: vi.fn(), onHide: vi.fn(), onHideComplete: vi.fn(),
+          onReveal: vi.fn(), onRevealComplete: vi.fn(),
         }}
         geometry={{ stageLayout: null }}
         scene={{
           kind: 'identityConfirmation', matchID: 'ABC123456', playerCount: 5, players: [], questProgress: [],
-          role: 'merlin', view: 'concealed', confirmedCount: 0, participantCount: 5,
+          role: 'merlin', view: 'concealed', completedCount: 0, participantCount: 5,
           confirmRequestState: 'idle',
         }}
         slots={{ back: null, toolbar: null }}
@@ -161,7 +161,7 @@ describe('RoomScreen', () => {
     const html = renderToStaticMarkup(
       <RoomIdentityRecognitionScene
         actions={{
-          onConfirm: vi.fn(), onReveal: vi.fn(), onRevealComplete: vi.fn(),
+          onConfirm: vi.fn(), onHide: vi.fn(), onReveal: vi.fn(), onRevealComplete: vi.fn(),
         }}
         geometry={{ stageLayout: {
           status: 'ready', shape: 'circle', tabletop: { x: 0, y: 0, width: 300, height: 300 },
@@ -173,7 +173,7 @@ describe('RoomScreen', () => {
             kind: 'clue', clue: { kind: 'evilAllies', targetPlayerIDs: ['0'] },
             view: 'revealed', confirmRequestState: 'idle',
           },
-          confirmedCount: 0, participantCount: 5,
+          completedCount: 0, participantCount: 5,
         }}
         slots={{ back: null, toolbar: null }}
       />,
