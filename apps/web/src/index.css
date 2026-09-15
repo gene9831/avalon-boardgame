@@ -70,7 +70,7 @@ select {
 .room-seat__avatar[data-avatar-state='known-evil'] { border-color: #be123c; box-shadow: 0 0 24px rgb(127 29 29 / 65%); }
 .room-seat__avatar[data-avatar-state='merlin-candidate'] {
   border-color: #c9b982;
-  box-shadow: 0 0 0 3px #28271f, 0 0 0 5px rgb(201 185 130 / 85%), 0 0 24px rgb(229 220 192 / 48%);
+  box-shadow: 0 0 24px rgb(201 185 130 / 58%);
 }
 .room-seat__avatar[data-avatar-state='revealed-good'] { border-color: rgb(103 232 249 / 68%); box-shadow: 0 5px 12px rgb(0 0 0 / 40%); }
 .room-seat__avatar[data-avatar-state='revealed-evil'] { border-color: rgb(253 164 175 / 68%); box-shadow: 0 5px 12px rgb(0 0 0 / 40%); }

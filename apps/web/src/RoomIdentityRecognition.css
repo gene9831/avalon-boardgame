@@ -61,6 +61,10 @@
   box-shadow: 0 0 0 3px #211923, 0 0 0 5px rgb(118 82 111 / 88%), 0 0 24px rgb(91 39 51 / 62%);
 }
 
+[data-recognition-tone='candidate'] .room-seat__avatar {
+  box-shadow: 0 0 0 3px #28271f, 0 0 0 5px rgb(201 185 130 / 85%), 0 0 24px rgb(229 220 192 / 48%);
+}
+
 .room-seat__recognition-label {
   position: absolute;
   z-index: 5;
