@@ -29,20 +29,26 @@ const player: RoomPlayerPresentation = {
 
 let root: Root | null = null
 let container: HTMLDivElement | null = null
+let stageHost: HTMLElement | null = null
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 afterEach(async () => {
   await act(async () => root?.unmount())
+  stageHost?.remove()
   container?.remove()
   root = null
   container = null
+  stageHost = null
 })
 
 describe('RoomPlayerSeat', () => {
   it('opens the complete identity details from the revealed current-player avatar', async () => {
+    stageHost = document.createElement('main')
+    stageHost.dataset.roomSlot = 'stage'
     container = document.createElement('div')
-    document.body.append(container)
+    stageHost.append(container)
+    document.body.append(stageHost)
     root = createRoot(container)
     await act(async () => root?.render(
       <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
@@ -65,6 +71,17 @@ describe('RoomPlayerSeat', () => {
     expect(dialog?.textContent).toContain('你的目标')
     expect(dialog?.textContent).toContain('角色能力')
     expect(dialog?.textContent).toContain('行动提示')
+    expect(dialog?.parentElement).toBe(stageHost)
+
+    const closeButton = dialog?.querySelector<HTMLButtonElement>(
+      'button[data-identity-review-close="true"]',
+    )
+    expect(closeButton?.textContent).toContain('收起身份卡')
+    expect(closeButton?.querySelector('svg')).toBeNull()
+    expect(dialog?.lastElementChild?.contains(closeButton ?? null)).toBe(true)
+
+    await act(async () => closeButton?.click())
+    expect(document.querySelector('[role="dialog"][aria-label="我的身份详情"]')).toBeNull()
   })
 
   it('keeps the phase action separate from identity review on the current-player seat', async () => {
@@ -105,6 +122,20 @@ describe('RoomPlayerSeat', () => {
 
     expect(html).toContain('data-avatar-state="merlin-candidate"')
     expect(html).toContain('data-seat-decoration="merlin-candidate"')
+    expect(html).not.toContain('data-room-role-revealed="true"')
+  })
+
+  it('uses the same candidate avatar state during Percival clue recognition', () => {
+    const html = renderToStaticMarkup(
+      <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
+        ...player, markers: [],
+        caption: { kind: 'recognition', label: '候选人', tone: 'candidate' },
+        emphasis: 'target',
+      }} />,
+    )
+
+    expect(html).toContain('data-avatar-state="merlin-candidate"')
+    expect(html).toContain('data-recognition-tone="candidate"')
     expect(html).not.toContain('data-room-role-revealed="true"')
   })
 

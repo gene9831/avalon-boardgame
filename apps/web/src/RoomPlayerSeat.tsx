@@ -255,7 +255,10 @@ function avatarState(player: RoomPlayerPresentation): string {
   if (player.caption.kind === 'role') {
     return `revealed-${loyaltyForRole(player.caption.role)}`
   }
-  if (player.markers.some((marker) => marker.kind === 'merlinCandidate')) {
+  if (
+    player.markers.some((marker) => marker.kind === 'merlinCandidate') ||
+    (player.caption.kind === 'recognition' && player.caption.tone === 'candidate')
+  ) {
     return 'merlin-candidate'
   }
   switch (player.emphasis) {
@@ -281,6 +284,7 @@ function portraitRole(portrait: RoomPlayerPortrait): Role | null {
 
 export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatProps) {
   const [identityDetailsOpen, setIdentityDetailsOpen] = useState(false)
+  const [identityDetailsHost, setIdentityDetailsHost] = useState<HTMLElement | null>(null)
   const interaction = interactionPresentation(player.interaction, player)
   const avatarStyle = localRectStyle(layout.avatarRect, layout.playerSeatBounds)
   const emptySeatActionStyle = localEmptySeatActionStyle(
@@ -414,13 +418,19 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
       <button
         aria-label="查看我的身份详情"
         className="room-seat__identity-action pointer-events-auto absolute"
-        onClick={() => setIdentityDetailsOpen(true)}
+        onClick={(event) => {
+          setIdentityDetailsHost(
+            event.currentTarget.closest('[data-room-slot="stage"]') as HTMLElement | null,
+          )
+          setIdentityDetailsOpen(true)
+        }}
         style={avatarStyle}
         type="button"
       />
       {identityDetailsOpen && (
         <RoomIdentityReviewDialog
           onClose={() => setIdentityDetailsOpen(false)}
+          portalHost={identityDetailsHost}
           role={role}
         />
       )}

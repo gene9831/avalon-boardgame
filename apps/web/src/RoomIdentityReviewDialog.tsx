@@ -1,35 +1,42 @@
-import { X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import type { Role } from '@avalon/game'
 
+import { RoomActionButton } from './RoomActionButton'
 import { RoomIdentityCardReading } from './RoomIdentityConfirmation'
 
 export function RoomIdentityReviewDialog({
   onClose,
+  portalHost,
   role,
 }: Readonly<{
   onClose: () => void
+  portalHost: HTMLElement | null
   role: Role
 }>) {
   const dialog = (
     <section
       aria-label="我的身份详情"
       aria-modal="true"
-      className="room-identity-review-dialog fixed inset-0 z-[100] min-h-0 overflow-hidden bg-slate-950/95 p-3"
+      className="room-identity-review-dialog absolute inset-0 z-[100] grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-3 overflow-hidden bg-slate-950/95 p-3"
       data-identity-review-dialog="true"
       role="dialog"
     >
-      <button
-        aria-label="收起身份卡"
-        className="absolute right-3 top-3 z-[110] grid size-10 place-items-center rounded-full border border-white/20 bg-slate-950/90 text-slate-100 shadow-lg hover:border-amber-200/60 hover:text-amber-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200"
-        onClick={onClose}
-        type="button"
-      >
-        <X aria-hidden="true" className="size-5" />
-      </button>
-      <RoomIdentityCardReading role={role} view="revealed" />
+      <div className="relative min-h-0 overflow-hidden">
+        <RoomIdentityCardReading role={role} view="revealed" />
+      </div>
+      <div className="mx-auto w-full max-w-[760px]">
+        <RoomActionButton
+          data-identity-review-close="true"
+          onClick={onClose}
+          tone="secondary"
+        >
+          收起身份卡
+        </RoomActionButton>
+      </div>
     </section>
   )
 
-  return typeof document === 'undefined' ? dialog : createPortal(dialog, document.body)
+  return typeof document === 'undefined'
+    ? dialog
+    : createPortal(dialog, portalHost ?? document.body)
 }
