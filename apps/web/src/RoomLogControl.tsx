@@ -96,7 +96,7 @@ export function RoomLogPanel({
             {entries.map((entry) => (
               <li className="relative border-l border-white/15 pl-4" key={entry.id}>
                 <span className={`absolute -left-1 top-2 size-2 rounded-full ${entry.tone === 'danger' ? 'bg-rose-300' : entry.tone === 'good' ? 'bg-emerald-300' : 'bg-cyan-300'}`} />
-                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">{entry.group}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{entry.group}</p>
                 <p className="mt-1 text-sm font-medium leading-5 text-slate-100">{entry.title}</p>
                 {entry.detail !== undefined && <p className="mt-1 text-xs leading-5 text-slate-400">{entry.detail}</p>}
               </li>

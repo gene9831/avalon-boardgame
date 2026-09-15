@@ -1,5 +1,6 @@
 import type { ReactNode, Ref } from 'react'
 import type {
+  IdentityRecognitionStage,
   PlayerID,
   QuestCard,
   Role,
@@ -121,6 +122,7 @@ export type RoomIdentityRecognitionPresentation =
 
 export interface RoomIdentityRecognitionScene
   extends RoomSceneBase<'identityRecognition'> {
+  stage: IdentityRecognitionStage
   presentation: RoomIdentityRecognitionPresentation
   completedCount: number
   participantCount: number
@@ -265,9 +267,7 @@ export type RoomPlayerMarker =
       kind: 'vote'
       status: 'pending' | TeamVote
     }>
-  | Readonly<{ kind: 'knownEvil' }>
   | Readonly<{ kind: 'assassinationTarget' }>
-  | Readonly<{ kind: 'merlinCandidate' }>
 
 /** 姓名牌下方最多显示一个短标签。 */
 export type RoomPlayerCaption =
@@ -278,8 +278,8 @@ export type RoomPlayerCaption =
     }>
   | Readonly<{
       kind: 'recognition'
-      label: '你' | '同伴' | '邪恶' | '候选人'
-      tone: 'self' | 'ally' | 'evil' | 'candidate'
+      label: '同伴' | '邪恶' | '梅林候选'
+      tone: 'ally' | 'evil' | 'candidate'
     }>
 
 /**
@@ -304,6 +304,7 @@ export interface RoomPlayerPresentation {
   name: string
   occupied: boolean
   isCurrentPlayer: boolean
+  canReviewIdentity: boolean
   portrait: RoomPlayerPortrait
   markers: readonly RoomPlayerMarker[]
   caption: RoomPlayerCaption

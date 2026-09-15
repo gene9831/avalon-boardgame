@@ -31,6 +31,7 @@ export type FilteredSeatInput = Readonly<{
   name: string
   occupied: boolean
   isCurrentPlayer: boolean
+  canReviewIdentity: boolean
   avatarID: PlayerAvatarID
   connected: boolean
   role: FilteredSeatRole
@@ -40,7 +41,6 @@ export type FilteredSeatInput = Readonly<{
   isSelected: boolean
   isSelectedTarget: boolean
   knownEvil: boolean
-  knownMerlinCandidate: boolean
   voteStatus: 'pending' | TeamVote | null
   recognition: FilteredSeatRecognition
   interaction: RoomPlayerInteraction
@@ -68,13 +68,15 @@ function buildMarkers(input: FilteredSeatInput): readonly RoomPlayerMarker[] {
   if (input.isLeader) markers.push({ kind: 'leader' })
   if (input.isQuestMember) markers.push({ kind: 'questMember' })
   if (input.voteStatus !== null) markers.push({ kind: 'vote', status: input.voteStatus })
-  if (input.knownEvil) markers.push({ kind: 'knownEvil' })
   if (input.isSelectedTarget) markers.push({ kind: 'assassinationTarget' })
-  if (input.knownMerlinCandidate) markers.push({ kind: 'merlinCandidate' })
   return markers
 }
 
 function buildCaption(input: FilteredSeatInput): RoomPlayerCaption {
+  if (input.role.kind === 'viewerVisible') {
+    return { kind: 'role', role: input.role.role }
+  }
+
   switch (input.recognition.kind) {
     case 'none':
     case 'dimmed':
@@ -115,11 +117,13 @@ export function buildRoomPlayerPresentation(
       caption: { kind: 'role', role: input.role.role },
       emphasis: 'default',
       interaction: { kind: 'none' },
+      canReviewIdentity: false,
     }
   }
 
   return {
     ...base,
+    canReviewIdentity: input.canReviewIdentity,
     portrait: buildPortrait(input),
     markers: buildMarkers(input),
     caption: buildCaption(input),

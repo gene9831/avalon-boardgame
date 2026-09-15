@@ -1600,7 +1600,6 @@ export function RoomView({
     onProposeTeam,
     onAssassinationSubmissionError: () => pushToast({ message: '确认刺杀失败，请重试。', tone: 'error' }),
     onIdentityRecognitionSubmissionError: () => pushToast({ message: '确认身份辨认失败，请重试。', tone: 'error' }),
-    onIdentityRecognitionSubmissionSuccess: () => pushToast({ message: '身份辨认进度已保存。', tone: 'success' }),
     onQuestCardSubmissionError: () => pushToast({ message: '确认任务牌失败，请重试。', tone: 'error' }),
     onTeamSubmissionError: () => pushToast({ message: '确认队伍失败，请重试。', tone: 'error' }),
     onTeamVoteSubmissionError: () => pushToast({ message: '确认投票失败，请重试。', tone: 'error' }),
@@ -1618,9 +1617,6 @@ export function RoomView({
     window.history.replaceState(window.history.state, '', nextURL)
   }, [])
 
-  const identityRecognitionComplete =
-    controller.binding.scene.kind === 'identityRecognition' &&
-    controller.binding.scene.presentation.kind === 'waiting'
   const utilityModel = {
     variant: gameState === null || room === null
       ? 'loading'
@@ -1633,8 +1629,6 @@ export function RoomView({
     showIdentityKnowledge:
       gameState?.G.status === 'playing' &&
       controller.binding.scene.kind !== 'identityConfirmation' &&
-      (controller.binding.scene.kind !== 'identityRecognition' ||
-        identityRecognitionComplete) &&
       controller.binding.scene.kind !== 'connectionRecovery',
     roleKnowledgeOpen: controller.roleKnowledgeOpen,
   } as const

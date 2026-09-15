@@ -123,6 +123,8 @@ describe('room player presentation', () => {
     expect(result.find(({ playerID }) => playerID === '0')).toMatchObject({
       isCurrentPlayer: true,
       portrait: { kind: 'roleArtwork', role: 'merlin' },
+      caption: { kind: 'role', role: 'merlin' },
+      canReviewIdentity: true,
       markers: [
         { kind: 'questMember' },
         { kind: 'vote', status: 'pending' },
@@ -133,10 +135,52 @@ describe('room player presentation', () => {
       markers: [{ kind: 'leader' }, { kind: 'questMember' }, { kind: 'assassinationTarget' }],
     })
     expect(result.find(({ playerID }) => playerID === '3')).toMatchObject({
-      markers: [{ kind: 'owner' }, { kind: 'knownEvil' }],
+      markers: [{ kind: 'owner' }],
+      caption: { kind: 'recognition', label: '邪恶', tone: 'evil' },
     })
     expect(result.find(({ playerID }) => playerID === '4')).toMatchObject({
       emphasis: 'selected',
+    })
+  })
+
+  it.each([
+    [
+      { role: 'minion', loyalty: 'evil', knownEvilPlayerIDs: ['3'], knownMerlinCandidatePlayerIDs: [] },
+      '3', '同伴', 'ally', ['owner'],
+    ],
+    [
+      { role: 'percival', loyalty: 'good', knownEvilPlayerIDs: [], knownMerlinCandidatePlayerIDs: ['1', '3'] },
+      '1', '梅林候选', 'candidate', ['leader', 'questMember'],
+    ],
+  ] as const)('presents restored %s knowledge as a colored text label', (viewer, targetPlayerID, label, tone, markerKinds) => {
+    const result = buildRoomPlayers({
+      ...baseInput,
+      game: gameView({ viewer }),
+      showKnownPlayerInfo: true,
+    })
+    const target = result.find(({ playerID }) => playerID === targetPlayerID)
+
+    expect(target?.caption).toEqual({ kind: 'recognition', label, tone })
+    expect(target?.markers.map(({ kind }) => kind)).toEqual(markerKinds)
+  })
+
+  it('keeps terminal public role labels non-reviewable', () => {
+    const result = buildRoomPlayers({
+      ...baseInput,
+      game: gameView({
+        status: 'finished',
+        revealedRoles: {
+          '0': 'merlin', '1': 'loyal_servant', '3': 'assassin', '4': 'minion',
+        },
+      }),
+      showPrivateRoleKnowledge: true,
+      showRoleReveal: true,
+    })
+
+    expect(result.find(({ playerID }) => playerID === '0')).toMatchObject({
+      portrait: { kind: 'roleArtwork', role: 'merlin' },
+      caption: { kind: 'role', role: 'merlin' },
+      canReviewIdentity: false,
     })
   })
 

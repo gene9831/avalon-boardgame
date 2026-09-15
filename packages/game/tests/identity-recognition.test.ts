@@ -56,6 +56,7 @@ describe('Avalon identity recognition', () => {
       '4': 'identityRecognition',
     })
     expect(game.identityRecognition).toEqual({
+      stage: 'identityConfirmation',
       completedCount: 0,
       participantCount: 5,
     })
@@ -68,7 +69,7 @@ describe('Avalon identity recognition', () => {
     })
   })
 
-  it('lets different roles progress independently without counting partial clue progress', () => {
+  it('keeps every player behind the identity-confirmation barrier until all confirm', () => {
     const client = createRecognitionClient()
     client.moves.startGame()
     const initial = client.store.getState().G as AvalonG
@@ -86,17 +87,20 @@ describe('Avalon identity recognition', () => {
     confirm(client, evilID)
 
     const game = client.store.getState().G as AvalonG
-    expect(game.secret.identityRecognitionStageByPlayerID[completeID]).toBe('complete')
-    expect(game.secret.identityRecognitionStageByPlayerID[merlinID]).toBe('clueRecognition')
-    expect(game.secret.identityRecognitionStageByPlayerID[evilID]).toBe('clueRecognition')
+    expect(game.secret.identityRecognitionStageByPlayerID[completeID]).toBe('waitingForClueRecognition')
+    expect(game.secret.identityRecognitionStageByPlayerID[merlinID]).toBe('waitingForClueRecognition')
+    expect(game.secret.identityRecognitionStageByPlayerID[evilID]).toBe('waitingForClueRecognition')
     expect(game.secret.identityRecognitionStageByPlayerID[untouchedID]).toBe('identityConfirmation')
     expect(game.identityRecognition).toEqual({
-      completedCount: 1,
+      stage: 'identityConfirmation',
+      completedCount: 3,
       participantCount: 5,
     })
+    expect(getAvalonPlayerView(game, merlinID).viewer.knownEvilPlayerIDs).toEqual([])
+    expect(getAvalonPlayerView(game, evilID).viewer.knownEvilPlayerIDs).toEqual([])
   })
 
-  it('requires clue roles to confirm twice and rejects duplicate completion', () => {
+  it('opens clue recognition for every clue role only after the last identity confirmation', () => {
     const client = createRecognitionClient()
     client.moves.startGame()
     const initial = client.store.getState().G as AvalonG
@@ -104,8 +108,31 @@ describe('Avalon identity recognition', () => {
 
     confirm(client, merlinID)
     let game = client.store.getState().G as AvalonG
-    expect(game.secret.identityRecognitionStageByPlayerID[merlinID]).toBe('clueRecognition')
-    expect(game.identityRecognition?.completedCount).toBe(0)
+    expect(game.secret.identityRecognitionStageByPlayerID[merlinID]).toBe('waitingForClueRecognition')
+    expect(game.identityRecognition).toEqual({
+      stage: 'identityConfirmation', completedCount: 1, participantCount: 5,
+    })
+
+    const stateIDBeforeDuplicateIdentity = client.store.getState()._stateID
+    confirm(client, merlinID)
+    expect(client.store.getState()._stateID).toBe(stateIDBeforeDuplicateIdentity)
+
+    for (const playerID of client.store.getState().ctx.playOrder) {
+      if (playerID !== merlinID) confirm(client, playerID)
+    }
+    game = client.store.getState().G as AvalonG
+    const cluePlayerIDs = Object.entries(game.secret.roleByPlayer)
+      .filter(([, role]) => role === 'merlin' || loyaltyForRole(role) === 'evil')
+      .map(([playerID]) => playerID)
+    expect(game.identityRecognition).toEqual({
+      stage: 'clueRecognition', completedCount: 0,
+      participantCount: cluePlayerIDs.length,
+    })
+    for (const playerID of client.store.getState().ctx.playOrder) {
+      expect(game.secret.identityRecognitionStageByPlayerID[playerID]).toBe(
+        cluePlayerIDs.includes(playerID) ? 'clueRecognition' : 'complete',
+      )
+    }
 
     confirm(client, merlinID)
     game = client.store.getState().G as AvalonG
@@ -118,7 +145,7 @@ describe('Avalon identity recognition', () => {
     expect((client.store.getState().G as AvalonG).identityRecognition?.completedCount).toBe(1)
   })
 
-  it('advances atomically only after every personal flow is complete', () => {
+  it('advances atomically after all clue participants complete in parallel', () => {
     const client = createRecognitionClient()
     client.moves.startGame()
     const playerIDs = client.store.getState().ctx.playOrder
@@ -127,8 +154,8 @@ describe('Avalon identity recognition', () => {
 
     let game = client.store.getState().G as AvalonG
     expect(client.store.getState().ctx.phase).toBe('identityRecognition')
-    expect(game.identityRecognition?.completedCount).toBeGreaterThan(0)
-    expect(game.identityRecognition?.completedCount).toBeLessThan(5)
+    expect(game.identityRecognition?.stage).toBe('clueRecognition')
+    expect(game.identityRecognition?.completedCount).toBe(0)
 
     for (const playerID of playerIDs) {
       if (game.secret.identityRecognitionStageByPlayerID[playerID] === 'clueRecognition') {
@@ -144,7 +171,7 @@ describe('Avalon identity recognition', () => {
     })
   })
 
-  it('releases only the current viewer knowledge after identity confirmation', () => {
+  it('releases viewer knowledge only after the room enters clue recognition', () => {
     const client = createRecognitionClient()
     client.moves.startGame()
     let game = client.store.getState().G as AvalonG
@@ -161,6 +188,20 @@ describe('Avalon identity recognition', () => {
     confirm(client, merlinID)
     confirm(client, evilID)
     confirm(client, servantID)
+    game = client.store.getState().G as AvalonG
+
+    expect(getAvalonPlayerView(game, merlinID).viewer.knownEvilPlayerIDs).toEqual([])
+    expect(getAvalonPlayerView(game, evilID).viewer.knownEvilPlayerIDs).toEqual([])
+    expect(getAvalonPlayerView(game, servantID).viewer.identityRecognition).toEqual({
+      personalStage: 'waitingForClueRecognition',
+    })
+
+    for (const playerID of client.store.getState().ctx.playOrder) {
+      if (
+        game.secret.identityRecognitionStageByPlayerID[playerID] ===
+        'identityConfirmation'
+      ) confirm(client, playerID)
+    }
     game = client.store.getState().G as AvalonG
 
     const evilIDs = Object.entries(game.secret.roleByPlayer)

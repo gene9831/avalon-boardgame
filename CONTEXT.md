@@ -51,14 +51,17 @@ _Avoid_: permissions, role access
 **Merlin candidate**: A seat that Percival knows belongs to either Merlin or Morgana without knowing which role it holds. When both roles are present, their candidate status is indistinguishable.
 _Avoid_: known Merlin, suspected Evil
 
-**Identity recognition**: The opening ceremony in which every player independently confirms their own role and, when applicable, privately recognizes their role-specific seats before the first team proposal. The ceremony ends only after every player completes their personal recognition stages.
+**Identity recognition**: The opening ceremony before the first team proposal. It has two globally ordered stages: every player first confirms their own role, then all clue-bearing roles privately recognize their authorized seats. Players act independently and concurrently within the current stage, but nobody receives role clues before every player has confirmed their identity.
 _Avoid_: night phase, role reveal phase
 
-**Personal recognition stage**: One player's private progress within identity recognition: identity confirmation, applicable role-clue recognition, or complete. Players progress independently, and another player's personal stage is not public information.
-_Avoid_: global recognition step, recognition round, night action
+**Personal recognition stage**: One player's private progress within the current identity-recognition stage: identity confirmation, waiting for the clue-recognition barrier, clue recognition, or complete. Another player's personal stage and seat-level completion are not public information.
+_Avoid_: role-group recognition round, night action
 
 **Identity confirmation**: A player's acknowledgement that they have finished viewing their own role card. It is not a game decision and carries no strategic choice.
 _Avoid_: identity vote, ready vote
+
+**Clue-recognition barrier**: The server-authoritative transition that releases authorized role clues only after every player has confirmed their own identity. It resets anonymous progress for the clue-bearing participant set.
+_Avoid_: personal clue unlock, role queue
 
 **Clue confirmation**: A player's acknowledgement that they have finished viewing the seats their role is allowed to recognize. Roles without seat knowledge do not require clue confirmation.
 _Avoid_: identity vote, role-group confirmation

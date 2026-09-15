@@ -795,7 +795,7 @@ describe('RoomView playing layout', () => {
     state.ctx.phase = 'identityRecognition'
     state.ctx.activePlayers = { '0': 'identityRecognition' }
     state.G.identityRecognition = {
-      completedCount: 0, participantCount: 5,
+      stage: 'identityConfirmation', completedCount: 0, participantCount: 5,
     }
     state.G.viewer.identityRecognition = {
       personalStage: 'identityConfirmation',
@@ -805,7 +805,7 @@ describe('RoomView playing layout', () => {
     state.G.viewer = {
       role: 'loyal_servant', loyalty: 'good', knownEvilPlayerIDs: [], knownMerlinCandidatePlayerIDs: [],
       identityRecognition: {
-        personalStage: 'complete',
+        personalStage: 'waitingForClueRecognition',
       },
     }
     state.G.identityRecognition.completedCount = 1
@@ -818,9 +818,24 @@ describe('RoomView playing layout', () => {
     expect(participant).not.toContain('aria-label="查看我的身份与已知信息"')
     expect(nonparticipant).toContain('data-room-scene="identityRecognition"')
     expect(nonparticipant).toContain('data-identity-recognition-state="waiting"')
-    expect(nonparticipant).toContain('等待其他玩家完成身份辨认')
+    expect(nonparticipant).toContain('等待其他玩家确认身份')
     expect(nonparticipant).toContain('aria-label="查看我的身份与已知信息"')
     expect(nonparticipant).not.toContain('data-curtain-state')
+  })
+
+  it('keeps the identity knowledge control available during clue recognition', () => {
+    const state = playingGameState()!
+    state.ctx.phase = 'identityRecognition'
+    state.ctx.activePlayers = { '0': 'identityRecognition' }
+    state.G.identityRecognition = {
+      stage: 'clueRecognition', completedCount: 0, participantCount: 3,
+    }
+    state.G.viewer.identityRecognition = { personalStage: 'clueRecognition' }
+
+    const html = renderRoomView({ gameState: state, room: fullRoom() }, true)
+
+    expect(html).toContain('data-room-scene="identityRecognition"')
+    expect(html).toContain('aria-label="查看我的身份与已知信息"')
   })
 
   it('marks only the requested empty seat as pending during a seat change', () => {

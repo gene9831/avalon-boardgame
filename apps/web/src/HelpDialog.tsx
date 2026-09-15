@@ -279,7 +279,7 @@ function HelpRoleCard({
             </p>
           </div>
           {optional && (
-            <span className="rounded-full border border-white/10 px-2 py-1 text-[0.65rem] font-semibold text-slate-400">可选角色</span>
+            <span className="rounded-full border border-white/10 px-2 py-1 text-xs font-semibold text-slate-400">可选角色</span>
           )}
         </div>
         <dl className="mt-3 space-y-2 text-xs leading-5 sm:mt-4 sm:space-y-3 sm:text-sm sm:leading-6">

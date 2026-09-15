@@ -51,7 +51,7 @@ async function finishPersonalRecognition(page: Page) {
   }
 }
 
-test('players recognize identities concurrently without the legacy curtain', async ({
+test('identity confirmation completes before concurrent clue recognition without a curtain', async ({
   browser,
 }) => {
   test.setTimeout(120_000)
@@ -98,7 +98,7 @@ test('players recognize identities concurrently without the legacy curtain', asy
       exact: true,
       name: '我已记住身份',
     }).click()
-    await expect(merlinPage.locator('[data-identity-recognition-state="concealed"]'))
+    await expect(merlinPage.locator('[data-identity-recognition-state="waiting"]'))
       .toBeVisible()
 
     await servantPage.getByRole('button', {
@@ -110,7 +110,7 @@ test('players recognize identities concurrently without the legacy curtain', asy
     await expect(servantPage.getByRole('button', {
       name: '查看我的身份与已知信息',
     })).toBeVisible()
-    await expect(servantPage.getByText('身份辨认进度已保存。')).toBeVisible()
+    await expect(servantPage.getByText('身份辨认进度已保存。')).toHaveCount(0)
 
     await expect(untouchedPage.locator('[data-identity-confirmation-state="revealed"]'))
       .toBeVisible()
@@ -121,7 +121,35 @@ test('players recognize identities concurrently without the legacy curtain', asy
     await expect(merlinPage.getByRole('button', {
       exact: true,
       name: '查看线索',
-    })).toBeVisible()
+    })).toHaveCount(0)
+    await expect(merlinPage.getByText('等待其他玩家确认身份')).toBeVisible()
+
+    for (const [playerID, page] of harness.pages.entries()) {
+      if (String(playerID) === merlinID || String(playerID) === servantID) continue
+      await page.getByRole('button', {
+        exact: true,
+        name: '我已记住身份',
+      }).click()
+    }
+
+    await expect(merlinPage.locator('[data-identity-recognition-state="concealed"]'))
+      .toBeVisible()
+    await expect(servantPage.getByText('等待其他玩家完成线索辨认')).toBeVisible()
+    await expect(servantPage.getByText('你已完成，可以查看身份与已知信息'))
+      .toHaveCount(0)
+
+    const merlinIdentity = merlinPage.getByRole('button', {
+      exact: true,
+      name: '查看我的身份与已知信息',
+    })
+    await expect(merlinIdentity).toBeVisible()
+    await merlinIdentity.click()
+    await expect(merlinPage.locator('[data-role-avatar="merlin"]')).toBeVisible()
+    await merlinPage.getByRole('button', {
+      exact: true,
+      name: '隐藏我的身份与已知信息',
+    }).click()
+    await expect(merlinPage.locator('[data-role-avatar="merlin"]')).toHaveCount(0)
 
     await merlinPage.getByRole('button', { exact: true, name: '查看线索' }).click()
     await expect(
@@ -135,6 +163,22 @@ test('players recognize identities concurrently without the legacy curtain', asy
       .toBeVisible()
     await expect(merlinPage.locator('[data-recognition-seat-state="target"]')).toHaveCount(0)
 
+    await merlinPage.getByRole('button', { exact: true, name: '查看线索' }).click()
+    await merlinPage.getByRole('button', { exact: true, name: '我已辨认' }).click()
+    await expect(merlinPage.locator('[data-identity-recognition-state="waiting"]'))
+      .toBeVisible()
+    await merlinPage.getByRole('button', {
+      name: '查看我的身份与已知信息',
+    }).click()
+    await expect(merlinPage.locator('[data-role-avatar="merlin"]')).toBeVisible()
+    const knownEvilAvatars = merlinPage.locator('[data-avatar-state="known-evil"]')
+    const knownEvilLabels = merlinPage.locator(
+      '[data-identity-recognition-label="true"][data-recognition-tone="evil"]',
+    )
+    await expect(knownEvilAvatars).toHaveCount(2)
+    await expect(knownEvilLabels).toHaveCount(2)
+    await expect(knownEvilLabels.first()).toBeVisible()
+
     for (const page of harness.pages) await finishPersonalRecognition(page)
 
     for (const page of harness.pages) {
@@ -144,7 +188,7 @@ test('players recognize identities concurrently without the legacy curtain', asy
       )
       await expect(page.locator('[data-curtain-state]')).toHaveCount(0)
       await expect(page.getByRole('button', {
-        name: '查看我的身份与已知信息',
+        name: /^(查看|隐藏)我的身份与已知信息$/,
       })).toBeVisible()
     }
     expect(consoleErrors).toEqual([])

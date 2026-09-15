@@ -1,14 +1,12 @@
-import type { CSSProperties, ReactNode } from 'react'
+import { useState, type CSSProperties, type ReactNode } from 'react'
 import {
   BadgeCheck,
   CircleCheck,
   CircleX,
   Crosshair,
   Crown,
-  HelpCircle,
   House,
   LoaderCircle,
-  ShieldAlert,
 } from 'lucide-react'
 import { loyaltyForRole, type Role, type TeamVote } from '@avalon/game'
 import type { PlayerSeatLayout, Rect } from '@avalon/ui-layout'
@@ -16,6 +14,7 @@ import type { PlayerSeatLayout, Rect } from '@avalon/ui-layout'
 import { PlayerAvatar } from './player-avatars'
 import { RoleAvatar } from './RoleCard'
 import { ROLE_LABELS } from './room-game'
+import { RoomIdentityReviewDialog } from './RoomIdentityReviewDialog'
 import { RoomSeatNumberBadge } from './RoomSeatNumberBadge'
 import type {
   RoomPlayerCaption,
@@ -110,9 +109,7 @@ function markerStatus(marker: RoomPlayerMarker): string {
     case 'questMember': return '任务队员'
     case 'vote':
       return marker.status === 'approve' ? '赞成' : marker.status === 'reject' ? '反对' : '已投票'
-    case 'knownEvil': return '已知阵营信息：邪恶'
     case 'assassinationTarget': return '刺杀目标'
-    case 'merlinCandidate': return '梅林候选'
     default: return assertNever(marker)
   }
 }
@@ -135,22 +132,10 @@ function markerDecoration(marker: RoomPlayerMarker, index: number): ReactNode {
           <VoteStatusIcon status={marker.status} />
         </span>
       )
-    case 'knownEvil':
-      return (
-        <span aria-label="已知邪恶阵营" className="room-seat__decoration" data-known-player-info="evil" data-seat-decoration="known-evil" key={`${marker.kind}-${index}`}>
-          <ShieldAlert />
-        </span>
-      )
     case 'assassinationTarget':
       return (
         <span aria-label="刺杀目标" className="room-seat__decoration" data-seat-decoration="assassination-target" key={`${marker.kind}-${index}`}>
           <Crosshair />
-        </span>
-      )
-    case 'merlinCandidate':
-      return (
-        <span aria-label="Merlin 候选" className="room-seat__decoration" data-known-player-info="merlin-candidate" data-seat-decoration="merlin-candidate" key={`${marker.kind}-${index}`}>
-          <HelpCircle />
         </span>
       )
     default:
@@ -254,6 +239,17 @@ function avatarState(player: RoomPlayerPresentation): string {
   if (player.caption.kind === 'role') {
     return `revealed-${loyaltyForRole(player.caption.role)}`
   }
+  if (
+    player.caption.kind === 'recognition' && player.caption.tone === 'candidate'
+  ) {
+    return 'merlin-candidate'
+  }
+  if (
+    player.caption.kind === 'recognition' &&
+    (player.caption.tone === 'ally' || player.caption.tone === 'evil')
+  ) {
+    return 'known-evil'
+  }
   switch (player.emphasis) {
     case 'target': return 'target'
     case 'selected': return 'selected'
@@ -276,6 +272,8 @@ function portraitRole(portrait: RoomPlayerPortrait): Role | null {
 }
 
 export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatProps) {
+  const [identityDetailsOpen, setIdentityDetailsOpen] = useState(false)
+  const [identityDetailsHost, setIdentityDetailsHost] = useState<HTMLElement | null>(null)
   const interaction = interactionPresentation(player.interaction, player)
   const avatarStyle = localRectStyle(layout.avatarRect, layout.playerSeatBounds)
   const emptySeatActionStyle = localEmptySeatActionStyle(
@@ -288,11 +286,12 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
   const nameStyle = localNameStyle(layout.nameRect, layout.playerSeatBounds, nameSize)
   const roleStyle = localRoleStyle(layout.nameRect, layout.playerSeatBounds)
   const role = portraitRole(player.portrait)
+  const canViewIdentity = player.isCurrentPlayer && player.canReviewIdentity && role !== null
   const connected = player.portrait.kind === 'playerAvatar' && player.portrait.connected
   const recognitionState = player.emphasis === 'dimmed'
     ? 'dimmed'
-    : player.caption.kind === 'recognition'
-      ? player.caption.tone === 'self' ? 'self' : 'target'
+    : player.emphasis === 'target' && player.caption.kind === 'recognition'
+      ? 'target'
       : undefined
   const selected = player.interaction.kind === 'selectTeam' && player.interaction.selected
   const statuses = [
@@ -397,6 +396,56 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
         role="group"
       >
         {content}
+      </div>
+    )
+  }
+
+  const identityReview = canViewIdentity && role !== null ? (
+    <>
+      <button
+        aria-label="查看我的身份详情"
+        className="room-seat__identity-action pointer-events-auto absolute"
+        onClick={(event) => {
+          setIdentityDetailsHost(
+            event.currentTarget.closest('[data-room-slot="stage"]') as HTMLElement | null,
+          )
+          setIdentityDetailsOpen(true)
+        }}
+        style={avatarStyle}
+        type="button"
+      />
+      {identityDetailsOpen && (
+        <RoomIdentityReviewDialog
+          onClose={() => setIdentityDetailsOpen(false)}
+          portalHost={identityDetailsHost}
+          role={role}
+        />
+      )}
+    </>
+  ) : null
+
+  if (canViewIdentity && interaction.canActivate) {
+    return (
+      <div {...commonProps} aria-label={accessibleLabel} role="group">
+        <button
+          aria-label={accessibleLabel}
+          aria-pressed={interaction.pressed}
+          className="room-seat__phase-action absolute inset-0 size-full border-0 bg-transparent p-0 text-center"
+          onClick={onActivate}
+          type="button"
+        >
+          {content}
+        </button>
+        {identityReview}
+      </div>
+    )
+  }
+
+  if (canViewIdentity) {
+    return (
+      <div {...commonProps} aria-label={accessibleLabel} role="group">
+        {content}
+        {identityReview}
       </div>
     )
   }

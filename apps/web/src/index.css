@@ -57,7 +57,7 @@ select {
 }
 .room-seat__portrait { display: grid; width: 100%; height: 100%; place-items: center; overflow: hidden; border-radius: inherit; }
 .room-seat__portrait[data-seat-portrait-connected='false'] { filter: grayscale(1); opacity: 0.45; }
-.room-seat__disconnected { position: absolute; inset-inline: 0; bottom: 0; padding-block: 1px; color: #cbd5e1; background: rgb(15 23 42 / 88%); font-size: 0.625rem; line-height: 1rem; }
+.room-seat__disconnected { position: absolute; inset-inline: 0; bottom: 0; padding-block: 1px; color: #cbd5e1; background: rgb(15 23 42 / 88%); font-size: 0.75rem; line-height: 1rem; }
 .room-seat__empty-action { display: grid; place-items: center; border: 0; border-radius: 9999px; pointer-events: auto; background: transparent; padding: 0; }
 .room-seat__avatar--empty { border-style: dashed; border-color: rgb(148 163 184 / 38%); color: #94a3b8; background: rgb(15 23 42 / 30%); padding: 0; }
 .room-seat__avatar--empty [data-empty-seat-number='true'] { font-size: 1rem; font-weight: 700; line-height: 1; }
@@ -68,10 +68,14 @@ select {
 .room-seat__avatar[data-avatar-state='quest-member'] { border-color: #cffafe; box-shadow: 0 0 26px rgb(34 211 238 / 70%); }
 .room-seat__avatar[data-avatar-state='target'] { border-color: #fecdd3; box-shadow: 0 0 26px rgb(251 113 133 / 70%); }
 .room-seat__avatar[data-avatar-state='known-evil'] { border-color: #be123c; box-shadow: 0 0 24px rgb(127 29 29 / 65%); }
+.room-seat__avatar[data-avatar-state='merlin-candidate'] {
+  border-color: #a78bfa;
+  box-shadow: 0 0 24px rgb(139 92 246 / 58%);
+}
 .room-seat__avatar[data-avatar-state='revealed-good'] { border-color: rgb(103 232 249 / 68%); box-shadow: 0 5px 12px rgb(0 0 0 / 40%); }
 .room-seat__avatar[data-avatar-state='revealed-evil'] { border-color: rgb(253 164 175 / 68%); box-shadow: 0 5px 12px rgb(0 0 0 / 40%); }
 .room-seat__avatar[data-room-role-revealed='true'] { animation: room-role-reveal 300ms ease-out both; }
-.room-seat__role-label { position: absolute; z-index: 2; display: block; overflow: hidden; padding: 1px 5px; border-radius: 9999px; pointer-events: none; color: #e2e8f0; background: rgb(2 6 23 / 82%); font-size: 0.625rem; font-weight: 600; line-height: 0.875rem; text-overflow: ellipsis; transform: translateX(-50%); white-space: nowrap; }
+.room-seat__role-label { position: absolute; z-index: 2; display: block; overflow: hidden; padding: 1px 5px; border-radius: 9999px; pointer-events: none; color: #e2e8f0; background: rgb(2 6 23 / 82%); font-size: 12px; font-weight: 600; line-height: 0.875rem; text-overflow: ellipsis; transform: translateX(-50%); white-space: nowrap; }
 .room-seat__role-label[data-room-role-revealed='true'] { animation: room-role-label-reveal 300ms ease-out both; }
 .room-seat__role-label[data-role-loyalty='good'] { color: #a5f3fc; }
 .room-seat__role-label[data-role-loyalty='evil'] { color: #fecdd3; }
@@ -85,7 +89,7 @@ select {
   border-radius: 0.375rem;
   background: rgb(2 6 23 / 90%);
   color: #fff;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 500;
   line-height: 1.1;
   box-shadow: 0 5px 12px rgb(0 0 0 / 40%);
@@ -110,12 +114,16 @@ select {
 .room-seat__decoration[data-seat-decoration='leader'] svg path:last-child { display: none; }
 .room-seat__decoration[data-seat-decoration='vote'] { right: -0.3rem; bottom: -0.3rem; color: #e2e8f0; background: #0f172a; }
 .room-seat__decoration[data-seat-decoration='selected'] { right: -0.3rem; top: -0.3rem; color: #67e8f9; }
-.room-seat__decoration[data-seat-decoration='known-evil'] { right: -0.3rem; top: -0.3rem; color: #ffe4e6; background: #881337; }
-.room-seat__decoration[data-seat-decoration='merlin-candidate'] { right: -0.3rem; top: -0.3rem; color: #fef3c7; background: #78350f; }
 .room-seat__decoration[data-seat-decoration='assassination-target'] { left: -0.3rem; bottom: -0.3rem; color: #fecdd3; background: #881337; }
 .room-seat:focus-visible { outline: none; }
 .room-seat:focus-visible .room-seat__avatar,
 .room-seat:focus-visible .room-seat__name { outline: 2px solid currentColor; outline-offset: 2px; }
+.room-seat__phase-action { pointer-events: auto; }
+.room-seat__phase-action:focus-visible { outline: none; }
+.room-seat__phase-action:focus-visible .room-seat__name { outline: 2px solid currentColor; outline-offset: 2px; }
+.room-seat__identity-action { z-index: 5; border: 0; border-radius: 9999px; cursor: pointer; background: transparent; }
+.room-seat__identity-action:hover { box-shadow: inset 0 0 0 2px rgb(254 243 199 / 72%); }
+.room-seat__identity-action:focus-visible { outline: 2px solid #fef3c7; outline-offset: 2px; }
 
 .room-team-tokens { display: flex; width: fit-content; max-width: 100%; flex-direction: column; align-items: center; gap: 0.5rem; }
 .room-team-token-row { display: flex; justify-content: center; gap: 0.5rem; }
@@ -123,7 +131,7 @@ select {
 button.room-team-token { cursor: pointer; }
 button.room-team-token:disabled { cursor: default; opacity: 0.55; }
 .room-team-token__avatar { display: grid; width: 100%; height: 100%; place-items: center; overflow: hidden; border-radius: inherit; }
-.room-seat-number-badge { position: absolute; top: -0.1rem; left: -0.4rem; display: grid; min-width: 0.875rem; height: 0.875rem; padding-inline: 0.1rem; place-items: center; border: 1px solid rgb(255 255 255 / 35%); border-radius: 9999px; color: #f8fafc; background: rgb(15 23 42 / 88%); font: 600 0.55rem/1 Inter, ui-sans-serif, system-ui, sans-serif; }
+.room-seat-number-badge[data-numeric-text='true'] { position: absolute; top: -0.1rem; left: -0.4rem; display: grid; min-width: 0.875rem; height: 0.875rem; padding-inline: 0.1rem; place-items: center; border: 1px solid rgb(255 255 255 / 35%); border-radius: 9999px; color: #f8fafc; background: rgb(15 23 42 / 88%); font: 600 0.625rem/1 Inter, ui-sans-serif, system-ui, sans-serif; }
 @container room-seat-decorations (max-width: 40px) {
   .room-seat__decoration[data-seat-decoration='leader'] { left: 55%; top: -0.65rem; width: 1.1rem; height: 1.1rem; }
   .room-seat__decoration[data-seat-decoration='leader'] svg { width: 0.8rem; height: 0.8rem; }
@@ -141,7 +149,7 @@ button.room-team-token:disabled { cursor: default; opacity: 0.55; }
   border-radius: 6px;
   color: #bae6fd;
   background: rgb(2 6 23 / 88%);
-  font: 11px/1.35 Inter, ui-sans-serif, system-ui, sans-serif;
+  font: 12px/1.35 Inter, ui-sans-serif, system-ui, sans-serif;
   text-align: center;
 }
 .room-layout-geometry { position: absolute; z-index: 60; inset: 0; width: 100%; height: 100%; overflow: visible; }

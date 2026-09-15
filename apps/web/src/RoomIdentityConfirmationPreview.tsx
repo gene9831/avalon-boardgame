@@ -59,6 +59,7 @@ function createPreviewState(input: Readonly<{
       lobby: { authorityVersion: 1, ownerPlayerID, occupiedPlayerIDs },
       players: Object.fromEntries(players.map((player) => [String(player.id), { name: player.name! }])),
       identityRecognition: {
+        stage: 'identityConfirmation',
         completedCount: input.confirmedCount,
         participantCount: input.playerCount,
       },

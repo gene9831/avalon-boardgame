@@ -7,6 +7,7 @@ import { getPlayerCountConfig } from './config'
 import { buildRoleDeck, assignRoles, loyaltyForRole } from './roles'
 import { getAvalonPlayerView } from './player-view'
 import {
+  createClueRecognitionStages,
   createPersonalRecognitionStages,
   nextPersonalRecognitionStage,
 } from './identity-recognition'
@@ -191,6 +192,7 @@ function createAvalonGameDefinition(
                   G.status = 'playing'
                   G.leaderID = ctx.playOrder[random.Die(ctx.numPlayers) - 1]
                   G.identityRecognition = {
+                    stage: 'identityConfirmation',
                     completedCount: 0,
                     participantCount: ctx.numPlayers,
                   }
@@ -218,22 +220,39 @@ function createAvalonGameDefinition(
                   if (recognition === null) return INVALID_MOVE
                   const currentStage =
                     G.secret.identityRecognitionStageByPlayerID[playerID]
-                  const role = G.secret.roleByPlayer[playerID]
-                  if (currentStage === undefined || role === undefined) {
-                    return INVALID_MOVE
-                  }
-                  const nextStage = nextPersonalRecognitionStage(
-                    currentStage,
-                    role,
-                    normalizeRoleConfiguration(G.rules.roleConfiguration),
-                  )
+                  if (currentStage === undefined) return INVALID_MOVE
+                  const nextStage = nextPersonalRecognitionStage(currentStage)
                   if (nextStage === null) return INVALID_MOVE
 
                   G.secret.identityRecognitionStageByPlayerID[playerID] =
                     nextStage
-                  if (nextStage !== 'complete') return
-
                   recognition.completedCount += 1
+
+                  if (recognition.stage === 'identityConfirmation') {
+                    if (
+                      recognition.completedCount !== recognition.participantCount
+                    ) return
+
+                    const clueStages = createClueRecognitionStages(
+                      G.secret.roleByPlayer,
+                      normalizeRoleConfiguration(G.rules.roleConfiguration),
+                    )
+                    const clueParticipantCount = Object.values(clueStages)
+                      .filter((stage) => stage === 'clueRecognition').length
+                    G.secret.identityRecognitionStageByPlayerID = clueStages
+                    if (clueParticipantCount === 0) {
+                      G.identityRecognition = null
+                      events.setPhase('teamProposal')
+                      return
+                    }
+                    G.identityRecognition = {
+                      stage: 'clueRecognition',
+                      completedCount: 0,
+                      participantCount: clueParticipantCount,
+                    }
+                    return
+                  }
+
                   if (
                     recognition.completedCount === recognition.participantCount
                   ) {

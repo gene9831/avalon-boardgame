@@ -8,17 +8,16 @@ import type {
 
 export type RoomPlayerSeatRecognition =
   | Readonly<{ state: 'dimmed' }>
-  | Readonly<{ state: 'self'; label: '你' }>
   | Readonly<{
       state: 'target'
-      label: '同伴' | '邪恶' | '候选人'
+      label: '同伴' | '邪恶' | '梅林候选'
       tone: 'ally' | 'evil' | 'candidate'
     }>
 
 const TARGET_MARKERS = {
   evilAllies: { label: '同伴', state: 'target', tone: 'ally' },
   merlinEvil: { label: '邪恶', state: 'target', tone: 'evil' },
-  percivalCandidates: { label: '候选人', state: 'target', tone: 'candidate' },
+  percivalCandidates: { label: '梅林候选', state: 'target', tone: 'candidate' },
 } as const satisfies Record<RoomIdentityClue['kind'], RoomPlayerSeatRecognition>
 
 type RecognitionSeatScene = Pick<RoomIdentityRecognitionScene, 'presentation'>
@@ -30,7 +29,7 @@ export function getRoomIdentityRecognitionSeat(
 ): RoomPlayerSeatRecognition | undefined {
   const presentation = scene.presentation
   if (presentation.kind !== 'clue') return undefined
-  if (isCurrentPlayer) return { label: '你', state: 'self' }
+  if (isCurrentPlayer) return undefined
 
   const cluesVisible = presentation.view === 'revealing' || presentation.view === 'revealed'
   if (
@@ -51,10 +50,7 @@ export function applyRoomIdentityRecognitionSeat(
   if (recognition === undefined) {
     return {
       ...player,
-      caption: { kind: 'none' },
-      emphasis: 'default',
       interaction: { kind: 'none' },
-      markers: [],
     }
   }
   if (recognition.state === 'dimmed') {
@@ -71,9 +67,9 @@ export function applyRoomIdentityRecognitionSeat(
     caption: {
       kind: 'recognition',
       label: recognition.label,
-      tone: recognition.state === 'self' ? 'self' : recognition.tone,
+      tone: recognition.tone,
     },
-    emphasis: recognition.state === 'target' ? 'target' : 'default',
+    emphasis: 'target',
     interaction: { kind: 'none' },
     markers: [],
   }

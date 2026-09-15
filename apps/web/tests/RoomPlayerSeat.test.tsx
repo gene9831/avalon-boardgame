@@ -1,5 +1,8 @@
+// @vitest-environment happy-dom
+import { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { PlayerSeatLayout } from '@avalon/ui-layout'
 
 import { RoomPlayerSeat } from '../src/RoomPlayerSeat'
@@ -16,7 +19,7 @@ const layout: PlayerSeatLayout = {
 
 const player: RoomPlayerPresentation = {
   playerID: '0', relativeSeatIndex: 0, seatNumber: 1, name: 'Alice', occupied: true,
-  isCurrentPlayer: false,
+  isCurrentPlayer: false, canReviewIdentity: false,
   portrait: { kind: 'playerAvatar', avatarID: 'merlin', connected: true },
   markers: [{ kind: 'leader' }],
   caption: { kind: 'none' },
@@ -24,20 +27,141 @@ const player: RoomPlayerPresentation = {
   interaction: { kind: 'none' },
 }
 
+let root: Root | null = null
+let container: HTMLDivElement | null = null
+let stageHost: HTMLElement | null = null
+
+globalThis.IS_REACT_ACT_ENVIRONMENT = true
+
+afterEach(async () => {
+  await act(async () => root?.unmount())
+  stageHost?.remove()
+  container?.remove()
+  root = null
+  container = null
+  stageHost = null
+})
+
 describe('RoomPlayerSeat', () => {
-  it('labels a normalized recognition target without replacing the player avatar', () => {
+  it('opens the complete identity details from the revealed current-player avatar', async () => {
+    stageHost = document.createElement('main')
+    stageHost.dataset.roomSlot = 'stage'
+    container = document.createElement('div')
+    stageHost.append(container)
+    document.body.append(stageHost)
+    root = createRoot(container)
+    await act(async () => root?.render(
+      <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
+        ...player,
+        isCurrentPlayer: true,
+        canReviewIdentity: true,
+        portrait: { kind: 'roleArtwork', role: 'merlin' },
+        caption: { kind: 'role', role: 'merlin' },
+      }} />,
+    ))
+
+    expect(container.querySelector('[data-role-loyalty="good"]')?.textContent).toBe('梅林')
+    const identityButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="查看我的身份详情"]',
+    )
+    expect(identityButton).not.toBeNull()
+    expect(identityButton?.classList).toContain('pointer-events-auto')
+    await act(async () => identityButton?.click())
+
+    const dialog = document.querySelector('[role="dialog"][aria-label="我的身份详情"]')
+    expect(dialog).not.toBeNull()
+    expect(dialog?.querySelector('[data-identity-role-artwork="merlin"]')).not.toBeNull()
+    expect(dialog?.textContent).toContain('你的目标')
+    expect(dialog?.textContent).toContain('角色能力')
+    expect(dialog?.textContent).toContain('行动提示')
+    expect(dialog?.parentElement).toBe(stageHost)
+
+    const closeButton = dialog?.querySelector<HTMLButtonElement>(
+      'button[data-identity-review-close="true"]',
+    )
+    expect(closeButton?.textContent).toContain('收起身份卡')
+    expect(closeButton?.querySelector('svg')).toBeNull()
+    expect(dialog?.lastElementChild?.contains(closeButton ?? null)).toBe(true)
+
+    await act(async () => closeButton?.click())
+    expect(document.querySelector('[role="dialog"][aria-label="我的身份详情"]')).toBeNull()
+  })
+
+  it('keeps the phase action separate from identity review on the current-player seat', async () => {
+    const onActivate = vi.fn()
+    container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+    await act(async () => root?.render(
+      <RoomPlayerSeat layout={layout} onActivate={onActivate} player={{
+        ...player,
+        isCurrentPlayer: true,
+        canReviewIdentity: true,
+        portrait: { kind: 'roleArtwork', role: 'merlin' },
+        interaction: { kind: 'selectTeam', disabled: false, selected: false },
+      }} />,
+    ))
+
+    const identityButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="查看我的身份详情"]',
+    )
+    const phaseButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="选择 Alice 加入任务队伍，队长，当前玩家，梅林"]',
+    )
+    expect(identityButton).not.toBeNull()
+    expect(phaseButton).not.toBeNull()
+
+    await act(async () => phaseButton?.click())
+    expect(onActivate).toHaveBeenCalledOnce()
+    expect(document.querySelector('[role="dialog"][aria-label="我的身份详情"]')).toBeNull()
+  })
+
+  it('shows restored Percival knowledge as a candidate-colored text label', () => {
     const html = renderToStaticMarkup(
       <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
-        ...player, markers: [],
-        caption: { kind: 'recognition', label: '同伴', tone: 'ally' },
+        ...player,
+        markers: [],
+        caption: { kind: 'recognition', label: '梅林候选', tone: 'candidate' },
       }} />,
     )
 
-    expect(html).toContain('data-recognition-seat-state="target"')
-    expect(html).toContain('data-recognition-tone="ally"')
+    expect(html).toContain('data-avatar-state="merlin-candidate"')
+    expect(html).toContain('>梅林候选</span>')
+    expect(html).not.toContain('data-known-player-info')
+    expect(html).not.toContain('data-room-role-revealed="true"')
+  })
+
+  it('uses the same candidate avatar state during Percival clue recognition', () => {
+    const html = renderToStaticMarkup(
+      <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
+        ...player, markers: [],
+        caption: { kind: 'recognition', label: '梅林候选', tone: 'candidate' },
+        emphasis: 'target',
+      }} />,
+    )
+
+    expect(html).toContain('data-avatar-state="merlin-candidate"')
+    expect(html).toContain('data-recognition-tone="candidate"')
+    expect(html).not.toContain('data-room-role-revealed="true"')
+  })
+
+  it.each([
+    ['同伴', 'ally'],
+    ['邪恶', 'evil'],
+  ] as const)('uses a compact known-evil treatment for restored %s knowledge', (label, tone) => {
+    const html = renderToStaticMarkup(
+      <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
+        ...player, markers: [],
+        caption: { kind: 'recognition', label, tone },
+      }} />,
+    )
+
+    expect(html).toContain('data-avatar-state="known-evil"')
+    expect(html).not.toContain('data-recognition-seat-state="target"')
+    expect(html).toContain(`data-recognition-tone="${tone}"`)
     expect(html).toContain('data-identity-recognition-label="true"')
-    expect(html).toContain('>同伴</span>')
-    expect(html).toContain('aria-label="1. Alice，同伴"')
+    expect(html).toContain(`>${label}</span>`)
+    expect(html).toContain(`aria-label="1. Alice，${label}"`)
     expect(html).not.toContain('data-room-role-revealed="true"')
   })
 
@@ -209,7 +333,7 @@ describe('RoomPlayerSeat', () => {
       }} />,
     )
 
-    expect(html).toContain('data-room-seat-number-badge="true">10</span>')
+    expect(html).toContain('data-numeric-text="true" data-room-seat-number-badge="true">10</span>')
     expect(html).toContain('data-nameplate-size="short"')
     expect(html).toMatch(/data-round-table-nameplate="true"[^>]*>.*data-seat-decoration="owner".*银月.*<\/span>/s)
     expect(html).not.toContain('data-seat-number="true"')

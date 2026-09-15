@@ -34,7 +34,7 @@ describe('RoomIdentityRecognitionPreview', () => {
     expect(html).toContain(`data-identity-recognition-scene="${scenarioID}"`)
     if (scenarioID === 'waiting') {
       expect(html).toContain('data-identity-recognition-state="waiting"')
-      expect(html).toContain('等待其他玩家完成身份辨认')
+      expect(html).toContain('等待其他玩家完成线索辨认')
       expect(html).not.toContain('查看线索')
     } else {
       expect(html).toContain('data-identity-recognition-state="concealed"')

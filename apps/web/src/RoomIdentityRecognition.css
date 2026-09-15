@@ -8,8 +8,8 @@
   margin: auto;
 }
 
-[data-identity-recognition-state] [data-seat-decoration],
-[data-identity-recognition-state] [data-seat-disconnected-badge='true'] {
+[data-identity-recognition-state]:not([data-identity-recognition-state='waiting']) [data-seat-decoration],
+[data-identity-recognition-state]:not([data-identity-recognition-state='waiting']) [data-seat-disconnected-badge='true'] {
   display: none;
 }
 
@@ -40,12 +40,6 @@
   opacity: 0.35;
 }
 
-[data-recognition-seat-state='self'] .room-seat__avatar,
-[data-recognition-seat-state='self'] .room-seat__name {
-  filter: saturate(0.65);
-  opacity: 0.55;
-}
-
 [data-recognition-seat-state='target'] .room-seat__avatar {
   z-index: 2;
   filter: none;
@@ -57,19 +51,14 @@
   opacity: 1;
 }
 
-[data-recognition-tone='ally'] .room-seat__avatar {
-  border-color: #8e3945;
-  box-shadow: 0 0 0 3px #27171d, 0 0 0 5px rgb(142 57 69 / 85%), 0 0 24px rgb(91 39 51 / 72%);
+[data-recognition-seat-state='target'][data-recognition-tone='ally'] .room-seat__avatar,
+[data-recognition-seat-state='target'][data-recognition-tone='evil'] .room-seat__avatar {
+  border-color: #be123c;
+  box-shadow: 0 0 0 3px #2b1118, 0 0 0 5px rgb(190 18 60 / 88%), 0 0 24px rgb(127 29 29 / 65%);
 }
 
-[data-recognition-tone='evil'] .room-seat__avatar {
-  border-color: #76526f;
-  box-shadow: 0 0 0 3px #211923, 0 0 0 5px rgb(118 82 111 / 88%), 0 0 24px rgb(91 39 51 / 62%);
-}
-
-[data-recognition-tone='candidate'] .room-seat__avatar {
-  border-color: #c9b982;
-  box-shadow: 0 0 0 3px #28271f, 0 0 0 5px rgb(201 185 130 / 85%), 0 0 24px rgb(229 220 192 / 48%);
+[data-recognition-seat-state='target'][data-recognition-tone='candidate'] .room-seat__avatar {
+  box-shadow: 0 0 0 3px #1e1b4b, 0 0 0 5px rgb(167 139 250 / 88%), 0 0 24px rgb(139 92 246 / 58%);
 }
 
 .room-seat__recognition-label {
@@ -84,7 +73,7 @@
   color: #f2e8d5;
   background: rgb(9 13 22 / 88%);
   box-shadow: 0 4px 12px rgb(0 0 0 / 36%);
-  font-size: 0.625rem;
+  font-size: 12px;
   font-weight: 650;
   line-height: 0.875rem;
   text-overflow: ellipsis;
@@ -92,27 +81,17 @@
   white-space: nowrap;
 }
 
-.room-seat__recognition-label[data-recognition-tone='ally'] {
-  border-color: rgb(142 57 69 / 70%);
-  color: #efc7cc;
-  background: rgb(39 23 29 / 92%);
-}
-
+.room-seat__recognition-label[data-recognition-tone='ally'],
 .room-seat__recognition-label[data-recognition-tone='evil'] {
-  border-color: rgb(118 82 111 / 72%);
-  color: #e1ccd9;
-  background: rgb(33 25 35 / 92%);
+  border-color: rgb(190 18 60 / 72%);
+  color: #fecdd3;
+  background: rgb(76 5 25 / 92%);
 }
 
 .room-seat__recognition-label[data-recognition-tone='candidate'] {
-  border-color: rgb(201 185 130 / 74%);
-  color: #f2e8d5;
-  background: rgb(40 39 31 / 92%);
-}
-
-.room-seat__recognition-label[data-recognition-tone='self'] {
-  border-color: rgb(170 166 157 / 42%);
-  color: #aaa69d;
+  border-color: rgb(167 139 250 / 74%);
+  color: #ede9fe;
+  background: rgb(46 16 101 / 92%);
 }
 
 .identity-recognition-atmosphere {
@@ -138,28 +117,6 @@
 [data-identity-recognition-state='revealing'] [data-recognition-seat-state='target'] .room-seat__avatar,
 [data-identity-recognition-state='revealing'] [data-recognition-seat-state='target'] .room-seat__recognition-label {
   animation: identity-recognition-target-reveal 450ms ease-out both;
-}
-
-[data-identity-recognition-state='waiting'] #current-player-avatar {
-  border-color: rgb(201 185 130 / 92%);
-  box-shadow: 0 0 0 3px rgb(201 185 130 / 28%), 0 0 22px rgb(201 185 130 / 38%);
-}
-
-[data-identity-recognition-state='waiting'] #current-player-avatar::after {
-  position: absolute;
-  right: -0.25rem;
-  bottom: -0.2rem;
-  display: grid;
-  width: 1.25rem;
-  height: 1.25rem;
-  place-items: center;
-  border: 1px solid rgb(242 232 213 / 78%);
-  border-radius: 9999px;
-  content: '✓';
-  color: #090d16;
-  background: #c9b982;
-  font-size: 0.75rem;
-  font-weight: 800;
 }
 
 @keyframes identity-recognition-transition {

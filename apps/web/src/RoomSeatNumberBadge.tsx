@@ -4,7 +4,7 @@ export interface RoomSeatNumberBadgeProps {
 
 export function RoomSeatNumberBadge({ seatNumber }: RoomSeatNumberBadgeProps) {
   return (
-    <span aria-hidden="true" className="room-seat-number-badge" data-room-seat-number-badge="true">
+    <span aria-hidden="true" className="room-seat-number-badge" data-numeric-text="true" data-room-seat-number-badge="true">
       {seatNumber}
     </span>
   )

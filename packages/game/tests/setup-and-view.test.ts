@@ -44,10 +44,12 @@ function completeIdentityRecognition(
 ) {
   while (client.store.getState().ctx.phase === 'identityRecognition') {
     const game = getAuthoritativeGame(client)
+    const activeStage = game.identityRecognition?.stage
+    if (activeStage === undefined) throw new Error('Expected identity recognition state')
     const pendingPlayerIDs = Object.entries(
       game.secret.identityRecognitionStageByPlayerID,
     )
-      .filter(([, stage]) => stage !== 'complete')
+      .filter(([, stage]) => stage === activeStage)
       .map(([playerID]) => playerID)
 
     for (const playerID of pendingPlayerIDs) {
@@ -68,8 +70,10 @@ function createRecognitionStateWithRoleAtClue(role: Role) {
   const playerID = Object.entries(game.secret.roleByPlayer)
     .find(([, assignedRole]) => assignedRole === role)?.[0]
   if (playerID === undefined) throw new Error(`Expected role ${role}`)
-  client.updatePlayerID(playerID)
-  client.moves.confirmIdentityRecognition()
+  for (const participantID of client.store.getState().ctx.playOrder) {
+    client.updatePlayerID(participantID)
+    client.moves.confirmIdentityRecognition()
+  }
   return { G: getAuthoritativeGame(client), playerID }
 }
 
@@ -353,10 +357,10 @@ describe('Avalon setup and player views', () => {
       .find(([, role]) => role === 'percival')?.[0]
     expect(merlinID).toBeDefined()
     expect(percivalID).toBeDefined()
-    client.updatePlayerID(merlinID ?? '')
-    client.moves.confirmIdentityRecognition()
-    client.updatePlayerID(percivalID ?? '')
-    client.moves.confirmIdentityRecognition()
+    for (const participantID of client.store.getState().ctx.playOrder) {
+      client.updatePlayerID(participantID)
+      client.moves.confirmIdentityRecognition()
+    }
     G = getAuthoritativeGame(client)
     const evilIDs = Object.entries(G.secret.roleByPlayer)
       .filter(([, role]) => loyaltyForRole(role) === 'evil')

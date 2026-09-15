@@ -13,7 +13,7 @@ const interactivePlayer = {
   playerID: '0', relativeSeatIndex: 0, seatNumber: 1, name: 'Alice', occupied: true,
   isCurrentPlayer: true,
   portrait: { kind: 'playerAvatar', avatarID: 'merlin', connected: true },
-  markers: [], caption: { kind: 'none' }, emphasis: 'selected',
+  canReviewIdentity: false, markers: [], caption: { kind: 'none' }, emphasis: 'selected',
   interaction: { kind: 'selectTeam', disabled: false, selected: true },
 } as const satisfies RoomIdentityConfirmationSceneData['players'][number]
 

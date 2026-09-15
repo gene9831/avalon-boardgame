@@ -11,10 +11,14 @@ import type {
 
 const players: readonly RoomPlayerPresentation[] = ['0', '1', '2'].map((playerID, relativeSeatIndex) => ({
   playerID, relativeSeatIndex, seatNumber: relativeSeatIndex + 1,
-  name: ['Alice', 'Bob', 'Carol'][relativeSeatIndex], occupied: true, isCurrentPlayer: playerID === '2',
+  name: ['Alice', 'Bob', 'Carol'][relativeSeatIndex], occupied: true,
+  isCurrentPlayer: playerID === '2', canReviewIdentity: false,
   portrait: { kind: 'playerAvatar', avatarID: 'merlin', connected: true },
-  markers: playerID === '0' ? [{ kind: 'knownEvil' }] : [],
-  caption: { kind: 'none' }, emphasis: playerID === '0' ? 'knownEvil' : 'default',
+  markers: [],
+  caption: playerID === '0'
+    ? { kind: 'recognition', label: '邪恶', tone: 'evil' }
+    : { kind: 'none' },
+  emphasis: playerID === '0' ? 'knownEvil' : 'default',
   interaction: playerID === '1'
     ? { kind: 'selectTeam', disabled: false, selected: false }
     : { kind: 'none' },
@@ -40,6 +44,7 @@ function clueScene(
 ): RoomIdentityRecognitionSceneData {
   return {
     kind: 'identityRecognition', matchID: 'ABC123456', playerCount: 3, players, questProgress: [],
+    stage: 'clueRecognition',
     presentation: {
       kind: 'clue',
       clue: { kind: 'merlinEvil', targetPlayerIDs: ['0'] },
@@ -51,10 +56,10 @@ function clueScene(
   }
 }
 
-function waitingScene(): RoomIdentityRecognitionSceneData {
+function waitingScene(stage: RoomIdentityRecognitionSceneData['stage'] = 'clueRecognition'): RoomIdentityRecognitionSceneData {
   return {
     kind: 'identityRecognition', matchID: 'ABC123456', playerCount: 3, players, questProgress: [],
-    presentation: { kind: 'waiting' }, completedCount: 3, participantCount: 5,
+    stage, presentation: { kind: 'waiting' }, completedCount: 3, participantCount: 5,
   }
 }
 
@@ -94,11 +99,29 @@ describe('RoomIdentityRecognitionScene', () => {
     const html = renderScene(clueScene('revealed'))
 
     expect(html).toMatch(/data-player-id="0"[^>]*data-recognition-seat-state="target"[^>]*data-recognition-tone="evil"/)
-    expect(html).toMatch(/data-player-id="2"[^>]*data-recognition-seat-state="self"[^>]*data-recognition-tone="self"/)
+    expect(html).toMatch(/data-player-id="2"[^>]*aria-label="3\. Carol，当前玩家"/)
     expect(html).toMatch(/data-player-id="1"[^>]*data-recognition-seat-state="dimmed"/)
     expect(html).toContain('>邪恶</span>')
+    expect(html).not.toContain('data-recognition-tone="self"')
+    expect(html).not.toContain('>你</span>')
     expect(html).toContain('暂时隐藏')
     expect(html).toContain('我已辨认')
+  })
+
+  it('uses the full Merlin-candidate label for Percival clues', () => {
+    const base = clueScene('revealed')
+    const scene: RoomIdentityRecognitionSceneData = {
+      ...base,
+      presentation: {
+        kind: 'clue',
+        clue: { kind: 'percivalCandidates', targetPlayerIDs: ['0', '1'] },
+        view: 'revealed',
+        confirmRequestState: 'idle',
+      },
+    }
+    const html = renderScene(scene)
+
+    expect(html.match(/>梅林候选<\/span>/g)).toHaveLength(2)
   })
 
   it('removes preexisting seat interactions from the private recognition scene', () => {
@@ -121,11 +144,22 @@ describe('RoomIdentityRecognitionScene', () => {
   it('returns completed players to an unobstructed table with anonymous progress', () => {
     const html = renderScene(waitingScene())
 
-    expect(html).toMatch(/3 \/ 5.*玩家已完成身份辨认.*等待其他玩家/s)
-    expect(html).toContain('等待其他玩家完成身份辨认')
+    expect(html).toMatch(/3 \/ 5.*玩家已完成线索辨认.*等待其他玩家/s)
+    expect(html).toContain('等待其他玩家完成线索辨认')
+    expect(html).not.toContain('你已完成，可以查看身份与已知信息')
     expect(html).toContain('data-room-stage="true"')
+    expect(html).toContain('>邪恶</span>')
+    expect(html).not.toContain('data-known-player-info')
     expect(html).not.toContain('data-recognition-seat-state="target"')
     expect(html).not.toContain('data-identity-recognition-atmosphere')
     expect(html).not.toContain('身份辨认幕布')
+  })
+
+  it('distinguishes waiting for identity confirmation from waiting for clue recognition', () => {
+    const html = renderScene(waitingScene('identityConfirmation'))
+
+    expect(html).toMatch(/3 \/ 5.*玩家已确认身份.*等待其他玩家/s)
+    expect(html).toContain('等待其他玩家确认身份')
+    expect(html).toContain('你已确认，可以再次查看自己的身份')
   })
 })

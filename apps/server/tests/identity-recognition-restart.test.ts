@@ -88,17 +88,29 @@ describe('identity recognition server recovery', () => {
 
     let clients: AvalonClient[] = []
     try {
-      const owner = createSocketClient(
-        running.gamePort,
-        matchID,
-        '0',
-        credentialsByPlayerID['0'],
+      const clientsByPlayerID: Record<PlayerID, AvalonClient> = {}
+      for (let index = 0; index < 5; index += 1) {
+        const playerID = String(index)
+        const client = createSocketClient(
+          running.gamePort,
+          matchID,
+          playerID,
+          credentialsByPlayerID[playerID],
+        )
+        clientsByPlayerID[playerID] = client
+        clients.push(client)
+        client.start()
+      }
+      await Promise.all(
+        Object.values(clientsByPlayerID).map((client) =>
+          waitForClientState(client, (state) => state.isConnected)),
       )
-      clients.push(owner)
-      owner.start()
-      await waitForClientState(owner, (state) => state.isConnected)
+      const owner = clientsByPlayerID['0']
       owner.moves.startGame()
-      await waitForClientState(owner, (state) => state.ctx.phase === 'identityRecognition')
+      await Promise.all(
+        Object.values(clientsByPlayerID).map((client) =>
+          waitForClientState(client, (state) => state.ctx.phase === 'identityRecognition')),
+      )
 
       let persisted = storage.fetch(matchID, { state: true }).state.G as AvalonG
       const merlinID = Object.entries(persisted.secret.roleByPlayer)
@@ -108,47 +120,43 @@ describe('identity recognition server recovery', () => {
       expect(merlinID).toBeDefined()
       expect(servantID).toBeDefined()
 
-      const merlin = createSocketClient(
-        running.gamePort,
-        matchID,
-        merlinID ?? '',
-        credentialsByPlayerID[merlinID ?? ''],
-      )
-      const servant = createSocketClient(
-        running.gamePort,
-        matchID,
-        servantID ?? '',
-        credentialsByPlayerID[servantID ?? ''],
-      )
-      clients.push(merlin, servant)
-      merlin.start()
-      servant.start()
-      await Promise.all([
-        waitForClientState(merlin, (state) => state.isConnected),
-        waitForClientState(servant, (state) => state.isConnected),
-      ])
-      const servantStateIDBeforeMerlin = servant.getState()?._stateID ?? 0
-      merlin.moves.confirmIdentityRecognition()
-      await Promise.all([
-        waitForClientState(
-          merlin,
-          (state) => gameState(state).viewer.identityRecognition?.personalStage === 'clueRecognition',
-        ),
-        waitForClientState(
-          servant,
-          (state) => state._stateID > servantStateIDBeforeMerlin,
-        ),
-      ])
-      servant.moves.confirmIdentityRecognition()
+      for (const [index, client] of Object.values(clientsByPlayerID).entries()) {
+        client.moves.confirmIdentityRecognition()
+        await Promise.all(
+          Object.values(clientsByPlayerID).map((observingClient) =>
+            waitForClientState(observingClient, (state) => {
+              const recognition = gameState(state).identityRecognition
+              return index === 4
+                ? recognition?.stage === 'clueRecognition'
+                : recognition?.stage === 'identityConfirmation' &&
+                    recognition.completedCount === index + 1
+            })),
+        )
+      }
+      const merlin = clientsByPlayerID[merlinID ?? '']
       await waitForClientState(
-        servant,
+        merlin,
+        (state) => gameState(state).identityRecognition?.stage === 'clueRecognition',
+      )
+      const completedClueID = Object.entries(persisted.secret.roleByPlayer)
+        .find(([playerID, role]) =>
+          playerID !== merlinID && role !== 'loyal_servant' && role !== 'percival')?.[0]
+      expect(completedClueID).toBeDefined()
+      await waitForClientState(
+        clientsByPlayerID[completedClueID ?? ''],
+        (state) => gameState(state).identityRecognition?.stage === 'clueRecognition',
+      )
+      clientsByPlayerID[completedClueID ?? ''].moves.confirmIdentityRecognition()
+      await waitForClientState(
+        clientsByPlayerID[completedClueID ?? ''],
         (state) => gameState(state).viewer.identityRecognition?.personalStage === 'complete',
       )
 
       persisted = storage.fetch(matchID, { state: true }).state.G as AvalonG
       expect(persisted.identityRecognition).toEqual({
+        stage: 'clueRecognition',
         completedCount: 1,
-        participantCount: 5,
+        participantCount: 4,
       })
       expect(persisted.secret.identityRecognitionStageByPlayerID[merlinID ?? ''])
         .toBe('clueRecognition')
