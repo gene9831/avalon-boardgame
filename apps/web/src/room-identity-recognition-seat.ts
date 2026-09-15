@@ -8,7 +8,6 @@ import type {
 
 export type RoomPlayerSeatRecognition =
   | Readonly<{ state: 'dimmed' }>
-  | Readonly<{ state: 'self'; label: '你' }>
   | Readonly<{
       state: 'target'
       label: '同伴' | '邪恶' | '候选人'
@@ -30,7 +29,7 @@ export function getRoomIdentityRecognitionSeat(
 ): RoomPlayerSeatRecognition | undefined {
   const presentation = scene.presentation
   if (presentation.kind !== 'clue') return undefined
-  if (isCurrentPlayer) return { label: '你', state: 'self' }
+  if (isCurrentPlayer) return undefined
 
   const cluesVisible = presentation.view === 'revealing' || presentation.view === 'revealed'
   if (
@@ -68,9 +67,9 @@ export function applyRoomIdentityRecognitionSeat(
     caption: {
       kind: 'recognition',
       label: recognition.label,
-      tone: recognition.state === 'self' ? 'self' : recognition.tone,
+      tone: recognition.tone,
     },
-    emphasis: recognition.state === 'target' ? 'target' : 'default',
+    emphasis: 'target',
     interaction: { kind: 'none' },
     markers: [],
   }

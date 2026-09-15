@@ -95,9 +95,11 @@ describe('RoomIdentityRecognitionScene', () => {
     const html = renderScene(clueScene('revealed'))
 
     expect(html).toMatch(/data-player-id="0"[^>]*data-recognition-seat-state="target"[^>]*data-recognition-tone="evil"/)
-    expect(html).toMatch(/data-player-id="2"[^>]*data-recognition-seat-state="self"[^>]*data-recognition-tone="self"/)
+    expect(html).toMatch(/data-player-id="2"[^>]*aria-label="3\. Carol，当前玩家"/)
     expect(html).toMatch(/data-player-id="1"[^>]*data-recognition-seat-state="dimmed"/)
     expect(html).toContain('>邪恶</span>')
+    expect(html).not.toContain('data-recognition-tone="self"')
+    expect(html).not.toContain('>你</span>')
     expect(html).toContain('暂时隐藏')
     expect(html).toContain('我已辨认')
   })

@@ -292,7 +292,7 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
   const recognitionState = player.emphasis === 'dimmed'
     ? 'dimmed'
     : player.caption.kind === 'recognition'
-      ? player.caption.tone === 'self' ? 'self' : 'target'
+      ? 'target'
       : undefined
   const selected = player.interaction.kind === 'selectTeam' && player.interaction.selected
   const statuses = [

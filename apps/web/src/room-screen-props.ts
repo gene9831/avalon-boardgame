@@ -280,8 +280,8 @@ export type RoomPlayerCaption =
     }>
   | Readonly<{
       kind: 'recognition'
-      label: '你' | '同伴' | '邪恶' | '候选人'
-      tone: 'self' | 'ally' | 'evil' | 'candidate'
+      label: '同伴' | '邪恶' | '候选人'
+      tone: 'ally' | 'evil' | 'candidate'
     }>
 
 /**

@@ -40,12 +40,6 @@
   opacity: 0.35;
 }
 
-[data-recognition-seat-state='self'] .room-seat__avatar,
-[data-recognition-seat-state='self'] .room-seat__name {
-  filter: saturate(0.65);
-  opacity: 0.55;
-}
-
 [data-recognition-seat-state='target'] .room-seat__avatar {
   z-index: 2;
   filter: none;
@@ -108,11 +102,6 @@
   border-color: rgb(201 185 130 / 74%);
   color: #f2e8d5;
   background: rgb(40 39 31 / 92%);
-}
-
-.room-seat__recognition-label[data-recognition-tone='self'] {
-  border-color: rgb(170 166 157 / 42%);
-  color: #aaa69d;
 }
 
 .identity-recognition-atmosphere {
