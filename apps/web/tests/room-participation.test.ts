@@ -800,8 +800,8 @@ describe('room participation client', () => {
   })
 
   it('uses the stable seat conflict code instead of exit copy', () => {
-    expect(getSeatChangeErrorMessage(new RoomParticipationHttpError(409, 'seat_unavailable')))
-      .toBe('该空座刚刚被其他玩家占用。')
+    expect(getSeatChangeErrorMessage(new RoomParticipationHttpError(409, 'seat_unavailable'), 5))
+      .toBe('5 号位已被占用，请选择其他空位。')
   })
 
   it('uses dedicated start failure copy', () => {

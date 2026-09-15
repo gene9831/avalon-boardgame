@@ -49,6 +49,17 @@ function localRectStyle(rect: Rect, bounds: Rect): CSSProperties {
   }
 }
 
+function localEmptySeatActionStyle(rect: Rect, bounds: Rect): CSSProperties {
+  const width = Math.max(44, rect.width)
+  const height = Math.max(44, rect.height)
+  return {
+    left: rect.x - bounds.x - (width - rect.width) / 2,
+    top: rect.y - bounds.y - (height - rect.height) / 2,
+    width,
+    height,
+  }
+}
+
 type NameplateSize = 'short' | 'medium' | 'max'
 
 function nameplateSize(label: string, hasOwnerIcon: boolean): NameplateSize {
@@ -267,6 +278,10 @@ function portraitRole(portrait: RoomPlayerPortrait): Role | null {
 export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatProps) {
   const interaction = interactionPresentation(player.interaction, player)
   const avatarStyle = localRectStyle(layout.avatarRect, layout.playerSeatBounds)
+  const emptySeatActionStyle = localEmptySeatActionStyle(
+    layout.avatarRect,
+    layout.playerSeatBounds,
+  )
   const visibleName = player.occupied ? player.name : interaction.pending ? '换座中' : '空位'
   const owner = player.markers.some((marker) => marker.kind === 'owner')
   const nameSize = nameplateSize(visibleName, owner)
@@ -311,6 +326,24 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
             <span className="room-seat__disconnected" data-seat-disconnected-badge="true">掉线</span>
           )}
         </span>
+      ) : interaction.canActivate ? (
+        <button
+          aria-label={accessibleLabel}
+          className="room-seat__empty-action absolute"
+          onClick={onActivate}
+          style={emptySeatActionStyle}
+          type="button"
+        >
+          <span
+            className="room-seat__avatar room-seat__avatar--empty"
+            data-round-table-avatar="true"
+            data-seat-pointer-target="avatar"
+            data-seat-state="empty"
+            style={{ width: avatarStyle.width, height: avatarStyle.height }}
+          >
+            <span aria-hidden="true" data-empty-seat-number="true">{player.seatNumber}</span>
+          </span>
+        </button>
       ) : (
         <span
           className="room-seat__avatar room-seat__avatar--empty absolute"
@@ -321,7 +354,7 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
         >
           {interaction.pending
             ? <LoaderCircle aria-hidden="true" className="size-5 animate-spin" />
-            : <span aria-hidden="true" data-empty-seat-symbol="true">+</span>}
+            : <span aria-hidden="true" data-empty-seat-number="true">{player.seatNumber}</span>}
         </span>
       )}
       <span
@@ -338,7 +371,7 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
       </span>
       {captionContent(player.caption, roleStyle)}
       <span className="room-seat__decorations absolute" style={avatarStyle}>
-        <RoomSeatNumberBadge seatNumber={player.seatNumber} />
+        {player.occupied && <RoomSeatNumberBadge seatNumber={player.seatNumber} />}
         {selected && (
           <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="selected">
             <CircleCheck fill="#0f172a" />
@@ -349,7 +382,6 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
     </>
   )
   const commonProps = {
-    'aria-label': accessibleLabel,
     className: 'room-seat relative size-full border-0 bg-transparent p-0 text-center',
     'data-player-id': player.playerID,
     'data-recognition-seat-state': recognitionState,
@@ -357,9 +389,22 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
     'data-round-table-player': 'true',
   } as const
 
+  if (!player.occupied) {
+    return (
+      <div
+        {...commonProps}
+        aria-label={interaction.canActivate ? undefined : accessibleLabel}
+        role="group"
+      >
+        {content}
+      </div>
+    )
+  }
+
   return interaction.canActivate ? (
     <button
       {...commonProps}
+      aria-label={accessibleLabel}
       aria-pressed={interaction.pressed}
       onClick={onActivate}
       type="button"
@@ -367,6 +412,6 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
       {content}
     </button>
   ) : (
-    <div {...commonProps} role="group">{content}</div>
+    <div {...commonProps} aria-label={accessibleLabel} role="group">{content}</div>
   )
 }

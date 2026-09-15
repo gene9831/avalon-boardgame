@@ -162,7 +162,10 @@ test('the IndexedDB lock fallback serializes two tabs and recovers a transient c
     }, roomSessionKey(matchID))).toBe('1')
 
     releaseTransientResponse()
-    await expect(movingPage.getByText('换座失败，请重试。', { exact: true })).toBeVisible()
+    await expect(movingPage.getByText('网络不稳定，正在确认换座结果。', { exact: true })).toBeVisible()
+    await expect(movingPage.locator('[data-round-table-player][data-player-id="4"] [data-seat-state="pending"]'))
+      .toBeVisible()
+    await expect(movingPage.getByText('正在进入房间', { exact: true })).toHaveCount(0)
     await expect.poll(() => movingPage.evaluate((key) => {
       const raw = localStorage.getItem(key)
       if (raw === null) return null
@@ -190,6 +193,7 @@ test('the IndexedDB lock fallback serializes two tabs and recovers a transient c
     }, roomSessionKey(matchID))).toBe('4')
     await expect.poll(() => movingPage.evaluate((key) => localStorage.getItem(key), seatTransitionKey(matchID)))
       .toBeNull()
+    await expect(movingPage.getByText('已换到 5 号位', { exact: true })).toBeVisible()
     expect(seatChangeRequestCount).toBeGreaterThanOrEqual(2)
 
     for (const page of [movingPage, stalePage]) {

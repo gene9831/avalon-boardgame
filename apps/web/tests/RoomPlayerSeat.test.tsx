@@ -122,11 +122,14 @@ describe('RoomPlayerSeat', () => {
 
     expect(occupiedHtml).toContain('role="group"')
     expect(occupiedHtml).not.toContain('<button')
+    expect(occupiedHtml).toContain('data-room-seat-number-badge="true">1</span>')
+    expect(emptyHtml).toContain('role="group"')
     expect(emptyHtml).toContain('<button')
     expect(emptyHtml).toContain('aria-label="移至 2 号空座位"')
     expect(emptyHtml).toContain('data-seat-state="empty"')
-    expect(emptyHtml).toContain('data-room-seat-number-badge="true">2</span>')
-    expect(emptyHtml).toContain('data-empty-seat-symbol="true">+</span>')
+    expect(emptyHtml).toContain('data-empty-seat-number="true">2</span>')
+    expect(emptyHtml).not.toContain('data-room-seat-number-badge')
+    expect(emptyHtml).not.toContain('data-empty-seat-symbol')
     expect(emptyHtml).toContain('>空位</span>')
   })
 
@@ -141,6 +144,9 @@ describe('RoomPlayerSeat', () => {
     expect(html).toContain('data-seat-state="pending"')
     expect(html).toContain('aria-label="正在移至 2 号空座位"')
     expect(html).toContain('换座中')
+    expect(html).toContain('lucide-loader-circle')
+    expect(html).not.toContain('data-empty-seat-number')
+    expect(html).not.toContain('data-room-seat-number-badge')
   })
 
   it('keeps long player names in the title and accessible name', () => {

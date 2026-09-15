@@ -123,6 +123,7 @@ import {
   validateRoomSession,
   type RoomSession,
   type RoomSessionStorage,
+  type SeatTransition,
 } from './room-session'
 import {
   getRequestErrorMessage,
@@ -283,6 +284,19 @@ function isSameRoomSession(current: RoomSession | null, expected: RoomSession) {
   return current?.playerID === expected.playerID && current.credentials === expected.credentials
 }
 
+function mergeSocketRoomMetadata(
+  room: AvalonMatch,
+  players: LobbyPlayer[],
+  gameState: AvalonClientState | null,
+): AvalonMatch {
+  const nextRoom = { ...room, players }
+  return {
+    ...nextRoom,
+    occupiedPlayerIDs: getOccupiedPlayerIDs(nextRoom),
+    ownerPlayerID: gameState?.G.lobby.ownerPlayerID ?? room.ownerPlayerID,
+  }
+}
+
 // oxlint-disable-next-line react/only-export-components
 export function getUpdatedRoomRouteSession(
   routeSession: RoomSession,
@@ -290,6 +304,19 @@ export function getUpdatedRoomRouteSession(
 ) {
   if (storedSession?.matchID !== routeSession.matchID) return null
   return isSameRoomSession(storedSession, routeSession) ? null : storedSession
+}
+
+// oxlint-disable-next-line react/only-export-components
+export function getSeatChangeTargetAfterTransitionStorageChange(
+  currentTargetPlayerID: PlayerID | null,
+  transition: Pick<SeatTransition, 'targetPlayerID'> | null,
+  storedSession: RoomSession | null = null,
+) {
+  if (transition !== null) return transition.targetPlayerID
+  if (currentTargetPlayerID === null) return null
+  return storedSession?.playerID === currentTargetPlayerID
+    ? currentTargetPlayerID
+    : null
 }
 
 // oxlint-disable-next-line react/only-export-components
@@ -663,19 +690,37 @@ function RoomRoute({
   const [session, setSession] = useState<RoomSession | null>(() =>
     loadRoomSession(matchID),
   )
+  const [presentationSession, setPresentationSession] = useState<RoomSession | null>(() =>
+    loadRoomSession(matchID),
+  )
   const [room, setRoom] = useState<AvalonMatch | null>(null)
   const [gameState, setGameState] = useState<AvalonClientState | null>(null)
   const [roomExitDialogOpen, setRoomExitDialogOpen] = useState(false)
   const [roomExitBusy, setRoomExitBusy] = useState(false)
-  const [seatChangeTargetID, setSeatChangeTargetID] = useState<PlayerID | null>(null)
+  const [seatChangeTargetID, setSeatChangeTargetID] = useState<PlayerID | null>(() =>
+    loadSeatTransition(matchID)?.targetPlayerID ?? null,
+  )
   const startOperationRef = useRef<RoomStartOperation<AvalonClient> | null>(null)
   const seatChangeOperationRef = useRef<RoomSeatChangeOperation<AvalonClient> | null>(null)
   const currentMatchIDRef = useRef(matchID)
   const currentRouteSessionRef = useRef<RoomSession | null>(null)
+  const presentationSessionRef = useRef(presentationSession)
+  const roomRef = useRef(room)
+  const gameStateRef = useRef(gameState)
+  const seatChangeTargetIDRef = useRef(seatChangeTargetID)
+  const seatTransitionRecoveryPendingRef = useRef(false)
   const [startPending, setStartPending] = useState(false)
-  const [seatTransitionRevision, setSeatTransitionRevision] = useState(0)
-  const [, setSeatTransitionGuardRevision] = useState(0)
+  const [seatTransitionGuardRevision, setSeatTransitionGuardRevision] = useState(0)
   const seatTransitionChangeRevisionRef = useRef(0)
+
+  presentationSessionRef.current = presentationSession
+  roomRef.current = room
+  gameStateRef.current = gameState
+
+  const updateSeatChangeTarget = useCallback((targetPlayerID: PlayerID | null) => {
+    seatChangeTargetIDRef.current = targetPlayerID
+    setSeatChangeTargetID(targetPlayerID)
+  }, [])
 
   const invalidateSession = useCallback(
     (reason: string, generation: number, expectedSession?: RoomSession) => {
@@ -731,15 +776,33 @@ function RoomRoute({
           invalidateSession('上次的座位已失效。', generation, currentSession)
           return
         }
+        const latestStoredSession = loadRoomSession(currentSession.matchID)
+        if (
+          latestStoredSession !== null &&
+          !isSameRoomSession(latestStoredSession, currentSession)
+        ) {
+          setSession(latestStoredSession)
+          return
+        }
         if (!isSameRoomSession(recoveredSession, currentSession)) {
           setSession(recoveredSession)
           return
         }
-        if (hadSeatTransition && clientRef.current === null) {
-          setSeatTransitionRevision((revision) => revision + 1)
-          return
+        const pendingTargetPlayerID = seatChangeTargetIDRef.current
+        if (
+          hadSeatTransition &&
+          loadSeatTransition(currentSession.matchID) === null &&
+          seatChangeOperationRef.current === null &&
+          pendingTargetPlayerID !== null &&
+          recoveredSession.playerID !== pendingTargetPlayerID
+        ) {
+          updateSeatChangeTarget(null)
+          pushToast({
+            durationMs: 8_000,
+            message: '换座失败，请重试。',
+            tone: 'error',
+          })
         }
-
         const [nextRoom] = await Promise.all([
           lobby.getMatch(AVALON_GAME_NAME, roomID),
           validateRoomSession(webConfig.lobbyURL, currentSession),
@@ -763,19 +826,33 @@ function RoomRoute({
         }
       }
     },
-    [invalidateSession, lobby, pushToast, roomParticipation],
+    [invalidateSession, lobby, pushToast, roomParticipation, updateSeatChangeTarget],
   )
 
+  const requestSeatTransitionRecovery = useCallback((
+    currentSession: RoomSession,
+    generation: number,
+  ) => {
+    if (seatTransitionRecoveryPendingRef.current) return
+    seatTransitionRecoveryPendingRef.current = true
+    void refreshRoom(currentSession.matchID, currentSession, generation, true)
+      .finally(() => {
+        seatTransitionRecoveryPendingRef.current = false
+      })
+  }, [refreshRoom])
+
   useEffect(() => {
-    setSession((currentSession) => {
-      if (currentSession?.matchID === matchID) return currentSession
-      return loadRoomSession(matchID)
-    })
+    const nextSession = loadRoomSession(matchID)
+    setSession((currentSession) => (
+      currentSession?.matchID === matchID ? currentSession : nextSession
+    ))
+    setPresentationSession(nextSession)
+    updateSeatChangeTarget(loadSeatTransition(matchID)?.targetPlayerID ?? null)
     setRoom(null)
     setGameState(null)
     setRoomExitDialogOpen(false)
     setRoomExitBusy(false)
-  }, [matchID])
+  }, [matchID, updateSeatChangeTarget])
 
   const routeSession = session?.matchID === matchID ? session : null
   const getCurrentRoomRoute = () => ({
@@ -789,7 +866,6 @@ function RoomRoute({
     currentRouteSessionRef.current = routeSession
     startOperationRef.current = null
     seatChangeOperationRef.current = null
-    setSeatChangeTargetID(null)
     setStartPending(false)
   }, [matchID, routeSession])
   const persistedSeatTransition = routeSession === null
@@ -809,17 +885,37 @@ function RoomRoute({
         event.key !== ROOM_SESSION_KEY &&
         event.key !== LAST_ROOM_SESSION_KEY
       ) return
+      const storedSession = loadRoomSession(matchID)
       if (event.key === getSeatTransitionKey(matchID)) {
         seatTransitionChangeRevisionRef.current += 1
         setSeatTransitionGuardRevision((revision) => revision + 1)
-        if (loadSeatTransition(matchID) !== null) {
+        const nextTransition = loadSeatTransition(matchID)
+        const previousTargetPlayerID = seatChangeTargetIDRef.current
+        const nextTargetPlayerID = getSeatChangeTargetAfterTransitionStorageChange(
+          previousTargetPlayerID,
+          nextTransition,
+          storedSession,
+        )
+        if (nextTargetPlayerID !== previousTargetPlayerID) {
+          updateSeatChangeTarget(nextTargetPlayerID)
+        }
+        if (nextTransition !== null) {
           setRoomExitDialogOpen(false)
+        } else if (
+          previousTargetPlayerID !== null &&
+          nextTargetPlayerID === null &&
+          storedSession !== null
+        ) {
+          pushToast({
+            durationMs: 8_000,
+            message: '换座失败，请重试。',
+            tone: 'error',
+          })
         }
       }
       if (shouldWakeRoomRouteForSeatTransitionChange(event.key, routeSession)) {
-        setSeatTransitionRevision((revision) => revision + 1)
+        requestSeatTransitionRecovery(routeSession, routeGenerationRef.current)
       }
-      const storedSession = loadRoomSession(matchID)
       const updatedSession = getUpdatedRoomRouteSession(routeSession, storedSession)
       if (updatedSession !== null) {
         stopCurrentClient(clientRef)
@@ -841,7 +937,19 @@ function RoomRoute({
 
     window.addEventListener('storage', handleRoomSessionStorage)
     return () => window.removeEventListener('storage', handleRoomSessionStorage)
-  }, [matchID, navigate, routeSession])
+  }, [matchID, navigate, pushToast, requestSeatTransitionRecovery, routeSession, updateSeatChangeTarget])
+
+  useEffect(() => {
+    if (routeSession === null) return
+    const transition = loadSeatTransition(routeSession.matchID)
+    if (transition?.status !== 'requesting') return
+
+    const delay = Math.max(0, transition.leaseExpiresAt - Date.now() + 50)
+    const timer = window.setTimeout(() => {
+      requestSeatTransitionRecovery(routeSession, routeGenerationRef.current)
+    }, delay)
+    return () => window.clearTimeout(timer)
+  }, [requestSeatTransitionRecovery, routeSession, seatTransitionGuardRevision])
 
   useEffect(() => {
     if (routeSession === null) {
@@ -854,12 +962,20 @@ function RoomRoute({
     let active = true
     let unsubscribe: () => void = () => undefined
     let client: AvalonClient | null = null
-    setRoom(null)
-    setGameState(null)
+    const preservesLobbyDuringSeatChange =
+      seatChangeTargetIDRef.current !== null &&
+      presentationSessionRef.current?.matchID === matchID &&
+      roomRef.current !== null &&
+      gameStateRef.current?.ctx.phase === 'lobby'
+    if (!preservesLobbyDuringSeatChange) {
+      setRoom(null)
+      setGameState(null)
+    }
 
     const connect = async () => {
       try {
         if (isSeatTransitionRequestingForSession(routeSession)) return
+        const hadSeatTransition = loadSeatTransition(routeSession.matchID) !== null
         const recoveredSession = await recoverRoomRouteSession(
           routeSession,
           roomParticipation,
@@ -882,18 +998,37 @@ function RoomRoute({
           setSession(recoveredSession)
           return
         }
+        const pendingTargetPlayerID = seatChangeTargetIDRef.current
+        if (
+          hadSeatTransition &&
+          loadSeatTransition(routeSession.matchID) === null &&
+          pendingTargetPlayerID !== null &&
+          recoveredSession.playerID !== pendingTargetPlayerID
+        ) {
+          updateSeatChangeTarget(null)
+          pushToast({
+            durationMs: 8_000,
+            message: '换座失败，请重试。',
+            tone: 'error',
+          })
+        }
 
-        const [initialRoom] = await Promise.all([
-          lobby.getMatch(AVALON_GAME_NAME, matchID),
-          validateRoomSession(webConfig.lobbyURL, routeSession),
-        ])
+        const initialRoomValue = preservesLobbyDuringSeatChange
+          ? roomRef.current!
+          : (await Promise.all([
+              lobby.getMatch(AVALON_GAME_NAME, matchID),
+              validateRoomSession(webConfig.lobbyURL, routeSession),
+            ]))[0] as unknown as AvalonMatch
+        if (preservesLobbyDuringSeatChange) {
+          await validateRoomSession(webConfig.lobbyURL, routeSession)
+        }
         if (!active || !isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
 
-        setRoom(initialRoom as unknown as AvalonMatch)
+        if (!preservesLobbyDuringSeatChange) setRoom(initialRoomValue)
         client = Client({
           debug: BOARDGAME_CLIENT_DEBUG,
           game: AvalonGame,
-          numPlayers: getMatchPlayerCount(initialRoom as unknown as AvalonMatch),
+          numPlayers: getMatchPlayerCount(initialRoomValue),
           multiplayer: SocketIO({
             server: webConfig.gameURL,
             socketOpts: { path: webConfig.socketPath },
@@ -905,9 +1040,44 @@ function RoomRoute({
         clientRef.current = client
         unsubscribe = client.subscribe((nextState) => {
           if (!active || !isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) return
-          setGameState(nextState as AvalonClientState | null)
+          const nextGameState = nextState as AvalonClientState | null
+          const matchPlayers = client?.matchData as unknown as LobbyPlayer[] | undefined
+          if (loadSeatTransition(routeSession.matchID)?.status === 'uncertain') {
+            requestSeatTransitionRecovery(routeSession, generation)
+          }
+          const awaitingSeatChangeConfirmation =
+            preservesLobbyDuringSeatChange &&
+            seatChangeTargetIDRef.current === routeSession.playerID
+          if (
+            awaitingSeatChangeConfirmation &&
+            nextGameState?.isConnected === true &&
+            isRoomSessionStillValid(
+              { players: matchPlayers ?? initialRoomValue.players },
+              routeSession,
+            )
+          ) {
+            setRoom(mergeSocketRoomMetadata(
+              initialRoomValue,
+              matchPlayers ?? initialRoomValue.players,
+              nextGameState,
+            ))
+            setGameState(nextGameState)
+            setPresentationSession(routeSession)
+            if (seatChangeTargetIDRef.current === routeSession.playerID) {
+              updateSeatChangeTarget(null)
+              pushToast({
+                durationMs: 3_000,
+                message: `已换到 ${Number(routeSession.playerID) + 1} 号位`,
+                tone: 'success',
+              })
+            }
+            return
+          }
+          if (awaitingSeatChangeConfirmation) return
+
+          setGameState(nextGameState)
           if (client?.matchData !== undefined) {
-            const players = client.matchData as unknown as LobbyPlayer[]
+            const players = matchPlayers ?? []
             if (!isRoomSessionStillValid({ players }, routeSession)) {
               void resolveRoomRouteSnapshotSession(
                 routeSession,
@@ -937,13 +1107,14 @@ function RoomRoute({
               })
               return
             }
+            if (
+              seatChangeTargetIDRef.current !== null &&
+              gameStateRef.current?.ctx.phase === 'lobby'
+            ) return
             setRoom((previousRoom) =>
               previousRoom === null
                 ? previousRoom
-                : {
-                    ...previousRoom,
-                    players,
-                  },
+                : mergeSocketRoomMetadata(previousRoom, players, nextGameState),
             )
           }
         })
@@ -964,25 +1135,19 @@ function RoomRoute({
     }
 
     void connect()
-    const timer = window.setInterval(
-      () => void refreshRoom(matchID, routeSession, generation, true),
-      2500,
-    )
 
     return () => {
       active = false
       startOperationRef.current = null
       seatChangeOperationRef.current = null
-      setSeatChangeTargetID(null)
       setStartPending(false)
       if (isRoomRouteGenerationCurrent(routeGenerationRef.current, generation)) {
         routeGenerationRef.current += 1
       }
-      window.clearInterval(timer)
       unsubscribe()
       if (client !== null) stopCurrentClient(clientRef, client)
     }
-  }, [invalidateSession, lobby, matchID, pushToast, refreshRoom, roomParticipation, routeSession, seatTransitionRevision])
+  }, [invalidateSession, lobby, matchID, pushToast, refreshRoom, requestSeatTransitionRecovery, roomParticipation, routeSession, updateSeatChangeTarget])
 
   const handleStart = async () => {
     const targetPlayerCount = room === null ? null : getMatchPlayerCount(room)
@@ -1045,7 +1210,7 @@ function RoomRoute({
       token: Symbol('room-seat-change'),
     }
     seatChangeOperationRef.current = operation
-    setSeatChangeTargetID(targetPlayerID)
+    updateSeatChangeTarget(targetPlayerID)
     await executeRoomSeatChangeOperation({
       changeSeat: () => changeRoomSeat(
         roomParticipation,
@@ -1054,13 +1219,37 @@ function RoomRoute({
       ),
       getCurrentRoute: getCurrentRoomRoute,
       onError: (error) => {
-        pushToast({ message: getSeatChangeErrorMessage(error), tone: 'error' })
+        const transition = loadSeatTransition(operation.matchID)
+        if (transition?.targetPlayerID === operation.targetPlayerID) {
+          pushToast({
+            durationMs: 8_000,
+            message: '网络不稳定，正在确认换座结果。',
+            tone: 'info',
+          })
+          requestSeatTransitionRecovery(operation.session, operation.generation)
+          return
+        }
+        updateSeatChangeTarget(null)
+        pushToast({
+          durationMs: 8_000,
+          message: getSeatChangeErrorMessage(
+            error,
+            Number(operation.targetPlayerID) + 1,
+          ),
+          tone: 'error',
+        })
       },
       onSession: setSession,
       onSettled: () => {
-        setSeatChangeTargetID((currentTarget) => (
-          currentTarget === operation.targetPlayerID ? null : currentTarget
-        ))
+        const storedSession = loadRoomSession(operation.matchID)
+        const transition = loadSeatTransition(operation.matchID)
+        if (
+          storedSession?.playerID !== operation.targetPlayerID &&
+          transition?.targetPlayerID !== operation.targetPlayerID &&
+          seatChangeTargetIDRef.current === operation.targetPlayerID
+        ) {
+          updateSeatChangeTarget(null)
+        }
       },
       operation,
       operationRef: seatChangeOperationRef,
@@ -1269,7 +1458,7 @@ function RoomRoute({
         roomExitBlocked={roomExitBlocked}
         roomExitBusy={roomExitBusy}
         seatChangeTargetID={effectiveSeatChangeTargetID}
-        session={routeSession}
+        session={presentationSession?.matchID === matchID ? presentationSession : routeSession}
         startPending={startPending}
       />
       <RoomExitDialog
