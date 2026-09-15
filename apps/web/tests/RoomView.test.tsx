@@ -823,6 +823,21 @@ describe('RoomView playing layout', () => {
     expect(nonparticipant).not.toContain('data-curtain-state')
   })
 
+  it('keeps the identity knowledge control available during clue recognition', () => {
+    const state = playingGameState()!
+    state.ctx.phase = 'identityRecognition'
+    state.ctx.activePlayers = { '0': 'identityRecognition' }
+    state.G.identityRecognition = {
+      stage: 'clueRecognition', completedCount: 0, participantCount: 3,
+    }
+    state.G.viewer.identityRecognition = { personalStage: 'clueRecognition' }
+
+    const html = renderRoomView({ gameState: state, room: fullRoom() }, true)
+
+    expect(html).toContain('data-room-scene="identityRecognition"')
+    expect(html).toContain('aria-label="查看我的身份与已知信息"')
+  })
+
   it('marks only the requested empty seat as pending during a seat change', () => {
     const html = renderRoomView(
       {

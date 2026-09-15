@@ -421,7 +421,8 @@ export function buildRoomSceneBinding(
         kind: 'identityRecognition',
         ...buildProductionSceneBase(input, 'none', {
           showPrivateRoleKnowledge:
-            (personalStage === 'waitingForClueRecognition' || personalStage === 'complete') &&
+            personalStage !== undefined &&
+            personalStage !== 'identityConfirmation' &&
             input.roleKnowledgeOpen,
           showKnownPlayerInfo:
             recognition?.stage === 'clueRecognition' &&
@@ -651,7 +652,6 @@ export interface UseRoomScreenControllerInput extends LobbyPresentationState, Lo
   onQuestCardSubmissionError?: (error: unknown) => void
   onAssassinationSubmissionError?: (error: unknown) => void
   onIdentityRecognitionSubmissionError?: (error: unknown) => void
-  onIdentityRecognitionSubmissionSuccess?: () => void
   onStart: () => void
   settlementReadStorage?: SettlementReadStorage | null
 }
@@ -732,7 +732,6 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
   const presentedSettlement = activeSettlement ?? settlementQueue[0] ?? pendingSettlement
   const phase = input.game === null ? 'loading' : input.game.status === 'lobby' ? 'lobby' : input.phase
   const personalRecognitionStage = input.game?.viewer.identityRecognition?.personalStage
-  const onIdentityRecognitionSubmissionSuccess = input.onIdentityRecognitionSubmissionSuccess
 
   useEffect(() => {
     if (baselineRef.current?.matchID === input.matchID) return
@@ -818,9 +817,6 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
       previousRecognition.scopeKey === identitySubmissionScopeKey &&
       previousRecognition.stage !== undefined &&
       (personalRecognitionStage !== previousRecognition.stage || phase !== 'identityRecognition')
-    if (recognitionAdvanced) {
-      onIdentityRecognitionSubmissionSuccess?.()
-    }
     if (recognitionAdvanced || phase !== 'identityRecognition') {
       setIdentityRecognitionSubmissionPending(false)
     }
@@ -831,7 +827,6 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
   }, [
     identityRecognitionSubmissionPending,
     identitySubmissionScopeKey,
-    onIdentityRecognitionSubmissionSuccess,
     personalRecognitionStage,
     phase,
   ])

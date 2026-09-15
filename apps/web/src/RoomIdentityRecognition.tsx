@@ -105,13 +105,9 @@ export function RoomIdentityRecognitionPhaseContentSurface({
       title: awaitingIdentityConfirmation
         ? '等待其他玩家确认身份'
         : '等待其他玩家完成线索辨认',
-      middle: (
-        <p className="text-sm text-slate-300">
-          {awaitingIdentityConfirmation
-            ? '你已确认，可以再次查看自己的身份'
-            : '你已完成，可以查看身份与已知信息'}
-        </p>
-      ),
+      middle: awaitingIdentityConfirmation
+        ? <p className="text-sm text-slate-300">你已确认，可以再次查看自己的身份</p>
+        : null,
       action: null,
     }
   }

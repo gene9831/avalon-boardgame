@@ -124,6 +124,7 @@ describe('RoomIdentityRecognitionScene', () => {
 
     expect(html).toMatch(/3 \/ 5.*玩家已完成线索辨认.*等待其他玩家/s)
     expect(html).toContain('等待其他玩家完成线索辨认')
+    expect(html).not.toContain('你已完成，可以查看身份与已知信息')
     expect(html).toContain('data-room-stage="true"')
     expect(html).toContain('data-known-player-info="evil"')
     expect(html).not.toContain('data-recognition-seat-state="target"')

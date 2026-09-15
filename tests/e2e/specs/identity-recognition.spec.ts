@@ -110,7 +110,7 @@ test('identity confirmation completes before concurrent clue recognition without
     await expect(servantPage.getByRole('button', {
       name: '查看我的身份与已知信息',
     })).toBeVisible()
-    await expect(servantPage.getByText('身份辨认进度已保存。')).toBeVisible()
+    await expect(servantPage.getByText('身份辨认进度已保存。')).toHaveCount(0)
 
     await expect(untouchedPage.locator('[data-identity-confirmation-state="revealed"]'))
       .toBeVisible()
@@ -135,6 +135,21 @@ test('identity confirmation completes before concurrent clue recognition without
     await expect(merlinPage.locator('[data-identity-recognition-state="concealed"]'))
       .toBeVisible()
     await expect(servantPage.getByText('等待其他玩家完成线索辨认')).toBeVisible()
+    await expect(servantPage.getByText('你已完成，可以查看身份与已知信息'))
+      .toHaveCount(0)
+
+    const merlinIdentity = merlinPage.getByRole('button', {
+      exact: true,
+      name: '查看我的身份与已知信息',
+    })
+    await expect(merlinIdentity).toBeVisible()
+    await merlinIdentity.click()
+    await expect(merlinPage.locator('[data-role-avatar="merlin"]')).toBeVisible()
+    await merlinPage.getByRole('button', {
+      exact: true,
+      name: '隐藏我的身份与已知信息',
+    }).click()
+    await expect(merlinPage.locator('[data-role-avatar="merlin"]')).toHaveCount(0)
 
     await merlinPage.getByRole('button', { exact: true, name: '查看线索' }).click()
     await expect(
