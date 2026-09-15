@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  getToastDurationMs,
   ToastViewport,
 } from '../src/toast'
 import { appendToast, type ToastMessage } from '../src/toast-context'
@@ -38,5 +39,14 @@ describe('toast notifications', () => {
     expect(html).toContain('role="status"')
     expect(html).toContain('role="alert"')
     expect(html.match(/aria-label="关闭通知"/g)).toHaveLength(2)
+  })
+
+  it('honors an explicit notification duration while preserving tone defaults', () => {
+    expect(getToastDurationMs({ ...toast('success'), tone: 'success', durationMs: 3_000 }))
+      .toBe(3_000)
+    expect(getToastDurationMs({ ...toast('uncertain'), durationMs: 8_000 }))
+      .toBe(8_000)
+    expect(getToastDurationMs({ ...toast('error'), tone: 'error' })).toBe(8_000)
+    expect(getToastDurationMs(toast('info'))).toBe(4_000)
   })
 })

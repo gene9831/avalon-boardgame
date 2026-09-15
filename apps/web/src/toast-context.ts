@@ -3,12 +3,14 @@ import { createContext, useContext } from 'react'
 export type ToastTone = 'error' | 'info' | 'success'
 
 export interface ToastMessage {
+  durationMs?: number
   id: string
   message: string
   tone: ToastTone
 }
 
 export interface ToastInput {
+  durationMs?: number
   message: string
   tone?: ToastTone
 }

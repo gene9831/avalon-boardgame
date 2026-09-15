@@ -280,11 +280,17 @@ export function buildRoomSceneBinding(
     return {
       scene: {
         kind: 'connectionRecovery',
-        ...buildProductionSceneBase(input, 'none', {
-          publicRevealedRolePlayerIDs: activeSettlement?.kind === 'assassination'
-            ? [activeSettlement.targetPlayerID]
-            : [],
-        }),
+        ...buildProductionSceneBase(
+          input,
+          input.game.status === 'lobby' && input.seatChangeTargetID !== null
+            ? 'changeSeat'
+            : 'none',
+          {
+            publicRevealedRolePlayerIDs: activeSettlement?.kind === 'assassination'
+              ? [activeSettlement.targetPlayerID]
+              : [],
+          },
+        ),
         manualReconnectAvailable: input.manualReconnectAvailable,
       },
       actions: { onReconnect: events.onReconnect },

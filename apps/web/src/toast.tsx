@@ -23,6 +23,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     nextID.current += 1
     const id = `toast-${nextID.current}`
     setToasts((current) => appendToast(current, {
+      durationMs: input.durationMs,
       id,
       message: input.message,
       tone: input.tone ?? 'info',
@@ -57,6 +58,11 @@ export function ToastViewport({
   )
 }
 
+// oxlint-disable-next-line react/only-export-components
+export function getToastDurationMs(toast: ToastMessage) {
+  return toast.durationMs ?? (toast.tone === 'error' ? 8_000 : 4_000)
+}
+
 function ToastItem({
   onDismiss,
   toast,
@@ -67,10 +73,10 @@ function ToastItem({
   useEffect(() => {
     const timer = window.setTimeout(
       () => onDismiss(toast.id),
-      toast.tone === 'error' ? 8_000 : 4_000,
+      getToastDurationMs(toast),
     )
     return () => window.clearTimeout(timer)
-  }, [onDismiss, toast.id, toast.tone])
+  }, [onDismiss, toast])
 
   const classes = toast.tone === 'error'
     ? 'border-rose-300/35 bg-rose-950/95 text-rose-50'

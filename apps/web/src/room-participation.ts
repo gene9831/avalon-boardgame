@@ -401,7 +401,7 @@ export function createRoomParticipationClient(
   }
 }
 
-export function getSeatChangeErrorMessage(error: unknown) {
+export function getSeatChangeErrorMessage(error: unknown, targetSeatNumber?: number) {
   if (error instanceof SeatTransitionPendingError) {
     return '座位正在变更，请稍后再试。'
   }
@@ -409,7 +409,9 @@ export function getSeatChangeErrorMessage(error: unknown) {
     return '当前浏览器无法安全换座，请刷新或更换浏览器后重试。'
   }
   if (error instanceof RoomParticipationHttpError && error.code === 'seat_unavailable') {
-    return getLobbyErrorMessage(error.code)
+    return targetSeatNumber === undefined
+      ? getLobbyErrorMessage(error.code)
+      : `${targetSeatNumber} 号位已被占用，请选择其他空位。`
   }
   return '换座失败，请重试。'
 }

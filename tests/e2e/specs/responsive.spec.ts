@@ -244,29 +244,80 @@ test('the create-game role option stays concise and vertically aligned on mobile
   expect(Math.max(...centers) - Math.min(...centers)).toBeLessThanOrEqual(1)
 })
 
-test('empty-seat actions stay 44px and keyboard operable at the smallest viewport', async ({
+test('empty-seat actions expose their full 44px pointer target and remain keyboard operable', async ({
   browser,
 }) => {
   const context = await browser.newContext({ viewport: { width: 320, height: 568 } })
   const page = await context.newPage()
+  let releaseSeatFailure: () => void = () => undefined
 
   try {
-    await createRoom(page, 5, 'Keyboard Seat Owner')
+    const matchID = await createRoom(page, 5, 'Keyboard Seat Owner')
     const emptySeat = page.getByRole('button', { name: '移至 2 号空座位' })
+    await expect(emptySeat.locator('[data-empty-seat-number="true"]')).toHaveText('2')
     const bounds = await emptySeat.boundingBox()
     expect(bounds).not.toBeNull()
     expect(bounds!.width).toBeGreaterThanOrEqual(44)
     expect(bounds!.height).toBeGreaterThanOrEqual(44)
 
-    await emptySeat.focus()
-    await expect(emptySeat).toBeFocused()
-    await page.keyboard.press('Enter')
+    await page.evaluate(() => {
+      const result = { globalLoadingSeen: false, targetPendingSeen: false }
+      ;(window as unknown as { seatChangeObservation: typeof result }).seatChangeObservation = result
+      const observe = () => {
+        result.globalLoadingSeen ||= document.body.textContent?.includes('正在进入房间') ?? false
+        result.targetPendingSeen ||= document.querySelector(
+          '[data-round-table-player][data-player-id="1"] [data-seat-state="pending"]',
+        ) !== null
+      }
+      new MutationObserver(observe).observe(document.body, { childList: true, subtree: true })
+      observe()
+    })
+    await page.mouse.click(bounds!.x + 1, bounds!.y + bounds!.height / 2)
+    await expect.poll(() => page.evaluate((roomID) => {
+      const raw = localStorage.getItem(`avalon:room-session:${encodeURIComponent(roomID)}`)
+      return raw === null ? null : (JSON.parse(raw) as { playerID?: unknown }).playerID ?? null
+    }, matchID)).toBe('1')
     await expect(page.locator('[data-round-table-player][data-player-id="1"]'))
       .toContainText('Keyboard Seat Owner')
     await expect(
       page.locator('[data-round-table-player][data-player-id="1"]'),
     ).toHaveAttribute('aria-label', /房间拥有者/)
+    await expect(page.getByText('已换到 2 号位', { exact: true })).toBeVisible()
+    await expect.poll(() => page.evaluate(() => (
+      (window as unknown as {
+        seatChangeObservation: { globalLoadingSeen: boolean, targetPendingSeen: boolean }
+      }).seatChangeObservation
+    ))).toEqual({ globalLoadingSeen: false, targetPendingSeen: true })
+
+    await context.setOffline(true)
+    await expect(page.locator('[data-room-scene="connectionRecovery"]')).toBeVisible()
+    await context.setOffline(false)
+    await expect(page.locator('[data-room-scene="lobby"]')).toBeVisible()
+
+    const seatFailureReleased = new Promise<void>((resolve) => {
+      releaseSeatFailure = resolve
+    })
+    await page.route('**/rooms/avalon/*/players/*/seat', async (route) => {
+      await seatFailureReleased
+      await route.fulfill({
+        body: JSON.stringify({ error: { code: 'seat_unavailable' } }),
+        contentType: 'application/json',
+        status: 409,
+      })
+    })
+    const sourceSeat = page.getByRole('button', { name: '移至 1 号空座位' })
+    await sourceSeat.focus()
+    await expect(sourceSeat).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(page.locator('[data-round-table-player][data-player-id="0"] [data-seat-state="pending"]'))
+      .toBeVisible()
+    releaseSeatFailure()
+    await expect(page.getByText('1 号位已被占用，请选择其他空位。', { exact: true }))
+      .toBeVisible()
+    await expect(page.getByRole('button', { name: '移至 1 号空座位' }))
+      .toContainText('1')
   } finally {
+    releaseSeatFailure()
     await context.close()
   }
 })

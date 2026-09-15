@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import type { PlayerID } from '@avalon/game'
 import { describe, expect, it, vi } from 'vitest'
 
-import { canRequestRoomExit, executeRoomSeatChangeOperation, executeRoomStartOperation, getUpdatedRoomRouteSession, recoverRoomRouteSession, resolveRecoverySeatValidation, resolveRoomRouteSnapshotSession, shouldWakeRoomRouteForSeatTransitionChange, RoomAccessView, RoomView, type RoomViewProps } from '../src/App'
+import { canRequestRoomExit, executeRoomSeatChangeOperation, executeRoomStartOperation, getSeatChangeTargetAfterTransitionStorageChange, getUpdatedRoomRouteSession, recoverRoomRouteSession, resolveRecoverySeatValidation, resolveRoomRouteSnapshotSession, shouldWakeRoomRouteForSeatTransitionChange, RoomAccessView, RoomView, type RoomViewProps } from '../src/App'
 import type { AvalonMatch } from '../src/lobby'
 import { RoomParticipationHttpError, type SeatTransitionReplayClient } from '../src/room-participation'
 import { beginSeatTransition, loadRoomSession, loadSeatTransition, markSeatTransitionUncertain, saveRoomSession, type RoomSession, type RoomSessionStorage } from '../src/room-session'
@@ -689,6 +689,19 @@ describe('RoomView connection state', () => {
     expect(getUpdatedRoomRouteSession(source, { ...target, matchID: 'other-room' })).toBeNull()
   })
 
+  it('clears a cross-tab pending target only when transition removal retains the source seat', () => {
+    const source = { credentials: 'source', matchID: 'room-123', playerID: '0', playerName: 'Alice' }
+    const target = { ...source, credentials: 'target', playerID: '3' }
+
+    expect(getSeatChangeTargetAfterTransitionStorageChange('3', null, source)).toBeNull()
+    expect(getSeatChangeTargetAfterTransitionStorageChange('3', null, target)).toBe('3')
+    expect(getSeatChangeTargetAfterTransitionStorageChange(
+      '3',
+      { targetPlayerID: '3' },
+      source,
+    )).toBe('3')
+  })
+
   it('rejects an attempted room exit while seat migration is pending', () => {
     expect(canRequestRoomExit('lobby', false, true, false)).toBe(false)
     expect(canRequestRoomExit('lobby', false, false, true)).toBe(false)
@@ -825,6 +838,24 @@ describe('RoomView playing layout', () => {
     expect(html).toContain('data-seat-state="pending"')
     expect(html).toContain('换座中')
     expect(html.match(/data-seat-state="pending"/g)).toHaveLength(1)
+  })
+
+  it('keeps the requested empty seat pending while its socket reconnects', () => {
+    const reconnectingState = lobbyGameState()!
+    reconnectingState.isConnected = false
+    const html = renderRoomView(
+      {
+        gameState: reconnectingState,
+        room: incompleteRoomWithEmptySeat('3'),
+        seatChangeTargetID: '3',
+      },
+      true,
+    )
+
+    expect(html).toContain('data-room-scene="connectionRecovery"')
+    expect(html).toContain('data-player-id="3"')
+    expect(html).toContain('data-seat-state="pending"')
+    expect(html).toContain('换座中')
   })
 
   it('keeps the original start label while the pending request disables it', () => {
