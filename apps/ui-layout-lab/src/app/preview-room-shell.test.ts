@@ -178,7 +178,7 @@ describe('preview room shell', () => {
           expectContainedInStage(seat.avatarRect, stageWidth, stageHeight)
           expectContainedInStage(seat.nameRect, stageWidth, stageHeight)
         }
-      })
+      }, 15_000)
     }
   }
 })

@@ -171,12 +171,13 @@ test('identity confirmation completes before concurrent clue recognition without
       name: '查看我的身份与已知信息',
     }).click()
     await expect(merlinPage.locator('[data-role-avatar="merlin"]')).toBeVisible()
-    await expect(
-      merlinPage.locator('[data-known-player-info="evil"]'),
-    ).toHaveCount(2)
-    await expect(
-      merlinPage.locator('[data-known-player-info="evil"]').first(),
-    ).toBeVisible()
+    const knownEvilAvatars = merlinPage.locator('[data-avatar-state="known-evil"]')
+    const knownEvilLabels = merlinPage.locator(
+      '[data-identity-recognition-label="true"][data-recognition-tone="evil"]',
+    )
+    await expect(knownEvilAvatars).toHaveCount(2)
+    await expect(knownEvilLabels).toHaveCount(2)
+    await expect(knownEvilLabels.first()).toBeVisible()
 
     for (const page of harness.pages) await finishPersonalRecognition(page)
 
