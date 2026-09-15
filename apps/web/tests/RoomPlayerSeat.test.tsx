@@ -1,5 +1,8 @@
+// @vitest-environment happy-dom
+import { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { PlayerSeatLayout } from '@avalon/ui-layout'
 
 import { RoomPlayerSeat } from '../src/RoomPlayerSeat'
@@ -24,7 +27,87 @@ const player: RoomPlayerPresentation = {
   interaction: { kind: 'none' },
 }
 
+let root: Root | null = null
+let container: HTMLDivElement | null = null
+
+globalThis.IS_REACT_ACT_ENVIRONMENT = true
+
+afterEach(async () => {
+  await act(async () => root?.unmount())
+  container?.remove()
+  root = null
+  container = null
+})
+
 describe('RoomPlayerSeat', () => {
+  it('opens the complete identity details from the revealed current-player avatar', async () => {
+    container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+    await act(async () => root?.render(
+      <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
+        ...player,
+        isCurrentPlayer: true,
+        portrait: { kind: 'roleArtwork', role: 'merlin' },
+      }} />,
+    ))
+
+    const identityButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="查看我的身份详情"]',
+    )
+    expect(identityButton).not.toBeNull()
+    expect(identityButton?.classList).toContain('pointer-events-auto')
+    await act(async () => identityButton?.click())
+
+    const dialog = document.querySelector('[role="dialog"][aria-label="我的身份详情"]')
+    expect(dialog).not.toBeNull()
+    expect(dialog?.querySelector('[data-identity-role-artwork="merlin"]')).not.toBeNull()
+    expect(dialog?.textContent).toContain('你的目标')
+    expect(dialog?.textContent).toContain('角色能力')
+    expect(dialog?.textContent).toContain('行动提示')
+  })
+
+  it('keeps the phase action separate from identity review on the current-player seat', async () => {
+    const onActivate = vi.fn()
+    container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+    await act(async () => root?.render(
+      <RoomPlayerSeat layout={layout} onActivate={onActivate} player={{
+        ...player,
+        isCurrentPlayer: true,
+        portrait: { kind: 'roleArtwork', role: 'merlin' },
+        interaction: { kind: 'selectTeam', disabled: false, selected: false },
+      }} />,
+    ))
+
+    const identityButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="查看我的身份详情"]',
+    )
+    const phaseButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="选择 Alice 加入任务队伍，队长，当前玩家，梅林"]',
+    )
+    expect(identityButton).not.toBeNull()
+    expect(phaseButton).not.toBeNull()
+
+    await act(async () => phaseButton?.click())
+    expect(onActivate).toHaveBeenCalledOnce()
+    expect(document.querySelector('[role="dialog"][aria-label="我的身份详情"]')).toBeNull()
+  })
+
+  it('adds a candidate-colored avatar state while keeping Percival candidates anonymous', () => {
+    const html = renderToStaticMarkup(
+      <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
+        ...player,
+        markers: [{ kind: 'merlinCandidate' }],
+      }} />,
+    )
+
+    expect(html).toContain('data-avatar-state="merlin-candidate"')
+    expect(html).toContain('data-seat-decoration="merlin-candidate"')
+    expect(html).not.toContain('data-room-role-revealed="true"')
+  })
+
   it('labels a normalized recognition target without replacing the player avatar', () => {
     const html = renderToStaticMarkup(
       <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{

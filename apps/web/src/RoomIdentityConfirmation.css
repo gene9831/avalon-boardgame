@@ -2,6 +2,11 @@
   pointer-events: auto;
 }
 
+.room-identity-review-dialog {
+  container-name: avalon-room-layout;
+  container-type: size;
+}
+
 [data-room-scene='identityConfirmation'] .avalon-room-layout__stage-atmosphere {
   z-index: 40;
   inset: var(--room-layout-stage-margin);

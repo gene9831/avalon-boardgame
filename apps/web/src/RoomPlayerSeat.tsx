@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react'
+import { useState, type CSSProperties, type ReactNode } from 'react'
 import {
   BadgeCheck,
   CircleCheck,
@@ -16,6 +16,7 @@ import type { PlayerSeatLayout, Rect } from '@avalon/ui-layout'
 import { PlayerAvatar } from './player-avatars'
 import { RoleAvatar } from './RoleCard'
 import { ROLE_LABELS } from './room-game'
+import { RoomIdentityReviewDialog } from './RoomIdentityReviewDialog'
 import { RoomSeatNumberBadge } from './RoomSeatNumberBadge'
 import type {
   RoomPlayerCaption,
@@ -254,6 +255,9 @@ function avatarState(player: RoomPlayerPresentation): string {
   if (player.caption.kind === 'role') {
     return `revealed-${loyaltyForRole(player.caption.role)}`
   }
+  if (player.markers.some((marker) => marker.kind === 'merlinCandidate')) {
+    return 'merlin-candidate'
+  }
   switch (player.emphasis) {
     case 'target': return 'target'
     case 'selected': return 'selected'
@@ -276,6 +280,7 @@ function portraitRole(portrait: RoomPlayerPortrait): Role | null {
 }
 
 export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatProps) {
+  const [identityDetailsOpen, setIdentityDetailsOpen] = useState(false)
   const interaction = interactionPresentation(player.interaction, player)
   const avatarStyle = localRectStyle(layout.avatarRect, layout.playerSeatBounds)
   const emptySeatActionStyle = localEmptySeatActionStyle(
@@ -288,6 +293,9 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
   const nameStyle = localNameStyle(layout.nameRect, layout.playerSeatBounds, nameSize)
   const roleStyle = localRoleStyle(layout.nameRect, layout.playerSeatBounds)
   const role = portraitRole(player.portrait)
+  const canViewIdentity = player.isCurrentPlayer &&
+    role !== null &&
+    player.caption.kind !== 'role'
   const connected = player.portrait.kind === 'playerAvatar' && player.portrait.connected
   const recognitionState = player.emphasis === 'dimmed'
     ? 'dimmed'
@@ -397,6 +405,50 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
         role="group"
       >
         {content}
+      </div>
+    )
+  }
+
+  const identityReview = canViewIdentity && role !== null ? (
+    <>
+      <button
+        aria-label="查看我的身份详情"
+        className="room-seat__identity-action pointer-events-auto absolute"
+        onClick={() => setIdentityDetailsOpen(true)}
+        style={avatarStyle}
+        type="button"
+      />
+      {identityDetailsOpen && (
+        <RoomIdentityReviewDialog
+          onClose={() => setIdentityDetailsOpen(false)}
+          role={role}
+        />
+      )}
+    </>
+  ) : null
+
+  if (canViewIdentity && interaction.canActivate) {
+    return (
+      <div {...commonProps} aria-label={accessibleLabel} role="group">
+        <button
+          aria-label={accessibleLabel}
+          aria-pressed={interaction.pressed}
+          className="room-seat__phase-action absolute inset-0 size-full border-0 bg-transparent p-0 text-center"
+          onClick={onActivate}
+          type="button"
+        >
+          {content}
+        </button>
+        {identityReview}
+      </div>
+    )
+  }
+
+  if (canViewIdentity) {
+    return (
+      <div {...commonProps} aria-label={accessibleLabel} role="group">
+        {content}
+        {identityReview}
       </div>
     )
   }
