@@ -8,15 +8,15 @@ import type { RoomIdentityClue, RoomIdentityRecognitionScene } from './room-scre
 import { RoomScreenPreviewShell } from './RoomScreenPreviewShell'
 import { useToast } from './toast-context'
 
-type IdentityRecognitionPreviewScenarioID = 'evil-allies' | 'merlin-evil' | 'percival-candidates' | 'none'
+type IdentityRecognitionPreviewScenarioID = 'evil-allies' | 'merlin-evil' | 'percival-candidates' | 'waiting'
 type CluePresentation = Extract<RoomIdentityRecognitionScene['presentation'], { kind: 'clue' }>
-type RoomIdentityRecognitionPreviewState = CluePresentation['view'] | 'confirming'
+type RoomIdentityRecognitionPreviewState = CluePresentation['view'] | 'confirming' | 'waiting'
 
 const SCENARIO_IDS: readonly IdentityRecognitionPreviewScenarioID[] = [
   'evil-allies',
   'merlin-evil',
   'percival-candidates',
-  'none',
+  'waiting',
 ]
 const CURRENT_PLAYER_ID = '2' as PlayerID
 const PLAYER_NAMES = ['苍', '雾林守望者', '银', '来自卡美洛的无名骑士', '青岚', '暮色远征者', '白鹿', '暮鸦议会记录官', '荆棘', '霜塔守夜人']
@@ -24,7 +24,7 @@ const SCENARIO_ROLES: Readonly<Record<IdentityRecognitionPreviewScenarioID, Role
   'evil-allies': 'assassin',
   'merlin-evil': 'merlin',
   'percival-candidates': 'percival',
-  none: 'loyal_servant',
+  waiting: 'loyal_servant',
 }
 
 function isScenarioID(value: string | undefined): value is IdentityRecognitionPreviewScenarioID {
@@ -40,7 +40,7 @@ function createPlayers(playerCount: number): LobbyPlayer[] {
 }
 
 function createClue(
-  scenarioID: IdentityRecognitionPreviewScenarioID,
+  scenarioID: Exclude<IdentityRecognitionPreviewScenarioID, 'waiting'>,
   playerCount: number,
 ): RoomIdentityClue {
   const evilCount = getPlayerCountConfig(playerCount).evil
@@ -57,7 +57,7 @@ function createClue(
       targetPlayerIDs: ['1', playerCount >= 7 ? '6' : '4'],
     }
   }
-  return { kind: 'none', targetPlayerIDs: [] }
+  throw new Error(`Unhandled clue scenario: ${scenarioID}`)
 }
 
 function createPreviewState(input: Readonly<{
@@ -85,9 +85,7 @@ function createPreviewState(input: Readonly<{
       lobby: { authorityVersion: 1, ownerPlayerID, occupiedPlayerIDs },
       players: Object.fromEntries(players.map((player) => [String(player.id), { name: player.name! }])),
       identityRecognition: {
-        step: 'roleReveal',
-        deadlineAt: 0,
-        confirmedCount: input.confirmedCount,
+        completedCount: input.confirmedCount,
         participantCount: input.playerCount,
       },
       leaderID: '0',
@@ -107,10 +105,9 @@ function createPreviewState(input: Readonly<{
         knownEvilPlayerIDs: [],
         knownMerlinCandidatePlayerIDs: [],
         identityRecognition: {
-          isParticipant: true,
-          confirmed: false,
-          deadlineRefreshRequired: false,
-          serverNow: 0,
+          personalStage: input.role === 'loyal_servant'
+            ? 'complete'
+            : 'clueRecognition',
         },
       },
     },
@@ -130,18 +127,22 @@ function IdentityRecognitionPreviewScenario({
 }) {
   const { pushToast } = useToast()
   const [playerCount, setPlayerCount] = useState(5)
-  const [confirmedCount, setConfirmedCount] = useState(0)
-  const [state, setState] = useState<RoomIdentityRecognitionPreviewState>('concealed')
+  const [confirmedCount, setConfirmedCount] = useState(
+    scenarioID === 'waiting' ? 2 : 0,
+  )
+  const [state, setState] = useState<RoomIdentityRecognitionPreviewState>(
+    scenarioID === 'waiting' ? 'waiting' : 'concealed',
+  )
   const role = SCENARIO_ROLES[scenarioID]
-  const clue = useMemo(() => createClue(scenarioID, playerCount), [playerCount, scenarioID])
+  const clue = useMemo(
+    () => scenarioID === 'waiting' ? null : createClue(scenarioID, playerCount),
+    [playerCount, scenarioID],
+  )
   const preview = useMemo(
     () => createPreviewState({ playerCount, role, confirmedCount }),
     [confirmedCount, playerCount, role],
   )
-  const showStableState = (next: RoomIdentityRecognitionPreviewState) => {
-    setState(next)
-    if (next === 'waiting') setConfirmedCount((count) => Math.max(1, count))
-  }
+  const showStableState = (next: RoomIdentityRecognitionPreviewState) => setState(next)
 
   const scene: RoomIdentityRecognitionScene = {
     kind: 'identityRecognition',
@@ -163,13 +164,15 @@ function IdentityRecognitionPreviewScenario({
       interactionMode: 'none',
     }),
     questProgress: buildQuestProgress(playerCount, preview.game),
-    presentation: {
-      kind: 'clue',
-      clue,
-      view: state === 'confirming' ? 'revealed' : state,
-      confirmRequestState: state === 'confirming' ? 'pending' : 'idle',
-    },
-    confirmedCount,
+    presentation: scenarioID === 'waiting' || state === 'waiting'
+      ? { kind: 'waiting' }
+      : {
+          kind: 'clue',
+          clue: clue!,
+          view: state === 'confirming' ? 'revealed' : state,
+          confirmRequestState: state === 'confirming' ? 'pending' : 'idle',
+        },
+    completedCount: confirmedCount,
     participantCount: playerCount,
   }
   const controls = (
@@ -196,7 +199,7 @@ function IdentityRecognitionPreviewScenario({
             <button onClick={() => showStableState('concealed')} type="button">未查看</button>
             <button onClick={() => showStableState('revealed')} type="button">已显示</button>
             <button onClick={() => showStableState('confirming')} type="button">正在确认</button>
-            <button onClick={() => showStableState('waiting')} type="button">已确认等待</button>
+            <button onClick={() => showStableState('waiting')} type="button">已完成等待</button>
           </fieldset>
           {state === 'confirming' && (
             <fieldset>
@@ -204,6 +207,7 @@ function IdentityRecognitionPreviewScenario({
               <button onClick={() => {
                 setConfirmedCount((count) => Math.min(playerCount, Math.max(1, count + 1)))
                 setState('waiting')
+                pushToast({ message: '身份辨认成功。', tone: 'success' })
               }} type="button">模拟确认成功</button>
               <button onClick={() => {
                 setState('revealed')
@@ -219,6 +223,7 @@ function IdentityRecognitionPreviewScenario({
       <RoomScreenPreviewShell
         actions={{
           onConfirm: () => setState('confirming'),
+          onHide: () => setState('concealed'),
           onReveal: () => setState('revealing'),
           onRevealComplete: () => setState('revealed'),
         }}

@@ -29,10 +29,10 @@ export function RoomIdentityConfirmationCenterSurface({
   return (
     <RoomCenter data-identity-confirmation-center="true" density="compact" role="status">
       <strong className="block text-lg font-semibold text-amber-100">
-        {scene.confirmedCount} / {scene.participantCount}
+        {scene.completedCount} / {scene.participantCount}
       </strong>
-      <span className="mt-1 block text-sm text-slate-200">玩家已确认身份</span>
-      <span className="mt-1 block text-sm text-slate-400">等待其他玩家确认</span>
+      <span className="mt-1 block text-sm text-slate-200">玩家已完成身份辨认</span>
+      <span className="mt-1 block text-sm text-slate-400">完成身份确认后继续</span>
     </RoomCenter>
   )
 }
@@ -41,18 +41,14 @@ export function RoomIdentityConfirmationStageSurface({
   actions,
   scene,
 }: RoomIdentityConfirmationSurfaceProps) {
-  if (scene.view === 'waiting') return null
-
   const artwork = ROLE_ARTWORK[scene.role]
   const guidance = ROLE_GUIDANCE[scene.role]
   const loyalty = loyaltyForRole(scene.role)
   const showPrivateDetails = scene.view !== 'concealed'
   const motion = scene.view === 'revealing' || scene.view === 'hiding'
     ? scene.view
-    : scene.view === 'concealed'
-      ? 'concealed'
-      : scene.view === 'reviewing'
-        ? 'soft'
+      : scene.view === 'concealed'
+        ? 'concealed'
         : 'settled'
   const handleCardMotionEnd = (event: AnimationEvent<HTMLDivElement>) => {
     if (event.target !== event.currentTarget) return
@@ -151,9 +147,15 @@ export function RoomIdentityConfirmationPhaseContentSurface({
 
   if (scene.view === 'revealed' || scene.view === 'hiding') {
     const hiding = scene.view === 'hiding'
+    const requiresClue = loyaltyForRole(scene.role) === 'evil' ||
+      scene.role === 'merlin' || scene.role === 'percival'
     return {
       title: '记住你的身份',
-      middle: <p className="text-sm text-slate-300">确认后将进入等待</p>,
+      middle: (
+        <p className="text-sm text-slate-300">
+          {requiresClue ? '确认后将辨认你的线索' : '确认后将等待其他玩家'}
+        </p>
+      ),
       action: (
         <div className="grid grid-cols-[minmax(0,0.72fr)_minmax(0,1fr)] gap-2">
           <RoomActionButton disabled={hiding} onClick={actions.onHide} tone="secondary">暂时隐藏</RoomActionButton>
@@ -169,22 +171,5 @@ export function RoomIdentityConfirmationPhaseContentSurface({
     }
   }
 
-  if (scene.view === 'waiting') {
-    return {
-      title: '等待其他玩家',
-      middle: (
-        <div className="flex items-center gap-3 text-sm text-slate-300">
-          <span aria-hidden="true" className="grid aspect-[5/7] h-10 place-items-center rounded-md border border-amber-200/40 bg-slate-950 text-amber-200">✦</span>
-          <span>你的身份已确认</span>
-        </div>
-      ),
-      action: <RoomActionButton onClick={actions.onReview}>再次查看身份</RoomActionButton>,
-    }
-  }
-
-  return {
-    title: '查看已确认身份',
-    middle: <p className="text-sm text-slate-300">你的身份已确认</p>,
-    action: <RoomActionButton onClick={actions.onCloseReview} tone="secondary">收起身份</RoomActionButton>,
-  }
+  throw new Error(`Unhandled identity confirmation view: ${String(scene.view)}`)
 }

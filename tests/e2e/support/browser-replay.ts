@@ -6,12 +6,6 @@ interface BrowserRoleConfiguration {
   percivalMorgana: boolean
 }
 
-export type BrowserRecognitionStep =
-  | 'roleReveal'
-  | 'evilRecognition'
-  | 'merlinRecognition'
-  | 'percivalRecognition'
-
 export interface BrowserReplaySnapshot {
   resultHeadings: string[]
   urls: string[]
@@ -77,65 +71,6 @@ export async function joinRoom(
   await expect(page).toHaveURL(new RegExp(`/rooms/${matchID}$`))
 }
 
-const RECOGNITION_CONFIRMATION_LABELS: Record<BrowserRecognitionStep, string> = {
-  roleReveal: '我已记住身份',
-  evilRecognition: '我已辨认',
-  merlinRecognition: '我已辨认',
-  percivalRecognition: '我已辨认',
-}
-
-export async function confirmRecognitionParticipants(
-  pages: readonly Page[],
-  step: BrowserRecognitionStep,
-) {
-  const confirmationLabel = RECOGNITION_CONFIRMATION_LABELS[step]
-  const participants: { page: Page; playerID: string }[] = []
-
-  for (const [index, page] of pages.entries()) {
-    if (step === 'roleReveal') {
-      await expect(page.locator('[data-room-scene="identityConfirmation"]')).toBeVisible()
-      const revealIdentity = page.locator('[data-room-slot="phase-action"]')
-        .getByRole('button', { exact: true, name: '揭示身份' })
-      if (
-        await revealIdentity.count() === 1 &&
-        await revealIdentity.isVisible() &&
-        await revealIdentity.isEnabled()
-      ) {
-        await revealIdentity.click()
-      }
-      const confirmation = page.getByRole('button', { exact: true, name: confirmationLabel })
-      await expect(confirmation).toBeVisible()
-      participants.push({ page, playerID: String(index) })
-      continue
-    }
-    const reveal = page.getByRole('button', { exact: true, name: '查看线索' })
-    if (await reveal.count() === 1) {
-      await reveal.click()
-      await expect(page.getByRole('button', {
-        exact: true,
-        name: confirmationLabel,
-      })).toBeVisible()
-    }
-    const confirmation = page.getByRole('button', { exact: true, name: confirmationLabel })
-    if (await confirmation.count() === 1 && await confirmation.isVisible()) {
-      participants.push({ page, playerID: String(index) })
-    }
-  }
-
-  for (const { page } of participants) {
-    await page.getByRole('button', {
-      exact: true,
-      name: confirmationLabel,
-    }).click()
-    await expect(page.getByRole('button', {
-      exact: true,
-      name: confirmationLabel,
-    })).toHaveCount(0)
-  }
-
-  return participants.map(({ playerID }) => playerID)
-}
-
 export async function createBrowserReplayHarness(options: {
   browser: Browser
   playerCount: number
@@ -190,7 +125,7 @@ export async function createBrowserReplayHarness(options: {
           case 'confirmIdentityRecognition':
             let confirmationButton = page.getByRole('button', {
               exact: true,
-              name: /^(我已记住身份|我已辨认|我已了解)$/,
+              name: /^(我已记住身份|我已辨认)$/,
             })
             if (await confirmationButton.count() === 0) {
               const revealIdentity = page.locator('[data-room-slot="phase-action"]')
@@ -207,7 +142,7 @@ export async function createBrowserReplayHarness(options: {
               }
               confirmationButton = page.getByRole('button', {
                 exact: true,
-                name: /^(我已记住身份|我已辨认|我已了解)$/,
+                name: /^(我已记住身份|我已辨认)$/,
               })
               await expect(confirmationButton).toBeVisible()
             }

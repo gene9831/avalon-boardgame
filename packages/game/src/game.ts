@@ -6,13 +6,15 @@ import type { Game, Plugin } from 'boardgame.io'
 import { getPlayerCountConfig } from './config'
 import { buildRoleDeck, assignRoles, loyaltyForRole } from './roles'
 import { getAvalonPlayerView } from './player-view'
-import { getIdentityRecognitionParticipantIDs } from './identity-recognition'
+import {
+  createPersonalRecognitionStages,
+  nextPersonalRecognitionStage,
+} from './identity-recognition'
 import { normalizeRoleConfiguration } from './types'
 import type {
   AvalonG,
   AvalonResult,
   AvalonSetupData,
-  IdentityRecognitionStep,
   PlayerID,
   QuestCard,
   TeamVote,
@@ -53,8 +55,7 @@ function createInitialGame(
     players: createPlayers(playerIDs, setupData?.players),
     secret: {
       roleByPlayer: {},
-      identityRecognitionConfirmedPlayerIDs: [],
-      identityRecognitionServerInstanceID: null,
+      identityRecognitionStageByPlayerID: {},
       pendingVotes: {},
       pendingQuestCards: {},
     },
@@ -120,17 +121,6 @@ function finishGame(
   endGame(result)
 }
 
-const BASE_IDENTITY_RECOGNITION_STEPS: readonly IdentityRecognitionStep[] = [
-  'roleReveal',
-  'evilRecognition',
-  'merlinRecognition',
-]
-
-const PERCIVAL_IDENTITY_RECOGNITION_STEPS: readonly IdentityRecognitionStep[] = [
-  ...BASE_IDENTITY_RECOGNITION_STEPS,
-  'percivalRecognition',
-]
-
 function canStartGame(G: AvalonG, playerID: PlayerID, numPlayers: number) {
   return G.status === 'lobby' &&
     G.lobby !== undefined &&
@@ -145,8 +135,7 @@ const identityRecognitionLogPrivacyPlugin: Plugin = {
   dangerouslyFlushRawState: ({ state }) => {
     const containsPrivateRecognitionAction = state.deltalog?.some((entry) => {
       const actionType = entry.action.payload.type
-      return actionType === 'confirmIdentityRecognition' ||
-        actionType === 'advanceIdentityRecognition'
+      return actionType === 'confirmIdentityRecognition'
     })
 
     return containsPrivateRecognitionAction
@@ -156,76 +145,8 @@ const identityRecognitionLogPrivacyPlugin: Plugin = {
 }
 
 function createAvalonGameDefinition(
-  options: AvalonGameOptions,
+  _options: AvalonGameOptions,
 ): Game<AvalonG, Record<string, never>, AvalonSetupData> {
-  const now = options.now ?? Date.now
-  const identityRecognitionDeadlineEnabled =
-    options.identityRecognitionDeadlineEnabled ?? false
-  const identityRecognitionStepMs = options.identityRecognitionStepMs ?? 10_000
-  const serverInstanceID = options.serverInstanceID ?? 'default'
-  const enterIdentityRecognitionStep = (
-    G: AvalonG,
-    step: IdentityRecognitionStep,
-    deadlineAt = now() + identityRecognitionStepMs,
-  ) => {
-    const participantIDs = getIdentityRecognitionParticipantIDs(
-      step,
-      G.secret.roleByPlayer,
-    )
-    G.secret.identityRecognitionConfirmedPlayerIDs = []
-    G.identityRecognition = {
-      step,
-      deadlineAt,
-      confirmedCount: 0,
-      participantCount: participantIDs.length,
-    }
-  }
-  const advanceIdentityRecognition = (
-    G: AvalonG,
-    setPhase: (phase: string) => void,
-    nextDeadlineAt?: number,
-  ) => {
-    const roleConfiguration = normalizeRoleConfiguration(
-      G.rules.roleConfiguration,
-    )
-    const recognitionSteps = roleConfiguration.percivalMorgana
-      ? PERCIVAL_IDENTITY_RECOGNITION_STEPS
-      : BASE_IDENTITY_RECOGNITION_STEPS
-    const currentStep = G.identityRecognition?.step
-    const currentIndex = currentStep === undefined
-      ? -1
-      : recognitionSteps.indexOf(currentStep)
-    const nextStep = recognitionSteps[currentIndex + 1]
-
-    if (nextStep !== undefined) {
-      enterIdentityRecognitionStep(G, nextStep, nextDeadlineAt)
-      return
-    }
-
-    G.secret.identityRecognitionConfirmedPlayerIDs = []
-    G.secret.identityRecognitionServerInstanceID = null
-    G.identityRecognition = null
-    setPhase('teamProposal')
-  }
-  const refreshIdentityRecognitionForServerInstance = (
-    G: AvalonG,
-    currentNow: number,
-  ) => {
-    const recognition = G.identityRecognition
-    if (
-      recognition === null ||
-      G.secret.identityRecognitionServerInstanceID === serverInstanceID
-    ) {
-      return false
-    }
-
-    G.secret.identityRecognitionServerInstanceID = serverInstanceID
-    G.secret.identityRecognitionConfirmedPlayerIDs = []
-    recognition.confirmedCount = 0
-    recognition.deadlineAt = currentNow + identityRecognitionStepMs
-    return true
-  }
-
   return {
   name: 'avalon',
   minPlayers: 5,
@@ -235,14 +156,7 @@ function createAvalonGameDefinition(
   validateSetupData,
   setup: ({ ctx }, setupData) =>
     createInitialGame(ctx.playOrder, setupData),
-  playerView: ({ G, playerID }) =>
-    getAvalonPlayerView(
-      G,
-      playerID,
-      serverInstanceID,
-      now(),
-      identityRecognitionDeadlineEnabled,
-    ),
+  playerView: ({ G, playerID }) => getAvalonPlayerView(G, playerID),
   phases: {
     lobby: {
       start: true,
@@ -272,12 +186,14 @@ function createAvalonGameDefinition(
                     buildRoleDeck(ctx.numPlayers, roleConfiguration),
                   )
                   G.secret.roleByPlayer = assignRoles(ctx.playOrder, roles)
-                  G.secret.identityRecognitionConfirmedPlayerIDs = []
-                  G.secret.identityRecognitionServerInstanceID =
-                    serverInstanceID
+                  G.secret.identityRecognitionStageByPlayerID =
+                    createPersonalRecognitionStages(ctx.playOrder)
                   G.status = 'playing'
                   G.leaderID = ctx.playOrder[random.Die(ctx.numPlayers) - 1]
-                  enterIdentityRecognitionStep(G, 'roleReveal')
+                  G.identityRecognition = {
+                    completedCount: 0,
+                    participantCount: ctx.numPlayers,
+                  }
                   events.setPhase('identityRecognition')
                 },
               },
@@ -300,80 +216,30 @@ function createAvalonGameDefinition(
                 move: ({ G, events, playerID }) => {
                   const recognition = G.identityRecognition
                   if (recognition === null) return INVALID_MOVE
-                  const currentNow = now()
-
-                  if (
-                    identityRecognitionDeadlineEnabled &&
-                    refreshIdentityRecognitionForServerInstance(G, currentNow)
-                  ) {
-                    return
-                  }
-
-                  if (
-                    identityRecognitionDeadlineEnabled &&
-                    currentNow >= recognition.deadlineAt
-                  ) {
-                    advanceIdentityRecognition(
-                      G,
-                      events.setPhase,
-                      recognition.deadlineAt + identityRecognitionStepMs,
-                    )
-                    return
-                  }
-
-                  const participantIDs = getIdentityRecognitionParticipantIDs(
-                    recognition.step,
-                    G.secret.roleByPlayer,
-                  )
-                  const confirmedPlayerIDs =
-                    G.secret.identityRecognitionConfirmedPlayerIDs
-                  if (
-                    !participantIDs.includes(playerID) ||
-                    confirmedPlayerIDs.includes(playerID)
-                  ) {
+                  const currentStage =
+                    G.secret.identityRecognitionStageByPlayerID[playerID]
+                  const role = G.secret.roleByPlayer[playerID]
+                  if (currentStage === undefined || role === undefined) {
                     return INVALID_MOVE
                   }
-
-                  confirmedPlayerIDs.push(playerID)
-                  recognition.confirmedCount = confirmedPlayerIDs.length
-                  if (confirmedPlayerIDs.length === participantIDs.length) {
-                    advanceIdentityRecognition(G, events.setPhase)
-                  }
-                },
-              },
-              advanceIdentityRecognition: {
-                client: false,
-                ignoreStaleStateID: true,
-                noLimit: true,
-                move: (
-                  { G, events },
-                  expectedStep: IdentityRecognitionStep,
-                  expectedDeadlineAt: number,
-                ) => {
-                  const recognition = G.identityRecognition
-                  if (recognition === null) return INVALID_MOVE
-                  if (!identityRecognitionDeadlineEnabled) return INVALID_MOVE
-                  const currentNow = now()
-
-                  if (
-                    refreshIdentityRecognitionForServerInstance(G, currentNow)
-                  ) {
-                    return
-                  }
-
-                  if (
-                    recognition.step !== expectedStep ||
-                    recognition.deadlineAt !== expectedDeadlineAt
-                  ) {
-                    return
-                  }
-
-                  if (currentNow < recognition.deadlineAt) return INVALID_MOVE
-                  advanceIdentityRecognition(
-                    G,
-                    events.setPhase,
-                    recognition.deadlineAt + identityRecognitionStepMs,
+                  const nextStage = nextPersonalRecognitionStage(
+                    currentStage,
+                    role,
+                    normalizeRoleConfiguration(G.rules.roleConfiguration),
                   )
+                  if (nextStage === null) return INVALID_MOVE
+
+                  G.secret.identityRecognitionStageByPlayerID[playerID] =
+                    nextStage
+                  if (nextStage !== 'complete') return
+
+                  recognition.completedCount += 1
+                  if (
+                    recognition.completedCount === recognition.participantCount
+                  ) {
+                    G.identityRecognition = null
+                    events.setPhase('teamProposal')
+                  }
                 },
               },
             },
@@ -668,11 +534,7 @@ function createAvalonGameDefinition(
 }
 
 export interface AvalonGameOptions {
-  identityRecognitionDeadlineEnabled?: boolean
-  identityRecognitionStepMs?: number
-  now?: () => number
   seed?: string | number
-  serverInstanceID?: string
 }
 
 export function createAvalonGame(options: AvalonGameOptions = {}) {

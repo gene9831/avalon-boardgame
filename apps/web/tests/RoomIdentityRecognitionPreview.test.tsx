@@ -26,22 +26,23 @@ describe('RoomIdentityRecognitionPreview', () => {
     'evil-allies',
     'merlin-evil',
     'percival-candidates',
-    'none',
+    'waiting',
   ])('starts the %s perspective in the shared concealed night scene', (scenarioID) => {
     const html = renderPreview(`/dev/room-layout/identity-recognition/${scenarioID}`)
 
     expect(html).toContain('data-room-screen="true"')
     expect(html).toContain(`data-identity-recognition-scene="${scenarioID}"`)
-    expect(html).toContain('data-identity-recognition-state="concealed"')
-    if (scenarioID === 'none') {
-      expect(html).toContain('我已了解')
+    if (scenarioID === 'waiting') {
+      expect(html).toContain('data-identity-recognition-state="waiting"')
+      expect(html).toContain('等待其他玩家完成身份辨认')
       expect(html).not.toContain('查看线索')
     } else {
+      expect(html).toContain('data-identity-recognition-state="concealed"')
       expect(html).toContain('查看线索')
-      expect(html).not.toContain('我已了解')
+      expect(html).not.toContain('我已辨认')
     }
     expect(html).not.toContain('data-identity-role-artwork')
-    expect(html).not.toContain('仅你可见')
+    expect(html).not.toContain('身份辨认幕布')
   })
 
   it('does not render an intermediate identity recognition index', () => {

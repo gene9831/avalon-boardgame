@@ -60,7 +60,6 @@ const PREVIEW_GROUPS = [
       { label: '角色牌未揭示', to: '/dev/room-layout/identity-confirmation/concealed' },
       { label: '身份已揭示', to: '/dev/room-layout/identity-confirmation/revealed' },
       { label: '正在确认', to: '/dev/room-layout/identity-confirmation/confirming' },
-      { label: '等待其他玩家', to: '/dev/room-layout/identity-confirmation/waiting' },
     ],
   },
   {
@@ -69,7 +68,7 @@ const PREVIEW_GROUPS = [
       { label: '邪恶阵营视角', to: '/dev/room-layout/identity-recognition/evil-allies' },
       { label: '梅林视角', to: '/dev/room-layout/identity-recognition/merlin-evil' },
       { label: '帕西维尔视角', to: '/dev/room-layout/identity-recognition/percival-candidates' },
-      { label: '无额外线索视角', to: '/dev/room-layout/identity-recognition/none' },
+      { label: '已完成等待', to: '/dev/room-layout/identity-recognition/waiting' },
     ],
   },
   {

@@ -790,24 +790,25 @@ describe('RoomView playing layout', () => {
     expect(html).toContain('font-sans')
   })
 
-  it('starts live role confirmation concealed and keeps unauthorized viewers behind the curtain', () => {
+  it('renders each live viewer personal recognition stage without a shared curtain', () => {
     const state = playingGameState()!
     state.ctx.phase = 'identityRecognition'
     state.ctx.activePlayers = { '0': 'identityRecognition' }
     state.G.identityRecognition = {
-      step: 'roleReveal', deadlineAt: 1000, confirmedCount: 0, participantCount: 5,
+      completedCount: 0, participantCount: 5,
     }
     state.G.viewer.identityRecognition = {
-      isParticipant: true, confirmed: false, deadlineRefreshRequired: false, serverNow: 0,
+      personalStage: 'identityConfirmation',
     }
     const participant = renderRoomView({ gameState: state, room: fullRoom() }, true)
 
     state.G.viewer = {
-      role: null, loyalty: null, knownEvilPlayerIDs: [], knownMerlinCandidatePlayerIDs: [],
+      role: 'loyal_servant', loyalty: 'good', knownEvilPlayerIDs: [], knownMerlinCandidatePlayerIDs: [],
       identityRecognition: {
-        isParticipant: false, confirmed: false, deadlineRefreshRequired: false, serverNow: 0,
+        personalStage: 'complete',
       },
     }
+    state.G.identityRecognition.completedCount = 1
     const nonparticipant = renderRoomView({ gameState: state, room: fullRoom() }, true)
 
     expect(participant).toContain('data-room-scene="identityConfirmation"')
@@ -816,11 +817,10 @@ describe('RoomView playing layout', () => {
     expect(participant).not.toContain('data-identity-role-artwork')
     expect(participant).not.toContain('aria-label="查看我的身份与已知信息"')
     expect(nonparticipant).toContain('data-room-scene="identityRecognition"')
-    expect(nonparticipant).toContain('data-curtain-state="closed"')
-    expect(nonparticipant).toContain('等待参与玩家完成辨认')
-    expect(nonparticipant).not.toContain('data-role-card=')
-    expect(nonparticipant).not.toContain('data-role-avatar=')
-    expect(nonparticipant).not.toContain('你的线索已确认')
+    expect(nonparticipant).toContain('data-identity-recognition-state="waiting"')
+    expect(nonparticipant).toContain('等待其他玩家完成身份辨认')
+    expect(nonparticipant).toContain('aria-label="查看我的身份与已知信息"')
+    expect(nonparticipant).not.toContain('data-curtain-state')
   })
 
   it('marks only the requested empty seat as pending during a seat change', () => {

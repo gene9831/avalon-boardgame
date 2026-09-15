@@ -51,14 +51,17 @@ _Avoid_: permissions, role access
 **Merlin candidate**: A seat that Percival knows belongs to either Merlin or Morgana without knowing which role it holds. When both roles are present, their candidate status is indistinguishable.
 _Avoid_: known Merlin, suspected Evil
 
-**Identity recognition**: The opening ceremony in which players privately learn their own role, Evil players recognize one another, Merlin recognizes Evil seats, and Percival recognizes Merlin candidates before the first team proposal.
+**Identity recognition**: The opening ceremony in which every player independently confirms their own role and, when applicable, privately recognizes their role-specific seats before the first team proposal. The ceremony ends only after every player completes their personal recognition stages.
 _Avoid_: night phase, role reveal phase
 
-**Recognition step**: One ordered part of identity recognition: role reveal, Evil recognition, Merlin recognition, or Percival recognition. Only that step's participants may view and confirm its private information; steps without a participating role are skipped.
-_Avoid_: recognition round, night action
+**Personal recognition stage**: One player's private progress within identity recognition: identity confirmation, applicable role-clue recognition, or complete. Players progress independently, and another player's personal stage is not public information.
+_Avoid_: global recognition step, recognition round, night action
 
-**Identity confirmation**: A participant's acknowledgement that they have finished viewing the current recognition step. It is not a game decision and carries no strategic choice.
+**Identity confirmation**: A player's acknowledgement that they have finished viewing their own role card. It is not a game decision and carries no strategic choice.
 _Avoid_: identity vote, ready vote
+
+**Clue confirmation**: A player's acknowledgement that they have finished viewing the seats their role is allowed to recognize. Roles without seat knowledge do not require clue confirmation.
+_Avoid_: identity vote, role-group confirmation
 
 ## Game flow
 

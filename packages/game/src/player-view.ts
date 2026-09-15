@@ -1,5 +1,4 @@
 import { loyaltyForRole } from './roles'
-import { getIdentityRecognitionParticipantIDs } from './identity-recognition'
 import type {
   AvalonG,
   AvalonPlayerView,
@@ -17,9 +16,6 @@ function findEvilPlayerIDs(roleByPlayer: Record<PlayerID, Role>) {
 export function getAvalonPlayerView(
   G: AvalonG,
   playerID: PlayerID | null,
-  serverInstanceID?: string,
-  serverNow = Date.now(),
-  identityRecognitionDeadlineEnabled = false,
 ): AvalonPlayerView {
   const { secret, ...publicGame } = G
   publicGame.rules = {
@@ -31,35 +27,26 @@ export function getAvalonPlayerView(
   const role = playerID === null ? undefined : secret.roleByPlayer[playerID]
   const loyalty = role === undefined ? null : loyaltyForRole(role)
   const evilPlayerIDs = findEvilPlayerIDs(secret.roleByPlayer)
-  const recognitionStep = G.identityRecognition?.step
-  const evilKnowledgeReleased =
-    recognitionStep === undefined || recognitionStep !== 'roleReveal'
-  const merlinKnowledgeReleased =
-    recognitionStep === undefined ||
-    recognitionStep === 'merlinRecognition' ||
-    recognitionStep === 'percivalRecognition'
+  const personalRecognitionStage = playerID === null
+    ? undefined
+    : secret.identityRecognitionStageByPlayerID[playerID]
+  const knowledgeReleased = G.identityRecognition === null ||
+    personalRecognitionStage === 'clueRecognition' ||
+    personalRecognitionStage === 'complete'
   const knownEvilPlayerIDs =
-    role === 'merlin' && merlinKnowledgeReleased
+    role === 'merlin' && knowledgeReleased
       ? evilPlayerIDs
-      : loyalty === 'evil' && evilKnowledgeReleased
+      : loyalty === 'evil' && knowledgeReleased
         ? evilPlayerIDs.filter((knownID) => knownID !== playerID)
         : []
-  const percivalKnowledgeReleased =
-    recognitionStep === undefined || recognitionStep === 'percivalRecognition'
   const knownMerlinCandidatePlayerIDs =
-    role === 'percival' && percivalKnowledgeReleased
+    role === 'percival' && knowledgeReleased
       ? Object.entries(secret.roleByPlayer)
         .filter(([, candidateRole]) =>
           candidateRole === 'merlin' || candidateRole === 'morgana',
         )
         .map(([candidatePlayerID]) => candidatePlayerID)
       : []
-  const recognitionParticipantIDs = recognitionStep === undefined
-    ? []
-    : getIdentityRecognitionParticipantIDs(
-      recognitionStep,
-      secret.roleByPlayer,
-    )
 
   const view: AvalonPlayerView = {
     ...publicGame,
@@ -72,19 +59,11 @@ export function getAvalonPlayerView(
       loyalty,
       knownEvilPlayerIDs,
       knownMerlinCandidatePlayerIDs,
-      identityRecognition: recognitionStep === undefined
+      identityRecognition:
+        G.identityRecognition === null || personalRecognitionStage === undefined
         ? undefined
         : {
-            isParticipant:
-              playerID !== null && recognitionParticipantIDs.includes(playerID),
-            confirmed:
-              playerID !== null &&
-              secret.identityRecognitionConfirmedPlayerIDs.includes(playerID),
-            deadlineRefreshRequired:
-              identityRecognitionDeadlineEnabled &&
-              serverInstanceID !== undefined &&
-              secret.identityRecognitionServerInstanceID !== serverInstanceID,
-            serverNow,
+            personalStage: personalRecognitionStage,
           },
       submittedVote:
         playerID === null ? undefined : secret.pendingVotes[playerID],

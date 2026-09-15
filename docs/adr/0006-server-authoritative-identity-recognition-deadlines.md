@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: superseded by ADR-0013
 ---
 
 # Retain optional server-authoritative identity-recognition deadlines

@@ -20,7 +20,7 @@ export interface RoomIdentityRecognitionSceneProps {
 }
 
 function recognitionState(scene: RoomIdentityRecognitionSceneData) {
-  return scene.presentation.kind === 'observer' ? 'observer' : scene.presentation.view
+  return scene.presentation.kind === 'waiting' ? 'waiting' : scene.presentation.view
 }
 
 export function RoomIdentityRecognitionScene({

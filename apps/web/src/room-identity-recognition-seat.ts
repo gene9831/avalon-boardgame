@@ -19,7 +19,7 @@ const TARGET_MARKERS = {
   evilAllies: { label: '同伴', state: 'target', tone: 'ally' },
   merlinEvil: { label: '邪恶', state: 'target', tone: 'evil' },
   percivalCandidates: { label: '候选人', state: 'target', tone: 'candidate' },
-} as const satisfies Record<Exclude<RoomIdentityClue['kind'], 'none'>, RoomPlayerSeatRecognition>
+} as const satisfies Record<RoomIdentityClue['kind'], RoomPlayerSeatRecognition>
 
 type RecognitionSeatScene = Pick<RoomIdentityRecognitionScene, 'presentation'>
 
@@ -29,13 +29,12 @@ export function getRoomIdentityRecognitionSeat(
   isCurrentPlayer: boolean,
 ): RoomPlayerSeatRecognition | undefined {
   const presentation = scene.presentation
-  if (presentation.kind !== 'clue' || presentation.view === 'waiting') return undefined
+  if (presentation.kind !== 'clue') return undefined
   if (isCurrentPlayer) return { label: '你', state: 'self' }
 
   const cluesVisible = presentation.view === 'revealing' || presentation.view === 'revealed'
   if (
     cluesVisible &&
-    presentation.clue.kind !== 'none' &&
     presentation.clue.targetPlayerIDs.includes(playerID)
   ) {
     return TARGET_MARKERS[presentation.clue.kind]

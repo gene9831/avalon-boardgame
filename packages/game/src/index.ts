@@ -47,7 +47,11 @@ export type {
   AvalonSeatID,
   AvalonSeatChangeRequest,
 } from './room-api'
-export { getIdentityRecognitionParticipantIDs } from './identity-recognition'
+export {
+  createPersonalRecognitionStages,
+  nextPersonalRecognitionStage,
+  roleRequiresClueRecognition,
+} from './identity-recognition'
 export {
   assignRoles,
   buildRoleDeck,
@@ -63,7 +67,7 @@ export type {
   AvalonG,
   AvalonLobbyState,
   IdentityRecognitionState,
-  IdentityRecognitionStep,
+  PersonalRecognitionStage,
   AvalonPlayerView,
   AvalonResult,
   AvalonSecret,

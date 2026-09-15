@@ -26,13 +26,11 @@ const interactivePlayerSeat: PlayerSeatLayout = {
 }
 
 const actions = (): RoomActionsByKind['identityConfirmation'] => ({
-  onCloseReview: vi.fn(),
   onConfirm: vi.fn(),
   onHide: vi.fn(),
   onHideComplete: vi.fn(),
   onReveal: vi.fn(),
   onRevealComplete: vi.fn(),
-  onReview: vi.fn(),
 })
 
 function scene(
@@ -41,7 +39,7 @@ function scene(
 ): RoomIdentityConfirmationSceneData {
   return {
     kind: 'identityConfirmation', matchID: 'ABC123456', playerCount: 5, players: [], questProgress: [],
-    role: 'merlin', view, confirmedCount: view === 'waiting' ? 3 : 1, participantCount: 5,
+    role: 'merlin', view, completedCount: 1, participantCount: 5,
     confirmRequestState,
   }
 }
@@ -133,22 +131,6 @@ describe('RoomIdentityConfirmationScene', () => {
     expect(html).toContain('data-identity-role-artwork="merlin"')
     expect(html).toContain('记住你的身份')
     expect(html.match(/disabled=""/g)).toHaveLength(2)
-  })
-
-  it('shows aggregate confirmation progress in the table center while waiting', () => {
-    const html = renderScene('waiting')
-
-    expect(html).toMatch(/3 \/ 5.*玩家已确认身份.*等待其他玩家确认/s)
-    expect(html).not.toContain('data-identity-role-artwork')
-    expect(html).toContain('再次查看身份')
-  })
-
-  it('reopens a confirmed identity for review without offering confirmation again', () => {
-    const html = renderScene('reviewing')
-
-    expect(html).toContain('data-identity-role-artwork="merlin"')
-    expect(html).toContain('收起身份')
-    expect(html).not.toContain('我已记住身份')
   })
 
   it('keeps the original confirmation label while only the request is pending', () => {
