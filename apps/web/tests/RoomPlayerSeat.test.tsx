@@ -19,7 +19,7 @@ const layout: PlayerSeatLayout = {
 
 const player: RoomPlayerPresentation = {
   playerID: '0', relativeSeatIndex: 0, seatNumber: 1, name: 'Alice', occupied: true,
-  isCurrentPlayer: false,
+  isCurrentPlayer: false, canReviewIdentity: false,
   portrait: { kind: 'playerAvatar', avatarID: 'merlin', connected: true },
   markers: [{ kind: 'leader' }],
   caption: { kind: 'none' },
@@ -54,10 +54,13 @@ describe('RoomPlayerSeat', () => {
       <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
         ...player,
         isCurrentPlayer: true,
+        canReviewIdentity: true,
         portrait: { kind: 'roleArtwork', role: 'merlin' },
+        caption: { kind: 'role', role: 'merlin' },
       }} />,
     ))
 
+    expect(container.querySelector('[data-role-loyalty="good"]')?.textContent).toBe('梅林')
     const identityButton = container.querySelector<HTMLButtonElement>(
       'button[aria-label="查看我的身份详情"]',
     )
@@ -93,6 +96,7 @@ describe('RoomPlayerSeat', () => {
       <RoomPlayerSeat layout={layout} onActivate={onActivate} player={{
         ...player,
         isCurrentPlayer: true,
+        canReviewIdentity: true,
         portrait: { kind: 'roleArtwork', role: 'merlin' },
         interaction: { kind: 'selectTeam', disabled: false, selected: false },
       }} />,
@@ -139,19 +143,23 @@ describe('RoomPlayerSeat', () => {
     expect(html).not.toContain('data-room-role-revealed="true"')
   })
 
-  it('labels a normalized recognition target without replacing the player avatar', () => {
+  it.each([
+    ['同伴', 'ally'],
+    ['邪恶', 'evil'],
+  ] as const)('uses the known-evil avatar treatment for the %s recognition view', (label, tone) => {
     const html = renderToStaticMarkup(
       <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
         ...player, markers: [],
-        caption: { kind: 'recognition', label: '同伴', tone: 'ally' },
+        caption: { kind: 'recognition', label, tone },
       }} />,
     )
 
+    expect(html).toContain('data-avatar-state="known-evil"')
     expect(html).toContain('data-recognition-seat-state="target"')
-    expect(html).toContain('data-recognition-tone="ally"')
+    expect(html).toContain(`data-recognition-tone="${tone}"`)
     expect(html).toContain('data-identity-recognition-label="true"')
-    expect(html).toContain('>同伴</span>')
-    expect(html).toContain('aria-label="1. Alice，同伴"')
+    expect(html).toContain(`>${label}</span>`)
+    expect(html).toContain(`aria-label="1. Alice，${label}"`)
     expect(html).not.toContain('data-room-role-revealed="true"')
   })
 

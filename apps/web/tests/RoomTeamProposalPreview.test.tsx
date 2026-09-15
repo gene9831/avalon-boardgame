@@ -27,7 +27,7 @@ const player: RoomPlayerPresentation = {
   playerID: '0', relativeSeatIndex: 0, seatNumber: 1, name: 'Alice', occupied: true,
   isCurrentPlayer: true,
   portrait: { kind: 'playerAvatar', avatarID: 'merlin', connected: true },
-  markers: [{ kind: 'leader' }], caption: { kind: 'none' }, emphasis: 'default',
+  canReviewIdentity: false, markers: [{ kind: 'leader' }], caption: { kind: 'none' }, emphasis: 'default',
   interaction: { kind: 'selectTeam', disabled: false, selected: false },
 }
 

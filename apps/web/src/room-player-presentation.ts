@@ -31,6 +31,7 @@ export type FilteredSeatInput = Readonly<{
   name: string
   occupied: boolean
   isCurrentPlayer: boolean
+  canReviewIdentity: boolean
   avatarID: PlayerAvatarID
   connected: boolean
   role: FilteredSeatRole
@@ -75,6 +76,10 @@ function buildMarkers(input: FilteredSeatInput): readonly RoomPlayerMarker[] {
 }
 
 function buildCaption(input: FilteredSeatInput): RoomPlayerCaption {
+  if (input.role.kind === 'viewerVisible') {
+    return { kind: 'role', role: input.role.role }
+  }
+
   switch (input.recognition.kind) {
     case 'none':
     case 'dimmed':
@@ -115,11 +120,13 @@ export function buildRoomPlayerPresentation(
       caption: { kind: 'role', role: input.role.role },
       emphasis: 'default',
       interaction: { kind: 'none' },
+      canReviewIdentity: false,
     }
   }
 
   return {
     ...base,
+    canReviewIdentity: input.canReviewIdentity,
     portrait: buildPortrait(input),
     markers: buildMarkers(input),
     caption: buildCaption(input),

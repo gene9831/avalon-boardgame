@@ -306,6 +306,7 @@ export interface RoomPlayerPresentation {
   name: string
   occupied: boolean
   isCurrentPlayer: boolean
+  canReviewIdentity: boolean
   portrait: RoomPlayerPortrait
   markers: readonly RoomPlayerMarker[]
   caption: RoomPlayerCaption

@@ -11,7 +11,8 @@ import type {
 
 const players: readonly RoomPlayerPresentation[] = ['0', '1', '2'].map((playerID, relativeSeatIndex) => ({
   playerID, relativeSeatIndex, seatNumber: relativeSeatIndex + 1,
-  name: ['Alice', 'Bob', 'Carol'][relativeSeatIndex], occupied: true, isCurrentPlayer: playerID === '2',
+  name: ['Alice', 'Bob', 'Carol'][relativeSeatIndex], occupied: true,
+  isCurrentPlayer: playerID === '2', canReviewIdentity: false,
   portrait: { kind: 'playerAvatar', avatarID: 'merlin', connected: true },
   markers: playerID === '0' ? [{ kind: 'knownEvil' }] : [],
   caption: { kind: 'none' }, emphasis: playerID === '0' ? 'knownEvil' : 'default',

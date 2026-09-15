@@ -261,6 +261,12 @@ function avatarState(player: RoomPlayerPresentation): string {
   ) {
     return 'merlin-candidate'
   }
+  if (
+    player.caption.kind === 'recognition' &&
+    (player.caption.tone === 'ally' || player.caption.tone === 'evil')
+  ) {
+    return 'known-evil'
+  }
   switch (player.emphasis) {
     case 'target': return 'target'
     case 'selected': return 'selected'
@@ -297,9 +303,7 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
   const nameStyle = localNameStyle(layout.nameRect, layout.playerSeatBounds, nameSize)
   const roleStyle = localRoleStyle(layout.nameRect, layout.playerSeatBounds)
   const role = portraitRole(player.portrait)
-  const canViewIdentity = player.isCurrentPlayer &&
-    role !== null &&
-    player.caption.kind !== 'role'
+  const canViewIdentity = player.isCurrentPlayer && player.canReviewIdentity && role !== null
   const connected = player.portrait.kind === 'playerAvatar' && player.portrait.connected
   const recognitionState = player.emphasis === 'dimmed'
     ? 'dimmed'

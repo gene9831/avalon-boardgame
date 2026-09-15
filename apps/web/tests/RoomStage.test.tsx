@@ -40,7 +40,7 @@ function player(playerID: string, relativeSeatIndex: number): RoomPlayerPresenta
     isCurrentPlayer: playerID === '0',
     portrait: { kind: 'playerAvatar', avatarID: 'merlin', connected: true },
     markers: [],
-    caption: { kind: 'none' },
+    canReviewIdentity: false, caption: { kind: 'none' },
     emphasis: 'default',
     interaction: { kind: 'none' },
   }

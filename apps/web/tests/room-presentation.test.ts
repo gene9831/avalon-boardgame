@@ -123,6 +123,8 @@ describe('room player presentation', () => {
     expect(result.find(({ playerID }) => playerID === '0')).toMatchObject({
       isCurrentPlayer: true,
       portrait: { kind: 'roleArtwork', role: 'merlin' },
+      caption: { kind: 'role', role: 'merlin' },
+      canReviewIdentity: true,
       markers: [
         { kind: 'questMember' },
         { kind: 'vote', status: 'pending' },
@@ -137,6 +139,26 @@ describe('room player presentation', () => {
     })
     expect(result.find(({ playerID }) => playerID === '4')).toMatchObject({
       emphasis: 'selected',
+    })
+  })
+
+  it('keeps terminal public role labels non-reviewable', () => {
+    const result = buildRoomPlayers({
+      ...baseInput,
+      game: gameView({
+        status: 'finished',
+        revealedRoles: {
+          '0': 'merlin', '1': 'loyal_servant', '3': 'assassin', '4': 'minion',
+        },
+      }),
+      showPrivateRoleKnowledge: true,
+      showRoleReveal: true,
+    })
+
+    expect(result.find(({ playerID }) => playerID === '0')).toMatchObject({
+      portrait: { kind: 'roleArtwork', role: 'merlin' },
+      caption: { kind: 'role', role: 'merlin' },
+      canReviewIdentity: false,
     })
   })
 

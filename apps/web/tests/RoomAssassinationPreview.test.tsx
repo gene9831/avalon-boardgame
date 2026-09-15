@@ -27,7 +27,7 @@ const player: RoomPlayerPresentation = {
   playerID: '0', relativeSeatIndex: 0, seatNumber: 1, name: 'Alice', occupied: true,
   isCurrentPlayer: false,
   portrait: { kind: 'playerAvatar', avatarID: 'merlin', connected: true },
-  markers: [{ kind: 'assassinationTarget' }], caption: { kind: 'none' }, emphasis: 'target',
+  canReviewIdentity: false, markers: [{ kind: 'assassinationTarget' }], caption: { kind: 'none' }, emphasis: 'target',
   interaction: { kind: 'selectAssassinationTarget', disabled: false, selected: true },
 }
 
