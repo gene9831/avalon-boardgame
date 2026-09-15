@@ -11,6 +11,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/server/package.json apps/server/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/game/package.json packages/game/package.json
+COPY packages/ui-layout/package.json packages/ui-layout/package.json
 COPY packages/test-support/package.json packages/test-support/package.json
 COPY tests/e2e/package.json tests/e2e/package.json
 
