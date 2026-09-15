@@ -280,7 +280,7 @@ describe('buildRoomSceneBinding', () => {
     expect(nonparticipant.scene.players.every((player) => player.portrait.kind === 'playerAvatar')).toBe(true)
   })
 
-  it('restores authorized clue markers for a completed clue role when knowledge is open', () => {
+  it('restores authorized clue labels for a completed clue role when knowledge is open', () => {
     const input = readyInput('identityRecognition', {
       identityRecognition: { stage: 'clueRecognition', completedCount: 1, participantCount: 3 },
       viewer: {
@@ -292,11 +292,14 @@ describe('buildRoomSceneBinding', () => {
     const revealed = buildRoomSceneBinding({ ...input, roleKnowledgeOpen: true }, eventHandlers)
 
     expect(concealed.scene.players
-      .filter(({ markers }) => markers.some(({ kind }) => kind === 'knownEvil')))
+      .filter(({ caption }) => caption.kind === 'recognition'))
       .toEqual([])
     expect(revealed.scene.players
-      .filter(({ markers }) => markers.some(({ kind }) => kind === 'knownEvil'))
-      .map(({ playerID }) => playerID)).toEqual(['3', '4'])
+      .filter(({ caption }) => caption.kind === 'recognition')
+      .map(({ playerID, caption }) => [playerID, caption])).toEqual([
+        ['3', { kind: 'recognition', label: '邪恶', tone: 'evil' }],
+        ['4', { kind: 'recognition', label: '邪恶', tone: 'evil' }],
+      ])
     expect(revealed.scene.players.find(({ playerID }) => playerID === '0')?.portrait)
       .toMatchObject({ kind: 'roleArtwork', role: 'merlin' })
   })
@@ -547,9 +550,10 @@ describe('buildRoomSceneBinding', () => {
     const revealed = buildRoomSceneBinding({ ...input, roleKnowledgeOpen: true }, eventHandlers)
 
     expect(concealed.scene.players.find(({ playerID }) => playerID === '0')?.portrait.kind).toBe('playerAvatar')
-    expect(concealed.scene.players.find(({ playerID }) => playerID === '3')?.markers).not.toContainEqual({ kind: 'knownEvil' })
+    expect(concealed.scene.players.find(({ playerID }) => playerID === '3')?.caption).toEqual({ kind: 'none' })
     expect(revealed.scene.players.find(({ playerID }) => playerID === '0')?.portrait).toEqual({ kind: 'roleArtwork', role: 'merlin' })
-    expect(revealed.scene.players.find(({ playerID }) => playerID === '3')?.markers).toContainEqual({ kind: 'knownEvil' })
+    expect(revealed.scene.players.find(({ playerID }) => playerID === '3')?.caption)
+      .toEqual({ kind: 'recognition', label: '邪恶', tone: 'evil' })
   })
 
   it('binds a settled quest team and target-only assassination role reveal', () => {

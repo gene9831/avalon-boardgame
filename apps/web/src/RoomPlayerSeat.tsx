@@ -5,10 +5,8 @@ import {
   CircleX,
   Crosshair,
   Crown,
-  HelpCircle,
   House,
   LoaderCircle,
-  ShieldAlert,
 } from 'lucide-react'
 import { loyaltyForRole, type Role, type TeamVote } from '@avalon/game'
 import type { PlayerSeatLayout, Rect } from '@avalon/ui-layout'
@@ -111,9 +109,7 @@ function markerStatus(marker: RoomPlayerMarker): string {
     case 'questMember': return '任务队员'
     case 'vote':
       return marker.status === 'approve' ? '赞成' : marker.status === 'reject' ? '反对' : '已投票'
-    case 'knownEvil': return '已知阵营信息：邪恶'
     case 'assassinationTarget': return '刺杀目标'
-    case 'merlinCandidate': return '梅林候选'
     default: return assertNever(marker)
   }
 }
@@ -136,22 +132,10 @@ function markerDecoration(marker: RoomPlayerMarker, index: number): ReactNode {
           <VoteStatusIcon status={marker.status} />
         </span>
       )
-    case 'knownEvil':
-      return (
-        <span aria-label="已知邪恶阵营" className="room-seat__decoration" data-known-player-info="evil" data-seat-decoration="known-evil" key={`${marker.kind}-${index}`}>
-          <ShieldAlert />
-        </span>
-      )
     case 'assassinationTarget':
       return (
         <span aria-label="刺杀目标" className="room-seat__decoration" data-seat-decoration="assassination-target" key={`${marker.kind}-${index}`}>
           <Crosshair />
-        </span>
-      )
-    case 'merlinCandidate':
-      return (
-        <span aria-label="Merlin 候选" className="room-seat__decoration" data-known-player-info="merlin-candidate" data-seat-decoration="merlin-candidate" key={`${marker.kind}-${index}`}>
-          <HelpCircle />
         </span>
       )
     default:
@@ -256,8 +240,7 @@ function avatarState(player: RoomPlayerPresentation): string {
     return `revealed-${loyaltyForRole(player.caption.role)}`
   }
   if (
-    player.markers.some((marker) => marker.kind === 'merlinCandidate') ||
-    (player.caption.kind === 'recognition' && player.caption.tone === 'candidate')
+    player.caption.kind === 'recognition' && player.caption.tone === 'candidate'
   ) {
     return 'merlin-candidate'
   }
@@ -307,7 +290,7 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
   const connected = player.portrait.kind === 'playerAvatar' && player.portrait.connected
   const recognitionState = player.emphasis === 'dimmed'
     ? 'dimmed'
-    : player.caption.kind === 'recognition'
+    : player.emphasis === 'target' && player.caption.kind === 'recognition'
       ? 'target'
       : undefined
   const selected = player.interaction.kind === 'selectTeam' && player.interaction.selected

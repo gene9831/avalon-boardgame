@@ -2,7 +2,11 @@ import { getPlayerCountConfig, type AvalonPlayerView, type PlayerID } from '@ava
 
 import type { AvalonMatch, LobbyPlayer } from './lobby'
 import { getDisplayedTeamVoteResult } from './room-game'
-import { buildRoomPlayerPresentation, type FilteredSeatRole } from './room-player-presentation'
+import {
+  buildRoomPlayerPresentation,
+  type FilteredSeatRecognition,
+  type FilteredSeatRole,
+} from './room-player-presentation'
 import type { RoomPlayerInteraction, RoomPlayerPresentation } from './room-screen-props'
 import { getSeatAvatarID } from './seat-avatar'
 import type { RoomTeamToken } from './RoomTeamTokens'
@@ -82,6 +86,15 @@ export function buildRoomPlayers(input: Readonly<{
       : privateRole === null ? { kind: 'none' } : { kind: 'viewerVisible', role: privateRole }
     const knownEvil = input.showKnownPlayerInfo && input.game?.viewer.knownEvilPlayerIDs.includes(playerID) === true
     const knownMerlinCandidate = input.showKnownPlayerInfo && input.game?.status !== 'finished' && input.game !== null && (input.game.viewer.knownMerlinCandidatePlayerIDs ?? []).includes(playerID)
+    const recognition: FilteredSeatRecognition = knownEvil
+      ? {
+          kind: 'recognition',
+          label: input.game?.viewer.loyalty === 'evil' ? '同伴' : '邪恶',
+          tone: input.game?.viewer.loyalty === 'evil' ? 'ally' : 'evil',
+        }
+      : knownMerlinCandidate
+        ? { kind: 'recognition', label: '梅林候选', tone: 'candidate' }
+        : { kind: 'none' }
     const voteStatus = input.showRoundDecorations === false ? null : settledVotes?.[playerID] ?? (input.game?.submittedTeamVotePlayerIDs.includes(playerID) === true ? 'pending' : null)
     const interactionMode = input.interactionMode ?? 'none'
     let interaction: RoomPlayerInteraction
@@ -101,7 +114,7 @@ export function buildRoomPlayers(input: Readonly<{
       isLeader: input.showRoundDecorations !== false && input.showLeader !== false && input.game?.leaderID === playerID,
       isQuestMember: input.showRoundDecorations !== false && (input.resolvedQuestTeam ?? input.game?.proposedTeam ?? []).includes(playerID),
       isSelected: input.selectedTeam.includes(playerID), isSelectedTarget: input.selectedTarget === playerID,
-      knownEvil, knownMerlinCandidate, voteStatus, recognition: { kind: 'none' }, interaction,
+      knownEvil, voteStatus, recognition, interaction,
     })
   })
 }

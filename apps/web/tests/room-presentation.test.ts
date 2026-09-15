@@ -135,11 +135,33 @@ describe('room player presentation', () => {
       markers: [{ kind: 'leader' }, { kind: 'questMember' }, { kind: 'assassinationTarget' }],
     })
     expect(result.find(({ playerID }) => playerID === '3')).toMatchObject({
-      markers: [{ kind: 'owner' }, { kind: 'knownEvil' }],
+      markers: [{ kind: 'owner' }],
+      caption: { kind: 'recognition', label: '邪恶', tone: 'evil' },
     })
     expect(result.find(({ playerID }) => playerID === '4')).toMatchObject({
       emphasis: 'selected',
     })
+  })
+
+  it.each([
+    [
+      { role: 'minion', loyalty: 'evil', knownEvilPlayerIDs: ['3'], knownMerlinCandidatePlayerIDs: [] },
+      '3', '同伴', 'ally', ['owner'],
+    ],
+    [
+      { role: 'percival', loyalty: 'good', knownEvilPlayerIDs: [], knownMerlinCandidatePlayerIDs: ['1', '3'] },
+      '1', '梅林候选', 'candidate', ['leader', 'questMember'],
+    ],
+  ] as const)('presents restored %s knowledge as a colored text label', (viewer, targetPlayerID, label, tone, markerKinds) => {
+    const result = buildRoomPlayers({
+      ...baseInput,
+      game: gameView({ viewer }),
+      showKnownPlayerInfo: true,
+    })
+    const target = result.find(({ playerID }) => playerID === targetPlayerID)
+
+    expect(target?.caption).toEqual({ kind: 'recognition', label, tone })
+    expect(target?.markers.map(({ kind }) => kind)).toEqual(markerKinds)
   })
 
   it('keeps terminal public role labels non-reviewable', () => {

@@ -116,16 +116,18 @@ describe('RoomPlayerSeat', () => {
     expect(document.querySelector('[role="dialog"][aria-label="我的身份详情"]')).toBeNull()
   })
 
-  it('adds a candidate-colored avatar state while keeping Percival candidates anonymous', () => {
+  it('shows restored Percival knowledge as a candidate-colored text label', () => {
     const html = renderToStaticMarkup(
       <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
         ...player,
-        markers: [{ kind: 'merlinCandidate' }],
+        markers: [],
+        caption: { kind: 'recognition', label: '梅林候选', tone: 'candidate' },
       }} />,
     )
 
     expect(html).toContain('data-avatar-state="merlin-candidate"')
-    expect(html).toContain('data-seat-decoration="merlin-candidate"')
+    expect(html).toContain('>梅林候选</span>')
+    expect(html).not.toContain('data-known-player-info')
     expect(html).not.toContain('data-room-role-revealed="true"')
   })
 
@@ -133,7 +135,7 @@ describe('RoomPlayerSeat', () => {
     const html = renderToStaticMarkup(
       <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
         ...player, markers: [],
-        caption: { kind: 'recognition', label: '候选人', tone: 'candidate' },
+        caption: { kind: 'recognition', label: '梅林候选', tone: 'candidate' },
         emphasis: 'target',
       }} />,
     )
@@ -146,7 +148,7 @@ describe('RoomPlayerSeat', () => {
   it.each([
     ['同伴', 'ally'],
     ['邪恶', 'evil'],
-  ] as const)('uses the known-evil avatar treatment for the %s recognition view', (label, tone) => {
+  ] as const)('uses a compact known-evil treatment for restored %s knowledge', (label, tone) => {
     const html = renderToStaticMarkup(
       <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
         ...player, markers: [],
@@ -155,7 +157,7 @@ describe('RoomPlayerSeat', () => {
     )
 
     expect(html).toContain('data-avatar-state="known-evil"')
-    expect(html).toContain('data-recognition-seat-state="target"')
+    expect(html).not.toContain('data-recognition-seat-state="target"')
     expect(html).toContain(`data-recognition-tone="${tone}"`)
     expect(html).toContain('data-identity-recognition-label="true"')
     expect(html).toContain(`>${label}</span>`)

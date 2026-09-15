@@ -51,13 +51,13 @@
   opacity: 1;
 }
 
-[data-recognition-tone='ally'] .room-seat__avatar,
-[data-recognition-tone='evil'] .room-seat__avatar {
+[data-recognition-seat-state='target'][data-recognition-tone='ally'] .room-seat__avatar,
+[data-recognition-seat-state='target'][data-recognition-tone='evil'] .room-seat__avatar {
   border-color: #be123c;
   box-shadow: 0 0 0 3px #2b1118, 0 0 0 5px rgb(190 18 60 / 88%), 0 0 24px rgb(127 29 29 / 65%);
 }
 
-[data-recognition-tone='candidate'] .room-seat__avatar {
+[data-recognition-seat-state='target'][data-recognition-tone='candidate'] .room-seat__avatar {
   box-shadow: 0 0 0 3px #1e1b4b, 0 0 0 5px rgb(167 139 250 / 88%), 0 0 24px rgb(139 92 246 / 58%);
 }
 
@@ -73,7 +73,7 @@
   color: #f2e8d5;
   background: rgb(9 13 22 / 88%);
   box-shadow: 0 4px 12px rgb(0 0 0 / 36%);
-  font-size: 0.625rem;
+  font-size: 12px;
   font-weight: 650;
   line-height: 0.875rem;
   text-overflow: ellipsis;

@@ -75,7 +75,7 @@ select {
 .room-seat__avatar[data-avatar-state='revealed-good'] { border-color: rgb(103 232 249 / 68%); box-shadow: 0 5px 12px rgb(0 0 0 / 40%); }
 .room-seat__avatar[data-avatar-state='revealed-evil'] { border-color: rgb(253 164 175 / 68%); box-shadow: 0 5px 12px rgb(0 0 0 / 40%); }
 .room-seat__avatar[data-room-role-revealed='true'] { animation: room-role-reveal 300ms ease-out both; }
-.room-seat__role-label { position: absolute; z-index: 2; display: block; overflow: hidden; padding: 1px 5px; border-radius: 9999px; pointer-events: none; color: #e2e8f0; background: rgb(2 6 23 / 82%); font-size: 0.625rem; font-weight: 600; line-height: 0.875rem; text-overflow: ellipsis; transform: translateX(-50%); white-space: nowrap; }
+.room-seat__role-label { position: absolute; z-index: 2; display: block; overflow: hidden; padding: 1px 5px; border-radius: 9999px; pointer-events: none; color: #e2e8f0; background: rgb(2 6 23 / 82%); font-size: 12px; font-weight: 600; line-height: 0.875rem; text-overflow: ellipsis; transform: translateX(-50%); white-space: nowrap; }
 .room-seat__role-label[data-room-role-revealed='true'] { animation: room-role-label-reveal 300ms ease-out both; }
 .room-seat__role-label[data-role-loyalty='good'] { color: #a5f3fc; }
 .room-seat__role-label[data-role-loyalty='evil'] { color: #fecdd3; }
@@ -114,8 +114,6 @@ select {
 .room-seat__decoration[data-seat-decoration='leader'] svg path:last-child { display: none; }
 .room-seat__decoration[data-seat-decoration='vote'] { right: -0.3rem; bottom: -0.3rem; color: #e2e8f0; background: #0f172a; }
 .room-seat__decoration[data-seat-decoration='selected'] { right: -0.3rem; top: -0.3rem; color: #67e8f9; }
-.room-seat__decoration[data-seat-decoration='known-evil'] { right: -0.3rem; top: -0.3rem; color: #ffe4e6; background: #881337; }
-.room-seat__decoration[data-seat-decoration='merlin-candidate'] { right: -0.3rem; top: -0.3rem; color: #ede9fe; background: #4c1d95; }
 .room-seat__decoration[data-seat-decoration='assassination-target'] { left: -0.3rem; bottom: -0.3rem; color: #fecdd3; background: #881337; }
 .room-seat:focus-visible { outline: none; }
 .room-seat:focus-visible .room-seat__avatar,

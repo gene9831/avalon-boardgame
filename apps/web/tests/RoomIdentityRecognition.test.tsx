@@ -14,8 +14,11 @@ const players: readonly RoomPlayerPresentation[] = ['0', '1', '2'].map((playerID
   name: ['Alice', 'Bob', 'Carol'][relativeSeatIndex], occupied: true,
   isCurrentPlayer: playerID === '2', canReviewIdentity: false,
   portrait: { kind: 'playerAvatar', avatarID: 'merlin', connected: true },
-  markers: playerID === '0' ? [{ kind: 'knownEvil' }] : [],
-  caption: { kind: 'none' }, emphasis: playerID === '0' ? 'knownEvil' : 'default',
+  markers: [],
+  caption: playerID === '0'
+    ? { kind: 'recognition', label: '邪恶', tone: 'evil' }
+    : { kind: 'none' },
+  emphasis: playerID === '0' ? 'knownEvil' : 'default',
   interaction: playerID === '1'
     ? { kind: 'selectTeam', disabled: false, selected: false }
     : { kind: 'none' },
@@ -105,6 +108,22 @@ describe('RoomIdentityRecognitionScene', () => {
     expect(html).toContain('我已辨认')
   })
 
+  it('uses the full Merlin-candidate label for Percival clues', () => {
+    const base = clueScene('revealed')
+    const scene: RoomIdentityRecognitionSceneData = {
+      ...base,
+      presentation: {
+        kind: 'clue',
+        clue: { kind: 'percivalCandidates', targetPlayerIDs: ['0', '1'] },
+        view: 'revealed',
+        confirmRequestState: 'idle',
+      },
+    }
+    const html = renderScene(scene)
+
+    expect(html.match(/>梅林候选<\/span>/g)).toHaveLength(2)
+  })
+
   it('removes preexisting seat interactions from the private recognition scene', () => {
     const html = renderScene(clueScene('revealed'))
 
@@ -129,7 +148,8 @@ describe('RoomIdentityRecognitionScene', () => {
     expect(html).toContain('等待其他玩家完成线索辨认')
     expect(html).not.toContain('你已完成，可以查看身份与已知信息')
     expect(html).toContain('data-room-stage="true"')
-    expect(html).toContain('data-known-player-info="evil"')
+    expect(html).toContain('>邪恶</span>')
+    expect(html).not.toContain('data-known-player-info')
     expect(html).not.toContain('data-recognition-seat-state="target"')
     expect(html).not.toContain('data-identity-recognition-atmosphere')
     expect(html).not.toContain('身份辨认幕布')

@@ -267,9 +267,7 @@ export type RoomPlayerMarker =
       kind: 'vote'
       status: 'pending' | TeamVote
     }>
-  | Readonly<{ kind: 'knownEvil' }>
   | Readonly<{ kind: 'assassinationTarget' }>
-  | Readonly<{ kind: 'merlinCandidate' }>
 
 /** 姓名牌下方最多显示一个短标签。 */
 export type RoomPlayerCaption =
@@ -280,7 +278,7 @@ export type RoomPlayerCaption =
     }>
   | Readonly<{
       kind: 'recognition'
-      label: '同伴' | '邪恶' | '候选人'
+      label: '同伴' | '邪恶' | '梅林候选'
       tone: 'ally' | 'evil' | 'candidate'
     }>
 
