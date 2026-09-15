@@ -51,10 +51,7 @@ export function applyRoomIdentityRecognitionSeat(
   if (recognition === undefined) {
     return {
       ...player,
-      caption: { kind: 'none' },
-      emphasis: 'default',
       interaction: { kind: 'none' },
-      markers: [],
     }
   }
   if (recognition.state === 'dimmed') {

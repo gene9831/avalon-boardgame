@@ -30,9 +30,13 @@ export function getAvalonPlayerView(
   const personalRecognitionStage = playerID === null
     ? undefined
     : secret.identityRecognitionStageByPlayerID[playerID]
-  const knowledgeReleased = G.identityRecognition === null ||
-    personalRecognitionStage === 'clueRecognition' ||
-    personalRecognitionStage === 'complete'
+  const knowledgeReleased = G.identityRecognition === null || (
+    G.identityRecognition.stage === 'clueRecognition' &&
+    (
+      personalRecognitionStage === 'clueRecognition' ||
+      personalRecognitionStage === 'complete'
+    )
+  )
   const knownEvilPlayerIDs =
     role === 'merlin' && knowledgeReleased
       ? evilPlayerIDs

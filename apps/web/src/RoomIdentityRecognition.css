@@ -8,8 +8,8 @@
   margin: auto;
 }
 
-[data-identity-recognition-state] [data-seat-decoration],
-[data-identity-recognition-state] [data-seat-disconnected-badge='true'] {
+[data-identity-recognition-state]:not([data-identity-recognition-state='waiting']) [data-seat-decoration],
+[data-identity-recognition-state]:not([data-identity-recognition-state='waiting']) [data-seat-disconnected-badge='true'] {
   display: none;
 }
 
@@ -138,28 +138,6 @@
 [data-identity-recognition-state='revealing'] [data-recognition-seat-state='target'] .room-seat__avatar,
 [data-identity-recognition-state='revealing'] [data-recognition-seat-state='target'] .room-seat__recognition-label {
   animation: identity-recognition-target-reveal 450ms ease-out both;
-}
-
-[data-identity-recognition-state='waiting'] #current-player-avatar {
-  border-color: rgb(201 185 130 / 92%);
-  box-shadow: 0 0 0 3px rgb(201 185 130 / 28%), 0 0 22px rgb(201 185 130 / 38%);
-}
-
-[data-identity-recognition-state='waiting'] #current-player-avatar::after {
-  position: absolute;
-  right: -0.25rem;
-  bottom: -0.2rem;
-  display: grid;
-  width: 1.25rem;
-  height: 1.25rem;
-  place-items: center;
-  border: 1px solid rgb(242 232 213 / 78%);
-  border-radius: 9999px;
-  content: '✓';
-  color: #090d16;
-  background: #c9b982;
-  font-size: 0.75rem;
-  font-weight: 800;
 }
 
 @keyframes identity-recognition-transition {

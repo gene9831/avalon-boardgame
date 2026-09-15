@@ -229,28 +229,28 @@ describe('buildRoomSceneBinding', () => {
 
   it('maps authorized role reveal into confirmation and keeps later private clues concealed', () => {
     const roleReveal = buildRoomSceneBinding(readyInput('identityRecognition', {
-      identityRecognition: { completedCount: 0, participantCount: 5 },
+      identityRecognition: { stage: 'identityConfirmation', completedCount: 0, participantCount: 5 },
       viewer: {
         role: 'merlin', loyalty: 'good', knownEvilPlayerIDs: [], knownMerlinCandidatePlayerIDs: [],
         identityRecognition: { personalStage: 'identityConfirmation' },
       },
     }), eventHandlers)
     const confirmedRoleReveal = buildRoomSceneBinding(readyInput('identityRecognition', {
-      identityRecognition: { completedCount: 1, participantCount: 5 },
+      identityRecognition: { stage: 'identityConfirmation', completedCount: 1, participantCount: 5 },
       viewer: {
         role: 'merlin', loyalty: 'good', knownEvilPlayerIDs: [], knownMerlinCandidatePlayerIDs: [],
-        identityRecognition: { personalStage: 'complete' },
+        identityRecognition: { personalStage: 'waitingForClueRecognition' },
       },
     }), eventHandlers)
     const participant = buildRoomSceneBinding(readyInput('identityRecognition', {
-      identityRecognition: { completedCount: 1, participantCount: 5 },
+      identityRecognition: { stage: 'clueRecognition', completedCount: 1, participantCount: 3 },
       viewer: {
         role: 'merlin', loyalty: 'good', knownEvilPlayerIDs: ['3', '4'], knownMerlinCandidatePlayerIDs: [],
         identityRecognition: { personalStage: 'clueRecognition' },
       },
     }), eventHandlers)
     const nonparticipant = buildRoomSceneBinding(readyInput('identityRecognition', {
-      identityRecognition: { completedCount: 1, participantCount: 5 },
+      identityRecognition: { stage: 'clueRecognition', completedCount: 1, participantCount: 3 },
       viewer: {
         role: 'loyal_servant', loyalty: 'good', knownEvilPlayerIDs: [], knownMerlinCandidatePlayerIDs: [],
         identityRecognition: { personalStage: 'complete' },
@@ -264,10 +264,11 @@ describe('buildRoomSceneBinding', () => {
       'onReveal', 'onRevealComplete', 'onHide', 'onHideComplete', 'onConfirm',
     ])
     expect(confirmedRoleReveal.scene).toMatchObject({
-      kind: 'identityRecognition', presentation: { kind: 'waiting' },
+      kind: 'identityRecognition', stage: 'identityConfirmation', presentation: { kind: 'waiting' },
     })
     expect(participant.scene).toMatchObject({
       kind: 'identityRecognition',
+      stage: 'clueRecognition',
       presentation: {
         kind: 'clue', clue: { kind: 'merlinEvil', targetPlayerIDs: ['3', '4'] },
         view: 'concealed', confirmRequestState: 'idle',
@@ -277,6 +278,27 @@ describe('buildRoomSceneBinding', () => {
       kind: 'identityRecognition', presentation: { kind: 'waiting' },
     })
     expect(nonparticipant.scene.players.every((player) => player.portrait.kind === 'playerAvatar')).toBe(true)
+  })
+
+  it('restores authorized clue markers for a completed clue role when knowledge is open', () => {
+    const input = readyInput('identityRecognition', {
+      identityRecognition: { stage: 'clueRecognition', completedCount: 1, participantCount: 3 },
+      viewer: {
+        role: 'merlin', loyalty: 'good', knownEvilPlayerIDs: ['3', '4'], knownMerlinCandidatePlayerIDs: [],
+        identityRecognition: { personalStage: 'complete' },
+      },
+    })
+    const concealed = buildRoomSceneBinding(input, eventHandlers)
+    const revealed = buildRoomSceneBinding({ ...input, roleKnowledgeOpen: true }, eventHandlers)
+
+    expect(concealed.scene.players
+      .filter(({ markers }) => markers.some(({ kind }) => kind === 'knownEvil')))
+      .toEqual([])
+    expect(revealed.scene.players
+      .filter(({ markers }) => markers.some(({ kind }) => kind === 'knownEvil'))
+      .map(({ playerID }) => playerID)).toEqual(['3', '4'])
+    expect(revealed.scene.players.find(({ playerID }) => playerID === '0')?.portrait)
+      .toMatchObject({ kind: 'roleArtwork', role: 'merlin' })
   })
 
   it('builds Good, Evil, observer, and submitted quest views without offering Good a Fail selection', () => {
@@ -551,8 +573,12 @@ describe('useRoomScreenController recognition request lifecycle', () => {
     let controller: ReturnType<typeof useRoomScreenController> | null = null
     const onConfirmIdentityRecognition = () => undefined
     const onIdentityRecognitionSubmissionSuccess = vi.fn()
-    const recognitionGame = (personalStage: 'identityConfirmation' | 'clueRecognition') => game({
-      identityRecognition: { completedCount: 0, participantCount: 5 },
+    const recognitionGame = (personalStage: 'identityConfirmation' | 'waitingForClueRecognition' | 'clueRecognition') => game({
+      identityRecognition: {
+        stage: personalStage === 'clueRecognition' ? 'clueRecognition' : 'identityConfirmation',
+        completedCount: 0,
+        participantCount: 5,
+      },
       viewer: {
         role: 'merlin', loyalty: 'good', knownEvilPlayerIDs: personalStage === 'clueRecognition' ? ['3', '4'] : [],
         knownMerlinCandidatePlayerIDs: [],
@@ -605,8 +631,12 @@ describe('useRoomScreenController recognition request lifecycle', () => {
     const root = createRoot(container)
     let controller: ReturnType<typeof useRoomScreenController> | null = null
     const onIdentityRecognitionSubmissionSuccess = vi.fn()
-    const recognitionGame = (personalStage: 'identityConfirmation' | 'clueRecognition') => game({
-      identityRecognition: { completedCount: 0, participantCount: 5 },
+    const recognitionGame = (personalStage: 'identityConfirmation' | 'waitingForClueRecognition' | 'clueRecognition') => game({
+      identityRecognition: {
+        stage: personalStage === 'clueRecognition' ? 'clueRecognition' : 'identityConfirmation',
+        completedCount: 0,
+        participantCount: 5,
+      },
       viewer: {
         role: 'merlin', loyalty: 'good', knownEvilPlayerIDs: personalStage === 'clueRecognition' ? ['3', '4'] : [],
         knownMerlinCandidatePlayerIDs: [],
@@ -659,7 +689,7 @@ describe('useRoomScreenController recognition request lifecycle', () => {
     const input: UseRoomScreenControllerInput = {
       activeStage: 'identityRecognition', canStart: false, connected: true,
       currentPlayerID: '0', game: game({
-        identityRecognition: { completedCount: 0, participantCount: 5 },
+        identityRecognition: { stage: 'identityConfirmation', completedCount: 0, participantCount: 5 },
         viewer: {
           role: 'merlin', loyalty: 'good', knownEvilPlayerIDs: [], knownMerlinCandidatePlayerIDs: [],
           identityRecognition: { personalStage: 'identityConfirmation' },
@@ -702,8 +732,12 @@ describe('useRoomScreenController recognition request lifecycle', () => {
     const root = createRoot(container)
     let controller: ReturnType<typeof useRoomScreenController> | null = null
     const onConfirmIdentityRecognition = vi.fn()
-    const recognitionGame = (personalStage: 'identityConfirmation' | 'clueRecognition') => game({
-      identityRecognition: { completedCount: 0, participantCount: 5 },
+    const recognitionGame = (personalStage: 'identityConfirmation' | 'waitingForClueRecognition' | 'clueRecognition') => game({
+      identityRecognition: {
+        stage: personalStage === 'clueRecognition' ? 'clueRecognition' : 'identityConfirmation',
+        completedCount: 0,
+        participantCount: 5,
+      },
       viewer: {
         role: 'merlin', loyalty: 'good',
         knownEvilPlayerIDs: personalStage === 'clueRecognition' ? ['3', '4'] : [],
@@ -766,7 +800,7 @@ describe('useRoomScreenController recognition request lifecycle', () => {
     let controller: ReturnType<typeof useRoomScreenController> | null = null
     const onConfirmIdentityRecognition = vi.fn()
     const currentGame = game({
-      identityRecognition: { completedCount: 0, participantCount: 5 },
+      identityRecognition: { stage: 'clueRecognition', completedCount: 0, participantCount: 5 },
       viewer: {
         role: 'merlin', loyalty: 'good', knownEvilPlayerIDs: ['3', '4'], knownMerlinCandidatePlayerIDs: [],
         identityRecognition: { personalStage: 'clueRecognition' },
@@ -822,7 +856,7 @@ describe('useRoomScreenController recognition request lifecycle', () => {
     const root = createRoot(container)
     let controller: ReturnType<typeof useRoomScreenController> | null = null
     const roleReveal = (role: 'merlin' | 'percival') => game({
-      identityRecognition: { completedCount: 0, participantCount: 5 },
+      identityRecognition: { stage: 'identityConfirmation', completedCount: 0, participantCount: 5 },
       viewer: {
         role, loyalty: 'good', knownEvilPlayerIDs: [], knownMerlinCandidatePlayerIDs: [],
         identityRecognition: { personalStage: 'identityConfirmation' },

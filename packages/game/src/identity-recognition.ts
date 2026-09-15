@@ -23,14 +23,26 @@ export function createPersonalRecognitionStages(
   )
 }
 
+export function createClueRecognitionStages(
+  roleByPlayer: Record<PlayerID, Role>,
+  roleConfiguration: AvalonRoleConfiguration,
+): Record<PlayerID, PersonalRecognitionStage> {
+  return Object.fromEntries(
+    Object.entries(roleByPlayer).map(([playerID, role]) => [
+      playerID,
+      roleRequiresClueRecognition(role, roleConfiguration)
+        ? 'clueRecognition'
+        : 'complete',
+    ]),
+  )
+}
+
 export function nextPersonalRecognitionStage(
   currentStage: PersonalRecognitionStage,
-  role: Role,
-  roleConfiguration: AvalonRoleConfiguration,
 ): PersonalRecognitionStage | null {
-  if (currentStage === 'complete') return null
+  if (currentStage === 'identityConfirmation') {
+    return 'waitingForClueRecognition'
+  }
   if (currentStage === 'clueRecognition') return 'complete'
-  return roleRequiresClueRecognition(role, roleConfiguration)
-    ? 'clueRecognition'
-    : 'complete'
+  return null
 }

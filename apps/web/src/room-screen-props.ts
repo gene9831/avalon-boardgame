@@ -1,5 +1,6 @@
 import type { ReactNode, Ref } from 'react'
 import type {
+  IdentityRecognitionStage,
   PlayerID,
   QuestCard,
   Role,
@@ -121,6 +122,7 @@ export type RoomIdentityRecognitionPresentation =
 
 export interface RoomIdentityRecognitionScene
   extends RoomSceneBase<'identityRecognition'> {
+  stage: IdentityRecognitionStage
   presentation: RoomIdentityRecognitionPresentation
   completedCount: number
   participantCount: number

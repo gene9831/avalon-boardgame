@@ -26,10 +26,16 @@ export type QuestCard = 'success' | 'fail'
 
 export type PersonalRecognitionStage =
   | 'identityConfirmation'
+  | 'waitingForClueRecognition'
   | 'clueRecognition'
   | 'complete'
 
+export type IdentityRecognitionStage =
+  | 'identityConfirmation'
+  | 'clueRecognition'
+
 export interface IdentityRecognitionState {
+  stage: IdentityRecognitionStage
   completedCount: number
   participantCount: number
 }

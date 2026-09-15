@@ -48,6 +48,7 @@ export type {
   AvalonSeatChangeRequest,
 } from './room-api'
 export {
+  createClueRecognitionStages,
   createPersonalRecognitionStages,
   nextPersonalRecognitionStage,
   roleRequiresClueRecognition,
@@ -66,6 +67,7 @@ export type {
   AvalonRoleConfiguration,
   AvalonG,
   AvalonLobbyState,
+  IdentityRecognitionStage,
   IdentityRecognitionState,
   PersonalRecognitionStage,
   AvalonPlayerView,

@@ -147,13 +147,11 @@ export function RoomIdentityConfirmationPhaseContentSurface({
 
   if (scene.view === 'revealed' || scene.view === 'hiding') {
     const hiding = scene.view === 'hiding'
-    const requiresClue = loyaltyForRole(scene.role) === 'evil' ||
-      scene.role === 'merlin' || scene.role === 'percival'
     return {
       title: '记住你的身份',
       middle: (
         <p className="text-sm text-slate-300">
-          {requiresClue ? '确认后将辨认你的线索' : '确认后将等待其他玩家'}
+          确认后将等待其他玩家
         </p>
       ),
       action: (

@@ -40,6 +40,7 @@ function clueScene(
 ): RoomIdentityRecognitionSceneData {
   return {
     kind: 'identityRecognition', matchID: 'ABC123456', playerCount: 3, players, questProgress: [],
+    stage: 'clueRecognition',
     presentation: {
       kind: 'clue',
       clue: { kind: 'merlinEvil', targetPlayerIDs: ['0'] },
@@ -51,10 +52,10 @@ function clueScene(
   }
 }
 
-function waitingScene(): RoomIdentityRecognitionSceneData {
+function waitingScene(stage: RoomIdentityRecognitionSceneData['stage'] = 'clueRecognition'): RoomIdentityRecognitionSceneData {
   return {
     kind: 'identityRecognition', matchID: 'ABC123456', playerCount: 3, players, questProgress: [],
-    presentation: { kind: 'waiting' }, completedCount: 3, participantCount: 5,
+    stage, presentation: { kind: 'waiting' }, completedCount: 3, participantCount: 5,
   }
 }
 
@@ -121,11 +122,20 @@ describe('RoomIdentityRecognitionScene', () => {
   it('returns completed players to an unobstructed table with anonymous progress', () => {
     const html = renderScene(waitingScene())
 
-    expect(html).toMatch(/3 \/ 5.*玩家已完成身份辨认.*等待其他玩家/s)
-    expect(html).toContain('等待其他玩家完成身份辨认')
+    expect(html).toMatch(/3 \/ 5.*玩家已完成线索辨认.*等待其他玩家/s)
+    expect(html).toContain('等待其他玩家完成线索辨认')
     expect(html).toContain('data-room-stage="true"')
+    expect(html).toContain('data-known-player-info="evil"')
     expect(html).not.toContain('data-recognition-seat-state="target"')
     expect(html).not.toContain('data-identity-recognition-atmosphere')
     expect(html).not.toContain('身份辨认幕布')
+  })
+
+  it('distinguishes waiting for identity confirmation from waiting for clue recognition', () => {
+    const html = renderScene(waitingScene('identityConfirmation'))
+
+    expect(html).toMatch(/3 \/ 5.*玩家已确认身份.*等待其他玩家/s)
+    expect(html).toContain('等待其他玩家确认身份')
+    expect(html).toContain('你已确认，可以再次查看自己的身份')
   })
 })

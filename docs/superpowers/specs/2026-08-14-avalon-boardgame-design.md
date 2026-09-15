@@ -80,7 +80,7 @@ The root package delegates web development, server development, lint, and previe
 4. Credentials are stored locally by the browser under the room identity. Reload reconnects to the current seat, and all tabs in one browser adopt a successful seat change.
 5. The room owner may start only after every seat is occupied. The owner may dissolve the waiting room but cannot leave or transfer ownership; ordinary players may leave only while waiting.
 6. `startGame` verifies the current owner and authoritative occupancy, assigns roles and the initial leader on the server using the boardgame.io random plugin, freezes the seating, and enters identity recognition.
-7. Each player independently confirms their role, then Evil players, Merlin, and enabled Percival immediately complete their own clue-recognition stage. Roles without seat knowledge complete after role confirmation. Public progress is anonymous, and the last completion atomically begins team proposal.
+7. Identity recognition has two serial global stages. First, every player independently confirms their role while all seat clues remain withheld. Only after every player confirms does the server atomically open clue recognition: Evil players, Merlin, and enabled Percival then recognize and confirm their authorized seats concurrently, while roles without seat knowledge wait. Public progress is anonymous within the current stage, and the last clue participant atomically begins team proposal.
 8. Once play begins, joining, leaving, changing seats, dissolving, and owner administration are rejected. A finished room is hidden from the default open-room list but remains in PostgreSQL.
 
 If a player loses their credentials, the seat cannot be reclaimed in the MVP. The owner must remain seated, so losing the owner's credential before starting leaves the room unrecoverable and requires deleting or replacing the room rather than transferring ownership. This is an intentional consequence of account-free seat binding.
@@ -223,9 +223,9 @@ Seat changes use the current seat credential and atomically rebind that credenti
 
 Team votes and quest cards are accepted independently while their players are active. The per-match server queue serializes arrival, and `maxMoves: 1` makes a repeated action invalid. A disconnected player leaves these strategic stages incomplete until reconnecting because automatic strategic timeout is disabled.
 
-Identity recognition is non-strategic and independent per player. It shows no countdown and sends no automatic wake-up. Socket.IO synchronization and persisted server state restore the exact personal stage after reconnect or restart; duplicate completion cannot increase the aggregate count.
+Identity recognition is non-strategic. Its identity-confirmation and clue-recognition stages are globally serial, while players confirm independently within each current stage. It shows no countdown and sends no automatic wake-up. Socket.IO synchronization and persisted server state restore the global stage and exact personal stage after reconnect or restart; duplicate completion cannot increase the aggregate count.
 
-The private role card may cover the stage only while the current player explicitly views it. Clue recognition keeps the round table visible: it begins with private markers concealed, reveals only authorized seat markers on demand, and can hide those markers again without hiding the table. Completed players return to the normal table and may use the existing read-only identity and knowledge control while waiting.
+The private role card may cover the stage only while the current player explicitly views it. A player waiting at the identity-confirmation barrier returns to the normal table and may review only their own role. Clue recognition keeps the round table visible: it begins with private markers concealed, reveals only authorized seat markers on demand, and can hide those markers again without hiding the table. Completed clue participants may use the existing read-only identity and knowledge control while waiting.
 
 ## In-game information presentation
 

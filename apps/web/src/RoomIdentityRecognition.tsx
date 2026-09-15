@@ -62,12 +62,15 @@ export function RoomIdentityRecognitionCenterSurface({
 }: Pick<RoomIdentityRecognitionSurfaceProps, 'scene'>) {
   const presentation = scene.presentation
   if (presentation.kind === 'waiting') {
+    const awaitingIdentityConfirmation = scene.stage === 'identityConfirmation'
     return (
       <RoomCenter data-identity-recognition-center="waiting" density="compact" role="status">
         <strong className="block text-lg font-semibold text-amber-100">
           {scene.completedCount} / {scene.participantCount}
         </strong>
-        <span className="mt-1 block text-sm text-slate-200">玩家已完成身份辨认</span>
+        <span className="mt-1 block text-sm text-slate-200">
+          {awaitingIdentityConfirmation ? '玩家已确认身份' : '玩家已完成线索辨认'}
+        </span>
         <span className="mt-1 block text-sm text-slate-400">等待其他玩家</span>
       </RoomCenter>
     )
@@ -97,9 +100,18 @@ export function RoomIdentityRecognitionPhaseContentSurface({
 }: RoomIdentityRecognitionSurfaceProps): RoomPhaseContent {
   const presentation = scene.presentation
   if (presentation.kind === 'waiting') {
+    const awaitingIdentityConfirmation = scene.stage === 'identityConfirmation'
     return {
-      title: '等待其他玩家完成身份辨认',
-      middle: <p className="text-sm text-slate-300">你已完成，可以查看身份与已知信息</p>,
+      title: awaitingIdentityConfirmation
+        ? '等待其他玩家确认身份'
+        : '等待其他玩家完成线索辨认',
+      middle: (
+        <p className="text-sm text-slate-300">
+          {awaitingIdentityConfirmation
+            ? '你已确认，可以再次查看自己的身份'
+            : '你已完成，可以查看身份与已知信息'}
+        </p>
+      ),
       action: null,
     }
   }

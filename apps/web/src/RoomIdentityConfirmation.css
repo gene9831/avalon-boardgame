@@ -212,28 +212,6 @@
   display: none;
 }
 
-[data-identity-confirmation-state='waiting'] #current-player-avatar {
-  border-color: rgb(253 230 138 / 92%);
-  box-shadow: 0 0 0 3px rgb(202 169 91 / 30%), 0 0 22px rgb(202 169 91 / 40%);
-}
-
-[data-identity-confirmation-state='waiting'] #current-player-avatar::after {
-  position: absolute;
-  right: -0.25rem;
-  bottom: -0.2rem;
-  display: grid;
-  width: 1.25rem;
-  height: 1.25rem;
-  place-items: center;
-  border: 1px solid rgb(254 243 199 / 78%);
-  border-radius: 9999px;
-  content: '✓';
-  color: #08111f;
-  background: #d6b66d;
-  font-size: 0.75rem;
-  font-weight: 800;
-}
-
 @container avalon-room-layout (orientation: portrait) and (height < 700px) {
   .identity-confirmation-reading {
     --identity-card-width: min(54cqw, 190px);

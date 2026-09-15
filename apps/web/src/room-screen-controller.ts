@@ -421,10 +421,14 @@ export function buildRoomSceneBinding(
         kind: 'identityRecognition',
         ...buildProductionSceneBase(input, 'none', {
           showPrivateRoleKnowledge:
-            personalStage === 'complete' && input.roleKnowledgeOpen,
+            (personalStage === 'waitingForClueRecognition' || personalStage === 'complete') &&
+            input.roleKnowledgeOpen,
           showKnownPlayerInfo:
-            personalStage === 'complete' && input.roleKnowledgeOpen,
+            recognition?.stage === 'clueRecognition' &&
+            personalStage === 'complete' &&
+            input.roleKnowledgeOpen,
         }),
+        stage: recognition?.stage ?? 'identityConfirmation',
         presentation,
         completedCount: recognition?.completedCount ?? 0,
         participantCount: recognition?.participantCount ?? 0,

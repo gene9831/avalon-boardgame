@@ -24,7 +24,7 @@
 - Web 主页会验证本机保存的全部活动房间凭据；已加入房间置顶并直接“进入”，存在活动房间时禁止从正常浏览器流程创建或加入其他房间，并同步同一浏览器的其他标签页。
 - Web 的加载、等待大厅、身份辨认、队伍提案、全员投票、任务秘密出牌、刺杀和最终结算共用单一 `RoomScreen`；PC、平板和移动端都由业务外壳测量最终舞台内容盒并调用共享圆桌求解器，当前玩家固定在底部、其他玩家顺时针排布。五次任务进度常驻外壳，桌心只显示当前公开摘要，真实操作统一位于阶段面板。
 - 房间场景重构已完成：控制器只产出已过滤的 `RoomScene`/对应 actions，座位与任务进度展示归入 `room-presentation.ts`，删除旧模型、中心/阶段内容、叠层和兼容入口。真实房间的角色牌使用 `identityConfirmation`，授权线索使用 `identityRecognition`；线索场景保持圆桌可见，只在本人主动查看时显示私密座位标记，旧 observer 幕布和无额外线索确认场景已删除。
-- 新房间默认成对启用 Percival 与 Morgana，也可在创建时关闭并使用基础角色。开局身份辨认按玩家独立推进：所有人先确认身份，邪恶玩家、Merlin 和启用的 Percival 随即进入各自线索辨认，无线索角色直接完成；不同玩家可以同时处于身份牌、线索或完成等待。公共状态只显示匿名完成数，最后一名玩家完成后才原子进入首次组队；无倒计时、自动跳过、房主或管理员代办。旧状态结构不再兼容，部署新版本前必须显式删除既有房间。
+- 新房间默认成对启用 Percival 与 Morgana，也可在创建时关闭并使用基础角色。开局身份辨认包含两个全局串行阶段：全员先独立确认自己的身份，服务器在最后一人确认后才统一释放线索；随后邪恶玩家、Merlin 和启用的 Percival 并行完成各自线索辨认，无线索角色等待。公共状态只显示当前阶段及匿名完成数，最后一名线索参与者完成后才原子进入首次组队；无倒计时、自动跳过、房主或管理员代办。旧状态结构不再兼容，部署新版本前必须显式删除既有房间。
 - Web 使用仅保存在浏览器的随机默认名称与八款装饰头像；主页 Header 用户中心可修改资料，存在任何活动房间座位时锁定名称和头像。创建/加入直接使用当前资料，不再弹出名称确认；同一房间允许同名并以座位号区分。
 - 创建房间先打开配置弹窗，当前支持 5–10 人选择、阵营/任务人数摘要与 Percival/Morgana 成对配置。
 - Web 提供统一“帮助说明”：主页桌面端使用文字入口、移动端收为 44px 图标，等待大厅和游戏页使用图标入口；弹窗分为“游戏基础规则”和“角色说明”两个 Tab。创建配置中的角色问号会直接打开角色说明，将帕西维尔与莫甘娜前置并短暂脉冲高亮；Merlin、Percival、Loyal Servant、Assassin、Morgana、Minion 六个 MVP 角色均使用响应式角色立绘，宽屏 4:3 区域使用同图模糊背景填充并在上层完整显示清晰原图。
@@ -48,7 +48,7 @@
 - 局域网内 5–10 个浏览器客户端进入同一个房间。
 - 多房间同时存在，房间状态互不影响。
 - Merlin、Assassin、Loyal Servant of Arthur、Minion of Mordred、Percival、Morgana。
-- 首次组队前的线上身份辨认仪式与按玩家独立推进的角色视野。
+- 首次组队前两段串行、段内并行的线上身份辨认仪式与角色视野。
 - 队伍提案、全员投票、任务出牌、三次任务成功后的刺杀和胜负结算。
 - 服务端权威管理秘密状态；客户端不得收到其他玩家不应看到的角色或未结算选择。
 - PostgreSQL 持久化，游戏服务重启后可以使用原座位凭据重连。
@@ -68,7 +68,7 @@
 - [服务端权威秘密状态](adr/0001-server-authoritative-secret-state.md)
 - [PostgreSQL 多房间持久化](adr/0002-postgresql-persistent-multi-room-storage.md)
 - [MVP 不自动超时或管理员修改](adr/0003-no-automatic-timeout-or-admin-mutation-in-mvp.md)
-- [独立、服务端权威的身份辨认](adr/0013-independent-identity-recognition.md)（取代 [旧截止线方案](adr/0006-server-authoritative-identity-recognition-deadlines.md)）
+- [两段串行、段内并行的服务端权威身份辨认](adr/0013-independent-identity-recognition.md)（取代 [旧截止线方案](adr/0006-server-authoritative-identity-recognition-deadlines.md)）
 - [收紧 boardgame.io 协议面](adr/0007-restrict-boardgame-protocol-surface.md)
 - [保留已持久化房间的角色配置](adr/0008-preserve-persisted-room-role-configuration.md)
 - [房间拥有者独立于 0 号座位](adr/0009-seat-independent-room-ownership.md)
@@ -97,7 +97,7 @@
 | Debug Panel 默认关闭 | ✅ | boardgame.io 内置 Debug Panel 显式设为 `false`；生产默认配置下不显示内置调试入口，也不显示自定义开发控制入口。 |
 | 响应式房间布局模型 | ✅ | Browser-safe `@avalon/ui-layout` 拥有纯圆桌求解器、`room-layout.css` 容器查询结构样式与详细 `/diagnostics` 子路径。生产 Web 由 `RoomScreen`/`RoomLayout` 组合，CSS Container Query 选择竖版、紧凑横版或普通横版；舞台区域可大于求解器边界，但其中居中的实测舞台内容盒固定不超过 744×800，`ResizeObserver` 只测量该内容盒并调用 `solveRoundTableStageLayout`。旧 `room-shell.css`/`ROOM_SHELL_CLASSES` 仅保留给既有 Layout Lab，待单独批准迁移。横屏不可行只替换舞台提示；开发诊断显示实际视口、安全区、画布、舞台、人数、头像和形态，不读取秘密。 |
 | 角色与阶段展示 | ✅ | 游戏开始后使用统一求解圆桌；固定 128px 桌心只显示当前任务、阶段提示和连续否决状态，唯一五轮任务进度由业务外壳在竖屏/普通横屏顶栏或紧凑横屏左侧任务轨道呈现，阶段操作常驻外壳而不进入桌心。进行中的姓名牌不常驻显示本人角色；身份开关只替换本人的装饰头像并显示 `playerView` 授权的知识，开关值继续跨刷新、房间、阶段和同浏览器标签页同步。角色牌仅在本人主动查看时覆盖舞台；线索辨认与完成等待都保留正常圆桌，对局结束公开角色的既有行为保持不变。 |
-| 开局身份辨认 | ✅ | `startGame` 为每名玩家建立私有、单调的个人阶段。身份确认后，邪恶玩家、Merlin 与启用的 Percival 独立进入线索辨认，其余角色直接完成；公共状态只有匿名 `completedCount / participantCount`，`playerView` 只返回当前玩家的个人阶段和已授权线索。线索默认隐藏标记，可主动查看或暂时隐藏；完成者回到正常桌面并可只读查看身份知识。Socket.IO、刷新与服务重启恢复精确个人阶段，重复提交不重复计数，最后完成者原子触发首次组队。旧全局 step、deadline、observer 幕布、无线索确认和兼容分支均已删除。 |
+| 开局身份辨认 | ✅ | `startGame` 为每名玩家建立私有、单调的个人阶段，并用公开 `stage` 串行身份确认与线索辨认。全员确认身份前不释放任何座位线索；最后一人确认后，邪恶玩家、Merlin 与启用的 Percival 并行进入线索辨认，其余角色等待。公共状态只含当前阶段及匿名 `completedCount / participantCount`，`playerView` 只返回当前玩家的个人阶段和当前阶段已授权线索。线索默认隐藏标记，可主动查看或暂时隐藏；完成者回到正常桌面，眼睛开关可恢复本人身份及已知座位。Socket.IO、刷新与服务重启恢复全局和个人阶段，重复提交不重复计数，最后一名线索参与者原子触发首次组队。旧角色组队列、deadline、observer 幕布、无线索确认和兼容分支均已删除。 |
 | 队伍提案 | ✅ | 队长直接点击圆桌座位选择正确人数，动作转发到服务端 `proposeTeam`。 |
 | 队伍投票 | ✅ | 所有玩家可独立提交 approve/reject；投票进行中公开提交者座位和 `x/n 已投票` 进度，但每张赞成/反对选择在全部提交前仍只向本人可见。提交状态以无边框、透明背景的中性 Lucide `BadgeCheck` 显示在姓名牌框外，结算后原位替换为绿色赞成勾或红色反对叉；图标不参与布局、不占用姓名牌内容宽度，也不会移动头像或姓名牌。右侧座位的图标放在姓名牌左边，其余座位放在右边，避免窄屏边缘裁切。中央区域同时显示通过/否决及赞成、反对总数；通过结果保留到该任务全部队员提交任务牌，否决结果保留到下一次投票开始，连续第五次否决的结果保留在最终结算。图标的完整文字含义也包含在座位可访问名称中，不只依赖颜色。 |
 | 开发房间删除与踢人 | ✅ | `/dev/status` 确认启用后，主页与房间统一显示右下角 Lucide `Bug` 悬浮入口；桌面使用悬浮面板，移动端使用最大 70dvh 的底部抽屉，Token 仅保存在当前路由内存中。面板支持遮罩、再次点击、Escape、焦点循环和安全区避让，操作错误通过触发器圆点和面板详情反馈；状态接口关闭或失败时不暴露入口。主页删除仍保留在对应房间卡片，房间内删除支持 lobby/playing/finished，踢人仅支持 lobby；连接中删除、匿名同步和延迟写入不会复活房间，快速复用座位即使复制旧公开数据也会由凭据校验拒绝旧会话；活动房间 metadata 使用按房间版本保护，延迟 fetch 不会被重新标记为当前版本，kick 和正式离座都会在旧写入之后权威落盘。 |
@@ -174,6 +174,8 @@
 ## 当前验证基线
 
 最近一次验证日期：2026-09-15
+
+2026-09-15 身份辨认两段式纠正：开局仪式改为全局串行的 `identityConfirmation → clueRecognition`，每个阶段内部仍允许参与者独立并行确认。全员确认身份前，已确认玩家进入 `waitingForClueRecognition`，只能通过眼睛复查自己的角色，服务端不会释放任何座位线索；最后一人确认后，公共匿名进度切换并重置为线索参与者集合，邪恶玩家、Merlin 与启用的 Percival 同时辨认各自线索，无线索角色等待。`playerView` 继续作为知识边界，重复或跨阶段提交无效；Socket.IO 重启测试覆盖全局阶段、个人阶段和匿名进度恢复。Web 为两个等待阶段显示不同文案，移除当前头像右下角无含义的勾号；线索参与者完成后，眼睛开关会同时恢复本人角色和已授权座位标记，等待态不再错误清空这些标记。本轮同步更新术语、角色视野规则、ADR-0013、接受设计与浏览器回归。根级 `pnpm test` 为 **784 tests passed**（Game 85、UI Layout 80、Web 434、UI Layout Lab 67、Test Support 25、Server 93），`@avalon/ui-layout` 继续使用 `--no-file-parallelism`；`pnpm build`、`pnpm lint`、`pnpm typecheck` 与 `git diff --check` 均 exit 0。身份专项 Playwright 为 **1/1 passed**，覆盖 5 名玩家的身份阶段屏障、线索并行、刷新重新隐藏、完成后眼睛恢复本人角色与 Merlin 已知邪恶座位、无旧幕布及最终进入组队；仅出现既有 `NO_COLOR`/`FORCE_COLOR` Node 警告。Web build 保留 613.31 kB minified / 183.25 kB gzip chunk 超过 500 kB 的建议性警告。已通过开发管理接口显式删除不兼容的现有房间；更新后的开发后端运行于 8000/8001，Vite 运行于 5183，应用内浏览器全新访问旧房间 URL 会回到房间目录且目录为空。本次未执行真实 5–10 台设备 LAN、多房间人工隔离、PostgreSQL 进程重启或真实设备断网恢复验收。
 
 2026-09-15 独立身份辨认迁移：服务端将旧的全局 `roleReveal → evilRecognition → merlinRecognition → percivalRecognition` 队列替换为每名玩家私有且单调的 `identityConfirmation → clueRecognition → complete` 流程；邪恶玩家、Merlin 与启用的 Percival 在确认角色牌后各自查看线索，其余角色直接完成，不同玩家互不阻塞。公共状态只保留匿名 `completedCount / participantCount`，`playerView` 只返回当前玩家阶段与已授权知识；重复确认不重复计数，最后完成者原子进入首次组队，Socket.IO 重连和服务重启保持精确个人阶段。Web 真实房间完全使用 `RoomScreen` 的身份确认、线索和完成等待场景：移除旧 observer 幕布与无线索确认旁路，线索默认隐藏标记并可“暂时隐藏”，完成者回到正常圆桌且可只读查看身份知识；提交 pending 仅锁定当前按钮，权威阶段推进后显示成功 Toast，切换房间不会误报成功。本轮不保留旧状态适配、截止线、自动跳过或管理员代确认；部署前已通过开发管理接口显式删除唯一旧房间，更新后的开发后端在 8000/8001 运行，5183 首页人工确认可正常加载且房间目录为空。最终根级 `pnpm test` 为 **782 tests passed**（Game 85、UI Layout 80、Web 432、UI Layout Lab 67、Test Support 25、Server 93），`@avalon/ui-layout` 继续使用 `--no-file-parallelism`；`pnpm build`、`pnpm lint`、`pnpm typecheck` 与 `git diff --check` 均 exit 0。并发身份专项 Playwright 为 **1/1 passed**，覆盖五名玩家同时处于角色牌、线索、完成等待，线索暂时隐藏、刷新恢复、成功通知、无旧幕布及最终进入组队；仅出现既有 `NO_COLOR`/`FORCE_COLOR` Node 警告。Web build 保留 612.64 kB minified / 183.11 kB gzip chunk 超过 500 kB 的建议性警告。未执行真实 5–10 台设备 LAN、多房间人工隔离、PostgreSQL 进程重启或真实设备断网恢复验收。
 
