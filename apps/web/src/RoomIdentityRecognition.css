@@ -62,7 +62,7 @@
 }
 
 [data-recognition-tone='candidate'] .room-seat__avatar {
-  box-shadow: 0 0 0 3px #28271f, 0 0 0 5px rgb(201 185 130 / 85%), 0 0 24px rgb(229 220 192 / 48%);
+  box-shadow: 0 0 0 3px #1e1b4b, 0 0 0 5px rgb(167 139 250 / 88%), 0 0 24px rgb(139 92 246 / 58%);
 }
 
 .room-seat__recognition-label {
@@ -98,9 +98,9 @@
 }
 
 .room-seat__recognition-label[data-recognition-tone='candidate'] {
-  border-color: rgb(201 185 130 / 74%);
-  color: #f2e8d5;
-  background: rgb(40 39 31 / 92%);
+  border-color: rgb(167 139 250 / 74%);
+  color: #ede9fe;
+  background: rgb(46 16 101 / 92%);
 }
 
 .identity-recognition-atmosphere {
