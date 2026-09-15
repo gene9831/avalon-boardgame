@@ -333,7 +333,7 @@ describe('RoomPlayerSeat', () => {
       }} />,
     )
 
-    expect(html).toContain('data-room-seat-number-badge="true">10</span>')
+    expect(html).toContain('data-numeric-text="true" data-room-seat-number-badge="true">10</span>')
     expect(html).toContain('data-nameplate-size="short"')
     expect(html).toMatch(/data-round-table-nameplate="true"[^>]*>.*data-seat-decoration="owner".*银月.*<\/span>/s)
     expect(html).not.toContain('data-seat-number="true"')
