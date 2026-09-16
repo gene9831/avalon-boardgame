@@ -20,7 +20,7 @@ import { useModalLayer } from './use-modal-layer'
 
 export interface PlayerProfileControlProps {
   locked: boolean
-  onSave: (profile: PlayerProfile) => void
+  onSave: (profile: PlayerProfile) => Promise<void> | void
   panelPlacement?: 'bottom-sheet' | 'responsive'
   profile: PlayerProfile
 }
@@ -243,7 +243,7 @@ export function PlayerProfilePanel({
             显示名称
             <input
               aria-invalid={error !== null}
-              className="mt-2 min-h-11 w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2 text-white outline-none transition focus:border-amber-300/70 focus:ring-2 focus:ring-amber-300/15"
+              className="mt-2 min-h-11 w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2 text-base text-white outline-none transition focus:border-amber-300/70 focus:ring-2 focus:ring-amber-300/15 sm:text-sm"
               disabled={busy}
               maxLength={24}
               name="player-profile-name"
