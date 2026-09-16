@@ -15,6 +15,7 @@ import {
   renewSeatTransitionLease,
   recoverSeatTransition,
   saveRoomSession,
+  updateRoomSessionProfile,
   validateActiveRoomSessions,
   validateRoomSession,
   RoomSessionValidationHttpError,
@@ -107,6 +108,41 @@ describe('room session storage', () => {
     clearRoomSessionIfCurrent(session, storage)
 
     expect(loadRoomSession(session.matchID, storage)).toEqual(targetSession)
+  })
+
+  it('updates profile data without undoing a concurrent seat move', () => {
+    const storage = createStorage()
+    saveRoomSession({ ...session, playerID: '4' }, storage)
+
+    expect(updateRoomSessionProfile(
+      session,
+      { avatarID: 'morgana', name: 'Morgan' },
+      storage,
+    )).toEqual({
+      ...session,
+      playerID: '4',
+      avatarID: 'morgana',
+      playerName: 'Morgan',
+    })
+    expect(loadRoomSession(session.matchID, storage)).toEqual({
+      ...session,
+      playerID: '4',
+      avatarID: 'morgana',
+      playerName: 'Morgan',
+    })
+  })
+
+  it('does not let a stale profile response overwrite a replacement credential', () => {
+    const storage = createStorage()
+    const replacement = { ...session, credentials: 'replacement-credential' }
+    saveRoomSession(replacement, storage)
+
+    expect(updateRoomSessionProfile(
+      session,
+      { avatarID: 'morgana', name: 'Morgan' },
+      storage,
+    )).toBeNull()
+    expect(loadRoomSession(session.matchID, storage)).toEqual(replacement)
   })
 
   it('saves the target session before completing a seat transition', () => {

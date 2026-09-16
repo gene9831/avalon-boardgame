@@ -1,5 +1,6 @@
 import {
   AVALON_LOBBY_ERROR_CODES,
+  parseAvalonPlayerProfileUpdateResponse,
   parseAvalonRoomSessionResponse,
   type AvalonLobbyErrorCode,
   type AvalonRoomSessionResponse,
@@ -15,6 +16,7 @@ import {
   loadSeatTransition,
   markSeatTransitionUncertain,
   recoverSeatTransition,
+  updateRoomSessionProfile,
   renewSeatTransitionLease,
   SEAT_TRANSITION_LEASE_MS,
   type RoomSession,
@@ -23,6 +25,7 @@ import {
   type ValidateSeat,
 } from './room-session'
 import { getLobbyErrorMessage } from './join-error'
+import type { PlayerProfile } from './player-profile'
 
 type Fetcher = typeof fetch
 
@@ -337,6 +340,12 @@ export interface RoomParticipationClient {
     playerID: string,
     credentials: string,
   ) => Promise<void>
+  updateProfile: (
+    matchID: string,
+    playerID: string,
+    credentials: string,
+    profile: PlayerProfile,
+  ) => Promise<PlayerProfile>
 }
 
 export type SeatTransitionReplayClient = Pick<RoomParticipationClient, 'changeSeat'>
@@ -398,7 +407,42 @@ export function createRoomParticipationClient(
         credentials,
       )
     },
+    async updateProfile(matchID, playerID, credentials, profile) {
+      const response = await request(
+        `${baseURL}/rooms/avalon/${encodeURIComponent(matchID)}/players/${encodeURIComponent(playerID)}/profile`,
+        credentials,
+        {
+          playerName: profile.name,
+          data: { avatarID: profile.avatarID },
+        },
+      )
+      try {
+        const parsed = parseAvalonPlayerProfileUpdateResponse(await response.json())
+        return {
+          avatarID: parsed.data.avatarID,
+          name: parsed.playerName,
+        }
+      } catch {
+        throw new RoomParticipationResponseContractError()
+      }
+    },
   }
+}
+
+export async function updateRoomProfile(
+  client: Pick<RoomParticipationClient, 'updateProfile'>,
+  source: RoomSession,
+  profile: PlayerProfile,
+  storage?: RoomSessionStorage,
+) {
+  const updatedProfile = await client.updateProfile(
+    source.matchID,
+    source.playerID,
+    source.credentials,
+    profile,
+  )
+  updateRoomSessionProfile(source, updatedProfile, storage)
+  return updatedProfile
 }
 
 export function getSeatChangeErrorMessage(error: unknown, targetSeatNumber?: number) {
@@ -433,7 +477,7 @@ export function getRoomExitErrorMessage(error: unknown, isHost: boolean) {
 }
 
 export async function changeRoomSeat(
-  client: RoomParticipationClient,
+  client: SeatTransitionReplayClient,
   source: RoomSession,
   targetPlayerID: string,
   storage?: RoomSessionStorage,

@@ -1,6 +1,6 @@
 import type { AvalonRoomSessionResponse, AvalonRoomSummary } from '@avalon/game'
 
-import type { PlayerAvatarID } from './player-profile'
+import type { PlayerAvatarID, PlayerProfile } from './player-profile'
 
 export interface RoomSession {
   matchID: string
@@ -133,6 +133,23 @@ export function saveRoomSession(
   storage.setItem(getRoomSessionKey(session.matchID), JSON.stringify(session))
   storage.setItem(LAST_ROOM_SESSION_KEY, session.matchID)
   storage.removeItem(ROOM_SESSION_KEY)
+}
+
+export function updateRoomSessionProfile(
+  source: Pick<RoomSession, 'matchID' | 'credentials'>,
+  profile: PlayerProfile,
+  storage: RoomSessionStorage = browserStorage(),
+): RoomSession | null {
+  const current = loadRoomSession(source.matchID, storage)
+  if (current?.credentials !== source.credentials) return null
+
+  const updated = {
+    ...current,
+    avatarID: profile.avatarID,
+    playerName: profile.name,
+  }
+  saveRoomSession(updated, storage)
+  return updated
 }
 
 export function loadRoomSession(
