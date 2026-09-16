@@ -275,6 +275,9 @@ test('refresh restores the unified room and keeps pending choices private', asyn
       `[data-round-table-player][data-player-id="${firstVote.actor}"]`,
     )
     await expect(submitterSeat).toBeVisible()
+    await submitterSeat.locator('[data-round-table-avatar]').evaluate(async (avatar) => {
+      await Promise.all(avatar.getAnimations().map((animation) => animation.finished))
+    })
     const geometryBeforeVote = await submitterSeat.evaluate((seat) => {
       const avatar = seat
         .querySelector('[data-round-table-avatar]')!
