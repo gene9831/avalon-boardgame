@@ -80,6 +80,27 @@ function waitForEvent(socket: Socket, event: string, timeoutMs = 3_000) {
   })
 }
 
+function waitForEventMatching(
+  socket: Socket,
+  event: string,
+  matches: (args: unknown[]) => boolean,
+  timeoutMs = 3_000,
+) {
+  return new Promise<unknown[]>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      socket.off(event, onEvent)
+      reject(new Error(`Timed out waiting for matching Socket.IO ${event}`))
+    }, timeoutMs)
+    const onEvent = (...args: unknown[]) => {
+      if (!matches(args)) return
+      clearTimeout(timeout)
+      socket.off(event, onEvent)
+      resolve(args)
+    }
+    socket.on(event, onEvent)
+  })
+}
+
 function connectSocket(port: number) {
   return io(`http://127.0.0.1:${port}/avalon`, {
     forceNew: true,
@@ -196,7 +217,16 @@ describe('room participation APIs', () => {
       const synced = waitForEvent(socket, 'sync')
       socket.emit('sync', matchID, host.playerID, host.playerCredentials, 5)
       await synced
-      const matchData = waitForEvent(socket, 'matchData')
+      const matchData = waitForEventMatching(socket, 'matchData', ([eventMatchID, players]) =>
+        eventMatchID === matchID &&
+        Array.isArray(players) &&
+        players.some((player) => (
+          typeof player === 'object' &&
+          player !== null &&
+          (player as { id?: unknown }).id === 1 &&
+          (player as { name?: unknown }).name === 'Morgan'
+        )),
+      )
 
       expect((await updateProfile(
         running,
