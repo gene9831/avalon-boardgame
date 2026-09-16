@@ -11,14 +11,16 @@ const selectedPlayerCount = process.env.E2E_PLAYER_COUNT === undefined
 test.describe('nightly data scenarios', () => {
   test.skip(process.env.E2E_MATRIX !== '1', 'Nightly scenarios run only in the nightly workflow')
 
-  for (const { scenario, resultText } of [
+  for (const { aggregateText, outcomeText, scenario } of [
     {
+      aggregateText: '3 张成功 · 1 张失败',
+      outcomeText: '成功',
       scenario: 'seven-player-fourth-quest-one-fail',
-      resultText: '第 4 次任务成功 · 3 张成功 · 1 张失败',
     },
     {
+      aggregateText: '2 张成功 · 2 张失败',
+      outcomeText: '失败',
       scenario: 'seven-player-fourth-quest-two-fails',
-      resultText: '第 4 次任务失败 · 2 张成功 · 2 张失败',
     },
   ] as const) {
     test(`${scenario} exposes the aggregate result to every browser`, async ({ browser }) => {
@@ -39,11 +41,18 @@ test.describe('nightly data scenarios', () => {
         for (const command of run.transcript.slice(0, fourthQuestSettledIndex + 1)) {
           await harness.dispatch(command)
         }
-        for (const page of harness.pages) {
+        await Promise.all(harness.pages.map(async (page) => {
           await expect(
-            page.locator('p:visible').filter({ hasText: resultText }),
+            page.locator('[data-quest-index="3"]'),
+          ).toHaveAttribute('aria-label', new RegExp(`^第 4 次任务.*，任务${outcomeText}$`))
+          await page.getByRole('button', { name: '房间操作' }).click()
+          await page.getByRole('menuitem', { name: '对局记录' }).click()
+          const roomLog = page.getByRole('dialog', { name: '对局记录' })
+          await expect(
+            roomLog.getByText(`第 4 次任务${outcomeText}`, { exact: true }),
           ).toBeVisible()
-        }
+          await expect(roomLog.getByText(aggregateText, { exact: true })).toBeVisible()
+        }))
       } finally {
         await harness.close()
       }

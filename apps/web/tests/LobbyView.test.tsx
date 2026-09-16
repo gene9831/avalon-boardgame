@@ -96,6 +96,7 @@ function renderLobby(overrides: Partial<LobbyViewProps> = {}) {
     onRefresh: vi.fn(),
     onSaveProfile: vi.fn(),
     profile: { avatarID: 'merlin', name: '银月骑士' },
+    profileLocked: false,
     roomAccessLocked: false,
     roomAccessPending: false,
     roomAccessUnavailable: false,
@@ -149,6 +150,7 @@ describe('LobbyView room access', () => {
     const html = renderLobby({
       activeRoomSessions: [currentSession],
       matches: [currentRoom],
+      profileLocked: true,
       roomAccessLocked: true,
     })
 
@@ -156,6 +158,19 @@ describe('LobbyView room access', () => {
     expect(html).toContain('data-profile-locked="true"')
     expect(html).not.toContain('>加入游戏<')
     expect(html).not.toContain('最近的房间')
+  })
+
+  it('keeps the homepage profile editable for an active waiting room', () => {
+    const waitingSession = { ...currentSession, matchID: openRoom.matchID }
+    const html = renderLobby({
+      activeRoomSessions: [waitingSession],
+      matches: [openRoom],
+      profileLocked: false,
+      roomAccessLocked: true,
+    })
+
+    expect(html).toContain('>继续游戏<')
+    expect(html).not.toContain('data-profile-locked="true"')
   })
 
   it('blocks creating or joining another room while an active session exists', () => {

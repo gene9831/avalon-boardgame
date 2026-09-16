@@ -8,7 +8,7 @@ function roomCard(page: Page, matchID: string) {
     .locator('xpath=ancestor::article')
 }
 
-test('profile persistence, room locking, and credential re-entry work', async ({
+test('profile persistence, lobby editing, room locking, and credential re-entry work', async ({
   browser,
 }) => {
   const context = await browser.newContext()
@@ -27,18 +27,27 @@ test('profile persistence, room locking, and credential re-entry work', async ({
     await page.getByRole('button', { name: '返回主页' }).click()
     await page.getByRole('button', { name: '打开用户中心' }).click()
     const retainedSeatProfile = page.getByRole('dialog', { name: '用户中心' })
-    await expect(retainedSeatProfile.getByText('Saved Arthur', { exact: true })).toBeVisible()
-    await expect(retainedSeatProfile.getByRole('textbox')).toHaveCount(0)
-    await retainedSeatProfile.getByRole('button', { name: '关闭用户中心' }).click()
+    const retainedName = retainedSeatProfile.getByRole('textbox', { name: '显示名称' })
+    await expect(retainedName).toHaveValue('Saved Arthur')
+    await expect(retainedSeatProfile.locator('[data-avatar-option]')).toHaveCount(8)
+    await retainedName.fill('Lobby Arthur')
+    await retainedSeatProfile.locator('[data-avatar-option="percival"]').click()
+    await retainedSeatProfile.getByRole('button', { name: '保存资料' }).click()
+    await expect(retainedSeatProfile).toHaveCount(0)
     await roomCard(page, matchID).getByRole('button', { name: '继续游戏' }).click()
     await expect(page).toHaveURL(new RegExp(`/rooms/${matchID}$`))
+    const currentPlayer = page.locator('[data-round-table-player="true"]', {
+      has: page.locator('#current-player-avatar'),
+    })
+    await expect(currentPlayer).toContainText('Lobby Arthur')
+    await expect(currentPlayer.locator('[data-player-avatar="percival"]')).toBeVisible()
 
     await page.getByRole('button', { name: '打开开发控制' }).click()
     page.once('dialog', (dialog) => dialog.accept())
     await page.getByRole('button', { name: '清除本地凭据（测试）' }).click()
     await expect(page).toHaveURL('/')
     await page.getByRole('button', { name: '打开用户中心' }).click()
-    await expect(page.getByRole('dialog', { name: '用户中心' }).getByRole('textbox', { name: '显示名称' })).toHaveValue('Saved Arthur')
+    await expect(page.getByRole('dialog', { name: '用户中心' }).getByRole('textbox', { name: '显示名称' })).toHaveValue('Lobby Arthur')
   } finally {
     await context.close()
   }

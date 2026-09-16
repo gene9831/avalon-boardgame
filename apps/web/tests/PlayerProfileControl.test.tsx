@@ -70,6 +70,9 @@ describe('PlayerProfilePanel', () => {
     expect(html.match(/data-avatar-option=/g)).toHaveLength(8)
     expect(html).toContain('重新随机')
     expect(html).toContain('保存资料')
+    expect(html).toMatch(
+      /<input[^>]*class="[^"]*text-base[^"]*sm:text-sm[^"]*"[^>]*name="player-profile-name"/,
+    )
     expect(html).toContain('ImperialOctopus/avalon-printable')
     expect(html).toContain('<details')
     expect(html).toContain('>素材与许可<')

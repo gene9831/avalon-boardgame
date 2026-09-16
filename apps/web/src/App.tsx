@@ -457,7 +457,13 @@ function AppRoutes() {
   return (
     <BrowserRouter basename={webConfig.routerBasename}>
       <Routes>
-        <Route element={<LobbyRoute onSaveProfile={handleSaveLobbyProfile} profile={profile} />} path="/" />
+        <Route element={(
+          <LobbyRoute
+            onSaveProfile={handleSaveLobbyProfile}
+            onSaveRoomProfile={persistServerOrderedProfile}
+            profile={profile}
+          />
+        )} path="/" />
         <Route element={<RoomRoute onSaveProfile={persistServerOrderedProfile} profile={profile} />} path="/rooms/:matchID" />
         {import.meta.env.DEV && <Route element={<RoomLayoutPreview />} path="/dev/room-layout" />}
         {import.meta.env.DEV && <Route element={<RoomLoadingPreview />} path="/dev/room-layout/loading" />}
@@ -486,13 +492,23 @@ function AppRoutes() {
 
 function LobbyRoute({
   onSaveProfile,
+  onSaveRoomProfile,
   profile,
 }: {
   onSaveProfile: (profile: PlayerProfile) => Promise<void> | void
+  onSaveRoomProfile: (
+    profile: PlayerProfile,
+    matchID: string,
+    revision: number,
+  ) => Promise<void> | void
   profile: PlayerProfile
 }) {
   const location = useLocation()
   const lobby = useMemo(() => createAvalonLobbyClient(), [])
+  const roomParticipation = useMemo(
+    () => createRoomParticipationClient(webConfig.lobbyURL),
+    [],
+  )
   const devTools = useMemo(() => createDevToolsClient(webConfig.lobbyURL), [])
   const clientID = useMemo(() => getClientID(), [])
   const navigate = useNavigate()
@@ -528,6 +544,13 @@ function LobbyRoute({
   const roomAccessPending = roomAccessStatus === 'checking'
   const roomAccessUnavailable = roomAccessStatus === 'unavailable'
   const roomAccessLocked = roomAccessStatus !== 'ready' || activeRoomSessions.length > 0
+  const editableRoomSession = roomAccessStatus === 'ready' && activeRoomSessions.length === 1
+    ? activeRoomSessions.find((session) =>
+        matches.some((room) => room.matchID === session.matchID && room.status === 'lobby')) ?? null
+    : null
+  const profileLocked = roomAccessStatus !== 'ready' || (
+    activeRoomSessions.length > 0 && editableRoomSession === null
+  )
 
   const refreshMatches = useCallback(async () => {
     const generation = ++refreshGenerationRef.current
@@ -649,6 +672,31 @@ function LobbyRoute({
     })
   }
 
+  const handleSaveProfile = useCallback(async (nextProfile: PlayerProfile) => {
+    if (profileLocked) throw new Error('Profile editing is unavailable')
+    if (editableRoomSession === null) {
+      await onSaveProfile(nextProfile)
+      return
+    }
+
+    const latestSession = loadRoomSession(editableRoomSession.matchID)
+    if (latestSession === null || !isSameRoomSession(latestSession, editableRoomSession)) {
+      throw new Error('Room profile session changed')
+    }
+    const result = await updateRoomProfile(
+      roomParticipation,
+      latestSession,
+      nextProfile,
+    )
+    await onSaveRoomProfile(result.profile, latestSession.matchID, result.revision)
+  }, [
+    editableRoomSession,
+    onSaveProfile,
+    onSaveRoomProfile,
+    profileLocked,
+    roomParticipation,
+  ])
+
   return (
     <>
       <LobbyView
@@ -663,13 +711,14 @@ function LobbyRoute({
         onJoin={handleJoin}
         onOpenHelp={() => openHelp()}
         onRefresh={() => void refreshMatches()}
-        onSaveProfile={onSaveProfile}
+        onSaveProfile={handleSaveProfile}
         onDeleteRoom={handleDeleteRoom}
         onDevTokenChange={setDevToken}
         roomAccessLocked={roomAccessLocked}
         roomAccessPending={roomAccessPending}
         roomAccessUnavailable={roomAccessUnavailable}
         profile={profile}
+        profileLocked={profileLocked}
       />
       <CreateGameDialog
         busy={busy}

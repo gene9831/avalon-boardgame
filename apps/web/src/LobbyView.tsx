@@ -33,8 +33,9 @@ export interface LobbyViewProps {
   onJoin: (intent: { type: 'join'; matchID: string }) => void
   onOpenHelp: () => void
   onRefresh: () => void
-  onSaveProfile: (profile: PlayerProfile) => void
+  onSaveProfile: (profile: PlayerProfile) => Promise<void> | void
   profile: PlayerProfile
+  profileLocked: boolean
   roomAccessLocked: boolean
   roomAccessPending: boolean
   roomAccessUnavailable: boolean
@@ -93,6 +94,7 @@ export function LobbyView({
   onRefresh,
   onSaveProfile,
   profile,
+  profileLocked,
   roomAccessLocked,
   roomAccessPending,
   roomAccessUnavailable,
@@ -191,7 +193,7 @@ export function LobbyView({
           </div>
           <div className="order-first flex shrink-0 items-center gap-2 self-end sm:order-none sm:self-auto">
             <HelpTrigger onOpen={onOpenHelp} variant="labeled" />
-            <PlayerProfileControl locked={roomAccessLocked} onSave={onSaveProfile} profile={profile} />
+            <PlayerProfileControl locked={profileLocked} onSave={onSaveProfile} profile={profile} />
           </div>
         </header>
 
