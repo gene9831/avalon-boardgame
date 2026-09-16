@@ -281,6 +281,7 @@ export function completeSeatTransition(
 ) {
   const currentSession = loadRoomSession(source.matchID, storage)
   if (
+    currentSession === null ||
     !isSameSeatTransition(loadSeatTransition(transition.matchID, storage), transition) ||
     !isExactRoomSessionCurrent(source, storage)
   ) return currentSession
