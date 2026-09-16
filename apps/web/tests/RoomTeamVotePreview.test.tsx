@@ -119,6 +119,12 @@ describe('RoomTeamVoteScene', () => {
     expect(selected).not.toMatch(/aria-label="确认投票"[^>]*disabled=""/)
   })
 
+  it('places in-progress vote participation before the task member list', () => {
+    const html = render({ kind: 'choosing', selectedVote: null, canChoose: true, submitRequestState: 'idle' })
+
+    expect(html.indexOf('已投票 2 / 5')).toBeLessThan(html.indexOf('data-team-token-layout="vertical"'))
+  })
+
   it('uses the shared secondary-text size for the rejection counter in the center summary', () => {
     const html = render({ kind: 'choosing', selectedVote: null, canChoose: true, submitRequestState: 'idle' })
 

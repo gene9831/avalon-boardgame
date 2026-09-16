@@ -7,8 +7,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RoomTeamTokens, type RoomTeamToken } from '../src/RoomTeamTokens'
 
 const tokens: readonly RoomTeamToken[] = [
-  { playerID: '0', seatNumber: 1, name: 'Alice', avatarID: 'merlin' },
-  { playerID: '2', seatNumber: 3, name: 'Caro', avatarID: 'assassin' },
+  { playerID: '0', seatNumber: 1, name: 'Alice' },
+  { playerID: '2', seatNumber: 3, name: 'Caro' },
 ]
 
 let root: Root | null = null
@@ -22,16 +22,19 @@ afterEach(async () => {
 })
 
 describe('RoomTeamTokens', () => {
-  it('shows only avatars and numeric badges while exposing the full identity to assistive technology', () => {
+  it('shows each member seat number and name without repeating the player avatar', () => {
     const html = renderToStaticMarkup(
-      <RoomTeamTokens requiredTeamSize={2} state="confirmed" tokens={tokens} onActivatePlayer={vi.fn()} />,
+      <RoomTeamTokens requiredTeamSize={2} state="confirmed" tokens={tokens} />,
     )
 
-    expect(html).toContain('data-player-avatar="merlin"')
-    expect(html).toContain('data-room-seat-number-badge="true"')
+    expect(html).toContain('data-team-member-seat="true">1</span>')
+    expect(html.match(/data-numeric-text="true"/g)).toHaveLength(2)
+    expect(html).toContain('data-team-member-name="true">Alice</span>')
+    expect(html).toContain('data-team-member-seat="true">3</span>')
+    expect(html).toContain('data-team-member-name="true">Caro</span>')
     expect(html).toContain('aria-label="1 号座位：Alice"')
     expect(html).toContain('title="1 号座位：Alice"')
-    expect(html).not.toMatch(/>Alice</)
+    expect(html).not.toContain('data-player-avatar')
   })
 
   it('exposes every confirmed read-only member identity without making tokens interactive', () => {
@@ -46,21 +49,20 @@ describe('RoomTeamTokens', () => {
     expect(html).not.toContain('<button')
   })
 
-  it.each([
-    [2, 'single-row', [2]],
-    [3, 'single-row', [3]],
-    [4, 'three-two', [3, 1]],
-    [5, 'three-two', [3, 2]],
-  ] as const)('centers %s selected members in the stable %s row layout', (count, layout, rowSizes) => {
-    const selected = Array.from({ length: count }, (_, index) => ({
-      playerID: String(index), seatNumber: index + 1, name: `Player ${index + 1}`, avatarID: 'merlin' as const,
-    }))
+  it('keeps five members in one vertical list with separately truncatable names', () => {
+    const selected: readonly RoomTeamToken[] = [
+      ...tokens,
+      { playerID: '3', seatNumber: 4, name: 'A very long player name that needs truncating' },
+      { playerID: '4', seatNumber: 5, name: 'Dara' },
+      { playerID: '5', seatNumber: 6, name: 'Evan' },
+    ]
     const html = renderToStaticMarkup(
-      <RoomTeamTokens requiredTeamSize={count} state="confirmed" tokens={selected} />,
+      <RoomTeamTokens requiredTeamSize={5} state="confirmed" tokens={selected} />,
     )
 
-    expect(html).toContain(`data-team-token-layout="${layout}"`)
-    expect(Array.from(html.matchAll(/data-team-token-row-size="(\d+)"/g), ([, size]) => Number(size))).toEqual(rowSizes)
+    expect(html).toContain('data-team-token-layout="vertical"')
+    expect(html.match(/data-team-token-row="true"/g)).toHaveLength(5)
+    expect(html).toContain('data-team-member-name="true">A very long player name that needs truncating</span>')
   })
 
   it('adds noninteractive plus placeholders only while previewing an incomplete team', () => {
@@ -73,7 +75,25 @@ describe('RoomTeamTokens', () => {
 
     expect(preview.match(/data-team-token-placeholder="true"/g)).toHaveLength(2)
     expect(preview).not.toContain('data-team-token-placeholder="true" role="button"')
+    expect(preview.match(/>待选择</g)).toHaveLength(2)
     expect(confirmed).not.toContain('data-team-token-placeholder="true"')
+  })
+
+  it('lets the leader remove a preview member from the readable row', async () => {
+    const onActivatePlayer = vi.fn()
+    container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+    await act(async () => root?.render(
+      <RoomTeamTokens requiredTeamSize={2} state="preview" tokens={tokens} onActivatePlayer={onActivatePlayer} />,
+    ))
+
+    const button = container.querySelector<HTMLButtonElement>('button[aria-label="取消选择 1 号座位：Alice"]')!
+    expect(button.textContent).toContain('1')
+    expect(button.textContent).toContain('Alice')
+    expect(button.textContent).toContain('×')
+    await act(async () => button.click())
+    expect(onActivatePlayer).toHaveBeenCalledWith('0')
   })
 
   it('does not activate a disabled filled token', async () => {
@@ -82,7 +102,7 @@ describe('RoomTeamTokens', () => {
     document.body.append(container)
     root = createRoot(container)
     await act(async () => root?.render(
-      <RoomTeamTokens disabled requiredTeamSize={2} state="confirmed" tokens={tokens} onActivatePlayer={onActivatePlayer} />,
+      <RoomTeamTokens disabled requiredTeamSize={2} state="preview" tokens={tokens} onActivatePlayer={onActivatePlayer} />,
     ))
 
     const button = container.querySelector('button')!

@@ -125,7 +125,11 @@ function markerDecoration(marker: RoomPlayerMarker, index: number): ReactNode {
         </span>
       )
     case 'questMember':
-      return null
+      return (
+        <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="quest-member" key={`${marker.kind}-${index}`}>
+          任务
+        </span>
+      )
     case 'vote':
       return (
         <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="vote" key={`${marker.kind}-${index}`}>
@@ -294,6 +298,7 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
       ? 'target'
       : undefined
   const selected = player.interaction.kind === 'selectTeam' && player.interaction.selected
+  const questMember = player.markers.some((marker) => marker.kind === 'questMember')
   const statuses = [
     ...player.markers.map(markerStatus),
     player.isCurrentPlayer ? '当前玩家' : null,
@@ -358,7 +363,7 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
       )}
       <span
         className="room-seat__name absolute"
-        data-nameplate-emphasis={player.emphasis === 'selected' || player.emphasis === 'questMember' ? 'cyan' : undefined}
+        data-nameplate-emphasis={player.emphasis === 'selected' || player.emphasis === 'questMember' ? 'gold' : undefined}
         data-nameplate-size={nameSize}
         data-round-table-nameplate="true"
         data-seat-pointer-target="name"
@@ -374,6 +379,11 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
         {selected && (
           <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="selected">
             <CircleCheck fill="#0f172a" />
+          </span>
+        )}
+        {selected && !questMember && (
+          <span aria-hidden="true" className="room-seat__decoration" data-seat-decoration="quest-member">
+            任务
           </span>
         )}
         {player.markers.map(markerDecoration)}

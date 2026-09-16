@@ -37,7 +37,6 @@ export function buildRoomTeamTokens(
       playerID: String(player.id) as PlayerID,
       seatNumber: player.id + 1,
       name: player.name!,
-      avatarID: getSeatAvatarID(player.data, player.id),
     }))
     .sort((left, right) => left.seatNumber - right.seatNumber)
 }

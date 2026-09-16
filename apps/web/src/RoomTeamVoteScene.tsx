@@ -116,12 +116,19 @@ export function RoomTeamVoteScene({ actions, geometry, scene, slots }: RoomTeamV
             <strong className={`block text-lg font-semibold ${scene.view.kind === 'result' ? scene.view.approved ? 'text-emerald-300' : 'text-rose-300' : 'text-amber-200'}`}>
               {scene.view.kind === 'result' ? scene.view.approved ? '队伍通过' : '队伍被否决' : `第 ${scene.questIndex + 1} 次任务`}
             </strong>
-            <div className="mt-2 flex justify-center">
+            {scene.view.kind !== 'result' && (
+              <span className="mt-1 block text-sm text-slate-300">
+                已投票 {scene.submittedCount} / {scene.participantCount}
+              </span>
+            )}
+            <div className={`${scene.view.kind === 'result' ? 'mt-2' : 'mt-1'} flex justify-center`}>
               <RoomTeamTokens requiredTeamSize={teamTokens.length} state="confirmed" tokens={teamTokens} />
             </div>
-            <span className="mt-1 block text-sm text-slate-300">
-              {scene.view.kind === 'result' ? `${scene.view.approvalCount} 同意 / ${scene.view.rejectionCount} 反对` : `已投票 ${scene.submittedCount} / ${scene.participantCount}`}
-            </span>
+            {scene.view.kind === 'result' && (
+              <span className="mt-1 block text-sm text-slate-300">
+                {scene.view.approvalCount} 同意 / {scene.view.rejectionCount} 反对
+              </span>
+            )}
             {scene.view.kind !== 'result' && scene.consecutiveRejectedTeams > 0 && (
               <span
                 className="mt-1 block text-sm text-slate-400"
