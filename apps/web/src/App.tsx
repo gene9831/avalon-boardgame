@@ -47,6 +47,7 @@ import { useDevTools } from './use-dev-tools'
 import { executePendingJoin, type PendingJoin } from './join-flow'
 import { classifyJoinError } from './join-error'
 import { LobbyView } from './LobbyView'
+import { PlayerProfileDialog } from './PlayerProfileControl'
 import { RoomDevTools } from './RoomDevTools'
 import { RoomExitDialog } from './RoomExitDialog'
 import { formatRoomID } from './room-id'
@@ -78,7 +79,9 @@ import {
   leaveRoom,
   reconcileRoomExit,
   recoverRoomSeatTransition,
+  RoomParticipationHttpError,
   type SeatTransitionReplayClient,
+  updateRoomProfile,
 } from './room-participation'
 import {
   consumeRoomNavigationNotice,
@@ -98,6 +101,7 @@ import {
   loadOrCreatePlayerProfile,
   PLAYER_PROFILE_KEY,
   savePlayerProfile,
+  saveServerOrderedPlayerProfile,
   type PlayerProfile,
 } from './player-profile'
 import {
@@ -420,11 +424,25 @@ function App() {
 function AppRoutes() {
   const { pushToast } = useToast()
   const [profile, setProfile] = useState(() => loadOrCreatePlayerProfile())
-  const handleSaveProfile = useCallback((nextProfile: PlayerProfile) => {
+  const persistProfile = useCallback((nextProfile: PlayerProfile) => {
     const savedProfile = savePlayerProfile(nextProfile)
     setProfile(savedProfile)
+  }, [])
+  const persistServerOrderedProfile = useCallback((
+    nextProfile: PlayerProfile,
+    matchID: string,
+    revision: number,
+  ) => {
+    const savedProfile = saveServerOrderedPlayerProfile(nextProfile, {
+      matchID,
+      revision,
+    })
+    setProfile(savedProfile)
+  }, [])
+  const handleSaveLobbyProfile = useCallback((nextProfile: PlayerProfile) => {
+    persistProfile(nextProfile)
     pushToast({ message: '用户资料已保存。', tone: 'success' })
-  }, [pushToast])
+  }, [persistProfile, pushToast])
 
   useEffect(() => {
     const handleProfileStorage = (event: StorageEvent) => {
@@ -439,8 +457,8 @@ function AppRoutes() {
   return (
     <BrowserRouter basename={webConfig.routerBasename}>
       <Routes>
-        <Route element={<LobbyRoute onSaveProfile={handleSaveProfile} profile={profile} />} path="/" />
-        <Route element={<RoomRoute onSaveProfile={handleSaveProfile} profile={profile} />} path="/rooms/:matchID" />
+        <Route element={<LobbyRoute onSaveProfile={handleSaveLobbyProfile} profile={profile} />} path="/" />
+        <Route element={<RoomRoute onSaveProfile={persistServerOrderedProfile} profile={profile} />} path="/rooms/:matchID" />
         {import.meta.env.DEV && <Route element={<RoomLayoutPreview />} path="/dev/room-layout" />}
         {import.meta.env.DEV && <Route element={<RoomLoadingPreview />} path="/dev/room-layout/loading" />}
         {import.meta.env.DEV && <Route element={<RoomLayoutBasePreview />} path="/dev/room-layout/base" />}
@@ -470,7 +488,7 @@ function LobbyRoute({
   onSaveProfile,
   profile,
 }: {
-  onSaveProfile: (profile: PlayerProfile) => void
+  onSaveProfile: (profile: PlayerProfile) => Promise<void> | void
   profile: PlayerProfile
 }) {
   const location = useLocation()
@@ -672,7 +690,11 @@ function RoomRoute({
   onSaveProfile,
   profile,
 }: {
-  onSaveProfile: (profile: PlayerProfile) => void
+  onSaveProfile: (
+    profile: PlayerProfile,
+    matchID: string,
+    revision: number,
+  ) => Promise<void> | void
   profile: PlayerProfile
 }) {
   const { matchID = '' } = useParams()
@@ -1190,10 +1212,30 @@ function RoomRoute({
     })
   }
 
+  const handleSaveRoomProfile = useCallback(async (nextProfile: PlayerProfile) => {
+    if (routeSession === null) throw new Error('Room profile session is unavailable')
+    const latestSession = loadRoomSession(routeSession.matchID)
+    if (latestSession === null || !isSameRoomSession(latestSession, routeSession)) {
+      throw new Error('Room profile session changed')
+    }
+
+    const result = await updateRoomProfile(
+      roomParticipation,
+      latestSession,
+      nextProfile,
+    )
+    await onSaveProfile(result.profile, latestSession.matchID, result.revision)
+  }, [onSaveProfile, roomParticipation, routeSession])
+
   const handleChangeSeat = async (targetPlayerID: PlayerID) => {
     const sourceClient = clientRef.current
+    const latestSession = routeSession === null
+      ? null
+      : loadRoomSession(routeSession.matchID)
     if (
       routeSession === null ||
+      latestSession === null ||
+      !isSameRoomSession(latestSession, routeSession) ||
       sourceClient === null ||
       gameState?.ctx.phase !== 'lobby' ||
       seatChangePending ||
@@ -1205,7 +1247,7 @@ function RoomRoute({
       client: sourceClient,
       generation: routeGenerationRef.current,
       matchID,
-      session: routeSession,
+      session: latestSession,
       targetPlayerID,
       token: Symbol('room-seat-change'),
     }
@@ -1452,7 +1494,7 @@ function RoomRoute({
         onChangeSeat={handleChangeSeat}
         onDeleteRoom={handleDeleteRoom}
         onKickPlayer={handleKickPlayer}
-        onSaveProfile={onSaveProfile}
+        onSaveProfile={handleSaveRoomProfile}
         profile={profile}
         room={room}
         roomExitBlocked={roomExitBlocked}
@@ -1513,7 +1555,7 @@ export interface RoomViewProps {
   onStart: () => void
   onDeleteRoom: (token: string) => Promise<void>
   onKickPlayer: (playerID: string, token: string) => Promise<void>
-  onSaveProfile: (profile: PlayerProfile) => void
+  onSaveProfile: (profile: PlayerProfile) => Promise<void> | void
   profile: PlayerProfile
   room: AvalonMatch | null
   roomExitBlocked: boolean
@@ -1536,9 +1578,11 @@ export function RoomView({
   onOpenHelp,
   onReconnect,
   onRequestRoomExit,
+  onSaveProfile,
   onStart,
   onDeleteRoom,
   onKickPlayer,
+  profile,
   room,
   roomExitBusy,
   roomExitBlocked,
@@ -1547,6 +1591,8 @@ export function RoomView({
   startPending,
 }: RoomViewProps) {
   const { pushToast } = useToast()
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false)
+  const profileTriggerRef = useRef<HTMLElement | null>(null)
   const [layoutDiagnosticsMode, setLayoutDiagnosticsMode] = useState(() =>
     resolveRoomLayoutDiagnosticsMode(
       typeof window === 'undefined' ? '' : window.location.search,
@@ -1577,6 +1623,25 @@ export function RoomView({
   const occupiedPlayerIDs = room === null ? [] : getOccupiedPlayerIDs(room)
   const isFull = numPlayers !== null && occupiedPlayerIDs.length === numPlayers
   const phase = gameState?.ctx.phase ?? 'loading'
+  const openProfileDialog = useCallback((trigger: HTMLButtonElement) => {
+    profileTriggerRef.current = trigger
+    setProfileDialogOpen(true)
+  }, [])
+  const closeProfileDialog = useCallback(() => setProfileDialogOpen(false), [])
+  useEffect(() => {
+    if (phase !== 'lobby') setProfileDialogOpen(false)
+  }, [phase])
+  const handleProfileSaveError = useCallback((error: unknown) => {
+    if (
+      error instanceof RoomParticipationHttpError &&
+      (error.status === 409 || error.code === 'room_not_joinable')
+    ) {
+      setProfileDialogOpen(false)
+      pushToast({ message: '游戏已开始，无法修改资料。', tone: 'error' })
+      return null
+    }
+    return '保存资料失败，请重试。'
+  }, [pushToast])
   const activeStage = gameState?.ctx.activePlayers?.[session.playerID]
   const canStart =
     connected &&
@@ -1595,6 +1660,7 @@ export function RoomView({
     onAssassinate,
     onCastTeamVote,
     onChangeSeat,
+    onEditProfile: openProfileDialog,
     onConfirmIdentityRecognition,
     onPlayQuestCard,
     onProposeTeam,
@@ -1634,45 +1700,57 @@ export function RoomView({
   } as const
 
   return (
-    <ImmersiveLobbyShell
-      variant="game"
-      developmentControls={(
-        <RoomDevTools
-          matchID={session.matchID}
-          layoutDiagnosticsMode={layoutDiagnosticsMode}
-          onClearLocalSession={onClearLocalSession}
-          onDeleteRoom={onDeleteRoom}
-          onKickPlayer={onKickPlayer}
-          onLayoutDiagnosticsModeChange={handleLayoutDiagnosticsModeChange}
-          phase={phase}
-          players={room?.players ?? []}
+    <>
+      <ImmersiveLobbyShell
+        variant="game"
+        developmentControls={(
+          <RoomDevTools
+            matchID={session.matchID}
+            layoutDiagnosticsMode={layoutDiagnosticsMode}
+            onClearLocalSession={onClearLocalSession}
+            onDeleteRoom={onDeleteRoom}
+            onKickPlayer={onKickPlayer}
+            onLayoutDiagnosticsModeChange={handleLayoutDiagnosticsModeChange}
+            phase={phase}
+            players={room?.players ?? []}
+          />
+        )}
+      >
+        <ObservedRoomScreen
+          {...controller.binding}
+          diagnosticsMode={layoutDiagnosticsMode}
+          slots={{
+            back: <RoomBackButton onBack={onBackHome} />,
+            toolbar: (
+              <RoomUtilities
+                model={utilityModel}
+                tools={{
+                  connected,
+                  isOwner: room?.ownerPlayerID === session.playerID,
+                  logEntries,
+                  onOpenHelp: () => onOpenHelp(numPlayers ?? 5),
+                  onRequestRoomExit,
+                  onToggleRoleKnowledge: controller.toggleRoleKnowledge,
+                  roomExitBlocked,
+                  roomExitBusy,
+                  seatChangePending: seatChangeTargetID !== null,
+                }}
+              />
+            ),
+          }}
         />
-      )}
-    >
-      <ObservedRoomScreen
-        {...controller.binding}
-        diagnosticsMode={layoutDiagnosticsMode}
-        slots={{
-          back: <RoomBackButton onBack={onBackHome} />,
-          toolbar: (
-            <RoomUtilities
-              model={utilityModel}
-              tools={{
-                connected,
-                isOwner: room?.ownerPlayerID === session.playerID,
-                logEntries,
-                onOpenHelp: () => onOpenHelp(numPlayers ?? 5),
-                onRequestRoomExit,
-                onToggleRoleKnowledge: controller.toggleRoleKnowledge,
-                roomExitBlocked,
-                roomExitBusy,
-                seatChangePending: seatChangeTargetID !== null,
-              }}
-            />
-          ),
-        }}
+      </ImmersiveLobbyShell>
+      <PlayerProfileDialog
+        onClose={closeProfileDialog}
+        onSave={onSaveProfile}
+        onSaveError={handleProfileSaveError}
+        open={profileDialogOpen}
+        panelPlacement="bottom-sheet"
+        profile={profile}
+        saveDisabledReason={connected ? null : '重新连接后才能修改资料。'}
+        triggerRef={profileTriggerRef}
       />
-    </ImmersiveLobbyShell>
+    </>
   )
 }
 

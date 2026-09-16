@@ -43,6 +43,50 @@ afterEach(async () => {
 })
 
 describe('RoomPlayerSeat', () => {
+  it('uses the unchanged current-player nameplate to request lobby profile editing', async () => {
+    const onActivate = vi.fn()
+    const onEditProfile = vi.fn()
+    container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+    await act(async () => root?.render(
+      <RoomPlayerSeat
+        layout={layout}
+        onActivate={onActivate}
+        onEditProfile={onEditProfile}
+        player={{ ...player, isCurrentPlayer: true, markers: [] }}
+      />,
+    ))
+
+    const nameplate = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="编辑名字和头像"]',
+    )
+    expect(nameplate).not.toBeNull()
+    expect(nameplate?.className).toBe('room-seat__name absolute')
+    expect(nameplate?.dataset.roundTableNameplate).toBe('true')
+    expect(nameplate?.dataset.seatPointerTarget).toBe('name')
+    expect(nameplate?.style.left).toBe('2px')
+    expect(nameplate?.textContent).toBe('Alice')
+
+    await act(async () => nameplate?.click())
+    expect(onEditProfile).toHaveBeenCalledWith(nameplate)
+    expect(onActivate).not.toHaveBeenCalled()
+  })
+
+  it('keeps another player nameplate non-interactive', () => {
+    const html = renderToStaticMarkup(
+      <RoomPlayerSeat
+        layout={layout}
+        onActivate={vi.fn()}
+        onEditProfile={vi.fn()}
+        player={player}
+      />,
+    )
+
+    expect(html).toContain('<span class="room-seat__name absolute"')
+    expect(html).not.toContain('编辑名字和头像')
+  })
+
   it('opens the complete identity details from the revealed current-player avatar', async () => {
     stageHost = document.createElement('main')
     stageHost.dataset.roomSlot = 'stage'

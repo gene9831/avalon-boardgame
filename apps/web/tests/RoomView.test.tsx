@@ -56,7 +56,9 @@ function renderRoomView(
     onProposeTeam: vi.fn(),
     onReconnect: vi.fn(),
     onRequestRoomExit: vi.fn(),
+    onSaveProfile: vi.fn(),
     onStart: vi.fn(),
+    profile: { avatarID: 'merlin', name: 'Alice' },
     room: {
       gameName: 'avalon',
       matchID: 'room-123',
@@ -765,12 +767,13 @@ describe('RoomView playing layout', () => {
         ],
         roleConfiguration: { percivalMorgana: true }, setupData: { numPlayers: 5 },
       },
-    })
+    }, true)
 
     expect(html.match(/data-room-scene="lobby"/g)).toHaveLength(1)
     expect(html).not.toContain('data-room-mode=')
     expect(html).toContain('>开始游戏<')
     expect(html).toContain('aria-label="打开帮助说明"')
+    expect(html).toContain('aria-label="编辑名字和头像"')
   })
 
   it('keeps lobby room actions in the complete toolbar during connection recovery', () => {
@@ -780,6 +783,12 @@ describe('RoomView playing layout', () => {
 
     expect(html).toContain('data-room-scene="connectionRecovery"')
     expect(html).toContain('data-room-toolbar-item="room"')
+  })
+
+  it('keeps the player nameplate non-interactive after the game starts', () => {
+    const html = renderRoomView({ gameState: playingGameState(), room: fullRoom() })
+
+    expect(html).not.toContain('aria-label="编辑名字和头像"')
   })
 
   it('composes exactly one back control and one complete toolbar outside the observed scene', () => {

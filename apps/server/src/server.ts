@@ -134,6 +134,7 @@ export interface AvalonServerOptions {
   config?: AvalonServerConfig
   db?: StorageAPI.Sync | StorageAPI.Async
   gameSeed?: string | number
+  now?: () => number
 }
 
 export interface RunningAvalonServer {
@@ -274,6 +275,9 @@ export function createAvalonServer(options: AvalonServerOptions = {}) {
     disconnectPlayer: (matchID, playerID) =>
       registry.disconnectPlayer(matchID, playerID),
     disconnectMatch: (matchID) => registry.disconnectMatch(matchID),
+    broadcastMatchData: (matchID, metadata) =>
+      registry.broadcastMatchData(matchID, metadata),
+    now: options.now,
   })
   registerDevAdminRoutes(boardgame.router, {
     config,

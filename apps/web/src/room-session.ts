@@ -1,6 +1,6 @@
 import type { AvalonRoomSessionResponse, AvalonRoomSummary } from '@avalon/game'
 
-import type { PlayerAvatarID } from './player-profile'
+import type { PlayerAvatarID, PlayerProfile } from './player-profile'
 
 export interface RoomSession {
   matchID: string
@@ -8,6 +8,7 @@ export interface RoomSession {
   credentials: string
   avatarID?: PlayerAvatarID
   playerName: string
+  profileRevision?: number
   sessionID?: string
 }
 
@@ -123,6 +124,9 @@ function isRoomSession(value: unknown): value is RoomSession {
   return requiredFieldsAreValid && (
     session.sessionID === undefined ||
     (typeof session.sessionID === 'string' && session.sessionID.length > 0)
+  ) && (
+    session.profileRevision === undefined ||
+    (Number.isInteger(session.profileRevision) && session.profileRevision >= 0)
   )
 }
 
@@ -133,6 +137,26 @@ export function saveRoomSession(
   storage.setItem(getRoomSessionKey(session.matchID), JSON.stringify(session))
   storage.setItem(LAST_ROOM_SESSION_KEY, session.matchID)
   storage.removeItem(ROOM_SESSION_KEY)
+}
+
+export function updateRoomSessionProfile(
+  source: Pick<RoomSession, 'matchID' | 'credentials'>,
+  profile: PlayerProfile,
+  revision: number,
+  storage: RoomSessionStorage = browserStorage(),
+): RoomSession | null {
+  const current = loadRoomSession(source.matchID, storage)
+  if (current?.credentials !== source.credentials) return null
+  if ((current.profileRevision ?? -1) >= revision) return current
+
+  const updated = {
+    ...current,
+    avatarID: profile.avatarID,
+    playerName: profile.name,
+    profileRevision: revision,
+  }
+  saveRoomSession(updated, storage)
+  return updated
 }
 
 export function loadRoomSession(
@@ -257,12 +281,13 @@ export function completeSeatTransition(
 ) {
   const currentSession = loadRoomSession(source.matchID, storage)
   if (
+    currentSession === null ||
     !isSameSeatTransition(loadSeatTransition(transition.matchID, storage), transition) ||
     !isExactRoomSessionCurrent(source, storage)
   ) return currentSession
 
   const target = {
-    ...source,
+    ...currentSession,
     matchID: response.matchID,
     playerID: response.playerID,
     credentials: response.playerCredentials,

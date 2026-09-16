@@ -18,6 +18,16 @@ export interface PlayerProfile {
   name: string
 }
 
+interface StoredPlayerProfile extends PlayerProfile {
+  profileMatchID?: string
+  profileRevision?: number
+}
+
+export interface ServerProfileOrder {
+  matchID: string
+  revision: number
+}
+
 const NAME_PREFIXES = [
   '银月',
   '雾林',
@@ -83,13 +93,24 @@ export function isPlayerAvatarID(value: unknown): value is PlayerAvatarID {
   return AvalonPlayerAvatarIDSchema.safeParse(value).success
 }
 
-function isPlayerProfile(value: unknown): value is PlayerProfile {
+function isPlayerProfile(value: unknown): value is StoredPlayerProfile {
   if (typeof value !== 'object' || value === null) return false
 
-  const profile = value as Partial<PlayerProfile>
+  const profile = value as Partial<StoredPlayerProfile>
   return typeof profile.name === 'string' &&
     getPlayerNameValidationError(profile.name) === null &&
-    isPlayerAvatarID(profile.avatarID)
+    isPlayerAvatarID(profile.avatarID) &&
+    (profile.profileMatchID === undefined || (
+      typeof profile.profileMatchID === 'string' && profile.profileMatchID.length > 0
+    )) &&
+    (profile.profileRevision === undefined || (
+      Number.isInteger(profile.profileRevision) && profile.profileRevision >= 0
+    )) &&
+    (profile.profileMatchID === undefined) === (profile.profileRevision === undefined)
+}
+
+function publicProfile(profile: PlayerProfile): PlayerProfile {
+  return { avatarID: profile.avatarID, name: profile.name }
 }
 
 function randomItem<T>(items: readonly T[], random: () => number) {
@@ -121,6 +142,50 @@ export function savePlayerProfile(
   return savedProfile
 }
 
+export function saveServerOrderedPlayerProfile(
+  profile: PlayerProfile,
+  order: ServerProfileOrder,
+  storage: RoomSessionStorage = browserStorage(),
+) {
+  if (
+    order.matchID.length === 0 ||
+    !Number.isInteger(order.revision) ||
+    order.revision < 0
+  ) {
+    throw new Error('玩家资料版本无效')
+  }
+
+  const savedProfile = publicProfile({
+    avatarID: profile.avatarID,
+    name: profile.name.trim(),
+  })
+  const validationError = getPlayerNameValidationError(savedProfile.name)
+  if (validationError !== null) throw new Error(validationError)
+  if (!isPlayerAvatarID(savedProfile.avatarID)) throw new Error('请选择有效头像')
+
+  try {
+    const rawProfile = storage.getItem(PLAYER_PROFILE_KEY)
+    if (rawProfile !== null) {
+      const current: unknown = JSON.parse(rawProfile)
+      if (
+        isPlayerProfile(current) &&
+        current.profileMatchID === order.matchID &&
+        (current.profileRevision ?? -1) >= order.revision
+      ) return publicProfile(current)
+    }
+  } catch {
+    // Replace malformed or inaccessible profile storage with the server response.
+  }
+
+  storage.setItem(PLAYER_PROFILE_KEY, JSON.stringify({
+    ...savedProfile,
+    profileMatchID: order.matchID,
+    profileRevision: order.revision,
+  } satisfies StoredPlayerProfile))
+  storage.removeItem(PLAYER_NAME_KEY)
+  return savedProfile
+}
+
 export function loadOrCreatePlayerProfile(
   storage: RoomSessionStorage = browserStorage(),
   random: () => number = Math.random,
@@ -129,7 +194,7 @@ export function loadOrCreatePlayerProfile(
     const rawProfile = storage.getItem(PLAYER_PROFILE_KEY)
     if (rawProfile !== null) {
       const parsed: unknown = JSON.parse(rawProfile)
-      if (isPlayerProfile(parsed)) return parsed
+      if (isPlayerProfile(parsed)) return publicProfile(parsed)
     }
   } catch {
     // Replace malformed or inaccessible profile storage with a safe local default.

@@ -2,6 +2,7 @@ import { koaBody } from 'koa-body'
 
 import {
   AvalonMatchIDSchema,
+  AvalonPlayerProfileUpdateRequestSchema,
   AvalonSeatChangeRequestSchema,
   AvalonSeatIDSchema,
 } from '@avalon/game'
@@ -94,6 +95,23 @@ export function registerRoomParticipationRoutes(
       const { matchID, playerID } = validatedPath(ctx)
       await context.lobby.prepareStart(matchID, playerID, credential(ctx))
       ctx.status = 204
+    }),
+  )
+
+  router.post?.(
+    '/rooms/avalon/:matchID/players/:playerID/profile',
+    async (ctx) => handle(ctx, async () => {
+      await parseJSONBody(ctx, async () => undefined)
+      const { matchID, playerID } = validatedPath(ctx)
+      const parsed = AvalonPlayerProfileUpdateRequestSchema.safeParse(ctx.request.body)
+      if (!parsed.success) throw invalidRequest()
+      ctx.body = await context.lobby.updatePlayerProfile(
+        matchID,
+        playerID,
+        credential(ctx),
+        parsed.data,
+      )
+      ctx.status = 200
     }),
   )
 

@@ -138,6 +138,7 @@ function LobbyPreviewScenario({ scenarioID }: { scenarioID: LobbyPreviewScenario
     <RoomScreenPreviewShell
       actions={{
         onActivatePlayer: (playerID) => setSeatChangeTargetID(playerID),
+        onEditProfile: () => undefined,
         onStart: () => setStartPending(true),
       }}
       controls={controls}

@@ -15,6 +15,7 @@ import {
   renewSeatTransitionLease,
   recoverSeatTransition,
   saveRoomSession,
+  updateRoomSessionProfile,
   validateActiveRoomSessions,
   validateRoomSession,
   RoomSessionValidationHttpError,
@@ -109,6 +110,72 @@ describe('room session storage', () => {
     expect(loadRoomSession(session.matchID, storage)).toEqual(targetSession)
   })
 
+  it('updates profile data without undoing a concurrent seat move', () => {
+    const storage = createStorage()
+    saveRoomSession({ ...session, playerID: '4' }, storage)
+
+    expect(updateRoomSessionProfile(
+      session,
+      { avatarID: 'morgana', name: 'Morgan' },
+      42,
+      storage,
+    )).toEqual({
+      ...session,
+      playerID: '4',
+      avatarID: 'morgana',
+      playerName: 'Morgan',
+      profileRevision: 42,
+    })
+    expect(loadRoomSession(session.matchID, storage)).toEqual({
+      ...session,
+      playerID: '4',
+      avatarID: 'morgana',
+      playerName: 'Morgan',
+      profileRevision: 42,
+    })
+  })
+
+  it('does not let a stale profile response overwrite a replacement credential', () => {
+    const storage = createStorage()
+    const replacement = { ...session, credentials: 'replacement-credential' }
+    saveRoomSession(replacement, storage)
+
+    expect(updateRoomSessionProfile(
+      session,
+      { avatarID: 'morgana', name: 'Morgan' },
+      42,
+      storage,
+    )).toBeNull()
+    expect(loadRoomSession(session.matchID, storage)).toEqual(replacement)
+  })
+
+  it('does not let an older profile response overwrite a newer server revision', () => {
+    const storage = createStorage()
+    saveRoomSession(session, storage)
+
+    updateRoomSessionProfile(
+      session,
+      { avatarID: 'merlin', name: 'Newest' },
+      43,
+      storage,
+    )
+    expect(updateRoomSessionProfile(
+      session,
+      { avatarID: 'morgana', name: 'Stale' },
+      42,
+      storage,
+    )).toEqual({
+      ...session,
+      playerName: 'Newest',
+      profileRevision: 43,
+    })
+    expect(loadRoomSession(session.matchID, storage)).toEqual({
+      ...session,
+      playerName: 'Newest',
+      profileRevision: 43,
+    })
+  })
+
   it('saves the target session before completing a seat transition', () => {
     const storage = createStorage()
     saveRoomSession(session, storage)
@@ -127,6 +194,27 @@ describe('room session storage', () => {
       credentials: 'credential-456',
     })
     expect(loadSeatTransition(session.matchID, storage)).toBeNull()
+  })
+
+  it('preserves a newer profile revision while completing a concurrent seat move', () => {
+    const storage = createStorage()
+    const source = { ...session, profileRevision: 42 }
+    saveRoomSession(source, storage)
+    beginSeatTransition(source, '4', storage, 42)
+    saveRoomSession({ ...source, profileRevision: 43 }, storage)
+
+    const transition = loadSeatTransition(source.matchID, storage)!
+    completeSeatTransition(source, transition, {
+      matchID: source.matchID,
+      playerID: '4',
+      playerCredentials: source.credentials,
+    }, storage)
+
+    expect(loadRoomSession(source.matchID, storage)).toEqual({
+      ...source,
+      playerID: '4',
+      profileRevision: 43,
+    })
   })
 
   it('replays the exact transition before a stale source probe can settle recovery', async () => {

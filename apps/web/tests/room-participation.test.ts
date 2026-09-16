@@ -15,6 +15,7 @@ import {
   RoomParticipationResponseContractError,
   SeatTransitionPendingError,
   SeatTransitionLockUnavailableError,
+  updateRoomProfile,
   type SeatTransitionLeaseDatabase,
   type SeatTransitionLeaseRecord,
 } from '../src/room-participation'
@@ -81,6 +82,88 @@ function withFailingRelease(
 }
 
 describe('room participation client', () => {
+  it('updates the authenticated profile and stores the normalized response', async () => {
+    const storage = createStorage()
+    const roomSession: RoomSession = {
+      ...session,
+      avatarID: 'merlin',
+      playerName: 'Alice',
+    }
+    saveRoomSession(roomSession, storage)
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      playerName: 'Morgan',
+      data: { avatarID: 'morgana' },
+      revision: 42,
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+    const client = createRoomParticipationClient('http://localhost:8001', fetcher)
+
+    await expect(updateRoomProfile(
+      client,
+      roomSession,
+      { avatarID: 'morgana', name: '  Morgan  ' },
+      storage,
+    )).resolves.toEqual({
+      profile: { avatarID: 'morgana', name: 'Morgan' },
+      revision: 42,
+    })
+
+    expect(fetcher).toHaveBeenCalledWith(
+      'http://localhost:8001/rooms/avalon/room%20123/players/2/profile',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer secret-credential',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          playerName: '  Morgan  ',
+          data: { avatarID: 'morgana' },
+        }),
+      },
+    )
+    expect(loadRoomSession(roomSession.matchID, storage)).toEqual({
+      ...roomSession,
+      avatarID: 'morgana',
+      playerName: 'Morgan',
+      profileRevision: 42,
+    })
+  })
+
+  it('rejects malformed profile success responses and preserves lobby conflicts', async () => {
+    const malformedClient = createRoomParticipationClient(
+      'http://localhost:8001',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({
+        playerName: 'Morgan',
+        data: { avatarID: 'unknown' },
+      }), { status: 200 })),
+    )
+    await expect(malformedClient.updateProfile(
+      'room-123',
+      '2',
+      'secret-credential',
+      { avatarID: 'morgana', name: 'Morgan' },
+    )).rejects.toBeInstanceOf(RoomParticipationResponseContractError)
+
+    const conflictClient = createRoomParticipationClient(
+      'http://localhost:8001',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({
+        error: { code: 'room_not_joinable' },
+      }), {
+        status: 409,
+        headers: { 'Content-Type': 'application/json' },
+      })),
+    )
+    await expect(conflictClient.updateProfile(
+      'room-123',
+      '2',
+      'secret-credential',
+      { avatarID: 'morgana', name: 'Morgan' },
+    )).rejects.toEqual(new RoomParticipationHttpError(409, 'room_not_joinable'))
+  })
+
   it('treats a malformed committed seat response as uncertain and recovers the target', async () => {
     const storage = createStorage()
     const roomSession = {

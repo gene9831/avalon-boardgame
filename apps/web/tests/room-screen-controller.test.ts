@@ -82,6 +82,7 @@ function readyInput(phase: string, overrides: Partial<AvalonPlayerView> = {}) {
 
 const eventHandlers: RoomSceneEventHandlers = {
   onActivatePlayer: () => undefined,
+  onEditProfile: () => undefined,
   onAssassinate: () => undefined,
   onConfirmIdentityRecognition: () => undefined,
   onConfirmQuestCard: () => undefined,
@@ -183,7 +184,9 @@ describe('buildRoomSceneBinding', () => {
       kind: 'lobby', occupiedCount: 5, seatCount: 5, viewer: 'owner',
       canStart: true, startRequestState: 'idle',
     })
-    expect(Object.keys(lobby.actions ?? {})).toEqual(['onActivatePlayer', 'onStart'])
+    expect(Object.keys(lobby.actions ?? {})).toEqual([
+      'onActivatePlayer', 'onEditProfile', 'onStart',
+    ])
     expect(proposal.scene).toMatchObject({
       kind: 'teamProposal', perspective: 'leader', requiredTeamSize: 2,
       selectedCount: 2, canSubmit: true, submitRequestState: 'idle',

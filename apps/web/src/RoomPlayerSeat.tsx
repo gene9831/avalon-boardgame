@@ -33,6 +33,7 @@ export interface RoomPlayerSeatProps {
   layout: PlayerSeatLayout
   player: RoomPlayerPresentation
   onActivate: () => void
+  onEditProfile?: (trigger: HTMLButtonElement) => void
 }
 
 function assertNever(value: never): never {
@@ -275,7 +276,12 @@ function portraitRole(portrait: RoomPlayerPortrait): Role | null {
   }
 }
 
-export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatProps) {
+export function RoomPlayerSeat({
+  layout,
+  player,
+  onActivate,
+  onEditProfile,
+}: RoomPlayerSeatProps) {
   const [identityDetailsOpen, setIdentityDetailsOpen] = useState(false)
   const [identityDetailsHost, setIdentityDetailsHost] = useState<HTMLElement | null>(null)
   const interaction = interactionPresentation(player.interaction, player)
@@ -307,6 +313,26 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
     player.caption.kind === 'recognition' ? player.caption.label : null,
   ].filter((status): status is string => status !== null)
   const accessibleLabel = [interaction.actionLabel, ...statuses].join('，')
+  const nameplateContent = (
+    <>
+      {owner && <RoomOwnerIcon />}
+      <span className="min-w-0 truncate">{visibleName}</span>
+    </>
+  )
+  const nameplateProps = {
+    className: 'room-seat__name absolute',
+    'data-nameplate-emphasis': player.emphasis === 'selected' || player.emphasis === 'questMember'
+      ? 'gold'
+      : undefined,
+    'data-nameplate-size': nameSize,
+    'data-round-table-nameplate': 'true',
+    'data-seat-pointer-target': 'name',
+    style: nameStyle,
+    title: player.occupied ? player.name : `${player.seatNumber} 号空座位`,
+  } as const
+  const editableNameplate = player.isCurrentPlayer &&
+    onEditProfile !== undefined &&
+    !interaction.canActivate
   const content: ReactNode = (
     <>
       {player.occupied ? (
@@ -361,18 +387,21 @@ export function RoomPlayerSeat({ layout, player, onActivate }: RoomPlayerSeatPro
             : <span aria-hidden="true" data-empty-seat-number="true">{player.seatNumber}</span>}
         </span>
       )}
-      <span
-        className="room-seat__name absolute"
-        data-nameplate-emphasis={player.emphasis === 'selected' || player.emphasis === 'questMember' ? 'gold' : undefined}
-        data-nameplate-size={nameSize}
-        data-round-table-nameplate="true"
-        data-seat-pointer-target="name"
-        style={nameStyle}
-        title={player.occupied ? player.name : `${player.seatNumber} 号空座位`}
-      >
-        {owner && <RoomOwnerIcon />}
-        <span className="min-w-0 truncate">{visibleName}</span>
-      </span>
+      {editableNameplate ? (
+        <button
+          {...nameplateProps}
+          aria-label="编辑名字和头像"
+          onClick={(event) => {
+            event.stopPropagation()
+            onEditProfile(event.currentTarget)
+          }}
+          type="button"
+        >
+          {nameplateContent}
+        </button>
+      ) : (
+        <span {...nameplateProps}>{nameplateContent}</span>
+      )}
       {captionContent(player.caption, roleStyle)}
       <span className="room-seat__decorations absolute" style={avatarStyle}>
         {player.occupied && <RoomSeatNumberBadge seatNumber={player.seatNumber} />}
