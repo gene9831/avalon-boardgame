@@ -192,20 +192,55 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  browser-game-flow-contracts:
+    name: Browser game-flow contracts (${{ matrix.player_count }} players)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        player_count: [5, 7]
+    env:
+      E2E_MASTER_SEED: ci-game-flow-contracts-${{ matrix.player_count }}p
+      E2E_MATRIX: '1'
+      E2E_PLAYER_COUNT: ${{ matrix.player_count }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          runtime: node@${{ env.NODE_VERSION }}
+          cache: true
+          install: false
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @avalon/e2e exec playwright install --with-deps chromium
+      - run: pnpm --filter @avalon/e2e exec playwright test specs/nightly.spec.ts
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-game-flow-${{ matrix.player_count }}p-${{ github.run_id }}
+          path: |
+            tests/e2e/playwright-report
+            tests/e2e/test-results
+          if-no-files-found: ignore
+          retention-days: 14
+
   browser-gate:
     name: Browser smoke
     if: always()
     needs:
+      - browser-game-flow-contracts
       - browser-smoke-execution
       - browser-regression
     runs-on: ubuntu-latest
     steps:
-      - name: Require smoke and regression checks
+      - name: Require smoke, regression, and game-flow checks
         env:
+          GAME_FLOW_RESULT: ${{ needs.browser-game-flow-contracts.result }}
           REGRESSION_RESULT: ${{ needs.browser-regression.result }}
           SMOKE_RESULT: ${{ needs.browser-smoke-execution.result }}
         run: |
-          if [[ "$SMOKE_RESULT" != success || "$REGRESSION_RESULT" != success ]]; then
-            echo "Browser checks failed: smoke=$SMOKE_RESULT regression=$REGRESSION_RESULT"
+          if [[ "$SMOKE_RESULT" != success || "$REGRESSION_RESULT" != success || "$GAME_FLOW_RESULT" != success ]]; then
+            echo "Browser checks failed: smoke=$SMOKE_RESULT regression=$REGRESSION_RESULT game-flow=$GAME_FLOW_RESULT"
             exit 1
           fi
