@@ -101,6 +101,7 @@ import {
   loadOrCreatePlayerProfile,
   PLAYER_PROFILE_KEY,
   savePlayerProfile,
+  saveServerOrderedPlayerProfile,
   type PlayerProfile,
 } from './player-profile'
 import {
@@ -427,6 +428,17 @@ function AppRoutes() {
     const savedProfile = savePlayerProfile(nextProfile)
     setProfile(savedProfile)
   }, [])
+  const persistServerOrderedProfile = useCallback((
+    nextProfile: PlayerProfile,
+    matchID: string,
+    revision: number,
+  ) => {
+    const savedProfile = saveServerOrderedPlayerProfile(nextProfile, {
+      matchID,
+      revision,
+    })
+    setProfile(savedProfile)
+  }, [])
   const handleSaveLobbyProfile = useCallback((nextProfile: PlayerProfile) => {
     persistProfile(nextProfile)
     pushToast({ message: '用户资料已保存。', tone: 'success' })
@@ -446,7 +458,7 @@ function AppRoutes() {
     <BrowserRouter basename={webConfig.routerBasename}>
       <Routes>
         <Route element={<LobbyRoute onSaveProfile={handleSaveLobbyProfile} profile={profile} />} path="/" />
-        <Route element={<RoomRoute onSaveProfile={persistProfile} profile={profile} />} path="/rooms/:matchID" />
+        <Route element={<RoomRoute onSaveProfile={persistServerOrderedProfile} profile={profile} />} path="/rooms/:matchID" />
         {import.meta.env.DEV && <Route element={<RoomLayoutPreview />} path="/dev/room-layout" />}
         {import.meta.env.DEV && <Route element={<RoomLoadingPreview />} path="/dev/room-layout/loading" />}
         {import.meta.env.DEV && <Route element={<RoomLayoutBasePreview />} path="/dev/room-layout/base" />}
@@ -678,7 +690,11 @@ function RoomRoute({
   onSaveProfile,
   profile,
 }: {
-  onSaveProfile: (profile: PlayerProfile) => Promise<void> | void
+  onSaveProfile: (
+    profile: PlayerProfile,
+    matchID: string,
+    revision: number,
+  ) => Promise<void> | void
   profile: PlayerProfile
 }) {
   const { matchID = '' } = useParams()
@@ -1203,12 +1219,12 @@ function RoomRoute({
       throw new Error('Room profile session changed')
     }
 
-    const savedProfile = await updateRoomProfile(
+    const result = await updateRoomProfile(
       roomParticipation,
       latestSession,
       nextProfile,
     )
-    await onSaveProfile(savedProfile)
+    await onSaveProfile(result.profile, latestSession.matchID, result.revision)
   }, [onSaveProfile, roomParticipation, routeSession])
 
   const handleChangeSeat = async (targetPlayerID: PlayerID) => {

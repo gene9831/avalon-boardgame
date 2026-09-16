@@ -118,6 +118,7 @@ describe('room participation APIs', () => {
       await expect(response.json()).resolves.toEqual({
         playerName: 'Morgan',
         data: { avatarID: 'morgana' },
+        revision: expect.any(Number),
       })
       const { metadata, state } = db.fetch(matchID, { metadata: true, state: true })
       expect(metadata?.players[1]).toMatchObject({
@@ -131,6 +132,45 @@ describe('room participation APIs', () => {
         },
       })
       expect((state?.G as AvalonG).players['1']?.name).toBe('Morgan')
+    } finally {
+      await running.close()
+    }
+  })
+
+  it('returns strictly increasing profile revisions when the clock does not advance', async () => {
+    const running = await startAvalonServer({
+      config,
+      db: new MemoryStorage(),
+      now: () => 42,
+    })
+    const lobby = new LobbyClient({ server: baseURL(running) })
+
+    try {
+      const { matchID } = await lobby.createMatch('avalon', { numPlayers: 5 })
+      const player = await lobby.joinMatch('avalon', matchID, {
+        playerID: '0',
+        playerName: 'Alice',
+      })
+      const first = await updateProfile(
+        running,
+        matchID,
+        player.playerID,
+        player.playerCredentials,
+        { playerName: 'Morgan', data: { avatarID: 'morgana' } },
+      )
+      const second = await updateProfile(
+        running,
+        matchID,
+        player.playerID,
+        player.playerCredentials,
+        { playerName: 'Merlin', data: { avatarID: 'merlin' } },
+      )
+
+      expect(first.status).toBe(200)
+      expect(second.status).toBe(200)
+      const firstBody = await first.json() as { revision: number }
+      const secondBody = await second.json() as { revision: number }
+      expect(secondBody.revision).toBeGreaterThan(firstBody.revision)
     } finally {
       await running.close()
     }

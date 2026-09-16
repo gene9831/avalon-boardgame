@@ -93,6 +93,7 @@ describe('room participation client', () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       playerName: 'Morgan',
       data: { avatarID: 'morgana' },
+      revision: 42,
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -104,7 +105,10 @@ describe('room participation client', () => {
       roomSession,
       { avatarID: 'morgana', name: '  Morgan  ' },
       storage,
-    )).resolves.toEqual({ avatarID: 'morgana', name: 'Morgan' })
+    )).resolves.toEqual({
+      profile: { avatarID: 'morgana', name: 'Morgan' },
+      revision: 42,
+    })
 
     expect(fetcher).toHaveBeenCalledWith(
       'http://localhost:8001/rooms/avalon/room%20123/players/2/profile',
@@ -124,6 +128,7 @@ describe('room participation client', () => {
       ...roomSession,
       avatarID: 'morgana',
       playerName: 'Morgan',
+      profileRevision: 42,
     })
   })
 

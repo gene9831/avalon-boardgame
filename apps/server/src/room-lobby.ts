@@ -467,6 +467,7 @@ export function createRoomLobbyService(
           if (!lobby.occupiedPlayerIDs.includes(normalizedPlayerID.data)) {
             throw invalidSeatSession()
           }
+          const revision = Math.max(now(), metadata.updatedAt + 1)
 
           metadata.players[Number(normalizedPlayerID.data)] = {
             ...authenticatedPlayer,
@@ -479,8 +480,11 @@ export function createRoomLobbyService(
           G.players[normalizedPlayerID.data] = { name: request.playerName }
           return {
             state: { ...state, G: G as AvalonG },
-            metadata: withUpdatedAt(metadata, now()),
-            result: { profile: request, metadata },
+            metadata: withUpdatedAt(metadata, revision),
+            result: {
+              profile: { ...request, revision },
+              metadata,
+            },
           }
         })
         dependencies.broadcastMatchData(matchID, result.metadata)

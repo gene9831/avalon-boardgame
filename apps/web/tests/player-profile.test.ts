@@ -4,6 +4,7 @@ import {
   PLAYER_PROFILE_KEY,
   loadOrCreatePlayerProfile,
   savePlayerProfile,
+  saveServerOrderedPlayerProfile,
 } from '../src/player-profile'
 import { PLAYER_NAME_KEY } from '../src/player-name'
 import type { RoomSessionStorage } from '../src/room-session'
@@ -88,5 +89,67 @@ describe('browser player profile', () => {
       avatarID: 'unknown' as 'assassin',
       name: 'Arthur',
     }, storage)).toThrow('请选择有效头像')
+  })
+
+  it('keeps the newest server-ordered profile when responses arrive out of order', () => {
+    const { storage, values } = createStorage()
+
+    expect(saveServerOrderedPlayerProfile({
+      avatarID: 'merlin',
+      name: 'Newest',
+    }, { matchID: 'room-1', revision: 43 }, storage)).toEqual({
+      avatarID: 'merlin',
+      name: 'Newest',
+    })
+    expect(saveServerOrderedPlayerProfile({
+      avatarID: 'morgana',
+      name: 'Stale',
+    }, { matchID: 'room-1', revision: 42 }, storage)).toEqual({
+      avatarID: 'merlin',
+      name: 'Newest',
+    })
+    expect(loadOrCreatePlayerProfile(storage)).toEqual({
+      avatarID: 'merlin',
+      name: 'Newest',
+    })
+    expect(JSON.parse(values.get(PLAYER_PROFILE_KEY)!)).toEqual({
+      avatarID: 'merlin',
+      name: 'Newest',
+      profileMatchID: 'room-1',
+      profileRevision: 43,
+    })
+  })
+
+  it('does not compare revisions issued by different rooms', () => {
+    const { storage } = createStorage()
+    saveServerOrderedPlayerProfile({
+      avatarID: 'merlin',
+      name: 'First room',
+    }, { matchID: 'room-1', revision: 100 }, storage)
+
+    expect(saveServerOrderedPlayerProfile({
+      avatarID: 'morgana',
+      name: 'Second room',
+    }, { matchID: 'room-2', revision: 1 }, storage)).toEqual({
+      avatarID: 'morgana',
+      name: 'Second room',
+    })
+  })
+
+  it('lets an explicit local profile edit replace server revision metadata', () => {
+    const { storage, values } = createStorage()
+    saveServerOrderedPlayerProfile({
+      avatarID: 'merlin',
+      name: 'Room name',
+    }, { matchID: 'room-1', revision: 43 }, storage)
+
+    expect(savePlayerProfile({
+      avatarID: 'morgana',
+      name: 'Home name',
+    }, storage)).toEqual({ avatarID: 'morgana', name: 'Home name' })
+    expect(JSON.parse(values.get(PLAYER_PROFILE_KEY)!)).toEqual({
+      avatarID: 'morgana',
+      name: 'Home name',
+    })
   })
 })

@@ -27,6 +27,11 @@ import {
 import { getLobbyErrorMessage } from './join-error'
 import type { PlayerProfile } from './player-profile'
 
+export interface RoomProfileUpdateResult {
+  profile: PlayerProfile
+  revision: number
+}
+
 type Fetcher = typeof fetch
 
 export class RoomParticipationHttpError extends Error {
@@ -345,7 +350,7 @@ export interface RoomParticipationClient {
     playerID: string,
     credentials: string,
     profile: PlayerProfile,
-  ) => Promise<PlayerProfile>
+  ) => Promise<RoomProfileUpdateResult>
 }
 
 export type SeatTransitionReplayClient = Pick<RoomParticipationClient, 'changeSeat'>
@@ -419,8 +424,11 @@ export function createRoomParticipationClient(
       try {
         const parsed = parseAvalonPlayerProfileUpdateResponse(await response.json())
         return {
-          avatarID: parsed.data.avatarID,
-          name: parsed.playerName,
+          profile: {
+            avatarID: parsed.data.avatarID,
+            name: parsed.playerName,
+          },
+          revision: parsed.revision,
         }
       } catch {
         throw new RoomParticipationResponseContractError()
@@ -435,14 +443,14 @@ export async function updateRoomProfile(
   profile: PlayerProfile,
   storage?: RoomSessionStorage,
 ) {
-  const updatedProfile = await client.updateProfile(
+  const result = await client.updateProfile(
     source.matchID,
     source.playerID,
     source.credentials,
     profile,
   )
-  updateRoomSessionProfile(source, updatedProfile, storage)
-  return updatedProfile
+  updateRoomSessionProfile(source, result.profile, result.revision, storage)
+  return result
 }
 
 export function getSeatChangeErrorMessage(error: unknown, targetSeatNumber?: number) {

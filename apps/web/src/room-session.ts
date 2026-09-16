@@ -8,6 +8,7 @@ export interface RoomSession {
   credentials: string
   avatarID?: PlayerAvatarID
   playerName: string
+  profileRevision?: number
   sessionID?: string
 }
 
@@ -123,6 +124,9 @@ function isRoomSession(value: unknown): value is RoomSession {
   return requiredFieldsAreValid && (
     session.sessionID === undefined ||
     (typeof session.sessionID === 'string' && session.sessionID.length > 0)
+  ) && (
+    session.profileRevision === undefined ||
+    (Number.isInteger(session.profileRevision) && session.profileRevision >= 0)
   )
 }
 
@@ -138,15 +142,18 @@ export function saveRoomSession(
 export function updateRoomSessionProfile(
   source: Pick<RoomSession, 'matchID' | 'credentials'>,
   profile: PlayerProfile,
+  revision: number,
   storage: RoomSessionStorage = browserStorage(),
 ): RoomSession | null {
   const current = loadRoomSession(source.matchID, storage)
   if (current?.credentials !== source.credentials) return null
+  if ((current.profileRevision ?? -1) >= revision) return current
 
   const updated = {
     ...current,
     avatarID: profile.avatarID,
     playerName: profile.name,
+    profileRevision: revision,
   }
   saveRoomSession(updated, storage)
   return updated
@@ -279,7 +286,7 @@ export function completeSeatTransition(
   ) return currentSession
 
   const target = {
-    ...source,
+    ...currentSession,
     matchID: response.matchID,
     playerID: response.playerID,
     credentials: response.playerCredentials,

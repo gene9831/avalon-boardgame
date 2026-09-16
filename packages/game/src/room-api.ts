@@ -91,7 +91,9 @@ export const AvalonPlayerProfileUpdateRequestSchema = z.object({
 }).strict()
 
 export const AvalonPlayerProfileUpdateResponseSchema =
-  AvalonPlayerProfileUpdateRequestSchema
+  AvalonPlayerProfileUpdateRequestSchema.extend({
+    revision: z.number().int().nonnegative(),
+  }).strict()
 
 export const AvalonRoomSessionResponseSchema = z.object({
   matchID: AvalonMatchIDSchema,

@@ -5,6 +5,7 @@ import {
   parseAvalonCreateRoomRequest,
   parseAvalonJoinRoomRequest,
   parseAvalonPlayerProfileUpdateRequest,
+  parseAvalonPlayerProfileUpdateResponse,
   parseAvalonRoomDetail,
   parseAvalonSeatChangeRequest,
 } from '../src/room-api'
@@ -71,6 +72,25 @@ describe('Avalon room API contracts', () => {
     expect(() => parseAvalonPlayerProfileUpdateRequest({
       playerName: 'Alice',
       data: { avatarID: 'merlin', clientID: 'must-not-change' },
+    })).toThrow()
+
+    expect(parseAvalonPlayerProfileUpdateResponse({
+      playerName: 'Alice',
+      data: { avatarID: 'merlin' },
+      revision: 42,
+    })).toEqual({
+      playerName: 'Alice',
+      data: { avatarID: 'merlin' },
+      revision: 42,
+    })
+    expect(() => parseAvalonPlayerProfileUpdateResponse({
+      playerName: 'Alice',
+      data: { avatarID: 'merlin' },
+    })).toThrow()
+    expect(() => parseAvalonPlayerProfileUpdateRequest({
+      playerName: 'Alice',
+      data: { avatarID: 'merlin' },
+      revision: 42,
     })).toThrow()
   })
 
