@@ -90,6 +90,7 @@ export type BuildRoomSceneInput =
 
 export interface RoomSceneEventHandlers {
   onActivatePlayer(playerID: PlayerID): void
+  onEditProfile(trigger: HTMLButtonElement): void
   onAssassinate(): void
   onConfirmIdentityRecognition(): void
   onConfirmQuestCard(): void
@@ -375,6 +376,7 @@ export function buildRoomSceneBinding(
       },
       actions: {
         onActivatePlayer: events.onActivatePlayer,
+        onEditProfile: events.onEditProfile,
         onStart: events.onStart,
       },
     }
@@ -644,6 +646,7 @@ export interface UseRoomScreenControllerInput extends LobbyPresentationState, Lo
   onAssassinate: (targetID: PlayerID) => void
   onCastTeamVote: (vote: TeamVote) => void
   onChangeSeat: (targetID: PlayerID) => void
+  onEditProfile?: (trigger: HTMLButtonElement) => void
   onConfirmIdentityRecognition: () => void
   onPlayQuestCard: (card: QuestCard) => void
   onProposeTeam: (team: PlayerID[]) => void
@@ -878,6 +881,7 @@ export function useRoomScreenController(input: UseRoomScreenControllerInput) {
         !assassinationSubmissionPending
       ) setSelectedTarget(playerID)
     },
+    onEditProfile: input.onEditProfile ?? (() => undefined),
     onStart: input.onStart,
     onReconnect: input.onReconnect,
     onContinue: () => setActiveSettlement(null),

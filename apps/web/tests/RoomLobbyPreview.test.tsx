@@ -35,7 +35,7 @@ describe('RoomLobbyPreview', () => {
   it('presents the owner start affordance and occupied-seat summary through the lobby scene', () => {
     const html = renderToStaticMarkup(
       <RoomLobbyScene
-        actions={{ onActivatePlayer: () => {}, onStart: () => {} }}
+        actions={{ onActivatePlayer: () => {}, onEditProfile: () => {}, onStart: () => {} }}
         geometry={{
           stageLayout: {
             status: 'ready', shape: 'circle', tabletop: { x: 20, y: 40, width: 319, height: 319 },

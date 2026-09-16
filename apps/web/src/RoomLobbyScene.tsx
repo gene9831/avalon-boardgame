@@ -39,6 +39,7 @@ export function RoomLobbyScene({ actions, geometry, scene, slots }: RoomLobbySce
       }}
       geometry={geometry}
       onActivatePlayer={actions.onActivatePlayer}
+      onEditCurrentPlayerProfile={actions.onEditProfile}
       scene={scene}
       slots={slots}
     />

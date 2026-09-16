@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type Ref,
+  type RefObject,
 } from 'react'
 
 import { PlayerAvatar } from './player-avatars'
@@ -24,6 +25,18 @@ export interface PlayerProfileControlProps {
   profile: PlayerProfile
 }
 
+export interface PlayerProfileDialogProps {
+  locked?: boolean
+  onClose: () => void
+  onSave: (profile: PlayerProfile) => Promise<void> | void
+  onSaveError?: (error: unknown) => string | null
+  open: boolean
+  panelPlacement?: 'bottom-sheet' | 'responsive'
+  profile: PlayerProfile
+  saveDisabledReason?: string | null
+  triggerRef: RefObject<HTMLElement | null>
+}
+
 export function PlayerProfileControl({
   locked,
   onSave,
@@ -31,31 +44,11 @@ export function PlayerProfileControl({
   profile,
 }: PlayerProfileControlProps) {
   const [open, setOpen] = useState(false)
-  const [draft, setDraft] = useState(profile)
-  const [error, setError] = useState<string | null>(null)
-  const panelRef = useRef<HTMLElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
 
   const close = useCallback(() => {
     setOpen(false)
-    setError(null)
   }, [])
-
-  useEffect(() => {
-    if (!open) setDraft(profile)
-  }, [open, profile])
-
-  useModalLayer({ onClose: close, open, panelRef, triggerRef })
-
-  const save = () => {
-    const validationError = getPlayerNameValidationError(draft.name)
-    if (validationError !== null) {
-      setError(validationError)
-      return
-    }
-    onSave(draft)
-    close()
-  }
 
   return (
     <div className="relative" data-profile-panel-placement={panelPlacement}>
@@ -76,39 +69,109 @@ export function PlayerProfileControl({
         </span>
       </button>
 
-      {open && (
-        <>
-          <button
-            aria-label="关闭用户中心"
-            className={`fixed inset-0 z-[109] cursor-default bg-slate-950/55 ${panelPlacement === 'responsive' ? 'sm:bg-transparent' : ''}`}
-            onClick={close}
-            type="button"
-          />
-          <PlayerProfilePanel
-            draft={draft}
-            error={error}
-            locked={locked}
-            onAvatarChange={(avatarID) => setDraft((current) => ({ ...current, avatarID }))}
-            onClose={close}
-            onNameChange={(name) => {
-              setDraft((current) => ({ ...current, name }))
-              setError(null)
-            }}
-            onRandomize={() => {
-              setDraft(createRandomPlayerProfile())
-              setError(null)
-            }}
-            onSave={save}
-            placement={panelPlacement}
-            panelRef={panelRef}
-          />
-        </>
-      )}
+      <PlayerProfileDialog
+        locked={locked}
+        onClose={close}
+        onSave={onSave}
+        open={open}
+        panelPlacement={panelPlacement}
+        profile={profile}
+        triggerRef={triggerRef}
+      />
     </div>
   )
 }
 
+export function PlayerProfileDialog({
+  locked = false,
+  onClose,
+  onSave,
+  onSaveError,
+  open,
+  panelPlacement = 'responsive',
+  profile,
+  saveDisabledReason = null,
+  triggerRef,
+}: PlayerProfileDialogProps) {
+  const [draft, setDraft] = useState(profile)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const panelRef = useRef<HTMLElement>(null)
+  const close = useCallback(() => {
+    if (busy) return
+    setError(null)
+    onClose()
+  }, [busy, onClose])
+
+  useEffect(() => {
+    if (open) return
+    setDraft(profile)
+    setError(null)
+    setBusy(false)
+  }, [open, profile])
+
+  useModalLayer({ onClose: close, open, panelRef, triggerRef })
+
+  const save = async () => {
+    if (busy || saveDisabledReason !== null) return
+    const validationError = getPlayerNameValidationError(draft.name)
+    if (validationError !== null) {
+      setError(validationError)
+      return
+    }
+
+    setBusy(true)
+    setError(null)
+    try {
+      await onSave(draft)
+      onClose()
+    } catch (saveError) {
+      const message = onSaveError === undefined
+        ? '保存资料失败，请重试。'
+        : onSaveError(saveError)
+      if (message !== null) setError(message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!open) return null
+
+  return (
+    <>
+      <button
+        aria-label="关闭用户中心"
+        className={`fixed inset-0 z-[109] cursor-default bg-slate-950/55 ${panelPlacement === 'responsive' ? 'sm:bg-transparent' : ''}`}
+        disabled={busy}
+        onClick={close}
+        type="button"
+      />
+      <PlayerProfilePanel
+        busy={busy}
+        draft={draft}
+        error={error}
+        locked={locked}
+        onAvatarChange={(avatarID) => setDraft((current) => ({ ...current, avatarID }))}
+        onClose={close}
+        onNameChange={(name) => {
+          setDraft((current) => ({ ...current, name }))
+          setError(null)
+        }}
+        onRandomize={() => {
+          setDraft(createRandomPlayerProfile())
+          setError(null)
+        }}
+        onSave={() => void save()}
+        placement={panelPlacement}
+        panelRef={panelRef}
+        saveDisabledReason={saveDisabledReason}
+      />
+    </>
+  )
+}
+
 export function PlayerProfilePanel({
+  busy = false,
   draft,
   error,
   locked,
@@ -119,7 +182,9 @@ export function PlayerProfilePanel({
   onSave,
   placement = 'responsive',
   panelRef,
+  saveDisabledReason = null,
 }: {
+  busy?: boolean
   draft: PlayerProfile
   error: string | null
   locked: boolean
@@ -130,6 +195,7 @@ export function PlayerProfilePanel({
   onSave: () => void
   placement?: 'bottom-sheet' | 'responsive'
   panelRef?: Ref<HTMLElement>
+  saveDisabledReason?: string | null
 }) {
   return (
     <section
@@ -148,6 +214,7 @@ export function PlayerProfilePanel({
         <button
           aria-label="关闭用户中心"
           className="grid min-h-11 min-w-11 place-items-center rounded-lg text-slate-400 transition hover:bg-white/10 hover:text-white"
+          disabled={busy}
           onClick={onClose}
           type="button"
         >
@@ -177,6 +244,7 @@ export function PlayerProfilePanel({
             <input
               aria-invalid={error !== null}
               className="mt-2 min-h-11 w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2 text-white outline-none transition focus:border-amber-300/70 focus:ring-2 focus:ring-amber-300/15"
+              disabled={busy}
               maxLength={24}
               name="player-profile-name"
               onChange={(event) => onNameChange(event.target.value)}
@@ -194,6 +262,7 @@ export function PlayerProfilePanel({
                   aria-pressed={avatarID === draft.avatarID}
                   className={`grid aspect-square place-items-center overflow-hidden rounded-xl border p-1.5 transition ${avatarID === draft.avatarID ? 'border-amber-200 bg-amber-300/15 shadow-lg shadow-amber-300/10' : 'border-white/10 bg-slate-900 hover:border-white/30'}`}
                   data-avatar-option={avatarID}
+                  disabled={busy}
                   key={avatarID}
                   onClick={() => onAvatarChange(avatarID)}
                   type="button"
@@ -207,6 +276,7 @@ export function PlayerProfilePanel({
           <div className="mt-5 grid grid-cols-2 gap-2">
             <button
               className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/15 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/35 hover:text-white"
+              disabled={busy}
               onClick={onRandomize}
               type="button"
             >
@@ -215,12 +285,17 @@ export function PlayerProfilePanel({
             </button>
             <button
               className="min-h-11 rounded-xl bg-amber-300 px-3 py-2 text-sm font-semibold text-slate-950 transition hover:bg-amber-200"
+              data-profile-save="true"
+              disabled={busy || saveDisabledReason !== null}
               onClick={onSave}
               type="button"
             >
-              保存资料
+              {busy ? '保存中…' : '保存资料'}
             </button>
           </div>
+          {saveDisabledReason !== null && (
+            <p className="mt-3 text-sm text-amber-100">{saveDisabledReason}</p>
+          )}
         </>
       )}
 

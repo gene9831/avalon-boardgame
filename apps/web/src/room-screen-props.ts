@@ -358,6 +358,7 @@ export interface RoomActionsByKind {
 
   lobby: Readonly<{
     onActivatePlayer(playerID: PlayerID): void
+    onEditProfile(trigger: HTMLButtonElement): void
     onStart(): void
   }>
 

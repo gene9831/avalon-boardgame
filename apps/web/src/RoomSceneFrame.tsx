@@ -31,6 +31,7 @@ export interface RoomSceneFrameProps {
   content: RoomSceneContent
   geometry: RoomScreenGeometry
   onActivatePlayer?: (playerID: RoomPlayerPresentation['playerID']) => void
+  onEditCurrentPlayerProfile?: (trigger: HTMLButtonElement) => void
   scene: RoomSceneFrameScene
   slots: RoomScreenSlots
 }
@@ -39,6 +40,7 @@ export function RoomSceneFrame({
   content,
   geometry,
   onActivatePlayer,
+  onEditCurrentPlayerProfile,
   scene,
   slots,
 }: RoomSceneFrameProps) {
@@ -61,6 +63,7 @@ export function RoomSceneFrame({
         <RoomPlayerSeat
           layout={layout}
           onActivate={() => onActivatePlayer?.(player.playerID)}
+          onEditProfile={player.isCurrentPlayer ? onEditCurrentPlayerProfile : undefined}
           player={player}
         />
       )}
