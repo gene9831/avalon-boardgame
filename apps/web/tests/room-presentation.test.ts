@@ -80,9 +80,9 @@ describe('room player presentation', () => {
     }
 
     expect(buildRoomTeamTokens(room, ['2', '0', '1'])).toEqual([
-      { playerID: '0', seatNumber: 1, name: 'Alice', avatarID: 'assassin' },
-      { playerID: '1', seatNumber: 2, name: 'Bob', avatarID: 'merlin' },
-      { playerID: '2', seatNumber: 3, name: 'Caro', avatarID: 'percival' },
+      { playerID: '0', seatNumber: 1, name: 'Alice' },
+      { playerID: '1', seatNumber: 2, name: 'Bob' },
+      { playerID: '2', seatNumber: 3, name: 'Caro' },
     ])
   })
 

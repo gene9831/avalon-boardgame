@@ -92,7 +92,7 @@ describe('RoomTeamProposalScene', () => {
     }))
 
     expect(html).toContain('预选队伍 · 1 / 3')
-    expect(html).toContain('aria-label="1 号座位：Alice"')
+    expect(html).toContain('aria-label="取消选择 1 号座位：Alice"')
     expect(html.match(/data-team-token-placeholder="true"/g)).toHaveLength(2)
     expect(html).not.toContain('需要 3 名队员')
   })
@@ -123,7 +123,7 @@ describe('RoomTeamProposalScene', () => {
     expect(html).toContain('>确认队伍</button>')
     expect(html).not.toContain('正在确认')
     expect(html).not.toContain('<button aria-label="选择 Alice 加入任务队伍')
-    expect(html).toMatch(/aria-label="1 号座位：Alice"[^>]*disabled=""/)
+    expect(html).toMatch(/aria-label="取消选择 1 号座位：Alice"[^>]*disabled=""/)
   })
 
   it('normalizes observer seats to non-actionable groups and removes the bottom action', () => {

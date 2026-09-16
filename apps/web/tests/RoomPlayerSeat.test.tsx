@@ -194,10 +194,12 @@ describe('RoomPlayerSeat', () => {
     expect(html).toContain('data-seat-decoration="selected"')
     expect(html).toMatch(/<svg[^>]*fill="#0f172a"[^>]*class="lucide lucide-circle-check"/)
     expect(html).toMatch(/data-seat-decoration="leader"[^>]*>.*lucide-crown/s)
-    expect(html).toContain('data-nameplate-emphasis="cyan"')
+    expect(html).toContain('data-nameplate-emphasis="gold"')
+    expect(html).toContain('data-seat-decoration="quest-member"')
+    expect(html).toMatch(/data-seat-decoration="quest-member"[^>]*>任务</)
   })
 
-  it('gives submitted quest members the same cyan nameplate emphasis', () => {
+  it('gives submitted quest members a gold ring and visible task badge', () => {
     const html = renderToStaticMarkup(
       <RoomPlayerSeat layout={layout} onActivate={vi.fn()} player={{
         ...player, emphasis: 'questMember', markers: [{ kind: 'questMember' }],
@@ -205,9 +207,10 @@ describe('RoomPlayerSeat', () => {
     )
 
     expect(html).toContain('data-avatar-state="quest-member"')
-    expect(html).toContain('data-nameplate-emphasis="cyan"')
+    expect(html).toContain('data-nameplate-emphasis="gold"')
     expect(html).toContain('aria-label="1. Alice，任务队员"')
-    expect(html).not.toContain('data-seat-decoration="quest-member"')
+    expect(html).toContain('data-seat-decoration="quest-member"')
+    expect(html).toMatch(/data-seat-decoration="quest-member"[^>]*>任务</)
   })
 
   it('renders a non-button group when the seat has no interaction', () => {

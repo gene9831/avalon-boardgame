@@ -65,7 +65,7 @@ select {
 .room-seat__empty-action:focus-visible .room-seat__avatar--empty { border-color: rgb(226 232 240 / 72%); color: #e2e8f0; background: rgb(30 41 59 / 58%); }
 .room-seat__empty-action:focus-visible { outline: 2px solid #e2e8f0; outline-offset: 2px; }
 .room-seat__avatar[data-avatar-state='selected'],
-.room-seat__avatar[data-avatar-state='quest-member'] { border-color: #cffafe; box-shadow: 0 0 26px rgb(34 211 238 / 70%); }
+.room-seat__avatar[data-avatar-state='quest-member'] { border-color: #fcd34d; box-shadow: 0 0 26px rgb(245 158 11 / 62%); animation: room-task-member-emphasis 180ms ease-out both; }
 .room-seat__avatar[data-avatar-state='target'] { border-color: #fecdd3; box-shadow: 0 0 26px rgb(251 113 133 / 70%); }
 .room-seat__avatar[data-avatar-state='known-evil'] { border-color: #be123c; box-shadow: 0 0 24px rgb(127 29 29 / 65%); }
 .room-seat__avatar[data-avatar-state='merlin-candidate'] {
@@ -94,7 +94,7 @@ select {
   line-height: 1.1;
   box-shadow: 0 5px 12px rgb(0 0 0 / 40%);
 }
-.room-seat__name[data-nameplate-emphasis='cyan'] { border-color: rgb(103 232 249 / 62%); box-shadow: 0 0 12px rgb(34 211 238 / 30%), 0 5px 12px rgb(0 0 0 / 40%); }
+.room-seat__name[data-nameplate-emphasis='gold'] { border-color: rgb(252 211 77 / 72%); box-shadow: 0 0 12px rgb(245 158 11 / 28%), 0 5px 12px rgb(0 0 0 / 40%); }
 .room-seat__decoration {
   position: absolute;
   z-index: 4;
@@ -112,8 +112,9 @@ select {
 .room-seat__decoration[data-seat-decoration='leader'] { left: 50%; top: -0.75rem; width: 1.5rem; height: 1.5rem; color: #fcd34d; transform: translateX(-50%); }
 .room-seat__decoration[data-seat-decoration='leader'] svg { width: 1.15rem; height: 1.15rem; }
 .room-seat__decoration[data-seat-decoration='leader'] svg path:last-child { display: none; }
-.room-seat__decoration[data-seat-decoration='vote'] { right: -0.3rem; bottom: -0.3rem; color: #e2e8f0; background: #0f172a; }
+.room-seat__decoration[data-seat-decoration='vote'] { left: -0.3rem; bottom: -0.3rem; color: #e2e8f0; background: #0f172a; }
 .room-seat__decoration[data-seat-decoration='selected'] { right: -0.3rem; top: -0.3rem; color: #67e8f9; }
+.room-seat__decoration[data-seat-decoration='quest-member'] { right: -0.55rem; bottom: -0.35rem; width: auto; min-width: 1.75rem; height: 1.125rem; padding-inline: 0.25rem; border: 1px solid rgb(254 243 199 / 72%); border-radius: 9999px; color: #0f172a; background: #fcd34d; font-size: 0.75rem; font-weight: 800; line-height: 1; box-shadow: 0 2px 6px rgb(0 0 0 / 35%); }
 .room-seat__decoration[data-seat-decoration='assassination-target'] { left: -0.3rem; bottom: -0.3rem; color: #fecdd3; background: #881337; }
 .room-seat:focus-visible { outline: none; }
 .room-seat:focus-visible .room-seat__avatar,
@@ -125,19 +126,34 @@ select {
 .room-seat__identity-action:hover { box-shadow: inset 0 0 0 2px rgb(254 243 199 / 72%); }
 .room-seat__identity-action:focus-visible { outline: 2px solid #fef3c7; outline-offset: 2px; }
 
-.room-team-tokens { display: flex; width: fit-content; max-width: 100%; flex-direction: column; align-items: center; gap: 0.5rem; }
-.room-team-token-row { display: flex; justify-content: center; gap: 0.5rem; }
-.room-team-token { position: relative; display: grid; width: 2.5rem; height: 2.5rem; padding: 0; place-items: center; overflow: visible; border: 1px solid rgb(216 198 159 / 70%); border-radius: 9999px; color: #f8fafc; background: #efe3c6; box-shadow: 0 3px 8px rgb(0 0 0 / 35%); }
+.room-team-tokens { display: flex; width: 11rem; max-width: 100%; flex-direction: column; align-items: stretch; gap: 0.25rem; }
+.room-team-token { position: relative; display: grid; min-width: 0; min-height: 1.625rem; grid-template-columns: 1.5rem minmax(0, 1fr) 1rem; align-items: center; overflow: hidden; padding: 0.125rem 0.375rem; border: 1px solid rgb(216 198 159 / 72%); border-radius: 0.5rem; color: #f8fafc; background: rgb(15 23 42 / 78%); box-shadow: 0 3px 8px rgb(0 0 0 / 25%); font-size: 0.75rem; line-height: 1rem; text-align: left; animation: room-team-member-emphasis 180ms ease-out both; }
+.room-team-tokens[data-team-token-state='preview'] .room-team-token { border-style: dashed; }
+.room-team-tokens[data-team-token-state='confirmed'] .room-team-token { border-style: solid; }
 button.room-team-token { cursor: pointer; }
 button.room-team-token:disabled { cursor: default; opacity: 0.55; }
-.room-team-token__avatar { display: grid; width: 100%; height: 100%; place-items: center; overflow: hidden; border-radius: inherit; }
+.room-team-token__seat { display: grid; width: 1.25rem; height: 1.25rem; place-items: center; border: 1px solid rgb(255 255 255 / 25%); border-radius: 9999px; color: #fde68a; background: rgb(2 6 23 / 80%); font-weight: 700; line-height: 1; }
+.room-team-token__name { min-width: 0; overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.room-team-token__remove { color: #fde68a; font-size: 1rem; line-height: 1; text-align: center; }
 .room-seat-number-badge[data-numeric-text='true'] { position: absolute; top: -0.1rem; left: -0.4rem; display: grid; min-width: 0.875rem; height: 0.875rem; padding-inline: 0.1rem; place-items: center; border: 1px solid rgb(255 255 255 / 35%); border-radius: 9999px; color: #f8fafc; background: rgb(15 23 42 / 88%); font: 600 0.625rem/1 Inter, ui-sans-serif, system-ui, sans-serif; }
 @container room-seat-decorations (max-width: 40px) {
   .room-seat__decoration[data-seat-decoration='leader'] { left: 55%; top: -0.65rem; width: 1.1rem; height: 1.1rem; }
   .room-seat__decoration[data-seat-decoration='leader'] svg { width: 0.8rem; height: 0.8rem; }
 }
-.room-team-token--placeholder { border-style: dashed; border-color: rgb(216 198 159 / 50%); color: #d6c69f; background: rgb(15 23 42 / 30%); font: 400 1.5rem/1 var(--font-avalon-serif); }
-@media (prefers-reduced-motion: reduce) { .room-team-token { scroll-behavior: auto; } }
+.room-team-token--placeholder { border-color: rgb(216 198 159 / 45%); color: #d6c69f; background: rgb(15 23 42 / 30%); }
+@keyframes room-team-member-emphasis {
+  from { opacity: 0.65; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes room-task-member-emphasis {
+  from { transform: scale(0.94); }
+  to { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .room-team-token,
+  .room-seat__avatar[data-avatar-state='selected'],
+  .room-seat__avatar[data-avatar-state='quest-member'] { animation: none; }
+}
 
 .room-layout-diagnostics {
   position: absolute;

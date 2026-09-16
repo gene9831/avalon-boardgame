@@ -1,14 +1,9 @@
 import type { PlayerID } from '@avalon/game'
 
-import { PlayerAvatar } from './player-avatars'
-import { RoomSeatNumberBadge } from './RoomSeatNumberBadge'
-import type { PlayerAvatarID } from './player-profile'
-
 export type RoomTeamToken = Readonly<{
   playerID: PlayerID
   seatNumber: number
   name: string
-  avatarID: PlayerAvatarID
 }>
 
 export interface RoomTeamTokensProps {
@@ -17,10 +12,6 @@ export interface RoomTeamTokensProps {
   state: 'preview' | 'confirmed'
   disabled?: boolean
   onActivatePlayer?: (playerID: PlayerID) => void
-}
-
-function layoutForTokenCount(count: number): 'single-row' | 'three-two' {
-  return count <= 3 ? 'single-row' : 'three-two'
 }
 
 function tokenLabel(token: RoomTeamToken) {
@@ -37,34 +28,27 @@ export function RoomTeamTokens({
   const placeholderCount = state === 'preview'
     ? Math.max(0, requiredTeamSize - tokens.length)
     : 0
-  const layout = layoutForTokenCount(tokens.length + placeholderCount)
+  const interactive = state === 'preview' && onActivatePlayer !== undefined
   const tokenElements = tokens.map((token) => {
     const label = tokenLabel(token)
     const content = (
       <>
-        <span className="room-team-token__avatar" aria-hidden="true">
-          <PlayerAvatar avatarID={token.avatarID} className="size-full object-contain p-[12%]" />
+        <span aria-hidden="true" className="room-team-token__seat" data-team-member-seat="true">
+          {token.seatNumber}
         </span>
-        <RoomSeatNumberBadge seatNumber={token.seatNumber} />
+        <span className="room-team-token__name" data-team-member-name="true">
+          {token.name}
+        </span>
+        {interactive && <span aria-hidden="true" className="room-team-token__remove">×</span>}
       </>
     )
 
-    return onActivatePlayer === undefined ? (
-      <span
-        aria-label={label}
-        className="room-team-token"
-        data-team-token="filled"
-        key={token.playerID}
-        role="listitem"
-        title={label}
-      >
-        {content}
-      </span>
-    ) : (
+    return interactive ? (
       <button
-        aria-label={label}
+        aria-label={`取消选择 ${label}`}
         className="room-team-token"
         data-team-token="filled"
+        data-team-token-row="true"
         disabled={disabled}
         key={token.playerID}
         onClick={() => onActivatePlayer(token.playerID)}
@@ -73,6 +57,18 @@ export function RoomTeamTokens({
       >
         {content}
       </button>
+    ) : (
+      <span
+        aria-label={label}
+        className="room-team-token"
+        data-team-token="filled"
+        data-team-token-row="true"
+        key={token.playerID}
+        role="listitem"
+        title={label}
+      >
+        {content}
+      </span>
     )
   })
   const placeholderElements = Array.from({ length: placeholderCount }, (_, index) => (
@@ -80,34 +76,24 @@ export function RoomTeamTokens({
       aria-hidden="true"
       className="room-team-token room-team-token--placeholder"
       data-team-token-placeholder="true"
+      data-team-token-row="true"
       key={`placeholder-${index}`}
     >
-      +
+      <span aria-hidden="true" className="room-team-token__seat">+</span>
+      <span className="room-team-token__name">待选择</span>
     </span>
   ))
   const elements = [...tokenElements, ...placeholderElements]
-  const rows = layout === 'single-row'
-    ? [elements]
-    : [elements.slice(0, 3), elements.slice(3)]
 
   return (
     <div
       aria-label={`任务队伍：${tokens.length} / ${requiredTeamSize}`}
       className="room-team-tokens"
-      data-team-token-layout={layout}
+      data-team-token-layout="vertical"
       data-team-token-state={state}
-      role={onActivatePlayer === undefined ? 'list' : 'group'}
+      role={interactive ? 'group' : 'list'}
     >
-      {rows.map((row, index) => (
-        <div
-          className="room-team-token-row"
-          data-team-token-row-size={row.length}
-          key={`row-${index}`}
-          role="presentation"
-        >
-          {row}
-        </div>
-      ))}
+      {elements}
     </div>
   )
 }
