@@ -95,6 +95,10 @@ describe('RoomIdentityConfirmationScene', () => {
     const html = renderScene('revealed')
 
     expect(html).toContain('data-identity-role-artwork="merlin"')
+    expect(html).toContain('src="./images/roles/merlin-752.webp"')
+    expect(html).toContain('./images/roles/merlin-320.webp 320w')
+    expect(html).toContain('./images/roles/merlin-480.webp 480w')
+    expect(html).toContain('./images/roles/merlin-752.webp 752w')
     expect(html).toContain('梅林')
     expect(html).toContain('正义阵营')
     expect(html).toContain('你的目标')

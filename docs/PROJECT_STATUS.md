@@ -173,7 +173,9 @@
 
 ## 当前验证基线
 
-最近一次验证日期：2026-09-15
+最近一次验证日期：2026-09-16
+
+2026-09-16 随机子路径角色立绘修复：公网部署使用宿主机 nginx 随机前缀时，角色帮助与身份确认曾生成站点根路径 `/images/roles/...`，绕过 `<base href>` 和私密前缀并返回 404；现由 `role-artwork` 统一生成 `./images/roles/...`，`src` 与全部响应式 `srcset` 会复用 gateway 根据 `X-Forwarded-Prefix` 注入的文档 base path，根路径图片仍保持不可访问。永久回归完成 RED→GREEN，Web **63 files / 448 tests passed**；`@avalon/web` build、lint、typecheck 与 `git diff --check` 均 exit 0，build 仅保留 614.03 kB minified / 183.38 kB gzip chunk 超过 500 kB 的既有建议性警告。PR #34 的修复已部署到 gateway；服务器构建使用只含 Git 跟踪文件的临时上下文，未包含 `.env`、PostgreSQL `data/` 或未跟踪文件。公网验收确认域名根目录角色图片 404、随机前缀角色图片 200、健康检查 200、Socket.IO WebSocket 101；无头 Chromium 打开实际邀请页后，角色帮助中的 12 个前景/背景立绘元素全部通过部署 base path 完成加载。本轮只重建 gateway，PostgreSQL 与 server 未重建；未执行真实 5–10 台设备、多房间人工隔离、PostgreSQL 重启或凭据重连验收。
 
 2026-09-15 PR #32 CI 稳定性修复：身份辨认 Playwright 不再查找已由统一座位表现移除的 `data-known-player-info` 图标，改为同时验证 Merlin 回看知识时存在 2 个 `known-evil` 头像边框和 2 个“邪恶”文本标签。UI Layout Lab 的确认视口正确性用例继续执行真实圆桌求解，仅将该组 CPU 密集型用例的局部超时从 Vitest 默认 5 秒提高到 15 秒；生产求解器与全局测试配置不变。身份专项 Playwright **1/1 passed**，UI Layout Lab **2 files / 67 tests passed**，完整 `pnpm test` 共 **798 passed**；`pnpm build`、`pnpm lint`、`pnpm typecheck` 与 `git diff --check` 均 exit 0。Playwright 仅出现既有 `NO_COLOR`/`FORCE_COLOR` Node 警告，Web build 仅保留 614.06 kB minified / 183.38 kB gzip chunk 超过 500 kB 的建议性警告；测试生成的 `test-results` 已删除。
 

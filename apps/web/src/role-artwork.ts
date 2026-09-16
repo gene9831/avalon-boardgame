@@ -15,8 +15,12 @@ export const ROLE_ARTWORK: Readonly<Record<Role, RoleArtworkSource>> = {
   percival: { height: 1127, slug: 'percival', width: 752 },
 }
 
+export function getRoleArtworkSource(source: RoleArtworkSource, width = source.width) {
+  return `./images/roles/${source.slug}-${width}.webp`
+}
+
 export function getRoleArtworkSourceSet(source: RoleArtworkSource) {
   return [320, 480, source.width]
-    .map((width) => `/images/roles/${source.slug}-${width}.webp ${width}w`)
+    .map((width) => `${getRoleArtworkSource(source, width)} ${width}w`)
     .join(', ')
 }
