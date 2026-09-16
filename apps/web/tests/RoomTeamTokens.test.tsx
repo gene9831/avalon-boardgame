@@ -28,6 +28,7 @@ describe('RoomTeamTokens', () => {
     )
 
     expect(html).toContain('data-team-member-seat="true">1</span>')
+    expect(html.match(/data-numeric-text="true"/g)).toHaveLength(2)
     expect(html).toContain('data-team-member-name="true">Alice</span>')
     expect(html).toContain('data-team-member-seat="true">3</span>')
     expect(html).toContain('data-team-member-name="true">Caro</span>')

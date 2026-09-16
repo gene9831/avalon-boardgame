@@ -244,6 +244,89 @@ test('the create-game role option stays concise and vertically aligned on mobile
   expect(Math.max(...centers) - Math.min(...centers)).toBeLessThanOrEqual(1)
 })
 
+test('task badges stay horizontally centered on their player avatars', async ({ page }) => {
+  await page.goto('/dev/room-layout/team-vote/voter')
+  const table = page.getByLabel('5 人游戏圆桌', { exact: true })
+  await expect(table).toHaveAttribute('data-stage-layout-status', 'ready')
+
+  const badgeGeometry = await table.locator('[data-seat-decoration="quest-member"]').evaluateAll((badges) => (
+    badges.map((badge) => {
+      const avatarBounds = badge.parentElement!.getBoundingClientRect()
+      const badgeBounds = badge.getBoundingClientRect()
+      const textRange = document.createRange()
+      textRange.selectNodeContents(badge)
+      return {
+        centerOffset: Math.abs(
+          avatarBounds.left + avatarBounds.width / 2 - (badgeBounds.left + badgeBounds.width / 2),
+        ),
+        textLineCount: textRange.getClientRects().length,
+      }
+    })
+  ))
+
+  expect(badgeGeometry.length).toBeGreaterThan(0)
+  expect(Math.max(...badgeGeometry.map(({ centerOffset }) => centerOffset))).toBeLessThanOrEqual(1)
+  expect(badgeGeometry.every(({ textLineCount }) => textLineCount === 1)).toBe(true)
+})
+
+test('task member seat numbers use compact sans-serif circles with clear row inset', async ({ page }) => {
+  await page.goto('/dev/room-layout/team-vote/voter')
+  const table = page.getByLabel('5 人游戏圆桌', { exact: true })
+  await expect(table).toHaveAttribute('data-stage-layout-status', 'ready')
+
+  const seatNumbers = await table.locator('[data-team-member-seat="true"]').evaluateAll((seats) => (
+    seats.map((seat) => {
+      const seatBounds = seat.getBoundingClientRect()
+      const rowBounds = seat.parentElement!.getBoundingClientRect()
+      const styles = getComputedStyle(seat)
+      return {
+        diameter: seatBounds.width,
+        fontFamily: styles.fontFamily,
+        verticalInset: Math.min(seatBounds.top - rowBounds.top, rowBounds.bottom - seatBounds.bottom),
+      }
+    })
+  ))
+
+  expect(seatNumbers.length).toBeGreaterThan(0)
+  expect(seatNumbers.every(({ diameter }) => diameter <= 16.5)).toBe(true)
+  expect(seatNumbers.every(({ fontFamily }) => fontFamily.startsWith('Inter'))).toBe(true)
+  expect(seatNumbers.every(({ verticalInset }) => verticalInset >= 4)).toBe(true)
+})
+
+test('task member names use the shared sans-serif interface font', async ({ page }) => {
+  await page.goto('/dev/room-layout/team-vote/voter')
+  const table = page.getByLabel('5 人游戏圆桌', { exact: true })
+  await expect(table).toHaveAttribute('data-stage-layout-status', 'ready')
+
+  const fontFamilies = await table.locator('[data-team-member-name="true"]').evaluateAll((names) => (
+    names.map((name) => getComputedStyle(name).fontFamily)
+  ))
+
+  expect(fontFamilies.length).toBeGreaterThan(0)
+  expect(fontFamilies.every((fontFamily) => fontFamily.startsWith('Inter'))).toBe(true)
+})
+
+test('confirmed task member rows use the outer nameplate maximum without a trailing action gap', async ({ page }) => {
+  await page.goto('/dev/room-layout/team-vote/voter')
+  const table = page.getByLabel('5 人游戏圆桌', { exact: true })
+  await expect(table).toHaveAttribute('data-stage-layout-status', 'ready')
+
+  const geometry = await table.locator('[data-team-token-layout="vertical"]').evaluate((list) => {
+    const row = list.querySelector<HTMLElement>('[data-team-token-row="true"]')!
+    const name = row.querySelector<HTMLElement>('[data-team-member-name="true"]')!
+    const listBounds = list.getBoundingClientRect()
+    const rowBounds = row.getBoundingClientRect()
+    const nameBounds = name.getBoundingClientRect()
+    return {
+      listWidth: listBounds.width,
+      nameTrailingInset: rowBounds.right - nameBounds.right,
+    }
+  })
+
+  expect.soft(geometry.listWidth).toBeCloseTo(112, 1)
+  expect.soft(geometry.nameTrailingInset).toBeLessThanOrEqual(8)
+})
+
 test('empty-seat actions expose their full 44px pointer target and remain keyboard operable', async ({
   browser,
 }) => {

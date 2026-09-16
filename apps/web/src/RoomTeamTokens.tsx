@@ -33,7 +33,7 @@ export function RoomTeamTokens({
     const label = tokenLabel(token)
     const content = (
       <>
-        <span aria-hidden="true" className="room-team-token__seat" data-team-member-seat="true">
+        <span aria-hidden="true" className="room-team-token__seat" data-numeric-text="true" data-team-member-seat="true">
           {token.seatNumber}
         </span>
         <span className="room-team-token__name" data-team-member-name="true">
