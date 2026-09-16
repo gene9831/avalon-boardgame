@@ -11,6 +11,8 @@ import {
   type AvalonJoinRoomRequest,
   type AvalonLobbyErrorCode,
   type AvalonLobbyState,
+  type AvalonPlayerProfileUpdateRequest,
+  type AvalonPlayerProfileUpdateResponse,
   type AvalonRoleConfiguration,
   type AvalonRoomSessionResponse,
   type AvalonSeatID,
@@ -34,6 +36,7 @@ interface RoomLobbyDependencies {
   deletionGuard: MatchDeletionGuard
   disconnectPlayer(matchID: string, playerID: string): void
   disconnectMatch(matchID: string): void
+  broadcastMatchData(matchID: string, metadata: Server.MatchData): void
   now?: () => number
   createID?: () => string
   createCredential?: () => string
@@ -64,6 +67,12 @@ export interface RoomLobbyService {
     credential: string,
     targetPlayerID: string,
   ): Promise<AvalonRoomSessionResponse>
+  updatePlayerProfile(
+    matchID: string,
+    playerID: string,
+    credential: string,
+    request: AvalonPlayerProfileUpdateRequest,
+  ): Promise<AvalonPlayerProfileUpdateResponse>
   prepareStart(
     matchID: string,
     playerID: string,
@@ -236,6 +245,12 @@ function readClientID(data: unknown) {
   if (typeof data !== 'object' || data === null) return undefined
   const value = (data as Record<string, unknown>).clientID
   return typeof value === 'string' ? value : undefined
+}
+
+function recordData(data: unknown): Record<string, unknown> {
+  return typeof data === 'object' && data !== null
+    ? data as Record<string, unknown>
+    : {}
 }
 
 function sessionResponse(
@@ -432,6 +447,45 @@ export function createRoomLobbyService(
       )
       dependencies.disconnectPlayer(matchID, sourcePlayerID)
       return result
+    },
+
+    async updatePlayerProfile(matchID, playerID, credential, request) {
+      return dependencies.queues.getMatchQueue(matchID).add(async () => {
+        const result = await mutate<{
+          profile: AvalonPlayerProfileUpdateResponse
+          metadata: Server.MatchData
+        }>(matchID, ({ state, metadata }) => {
+          const normalizedPlayerID = AvalonSeatIDSchema.safeParse(playerID)
+          if (!normalizedPlayerID.success) throw invalidSeatSession()
+          const G = state.G as PersistedAvalonG
+          const lobby = normalizeLobbyAuthority(G, metadata)
+          const authenticatedPlayer = authenticatePlayer(
+            metadata,
+            normalizedPlayerID.data,
+            credential,
+          )
+          if (!lobby.occupiedPlayerIDs.includes(normalizedPlayerID.data)) {
+            throw invalidSeatSession()
+          }
+
+          metadata.players[Number(normalizedPlayerID.data)] = {
+            ...authenticatedPlayer,
+            name: request.playerName,
+            data: {
+              ...recordData(authenticatedPlayer.data),
+              avatarID: request.data.avatarID,
+            },
+          }
+          G.players[normalizedPlayerID.data] = { name: request.playerName }
+          return {
+            state: { ...state, G: G as AvalonG },
+            metadata: withUpdatedAt(metadata, now()),
+            result: { profile: request, metadata },
+          }
+        })
+        dependencies.broadcastMatchData(matchID, result.metadata)
+        return result.profile
+      })
     },
 
     async prepareStart(matchID, playerID, credential) {

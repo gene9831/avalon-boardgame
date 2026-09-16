@@ -83,6 +83,16 @@ export const AvalonSeatChangeRequestSchema = z.object({
   targetPlayerID: AvalonSeatIDSchema,
 }).strict()
 
+export const AvalonPlayerProfileUpdateRequestSchema = z.object({
+  playerName: AvalonPlayerNameSchema,
+  data: z.object({
+    avatarID: AvalonPlayerAvatarIDSchema,
+  }).strict(),
+}).strict()
+
+export const AvalonPlayerProfileUpdateResponseSchema =
+  AvalonPlayerProfileUpdateRequestSchema
+
 export const AvalonRoomSessionResponseSchema = z.object({
   matchID: AvalonMatchIDSchema,
   playerID: AvalonSeatIDSchema,
@@ -142,6 +152,12 @@ export type AvalonPlayerAvatarID = z.infer<typeof AvalonPlayerAvatarIDSchema>
 export type AvalonCreateRoomRequest = z.infer<typeof AvalonCreateRoomRequestSchema>
 export type AvalonJoinRoomRequest = z.infer<typeof AvalonJoinRoomRequestSchema>
 export type AvalonSeatChangeRequest = z.infer<typeof AvalonSeatChangeRequestSchema>
+export type AvalonPlayerProfileUpdateRequest = z.infer<
+  typeof AvalonPlayerProfileUpdateRequestSchema
+>
+export type AvalonPlayerProfileUpdateResponse = z.infer<
+  typeof AvalonPlayerProfileUpdateResponseSchema
+>
 export type AvalonRoomSessionResponse = z.infer<
   typeof AvalonRoomSessionResponseSchema
 >
@@ -177,6 +193,14 @@ export function parseAvalonJoinRoomRequest(value: unknown) {
 
 export function parseAvalonSeatChangeRequest(value: unknown) {
   return AvalonSeatChangeRequestSchema.parse(value)
+}
+
+export function parseAvalonPlayerProfileUpdateRequest(value: unknown) {
+  return AvalonPlayerProfileUpdateRequestSchema.parse(value)
+}
+
+export function parseAvalonPlayerProfileUpdateResponse(value: unknown) {
+  return AvalonPlayerProfileUpdateResponseSchema.parse(value)
 }
 
 export function parseAvalonRoomSessionResponse(value: unknown) {

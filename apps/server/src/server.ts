@@ -274,6 +274,8 @@ export function createAvalonServer(options: AvalonServerOptions = {}) {
     disconnectPlayer: (matchID, playerID) =>
       registry.disconnectPlayer(matchID, playerID),
     disconnectMatch: (matchID) => registry.disconnectMatch(matchID),
+    broadcastMatchData: (matchID, metadata) =>
+      registry.broadcastMatchData(matchID, metadata),
   })
   registerDevAdminRoutes(boardgame.router, {
     config,

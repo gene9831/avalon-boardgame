@@ -4,6 +4,7 @@ import {
   AvalonJoinRoomRequestSchema,
   parseAvalonCreateRoomRequest,
   parseAvalonJoinRoomRequest,
+  parseAvalonPlayerProfileUpdateRequest,
   parseAvalonRoomDetail,
   parseAvalonSeatChangeRequest,
 } from '../src/room-api'
@@ -57,6 +58,20 @@ describe('Avalon room API contracts', () => {
     expect(parseAvalonSeatChangeRequest({ targetPlayerID: '0' })).toEqual({
       targetPlayerID: '0',
     })
+  })
+
+  it('parses only the mutable public player profile', () => {
+    expect(parseAvalonPlayerProfileUpdateRequest({
+      playerName: '  Ａlice  ',
+      data: { avatarID: 'morgana' },
+    })).toEqual({
+      playerName: 'Ａlice',
+      data: { avatarID: 'morgana' },
+    })
+    expect(() => parseAvalonPlayerProfileUpdateRequest({
+      playerName: 'Alice',
+      data: { avatarID: 'merlin', clientID: 'must-not-change' },
+    })).toThrow()
   })
 
   it.each([

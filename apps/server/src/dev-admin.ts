@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-import type { StorageAPI } from 'boardgame.io'
+import type { Server as BoardgameServer, StorageAPI } from 'boardgame.io'
 
 import { AvalonSeatIDSchema, type AvalonG } from '@avalon/game'
 
@@ -20,6 +20,7 @@ type SocketLike = {
   id: string
   conn?: { close(): void }
   disconnect(close?: boolean): void
+  emit(event: string, ...args: unknown[]): boolean
   listeners(event: string): SocketListener[]
   on(event: string, listener: SocketListener): void
   removeListener(event: string, listener: SocketListener): void
@@ -89,6 +90,18 @@ export class AvalonSocketRegistry {
 
   disconnectPlayer(matchID: string, playerID: string) {
     this.disconnectWhere((entry) => entry.matchID === matchID && entry.playerID === playerID)
+  }
+
+  broadcastMatchData(matchID: string, metadata: BoardgameServer.MatchData) {
+    const publicPlayers = Object.values(metadata.players).map((player) => {
+      const { credentials: _credentials, ...publicPlayer } = player
+      return publicPlayer
+    })
+    for (const entry of this.sockets.values()) {
+      if (entry.matchID === matchID) {
+        entry.socket.emit('matchData', matchID, publicPlayers)
+      }
+    }
   }
 
   private disconnectWhere(predicate: (entry: { matchID: string; playerID: string }) => boolean) {
