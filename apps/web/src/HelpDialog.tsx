@@ -16,7 +16,11 @@ import {
 import type { HelpTab } from './help-context'
 import { ModalDialog } from './ModalDialog'
 import { ROLE_GUIDANCE } from './role-guidance'
-import { getRoleArtworkSourceSet, ROLE_ARTWORK } from './role-artwork'
+import {
+  getRoleArtworkSource,
+  getRoleArtworkSourceSet,
+  ROLE_ARTWORK,
+} from './role-artwork'
 import { LOYALTY_LABELS, ROLE_LABELS } from './room-game'
 
 const tabs: readonly { id: HelpTab; label: string }[] = [
@@ -305,7 +309,7 @@ function HelpRoleArtwork({ role }: { role: Role }) {
   const artwork = ROLE_ARTWORK[role]
   const className = 'relative isolate w-[5.5rem] overflow-hidden rounded-xl border border-white/15 bg-slate-950/35 sm:aspect-[4/3] sm:w-auto'
 
-  const src = `/images/roles/${artwork.slug}-${artwork.width}.webp`
+  const src = getRoleArtworkSource(artwork)
   const srcSet = getRoleArtworkSourceSet(artwork)
 
   return (

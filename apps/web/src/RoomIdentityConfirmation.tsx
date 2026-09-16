@@ -4,7 +4,11 @@ import { loyaltyForRole } from '@avalon/game'
 import { RoomActionButton } from './RoomActionButton'
 import { RoomCenter } from './RoomCenter'
 import { ROLE_GUIDANCE } from './role-guidance'
-import { getRoleArtworkSourceSet, ROLE_ARTWORK } from './role-artwork'
+import {
+  getRoleArtworkSource,
+  getRoleArtworkSourceSet,
+  ROLE_ARTWORK,
+} from './role-artwork'
 import { LOYALTY_LABELS, ROLE_LABELS } from './room-game'
 import type {
   RoomActionsByKind,
@@ -90,7 +94,7 @@ export function RoomIdentityCardReading({
                 decoding="async"
                 height={artwork.height}
                 sizes="(orientation: portrait) min(62vw, 220px), 260px"
-                src={`/images/roles/${artwork.slug}-${artwork.width}.webp`}
+                src={getRoleArtworkSource(artwork)}
                 srcSet={getRoleArtworkSourceSet(artwork)}
                 width={artwork.width}
               />

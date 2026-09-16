@@ -75,10 +75,10 @@ describe('HelpDialog', () => {
         throw new Error(`Missing responsive artwork layers for ${role}`)
       }
       for (const image of [foregroundImage, backdropImage]) {
-        expect(image).toContain(`/images/roles/${slug}-320.webp 320w`)
-        expect(image).toContain(`/images/roles/${slug}-480.webp 480w`)
-        expect(image).toContain(`/images/roles/${slug}-${width}.webp ${width}w`)
-        expect(image).toContain(`src="/images/roles/${slug}-${width}.webp"`)
+        expect(image).toContain(`./images/roles/${slug}-320.webp 320w`)
+        expect(image).toContain(`./images/roles/${slug}-480.webp 480w`)
+        expect(image).toContain(`./images/roles/${slug}-${width}.webp ${width}w`)
+        expect(image).toContain(`src="./images/roles/${slug}-${width}.webp"`)
         expect(image).toContain(`sizes="(min-width: 1024px) 18rem, (min-width: 640px) 42vw, 5.5rem"`)
         expect(image).toContain(`width="${width}"`)
         expect(image).toContain(`height="${height}"`)
